@@ -70,3 +70,6 @@ screenshots/
 /.diag*.mjs
 /.compare*.mjs
 /.narrow*.mjs
+
+# local brand tooling
+/.venv-brand/

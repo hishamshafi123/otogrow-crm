@@ -170,6 +170,15 @@ export const PAGE_LAYOUT_WIDGET_FRAGMENT = gql`
       ... on MessageCampaignDetailsConfiguration {
         configurationType
       }
+      ... on SequenceBuilderConfiguration {
+        configurationType
+      }
+      ... on QuoteBuilderConfiguration {
+        configurationType
+      }
+      ... on PortalAccessConfiguration {
+        configurationType
+      }
       ... on FieldConfiguration {
         configurationType
         fieldDisplayMode

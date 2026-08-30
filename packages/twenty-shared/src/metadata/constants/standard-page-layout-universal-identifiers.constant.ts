@@ -44,6 +44,31 @@ export const STANDARD_PAGE_LAYOUT_UNIVERSAL_IDENTIFIERS = {
       },
     },
   },
+  otogrowAnalyticsDashboard: {
+    universalIdentifier: '20202020-d001-4d01-8d01-da5ab0a00002',
+    tabs: {
+      tab1: {
+        universalIdentifier: '20202020-d011-4d11-8d11-da5ab0a01002',
+        widgets: {
+          leadsOverTime: {
+            universalIdentifier: '20202020-d111-4d11-8d11-da5ab0a11009',
+          },
+          sequencePerformance: {
+            universalIdentifier: '20202020-d111-4d11-8d11-da5ab0a1100a',
+          },
+          leadScoreDistribution: {
+            universalIdentifier: '20202020-d111-4d11-8d11-da5ab0a1100b',
+          },
+          pipelineByStage: {
+            universalIdentifier: '20202020-d111-4d11-8d11-da5ab0a1100c',
+          },
+          whatsappSmsVolume: {
+            universalIdentifier: '20202020-d111-4d11-8d11-da5ab0a1100d',
+          },
+        },
+      },
+    },
+  },
   companyRecordPage: buildStandardObjectRecordPageLayout({
     objectUniversalIdentifier: STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS.company,
     tabs: {
@@ -53,6 +78,8 @@ export const STANDARD_PAGE_LAYOUT_UNIVERSAL_IDENTIFIERS = {
           fields: 'Fields',
           people: 'People',
           opportunities: 'Opportunities',
+          quotes: 'Quotes',
+          portalAccess: 'Client portal',
         },
       },
       timeline: {
@@ -103,6 +130,10 @@ export const STANDARD_PAGE_LAYOUT_UNIVERSAL_IDENTIFIERS = {
           company: 'Company',
           pointOfContactForOpportunities: 'Opportunities',
           listMemberships: 'Lists',
+          sequenceEnrollments: 'Sequences',
+          channelMessages: 'Messages',
+          leadScoreEvents: 'Score history',
+          quotes: 'Quotes',
         },
       },
       timeline: {
@@ -154,6 +185,7 @@ export const STANDARD_PAGE_LAYOUT_UNIVERSAL_IDENTIFIERS = {
           pointOfContact: 'Point of Contact',
           company: 'Company',
           owner: 'Owner',
+          quotes: 'Quotes',
         },
       },
       timeline: {
@@ -523,6 +555,70 @@ export const STANDARD_PAGE_LAYOUT_UNIVERSAL_IDENTIFIERS = {
         title: 'Email',
         widgets: {
           messageCampaign: 'Email',
+        },
+      },
+    },
+  }),
+  sequenceRecordPage: buildStandardObjectRecordPageLayout({
+    objectUniversalIdentifier: STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS.sequence,
+    tabs: {
+      home: {
+        title: 'Home',
+        widgets: {
+          fields: 'Fields',
+        },
+      },
+      steps: {
+        title: 'Steps',
+        widgets: {
+          sequenceBuilder: 'Steps',
+        },
+      },
+    },
+  }),
+  leadScoringRuleRecordPage: buildStandardObjectRecordPageLayout({
+    objectUniversalIdentifier:
+      STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS.leadScoringRule,
+    tabs: {
+      home: {
+        title: 'Home',
+        widgets: {
+          fields: 'Fields',
+        },
+      },
+    },
+  }),
+  quoteRecordPage: buildStandardObjectRecordPageLayout({
+    objectUniversalIdentifier: STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS.quote,
+    tabs: {
+      home: {
+        title: 'Home',
+        widgets: {
+          fields: 'Fields',
+        },
+      },
+      builder: {
+        title: 'Builder',
+        widgets: {
+          quoteBuilder: 'Builder',
+        },
+      },
+      timeline: {
+        title: 'Timeline',
+        widgets: {
+          timeline: 'Timeline',
+        },
+      },
+    },
+  }),
+  priceBookItemRecordPage: buildStandardObjectRecordPageLayout({
+    objectUniversalIdentifier:
+      STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS.priceBookItem,
+    tabs: {
+      home: {
+        title: 'Home',
+        widgets: {
+          fields: 'Fields',
         },
       },
     },

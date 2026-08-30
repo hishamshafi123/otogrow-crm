@@ -410,6 +410,9 @@ export const fromPageLayoutWidgetConfigurationToUniversalConfiguration = ({
     case WidgetConfigurationType.CALL_RECORDING_TRANSCRIPT:
     case WidgetConfigurationType.MESSAGE_CAMPAIGN_BODY:
     case WidgetConfigurationType.MESSAGE_CAMPAIGN_DETAILS:
+    case WidgetConfigurationType.SEQUENCE_BUILDER:
+    case WidgetConfigurationType.QUOTE_BUILDER:
+    case WidgetConfigurationType.PORTAL_ACCESS:
       return configuration;
   }
 };

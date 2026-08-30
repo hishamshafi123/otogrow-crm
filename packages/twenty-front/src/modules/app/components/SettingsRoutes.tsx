@@ -463,13 +463,36 @@ const SettingsDevelopersWebhookNew = lazy(() =>
     }),
   ),
 );
-
 const SettingsDevelopersWebhookDetail = lazy(() =>
   import('~/pages/settings/developers/webhooks/components/SettingsDevelopersWebhookDetail').then(
     (module) => ({
       default: module.SettingsDevelopersWebhookDetail,
     }),
   ),
+);
+
+const SettingsLeadForms = lazy(() =>
+  import('~/pages/settings/forms/SettingsLeadForms').then((module) => ({
+    default: module.SettingsLeadForms,
+  })),
+);
+
+const SettingsLeadFormNew = lazy(() =>
+  import('~/pages/settings/forms/SettingsLeadFormNew').then((module) => ({
+    default: module.SettingsLeadFormNew,
+  })),
+);
+
+const SettingsLeadFormDetail = lazy(() =>
+  import('~/pages/settings/forms/SettingsLeadFormDetail').then((module) => ({
+    default: module.SettingsLeadFormDetail,
+  })),
+);
+
+const SettingsTwilio = lazy(() =>
+  import('~/pages/settings/twilio/SettingsTwilio').then((module) => ({
+    default: module.SettingsTwilio,
+  })),
 );
 
 const SettingsObjectNewFieldSelect = lazy(() =>
@@ -960,6 +983,16 @@ export const SettingsRoutes = ({ isAdminPageEnabled }: SettingsRoutesProps) => (
           path={SettingsPath.WebhookDetail}
           element={<SettingsDevelopersWebhookDetail />}
         />
+        <Route path={SettingsPath.LeadForms} element={<SettingsLeadForms />} />
+        <Route
+          path={SettingsPath.NewLeadForm}
+          element={<SettingsLeadFormNew />}
+        />
+        <Route
+          path={SettingsPath.LeadFormDetail}
+          element={<SettingsLeadFormDetail />}
+        />
+        <Route path={SettingsPath.Twilio} element={<SettingsTwilio />} />
       </Route>
 
       <Route

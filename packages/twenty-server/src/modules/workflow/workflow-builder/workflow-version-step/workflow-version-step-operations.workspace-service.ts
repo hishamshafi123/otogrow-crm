@@ -710,6 +710,38 @@ export class WorkflowVersionStepOperationsWorkspaceService {
           },
         };
       }
+      case WorkflowActionType.SEQUENCE_ENROLL: {
+        return {
+          builtStep: {
+            ...baseStep,
+            name: 'Enroll in sequence',
+            type: WorkflowActionType.SEQUENCE_ENROLL,
+            settings: {
+              ...BASE_STEP_DEFINITION,
+              input: {
+                sequenceId: '',
+                personId: '',
+              },
+            },
+          },
+        };
+      }
+      case WorkflowActionType.SEQUENCE_UNENROLL: {
+        return {
+          builtStep: {
+            ...baseStep,
+            name: 'Unenroll from sequence',
+            type: WorkflowActionType.SEQUENCE_UNENROLL,
+            settings: {
+              ...BASE_STEP_DEFINITION,
+              input: {
+                sequenceId: '',
+                personId: '',
+              },
+            },
+          },
+        };
+      }
       default:
         throw new WorkflowVersionStepException(
           `WorkflowActionType '${type}' unknown`,

@@ -21,6 +21,8 @@ export const getActionIcon = (actionType: WorkflowActionType) => {
     case 'SEND_EMAIL':
     case 'DRAFT_EMAIL':
     case 'CREATE_CALENDAR_EVENT':
+    case 'SEQUENCE_ENROLL':
+    case 'SEQUENCE_UNENROLL':
       return CORE_ACTIONS.find((item) => item.type === actionType)?.icon;
     case 'LOGIC_FUNCTION':
       return 'IconFunction';

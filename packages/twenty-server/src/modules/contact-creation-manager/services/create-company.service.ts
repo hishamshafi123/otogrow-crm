@@ -25,7 +25,7 @@ export type CompanyToCreate = {
   createdBySource: FieldActorSource;
   createdByWorkspaceMember?: WorkspaceMemberWorkspaceEntity | null;
   createdByContext: {
-    provider: ConnectedAccountProvider;
+    provider?: ConnectedAccountProvider;
   };
 };
 

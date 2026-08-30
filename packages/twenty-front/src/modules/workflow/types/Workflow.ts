@@ -26,6 +26,8 @@ import {
   type workflowRunStatusSchema,
   type workflowRunStepStatusSchema,
   type workflowSendEmailActionSchema,
+  type workflowSequenceEnrollActionSchema,
+  type workflowSequenceUnenrollActionSchema,
   type workflowTriggerSchema,
   type workflowUpdateRecordActionSchema,
   type workflowUpsertRecordActionSchema,
@@ -76,6 +78,12 @@ export type WorkflowIteratorAction = z.infer<
 >;
 export type WorkflowAiAgentAction = z.infer<typeof workflowAiAgentActionSchema>;
 export type WorkflowEmptyAction = z.infer<typeof workflowEmptyActionSchema>;
+export type WorkflowSequenceEnrollAction = z.infer<
+  typeof workflowSequenceEnrollActionSchema
+>;
+export type WorkflowSequenceUnenrollAction = z.infer<
+  typeof workflowSequenceUnenrollActionSchema
+>;
 
 export type WorkflowAction =
   | WorkflowCodeAction
@@ -96,6 +104,8 @@ export type WorkflowAction =
   | WorkflowAiAgentAction
   | WorkflowIteratorAction
   | WorkflowDelayAction
+  | WorkflowSequenceEnrollAction
+  | WorkflowSequenceUnenrollAction
   | WorkflowEmptyAction;
 
 export type WorkflowActionType = WorkflowAction['type'];

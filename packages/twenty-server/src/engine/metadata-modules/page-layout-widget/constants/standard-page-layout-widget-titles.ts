@@ -47,4 +47,22 @@ export const getStandardPageLayoutWidgetTitles = () => [
   msg({ message: `Recipients`, context: 'pageLayoutWidget.title' }),
   msg({ message: `Summary`, context: 'pageLayoutWidget.title' }),
   msg({ message: `Transcript`, context: 'pageLayoutWidget.title' }),
+  msg({ message: `Sequences`, context: 'pageLayoutWidget.title' }),
+  msg({ message: `Steps`, context: 'pageLayoutWidget.title' }),
+  msg({ message: `Messages`, context: 'pageLayoutWidget.title' }),
+  msg({ message: `Score history`, context: 'pageLayoutWidget.title' }),
+  msg({ message: `Leads over time`, context: 'pageLayoutWidget.title' }),
+  msg({ message: `Sequence performance`, context: 'pageLayoutWidget.title' }),
+  msg({
+    message: `Lead score distribution`,
+    context: 'pageLayoutWidget.title',
+  }),
+  msg({ message: `Pipeline by stage`, context: 'pageLayoutWidget.title' }),
+  msg({
+    message: `WhatsApp & SMS volume`,
+    context: 'pageLayoutWidget.title',
+  }),
+  msg({ message: `Quotes`, context: 'pageLayoutWidget.title' }),
+  msg({ message: `Builder`, context: 'pageLayoutWidget.title' }),
+  msg({ message: `Client portal`, context: 'pageLayoutWidget.title' }),
 ];

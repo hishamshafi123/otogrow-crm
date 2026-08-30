@@ -12,7 +12,9 @@ export { STANDARD_MESSAGE_PARTICIPANT_PAGE_LAYOUT_CONFIG } from './standard-mess
 export { STANDARD_MESSAGE_LIST_PAGE_LAYOUT_CONFIG } from './standard-message-list-page-layout.config';
 export { STANDARD_MESSAGE_THREAD_PAGE_LAYOUT_CONFIG } from './standard-message-thread-page-layout.config';
 export { STANDARD_NOTE_PAGE_LAYOUT_CONFIG } from './standard-note-page-layout.config';
+export { STANDARD_LEAD_SCORING_RULE_PAGE_LAYOUT_CONFIG } from './standard-lead-scoring-rule-page-layout.config';
 export { STANDARD_OPPORTUNITY_PAGE_LAYOUT_CONFIG } from './standard-opportunity-page-layout.config';
+export { STANDARD_OTOGROW_ANALYTICS_PAGE_LAYOUT_CONFIG } from './standard-otogrow-analytics-page-layout.config';
 export {
   type StandardPageLayoutConfig,
   type StandardPageLayoutTabConfig,
@@ -23,6 +25,9 @@ export {
   type StandardRecordPageWidgetConfig,
 } from './standard-page-layout-config.type';
 export { STANDARD_PERSON_PAGE_LAYOUT_CONFIG } from './standard-person-page-layout.config';
+export { STANDARD_PRICE_BOOK_ITEM_PAGE_LAYOUT_CONFIG } from './standard-price-book-item-page-layout.config';
+export { STANDARD_QUOTE_PAGE_LAYOUT_CONFIG } from './standard-quote-page-layout.config';
+export { STANDARD_SEQUENCE_PAGE_LAYOUT_CONFIG } from './standard-sequence-page-layout.config';
 export { STANDARD_TASK_PAGE_LAYOUT_CONFIG } from './standard-task-page-layout.config';
 export { STANDARD_WORKFLOW_AUTOMATED_TRIGGER_PAGE_LAYOUT_CONFIG } from './standard-workflow-automated-trigger-page-layout.config';
 export { STANDARD_WORKFLOW_PAGE_LAYOUT_CONFIG } from './standard-workflow-page-layout.config';

@@ -15,6 +15,8 @@ import { workflowIteratorActionSchema } from './iterator-action-schema';
 import { workflowLogicFunctionActionSchema } from './logic-function-action-schema';
 import { workflowPickRecordActionSchema } from './pick-record-action-schema';
 import { workflowSendEmailActionSchema } from './send-email-action-schema';
+import { workflowSequenceEnrollActionSchema } from './sequence-enroll-action-schema';
+import { workflowSequenceUnenrollActionSchema } from './sequence-unenroll-action-schema';
 import { workflowUpdateRecordActionSchema } from './update-record-action-schema';
 import { workflowUpsertRecordActionSchema } from './upsert-record-action-schema';
 import { workflowDelayActionSchema } from './workflow-delay-action-schema';
@@ -39,4 +41,6 @@ export const workflowActionSchema = z.discriminatedUnion('type', [
   workflowIteratorActionSchema,
   workflowDelayActionSchema,
   workflowEmptyActionSchema,
+  workflowSequenceEnrollActionSchema,
+  workflowSequenceUnenrollActionSchema,
 ]);

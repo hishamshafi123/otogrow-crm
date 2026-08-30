@@ -276,6 +276,144 @@ export const STANDARD_FLAT_OBJECT_METADATA_BUILDERS_BY_OBJECT_NAME = {
       twentyStandardApplicationId,
       now,
     }),
+  channelMessage: ({
+    now,
+    workspaceId,
+    standardObjectMetadataRelatedEntityIds,
+    twentyStandardApplicationId,
+    dependencyFlatEntityMaps,
+  }: Omit<
+    CreateStandardObjectArgs<'channelMessage'>,
+    'context' | 'objectName'
+  >) =>
+    createStandardObjectFlatMetadata({
+      objectName: 'channelMessage',
+      dependencyFlatEntityMaps,
+      context: {
+        universalIdentifier:
+          STANDARD_OBJECTS.channelMessage.universalIdentifier,
+        nameSingular: 'channelMessage',
+        namePlural: 'channelMessages',
+        labelSingular: i18nLabel(
+          msg({
+            message: `Channel Message`,
+            context: 'objectMetadata.labelSingular',
+          }),
+        ),
+        labelPlural: i18nLabel(
+          msg({
+            message: `Channel Messages`,
+            context: 'objectMetadata.labelPlural',
+          }),
+        ),
+        description: i18nLabel(
+          msg({
+            message: `A WhatsApp or SMS message exchanged with a person`,
+            context: 'objectMetadata.description',
+          }),
+        ),
+        icon: 'IconMessage',
+        isSystem: true,
+        isSearchable: true,
+        isUICreatable: false,
+        labelIdentifierFieldMetadataName: 'id',
+      },
+      workspaceId,
+      standardObjectMetadataRelatedEntityIds,
+      twentyStandardApplicationId,
+      now,
+    }),
+  leadScoringRule: ({
+    now,
+    workspaceId,
+    standardObjectMetadataRelatedEntityIds,
+    twentyStandardApplicationId,
+    dependencyFlatEntityMaps,
+  }: Omit<
+    CreateStandardObjectArgs<'leadScoringRule'>,
+    'context' | 'objectName'
+  >) =>
+    createStandardObjectFlatMetadata({
+      objectName: 'leadScoringRule',
+      dependencyFlatEntityMaps,
+      context: {
+        universalIdentifier:
+          STANDARD_OBJECTS.leadScoringRule.universalIdentifier,
+        nameSingular: 'leadScoringRule',
+        namePlural: 'leadScoringRules',
+        labelSingular: i18nLabel(
+          msg({
+            message: `Lead Scoring Rule`,
+            context: 'objectMetadata.labelSingular',
+          }),
+        ),
+        labelPlural: i18nLabel(
+          msg({
+            message: `Lead Scoring Rules`,
+            context: 'objectMetadata.labelPlural',
+          }),
+        ),
+        description: i18nLabel(
+          msg({
+            message: `A rule that grants lead score points on a property match or an event`,
+            context: 'objectMetadata.description',
+          }),
+        ),
+        icon: 'IconScoreboard',
+        isSearchable: true,
+        labelIdentifierFieldMetadataName: 'name',
+      },
+      workspaceId,
+      standardObjectMetadataRelatedEntityIds,
+      twentyStandardApplicationId,
+      now,
+    }),
+  leadScoreEvent: ({
+    now,
+    workspaceId,
+    standardObjectMetadataRelatedEntityIds,
+    twentyStandardApplicationId,
+    dependencyFlatEntityMaps,
+  }: Omit<
+    CreateStandardObjectArgs<'leadScoreEvent'>,
+    'context' | 'objectName'
+  >) =>
+    createStandardObjectFlatMetadata({
+      objectName: 'leadScoreEvent',
+      dependencyFlatEntityMaps,
+      context: {
+        universalIdentifier:
+          STANDARD_OBJECTS.leadScoreEvent.universalIdentifier,
+        nameSingular: 'leadScoreEvent',
+        namePlural: 'leadScoreEvents',
+        labelSingular: i18nLabel(
+          msg({
+            message: `Lead Score Event`,
+            context: 'objectMetadata.labelSingular',
+          }),
+        ),
+        labelPlural: i18nLabel(
+          msg({
+            message: `Lead Score Events`,
+            context: 'objectMetadata.labelPlural',
+          }),
+        ),
+        description: i18nLabel(
+          msg({
+            message: `A single grant of lead score points to a person`,
+            context: 'objectMetadata.description',
+          }),
+        ),
+        icon: 'IconChartArrowsVertical',
+        isSystem: true,
+        isUICreatable: false,
+        labelIdentifierFieldMetadataName: 'reason',
+      },
+      workspaceId,
+      standardObjectMetadataRelatedEntityIds,
+      twentyStandardApplicationId,
+      now,
+    }),
   company: ({
     now,
     workspaceId,
@@ -689,6 +827,260 @@ export const STANDARD_FLAT_OBJECT_METADATA_BUILDERS_BY_OBJECT_NAME = {
         isAuditLogged: false,
         isUICreatable: false,
         labelIdentifierFieldMetadataName: 'subject',
+      },
+      workspaceId,
+      standardObjectMetadataRelatedEntityIds,
+      twentyStandardApplicationId,
+      now,
+    }),
+  sequence: ({
+    now,
+    workspaceId,
+    standardObjectMetadataRelatedEntityIds,
+    twentyStandardApplicationId,
+    dependencyFlatEntityMaps,
+  }: Omit<CreateStandardObjectArgs<'sequence'>, 'context' | 'objectName'>) =>
+    createStandardObjectFlatMetadata({
+      objectName: 'sequence',
+      dependencyFlatEntityMaps,
+      context: {
+        universalIdentifier: STANDARD_OBJECTS.sequence.universalIdentifier,
+        nameSingular: 'sequence',
+        namePlural: 'sequences',
+        labelSingular: i18nLabel(
+          msg({ message: `Sequence`, context: 'objectMetadata.labelSingular' }),
+        ),
+        labelPlural: i18nLabel(
+          msg({ message: `Sequences`, context: 'objectMetadata.labelPlural' }),
+        ),
+        description: i18nLabel(
+          msg({
+            message: `A drip email sequence`,
+            context: 'objectMetadata.description',
+          }),
+        ),
+        icon: 'IconMailFast',
+        isSystem: true,
+        isSearchable: true,
+        isUICreatable: false,
+        labelIdentifierFieldMetadataName: 'name',
+      },
+      workspaceId,
+      standardObjectMetadataRelatedEntityIds,
+      twentyStandardApplicationId,
+      now,
+    }),
+  sequenceStep: ({
+    now,
+    workspaceId,
+    standardObjectMetadataRelatedEntityIds,
+    twentyStandardApplicationId,
+    dependencyFlatEntityMaps,
+  }: Omit<
+    CreateStandardObjectArgs<'sequenceStep'>,
+    'context' | 'objectName'
+  >) =>
+    createStandardObjectFlatMetadata({
+      objectName: 'sequenceStep',
+      dependencyFlatEntityMaps,
+      context: {
+        universalIdentifier: STANDARD_OBJECTS.sequenceStep.universalIdentifier,
+        nameSingular: 'sequenceStep',
+        namePlural: 'sequenceSteps',
+        labelSingular: i18nLabel(
+          msg({
+            message: `Sequence Step`,
+            context: 'objectMetadata.labelSingular',
+          }),
+        ),
+        labelPlural: i18nLabel(
+          msg({
+            message: `Sequence Steps`,
+            context: 'objectMetadata.labelPlural',
+          }),
+        ),
+        description: i18nLabel(
+          msg({
+            message: `A step in an email sequence`,
+            context: 'objectMetadata.description',
+          }),
+        ),
+        icon: 'IconListNumbers',
+        isSystem: true,
+        isUICreatable: false,
+        labelIdentifierFieldMetadataName: 'id',
+      },
+      workspaceId,
+      standardObjectMetadataRelatedEntityIds,
+      twentyStandardApplicationId,
+      now,
+    }),
+  sequenceEnrollment: ({
+    now,
+    workspaceId,
+    standardObjectMetadataRelatedEntityIds,
+    twentyStandardApplicationId,
+    dependencyFlatEntityMaps,
+  }: Omit<
+    CreateStandardObjectArgs<'sequenceEnrollment'>,
+    'context' | 'objectName'
+  >) =>
+    createStandardObjectFlatMetadata({
+      objectName: 'sequenceEnrollment',
+      dependencyFlatEntityMaps,
+      context: {
+        universalIdentifier:
+          STANDARD_OBJECTS.sequenceEnrollment.universalIdentifier,
+        nameSingular: 'sequenceEnrollment',
+        namePlural: 'sequenceEnrollments',
+        labelSingular: i18nLabel(
+          msg({
+            message: `Sequence Enrollment`,
+            context: 'objectMetadata.labelSingular',
+          }),
+        ),
+        labelPlural: i18nLabel(
+          msg({
+            message: `Sequence Enrollments`,
+            context: 'objectMetadata.labelPlural',
+          }),
+        ),
+        description: i18nLabel(
+          msg({
+            message: `A person's enrollment in an email sequence`,
+            context: 'objectMetadata.description',
+          }),
+        ),
+        icon: 'IconUserPlus',
+        isSystem: true,
+        isUICreatable: false,
+        labelIdentifierFieldMetadataName: 'id',
+      },
+      workspaceId,
+      standardObjectMetadataRelatedEntityIds,
+      twentyStandardApplicationId,
+      now,
+    }),
+  priceBookItem: ({
+    now,
+    workspaceId,
+    standardObjectMetadataRelatedEntityIds,
+    twentyStandardApplicationId,
+    dependencyFlatEntityMaps,
+  }: Omit<
+    CreateStandardObjectArgs<'priceBookItem'>,
+    'context' | 'objectName'
+  >) =>
+    createStandardObjectFlatMetadata({
+      objectName: 'priceBookItem',
+      dependencyFlatEntityMaps,
+      context: {
+        universalIdentifier: STANDARD_OBJECTS.priceBookItem.universalIdentifier,
+        nameSingular: 'priceBookItem',
+        openRecordIn: ObjectOpenRecordIn.RECORD_PAGE,
+        namePlural: 'priceBookItems',
+        labelSingular: i18nLabel(
+          msg({
+            message: `Price Book Item`,
+            context: 'objectMetadata.labelSingular',
+          }),
+        ),
+        labelPlural: i18nLabel(
+          msg({
+            message: `Price Book Items`,
+            context: 'objectMetadata.labelPlural',
+          }),
+        ),
+        description: i18nLabel(
+          msg({
+            message: `A sellable product or service with standard pricing`,
+            context: 'objectMetadata.description',
+          }),
+        ),
+        icon: 'IconTag',
+        isSearchable: true,
+        labelIdentifierFieldMetadataName: 'name',
+      },
+      workspaceId,
+      standardObjectMetadataRelatedEntityIds,
+      twentyStandardApplicationId,
+      now,
+    }),
+  quote: ({
+    now,
+    workspaceId,
+    standardObjectMetadataRelatedEntityIds,
+    twentyStandardApplicationId,
+    dependencyFlatEntityMaps,
+  }: Omit<CreateStandardObjectArgs<'quote'>, 'context' | 'objectName'>) =>
+    createStandardObjectFlatMetadata({
+      objectName: 'quote',
+      dependencyFlatEntityMaps,
+      context: {
+        universalIdentifier: STANDARD_OBJECTS.quote.universalIdentifier,
+        nameSingular: 'quote',
+        openRecordIn: ObjectOpenRecordIn.RECORD_PAGE,
+        namePlural: 'quotes',
+        labelSingular: i18nLabel(
+          msg({ message: `Quote`, context: 'objectMetadata.labelSingular' }),
+        ),
+        labelPlural: i18nLabel(
+          msg({ message: `Quotes`, context: 'objectMetadata.labelPlural' }),
+        ),
+        description: i18nLabel(
+          msg({
+            message: `A priced proposal that can be sent to a customer as a PDF`,
+            context: 'objectMetadata.description',
+          }),
+        ),
+        icon: 'IconFileDollar',
+        isSearchable: true,
+        labelIdentifierFieldMetadataName: 'quoteNumber',
+      },
+      workspaceId,
+      standardObjectMetadataRelatedEntityIds,
+      twentyStandardApplicationId,
+      now,
+    }),
+  quoteLineItem: ({
+    now,
+    workspaceId,
+    standardObjectMetadataRelatedEntityIds,
+    twentyStandardApplicationId,
+    dependencyFlatEntityMaps,
+  }: Omit<
+    CreateStandardObjectArgs<'quoteLineItem'>,
+    'context' | 'objectName'
+  >) =>
+    createStandardObjectFlatMetadata({
+      objectName: 'quoteLineItem',
+      dependencyFlatEntityMaps,
+      context: {
+        universalIdentifier: STANDARD_OBJECTS.quoteLineItem.universalIdentifier,
+        nameSingular: 'quoteLineItem',
+        namePlural: 'quoteLineItems',
+        labelSingular: i18nLabel(
+          msg({
+            message: `Quote Line Item`,
+            context: 'objectMetadata.labelSingular',
+          }),
+        ),
+        labelPlural: i18nLabel(
+          msg({
+            message: `Quote Line Items`,
+            context: 'objectMetadata.labelPlural',
+          }),
+        ),
+        description: i18nLabel(
+          msg({
+            message: `A single priced line on a quote`,
+            context: 'objectMetadata.description',
+          }),
+        ),
+        icon: 'IconListDetails',
+        isSystem: true,
+        isUICreatable: false,
+        labelIdentifierFieldMetadataName: 'label',
       },
       workspaceId,
       standardObjectMetadataRelatedEntityIds,

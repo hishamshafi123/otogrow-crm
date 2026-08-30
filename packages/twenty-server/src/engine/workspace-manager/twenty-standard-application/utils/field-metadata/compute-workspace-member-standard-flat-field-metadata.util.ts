@@ -821,6 +821,36 @@ export const buildWorkspaceMemberStandardFlatFieldMetadatas = ({
     twentyStandardApplicationId,
     now,
   }),
+  sequences: createStandardRelationFieldFlatMetadata({
+    objectName,
+    workspaceId,
+    context: {
+      type: FieldMetadataType.RELATION,
+      morphId: null,
+      fieldName: 'sequences',
+      label: i18nLabel(
+        msg({ message: `Sequences`, context: 'fieldMetadata.label' }),
+      ),
+      description: i18nLabel(
+        msg({
+          message: `Sequences owned by this workspace member`,
+          context: 'fieldMetadata.description',
+        }),
+      ),
+      icon: 'IconMailFast',
+      isNullable: false,
+      isUIEditable: false,
+      targetObjectName: 'sequence',
+      targetFieldName: 'owner',
+      settings: {
+        relationType: RelationType.ONE_TO_MANY,
+      },
+    },
+    standardObjectMetadataRelatedEntityIds,
+    dependencyFlatEntityMaps,
+    twentyStandardApplicationId,
+    now,
+  }),
   timelineActivities: createStandardRelationFieldFlatMetadata({
     objectName,
     workspaceId,

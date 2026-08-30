@@ -1470,4 +1470,46 @@ export const STANDARD_COMMAND_MENU_ITEMS = {
     engineComponentKey: EngineComponentKey.COMPOSE_EMAIL,
     hotKeys: null,
   },
+  enrollInSequence: {
+    universalIdentifier: 'a15fe08e-99ba-409e-b463-f26ee568209f',
+    label: i18nLabel(
+      msg({ message: `Enroll in sequence`, context: 'commandMenuItem.label' }),
+    ),
+    icon: 'IconListNumbers',
+    isPinned: true,
+    position: 67,
+    shortLabel: i18nLabel(
+      msg({ message: `Enroll`, context: 'commandMenuItem.shortLabel' }),
+    ),
+    availabilityType: CommandMenuItemAvailabilityType.RECORD_SELECTION,
+    conditionalAvailabilityExpression: 'numberOfSelectedRecords >= 1',
+    availabilityObjectMetadataUniversalIdentifier:
+      STANDARD_OBJECTS.person.universalIdentifier,
+    frontComponentUniversalIdentifier: null,
+    engineComponentKey: EngineComponentKey.ENROLL_IN_SEQUENCE,
+    hotKeys: null,
+  },
+  unenrollFromSequence: {
+    universalIdentifier: 'c0caae0c-0f37-49bd-89fe-2396089b9a97',
+    label: i18nLabel(
+      msg({
+        message: `Unenroll from sequence`,
+        context: 'commandMenuItem.label',
+      }),
+    ),
+    icon: 'IconListNumbers',
+    isPinned: true,
+    position: 68,
+    shortLabel: i18nLabel(
+      msg({ message: `Unenroll`, context: 'commandMenuItem.shortLabel' }),
+    ),
+    availabilityType: CommandMenuItemAvailabilityType.RECORD_SELECTION,
+    conditionalAvailabilityExpression:
+      'someEquals(selectedRecords, "status", "ACTIVE")',
+    availabilityObjectMetadataUniversalIdentifier:
+      STANDARD_OBJECTS.sequenceEnrollment.universalIdentifier,
+    frontComponentUniversalIdentifier: null,
+    engineComponentKey: EngineComponentKey.UNENROLL_FROM_SEQUENCE,
+    hotKeys: null,
+  },
 } as const;

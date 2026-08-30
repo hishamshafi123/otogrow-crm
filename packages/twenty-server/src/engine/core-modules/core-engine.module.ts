@@ -33,6 +33,11 @@ import { DpaModule } from 'src/engine/core-modules/dpa/dpa.module';
 import { EmailModule } from 'src/engine/core-modules/email/email.module';
 import { EmailingDomainModule } from 'src/engine/core-modules/emailing-domain/emailing-domain.module';
 import { EmailingModule } from 'src/modules/emailing/emailing.module';
+import { LeadScoringModule } from 'src/modules/lead-scoring/lead-scoring.module';
+import { ChannelsModule } from 'src/modules/messaging/channels/channels.module';
+import { PortalModule } from 'src/modules/portal/portal.module';
+import { QuotingModule } from 'src/modules/quoting/quoting.module';
+import { SequencesModule } from 'src/modules/sequences/sequences.module';
 import { EnvironmentModule } from 'src/engine/core-modules/environment/environment.module';
 import { ExceptionHandlerModule } from 'src/engine/core-modules/exception-handler/exception-handler.module';
 import { exceptionHandlerModuleFactory } from 'src/engine/core-modules/exception-handler/exception-handler.module-factory';
@@ -120,6 +125,11 @@ import { FileModule } from './file/file.module';
     ApprovedAccessDomainModule,
     EmailingDomainModule,
     EmailingModule,
+    SequencesModule,
+    LeadScoringModule,
+    QuotingModule,
+    PortalModule,
+    ChannelsModule,
     PublicDomainModule,
     CloudflareModule,
     DnsManagerModule,

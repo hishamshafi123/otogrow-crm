@@ -601,6 +601,241 @@ export const STANDARD_OBJECTS = {
       }),
     },
   },
+  sequence: {
+    universalIdentifier: STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS.sequence,
+    fields: STANDARD_OBJECT_FIELDS.sequence,
+    indexes: {
+      unsubscribeTopicIdIndex: {
+        universalIdentifier: 'a5e9f476-b4f5-468f-a91d-eac76a325651',
+      },
+      ownerWorkspaceMemberIdIndex: {
+        universalIdentifier: '1b1a8432-7a56-4401-b388-4f033d04ec7e',
+      },
+      searchVectorGinIndex: {
+        universalIdentifier: '17c97f4e-1a51-47f4-8d53-0b606170af36',
+      },
+    },
+    views: {
+      allSequences: buildStandardObjectIndexView({
+        objectUniversalIdentifier:
+          STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS.sequence,
+        fields: STANDARD_OBJECT_FIELDS.sequence,
+        viewFieldNames: [
+          'name',
+          'status',
+          'owner',
+          'dailySendCap',
+          'createdAt',
+        ],
+      }),
+    },
+  },
+  sequenceStep: {
+    universalIdentifier: STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS.sequenceStep,
+    fields: STANDARD_OBJECT_FIELDS.sequenceStep,
+    indexes: {
+      sequenceIdIndex: {
+        universalIdentifier: '3b572a92-5c17-4ad0-8b7e-4311f54bf339',
+      },
+    },
+  },
+  sequenceEnrollment: {
+    universalIdentifier:
+      STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS.sequenceEnrollment,
+    fields: STANDARD_OBJECT_FIELDS.sequenceEnrollment,
+    indexes: {
+      sequenceIdIndex: {
+        universalIdentifier: '3c5af8e7-f01b-480b-86f2-86d42ef33283',
+      },
+      personIdIndex: {
+        universalIdentifier: '2d459141-4d00-4234-a416-1e01567e1022',
+      },
+      sequencePersonUniqueIndex: {
+        universalIdentifier: '6f05a9db-f5e0-40a7-950d-5fa8e9a43988',
+      },
+      nextSendAtIndex: {
+        universalIdentifier: '8ffee3b0-aad6-4310-81b6-76387cbb5388',
+      },
+    },
+  },
+  leadScoringRule: {
+    universalIdentifier: STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS.leadScoringRule,
+    fields: STANDARD_OBJECT_FIELDS.leadScoringRule,
+    indexes: {},
+    views: {
+      allLeadScoringRules: buildStandardObjectIndexView({
+        objectUniversalIdentifier:
+          STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS.leadScoringRule,
+        fields: STANDARD_OBJECT_FIELDS.leadScoringRule,
+        viewFieldNames: ['name', 'ruleType', 'points', 'isActive', 'createdAt'],
+      }),
+    },
+  },
+  leadScoreEvent: {
+    universalIdentifier: STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS.leadScoreEvent,
+    fields: STANDARD_OBJECT_FIELDS.leadScoreEvent,
+    indexes: {
+      personIdIndex: {
+        universalIdentifier: '2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d01',
+      },
+      eventKeyUniqueIndex: {
+        universalIdentifier: '2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d02',
+      },
+    },
+  },
+  priceBookItem: {
+    universalIdentifier: STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS.priceBookItem,
+    fields: STANDARD_OBJECT_FIELDS.priceBookItem,
+    indexes: {
+      searchVectorGinIndex: {
+        universalIdentifier: '51c09c1d-3466-4327-aa9b-7d87ec0e2750',
+      },
+    },
+    views: {
+      allPriceBookItems: buildStandardObjectIndexView({
+        objectUniversalIdentifier:
+          STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS.priceBookItem,
+        fields: STANDARD_OBJECT_FIELDS.priceBookItem,
+        viewFieldNames: ['name', 'sku', 'unitPrice', 'isActive', 'createdAt'],
+      }),
+      priceBookItemRecordPageFields: buildStandardObjectRecordPageFieldsView({
+        objectUniversalIdentifier:
+          STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS.priceBookItem,
+        fields: STANDARD_OBJECT_FIELDS.priceBookItem,
+        viewFieldNames: [
+          'name',
+          'description',
+          'sku',
+          'isActive',
+          'unitPrice',
+          'bulkMinQuantity',
+          'bulkUnitPrice',
+          'quoteLineItems',
+          'createdAt',
+          'createdBy',
+          'updatedAt',
+          'updatedBy',
+        ],
+        viewFieldGroupNames: {
+          general: 'General',
+          pricing: 'Pricing',
+          system: 'System',
+        },
+      }),
+    },
+  },
+  quote: {
+    universalIdentifier: STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS.quote,
+    fields: STANDARD_OBJECT_FIELDS.quote,
+    indexes: {
+      quoteNumberUniqueIndex: {
+        universalIdentifier: 'b3871a28-6439-4e1d-b37f-0ff611239c65',
+      },
+      companyIdIndex: {
+        universalIdentifier: '97a8058f-8481-4c02-b72b-6c28f298680e',
+      },
+      personIdIndex: {
+        universalIdentifier: 'c0cf28c2-12aa-44d7-bc69-99ea600e4668',
+      },
+      opportunityIdIndex: {
+        universalIdentifier: 'c2c444a7-1e0d-413c-b5e7-470dbd7838d0',
+      },
+      searchVectorGinIndex: {
+        universalIdentifier: '5b0c483f-f97e-474f-bbae-8f760dba9386',
+      },
+    },
+    views: {
+      allQuotes: buildStandardObjectIndexView({
+        objectUniversalIdentifier: STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS.quote,
+        fields: STANDARD_OBJECT_FIELDS.quote,
+        viewFieldNames: [
+          'quoteNumber',
+          'status',
+          'total',
+          'validUntil',
+          'createdAt',
+        ],
+      }),
+      quoteRecordPageFields: buildStandardObjectRecordPageFieldsView({
+        objectUniversalIdentifier: STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS.quote,
+        fields: STANDARD_OBJECT_FIELDS.quote,
+        viewFieldNames: [
+          'quoteNumber',
+          'status',
+          'validUntil',
+          'taxPercent',
+          'terms',
+          'subtotal',
+          'taxAmount',
+          'total',
+          'company',
+          'person',
+          'opportunity',
+          'lineItems',
+          'createdAt',
+          'createdBy',
+          'updatedAt',
+          'updatedBy',
+        ],
+        viewFieldGroupNames: {
+          details: 'Details',
+          pricing: 'Pricing',
+          relations: 'Relations',
+          system: 'System',
+        },
+      }),
+    },
+  },
+  quoteLineItem: {
+    universalIdentifier: STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS.quoteLineItem,
+    fields: STANDARD_OBJECT_FIELDS.quoteLineItem,
+    indexes: {
+      quoteIdIndex: {
+        universalIdentifier: 'b9ec1dd0-8997-4fd4-9734-529712642c10',
+      },
+      priceBookItemIdIndex: {
+        universalIdentifier: '6ad0be38-eec9-4d6b-80f2-febe5cddd467',
+      },
+    },
+    views: {
+      allQuoteLineItems: buildStandardObjectIndexView({
+        objectUniversalIdentifier:
+          STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS.quoteLineItem,
+        fields: STANDARD_OBJECT_FIELDS.quoteLineItem,
+        viewFieldNames: ['label', 'quantity', 'unitPrice', 'lineTotal'],
+      }),
+    },
+  },
+  channelMessage: {
+    universalIdentifier: STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS.channelMessage,
+    fields: STANDARD_OBJECT_FIELDS.channelMessage,
+    indexes: {
+      personIdIndex: {
+        universalIdentifier: '621fd45e-1ed9-4cc7-83c0-6663dce9b86b',
+      },
+      sequenceEnrollmentIdIndex: {
+        universalIdentifier: '8f9220f4-ea4d-49c0-9334-3d7250ac12e1',
+      },
+      externalIdIndex: {
+        universalIdentifier: '422ca46f-e684-497e-9111-719c43cb0576',
+      },
+    },
+    views: {
+      allChannelMessages: buildStandardObjectIndexView({
+        objectUniversalIdentifier:
+          STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS.channelMessage,
+        fields: STANDARD_OBJECT_FIELDS.channelMessage,
+        viewFieldNames: [
+          'channel',
+          'direction',
+          'fromNumber',
+          'toNumber',
+          'status',
+          'createdAt',
+        ],
+      }),
+    },
+  },
   message: {
     universalIdentifier: STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS.message,
     fields: STANDARD_OBJECT_FIELDS.message,
@@ -610,6 +845,9 @@ export const STANDARD_OBJECTS = {
       },
       messageCampaignIdIndex: {
         universalIdentifier: '79e777ca-7008-46c5-b3a6-3108b7c7dfb6',
+      },
+      sequenceEnrollmentIdIndex: {
+        universalIdentifier: '33f1ac6f-e1a9-4767-a76f-072b9ad9d6e5',
       },
     },
     views: {
@@ -830,6 +1068,9 @@ export const STANDARD_OBJECTS = {
           'createdAt',
           'jobTitle',
           'linkedinLink',
+          'leadScore',
+          'leadSource',
+          'leadScoreBand',
         ],
       }),
       personRecordPageFields: buildStandardObjectRecordPageFieldsView({
@@ -840,6 +1081,9 @@ export const STANDARD_OBJECTS = {
           'phones',
           'company',
           'jobTitle',
+          'leadScore',
+          'leadSource',
+          'leadScoreBand',
           'linkedinLink',
           'avatarUrl',
           'createdAt',

@@ -4,6 +4,8 @@ import { CREATE_CALENDAR_EVENT_ACTION } from '@/workflow/workflow-steps/workflow
 import { DRAFT_EMAIL_ACTION } from '@/workflow/workflow-steps/workflow-actions/constants/actions/DraftEmailAction';
 import { HTTP_REQUEST_ACTION } from '@/workflow/workflow-steps/workflow-actions/constants/actions/HttpRequestAction';
 import { SEND_EMAIL_ACTION } from '@/workflow/workflow-steps/workflow-actions/constants/actions/SendEmailAction';
+import { SEQUENCE_ENROLL_ACTION } from '@/workflow/workflow-steps/workflow-actions/constants/actions/SequenceEnrollAction';
+import { SEQUENCE_UNENROLL_ACTION } from '@/workflow/workflow-steps/workflow-actions/constants/actions/SequenceUnenrollAction';
 
 export const CORE_ACTIONS: Array<{
   defaultLabel: string;
@@ -14,12 +16,16 @@ export const CORE_ACTIONS: Array<{
     | 'DRAFT_EMAIL'
     | 'HTTP_REQUEST'
     | 'CREATE_CALENDAR_EVENT'
+    | 'SEQUENCE_ENROLL'
+    | 'SEQUENCE_UNENROLL'
   >;
   icon: string;
 }> = [
   SEND_EMAIL_ACTION,
   DRAFT_EMAIL_ACTION,
   CREATE_CALENDAR_EVENT_ACTION,
+  SEQUENCE_ENROLL_ACTION,
+  SEQUENCE_UNENROLL_ACTION,
   CODE_ACTION,
   HTTP_REQUEST_ACTION,
 ];

@@ -11,6 +11,7 @@ import { computeStandardCalendarEventViewFields } from 'src/engine/workspace-man
 import { computeStandardCallRecordingViewFields } from 'src/engine/workspace-manager/twenty-standard-application/utils/view-field/compute-standard-call-recording-view-fields.util';
 import { computeStandardCompanyViewFields } from 'src/engine/workspace-manager/twenty-standard-application/utils/view-field/compute-standard-company-view-fields.util';
 import { computeStandardDashboardViewFields } from 'src/engine/workspace-manager/twenty-standard-application/utils/view-field/compute-standard-dashboard-view-fields.util';
+import { computeStandardLeadScoringRuleViewFields } from 'src/engine/workspace-manager/twenty-standard-application/utils/view-field/compute-standard-lead-scoring-rule-view-fields.util';
 import { computeStandardMessageCampaignViewFields } from 'src/engine/workspace-manager/twenty-standard-application/utils/view-field/compute-standard-message-campaign-view-fields.util';
 import { computeStandardMessageChannelMessageAssociationMessageFolderViewFields } from 'src/engine/workspace-manager/twenty-standard-application/utils/view-field/compute-standard-message-channel-message-association-message-folder-view-fields.util';
 import { computeStandardMessageChannelMessageAssociationViewFields } from 'src/engine/workspace-manager/twenty-standard-application/utils/view-field/compute-standard-message-channel-message-association-view-fields.util';
@@ -22,6 +23,10 @@ import { computeStandardNoteTargetViewFields } from 'src/engine/workspace-manage
 import { computeStandardNoteViewFields } from 'src/engine/workspace-manager/twenty-standard-application/utils/view-field/compute-standard-note-view-fields.util';
 import { computeStandardOpportunityViewFields } from 'src/engine/workspace-manager/twenty-standard-application/utils/view-field/compute-standard-opportunity-view-fields.util';
 import { computeStandardPersonViewFields } from 'src/engine/workspace-manager/twenty-standard-application/utils/view-field/compute-standard-person-view-fields.util';
+import { computeStandardPriceBookItemViewFields } from 'src/engine/workspace-manager/twenty-standard-application/utils/view-field/compute-standard-price-book-item-view-fields.util';
+import { computeStandardQuoteLineItemViewFields } from 'src/engine/workspace-manager/twenty-standard-application/utils/view-field/compute-standard-quote-line-item-view-fields.util';
+import { computeStandardQuoteViewFields } from 'src/engine/workspace-manager/twenty-standard-application/utils/view-field/compute-standard-quote-view-fields.util';
+import { computeStandardSequenceViewFields } from 'src/engine/workspace-manager/twenty-standard-application/utils/view-field/compute-standard-sequence-view-fields.util';
 import { computeStandardTaskTargetViewFields } from 'src/engine/workspace-manager/twenty-standard-application/utils/view-field/compute-standard-task-target-view-fields.util';
 import { computeStandardTaskViewFields } from 'src/engine/workspace-manager/twenty-standard-application/utils/view-field/compute-standard-task-view-fields.util';
 import { computeStandardTimelineActivityViewFields } from 'src/engine/workspace-manager/twenty-standard-application/utils/view-field/compute-standard-timeline-activity-view-fields.util';
@@ -46,6 +51,7 @@ const STANDARD_FLAT_VIEW_FIELD_METADATA_BUILDERS_BY_OBJECT_NAME = {
   callRecording: computeStandardCallRecordingViewFields,
   company: computeStandardCompanyViewFields,
   dashboard: computeStandardDashboardViewFields,
+  leadScoringRule: computeStandardLeadScoringRuleViewFields,
   message: computeStandardMessageViewFields,
   messageCampaign: computeStandardMessageCampaignViewFields,
   messageChannelMessageAssociation:
@@ -59,6 +65,10 @@ const STANDARD_FLAT_VIEW_FIELD_METADATA_BUILDERS_BY_OBJECT_NAME = {
   noteTarget: computeStandardNoteTargetViewFields,
   opportunity: computeStandardOpportunityViewFields,
   person: computeStandardPersonViewFields,
+  priceBookItem: computeStandardPriceBookItemViewFields,
+  quote: computeStandardQuoteViewFields,
+  quoteLineItem: computeStandardQuoteLineItemViewFields,
+  sequence: computeStandardSequenceViewFields,
   task: computeStandardTaskViewFields,
   taskTarget: computeStandardTaskTargetViewFields,
   timelineActivity: computeStandardTimelineActivityViewFields,

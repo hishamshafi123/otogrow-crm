@@ -13,6 +13,7 @@ import { STANDARD_RECORD_PAGE_LAYOUTS } from 'src/engine/workspace-manager/twent
 import { type AllStandardObjectName } from 'src/engine/workspace-manager/twenty-standard-application/types/all-standard-object-name.type';
 import { type StandardRecordPageLayoutConfig } from 'src/engine/workspace-manager/twenty-standard-application/utils/page-layout-config/standard-page-layout-config.type';
 import { computeMyFirstDashboardWidgets } from 'src/engine/workspace-manager/twenty-standard-application/utils/page-layout-widget/compute-my-first-dashboard-widgets.util';
+import { computeOtogrowAnalyticsDashboardWidgets } from 'src/engine/workspace-manager/twenty-standard-application/utils/page-layout-widget/compute-otogrow-analytics-dashboard-widgets.util';
 import {
   type CreateStandardPageLayoutWidgetArgs,
   type CreateStandardPageLayoutWidgetContext,
@@ -43,6 +44,9 @@ const RECORD_PAGE_LAYOUT_WIDGET_TYPES = [
   WidgetType.CALL_RECORDING_TRANSCRIPT,
   WidgetType.MESSAGE_CAMPAIGN_BODY,
   WidgetType.MESSAGE_CAMPAIGN_DETAILS,
+  WidgetType.SEQUENCE_BUILDER,
+  WidgetType.QUOTE_BUILDER,
+  WidgetType.PORTAL_ACCESS,
 ];
 
 const WIDGET_TYPE_TO_CONFIGURATION_TYPE: Partial<
@@ -72,6 +76,9 @@ const WIDGET_TYPE_TO_CONFIGURATION_TYPE: Partial<
     WidgetConfigurationType.MESSAGE_CAMPAIGN_BODY,
   [WidgetType.MESSAGE_CAMPAIGN_DETAILS]:
     WidgetConfigurationType.MESSAGE_CAMPAIGN_DETAILS,
+  [WidgetType.SEQUENCE_BUILDER]: WidgetConfigurationType.SEQUENCE_BUILDER,
+  [WidgetType.QUOTE_BUILDER]: WidgetConfigurationType.QUOTE_BUILDER,
+  [WidgetType.PORTAL_ACCESS]: WidgetConfigurationType.PORTAL_ACCESS,
 };
 
 const RECORD_PAGE_FIELDS_VIEW_NAME_BY_OBJECT: Partial<
@@ -93,6 +100,8 @@ const RECORD_PAGE_FIELDS_VIEW_NAME_BY_OBJECT: Partial<
   note: 'noteRecordPageFields',
   opportunity: 'opportunityRecordPageFields',
   person: 'personRecordPageFields',
+  priceBookItem: 'priceBookItemRecordPageFields',
+  quote: 'quoteRecordPageFields',
   task: 'taskRecordPageFields',
   workflowAutomatedTrigger: 'workflowAutomatedTriggerRecordPageFields',
   workflowRun: 'workflowRunRecordPageFields',
@@ -345,6 +354,7 @@ export const buildStandardFlatPageLayoutWidgetMetadataMaps = (
 ): FlatEntityMaps<FlatPageLayoutWidget> => {
   const allWidgetMetadatas: FlatPageLayoutWidget[] = [
     ...computeMyFirstDashboardWidgets(args),
+    ...computeOtogrowAnalyticsDashboardWidgets(args),
     ...computeRecordPageWidgets(args),
   ];
 

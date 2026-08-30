@@ -424,6 +424,9 @@ export const STANDARD_OBJECT_FIELDS = {
     opportunities: {
       universalIdentifier: '20202020-add3-4658-8e23-d70dccb6d0ec',
     },
+    quotes: {
+      universalIdentifier: 'bc2c5e39-908e-4688-b7c1-78feb1d58c42',
+    },
     attachments: {
       universalIdentifier: getSystemRelationFieldUniversalIdentifier({
         applicationUniversalIdentifier:
@@ -627,6 +630,225 @@ export const STANDARD_OBJECT_FIELDS = {
       universalIdentifier: 'a8ddbf8c-1137-45d1-b89e-5ffbd83f67c8',
     },
   },
+  sequence: {
+    ...buildStandardObjectSystemFields(
+      STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS.sequence,
+    ),
+    name: { universalIdentifier: 'e498860c-a04e-493f-9dc4-bb3519f7774f' },
+    status: { universalIdentifier: '675d051c-29ba-4d96-8dcf-10ab300ff728' },
+    businessHoursTimeZone: {
+      universalIdentifier: 'e3cade10-d649-4a73-a3ab-d349f43abbad',
+    },
+    dailySendCap: {
+      universalIdentifier: '4e7f2abb-3158-4af6-bb17-4a5638e4efdc',
+    },
+    unsubscribeTopicId: {
+      universalIdentifier: '8bce3b5e-52ba-4ff8-aad4-4e76432f324a',
+    },
+    owner: { universalIdentifier: 'e821d456-0724-4ef3-97e8-676a9d987c17' },
+    steps: { universalIdentifier: '895426ce-2eb5-4b13-bac5-169fb03a9557' },
+    enrollments: {
+      universalIdentifier: '1a9da64f-a0df-4a01-b6ee-f265e01953b4',
+    },
+  },
+  sequenceStep: {
+    ...buildStandardObjectSystemFields(
+      STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS.sequenceStep,
+    ),
+    stepPosition: {
+      universalIdentifier: 'ac66d6dc-8d74-4858-8bcc-df4ed4e59905',
+    },
+    delayValue: {
+      universalIdentifier: '8b8834ab-1797-4f5f-ae33-8a03ec6b8183',
+    },
+    delayUnit: {
+      universalIdentifier: '8e6a9be8-efce-41fc-9602-6cac4f078b3f',
+    },
+    channel: {
+      universalIdentifier: 'f2757f2e-4b74-4ee7-bd8e-9bb4880f5d90',
+    },
+    subject: { universalIdentifier: 'ef5026da-7c49-459b-9bf8-5fd466f20388' },
+    body: { universalIdentifier: '3fe05fc4-0b28-424e-8856-b2c4d72d26cc' },
+    whatsappTemplateName: {
+      universalIdentifier: 'a20e0bac-02a6-48ec-8edb-598eff7bee43',
+    },
+    whatsappTemplateParams: {
+      universalIdentifier: '5db8e6a5-086c-4540-8826-c427cd95d211',
+    },
+    sequence: {
+      universalIdentifier: '8f003133-efad-4334-9550-58dc23f15a17',
+    },
+  },
+  sequenceEnrollment: {
+    ...buildStandardObjectSystemFields(
+      STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS.sequenceEnrollment,
+    ),
+    sequence: {
+      universalIdentifier: '8b422f7c-ca35-4f16-91b3-eb766da46cc7',
+    },
+    person: {
+      universalIdentifier: 'd041d52d-8228-4629-a42a-e83983ed916b',
+    },
+    status: { universalIdentifier: 'a5d60176-9aea-4587-8316-11df6f874f63' },
+    currentStepPosition: {
+      universalIdentifier: '9c81d361-1d32-4727-a71b-ac41fecdbf6f',
+    },
+    nextSendAt: {
+      universalIdentifier: 'b6a2937c-dd92-4e5d-bbc6-77a093d28aed',
+    },
+    lastSentAt: {
+      universalIdentifier: '2d800d6f-52cb-41ca-b674-ad748979a5e1',
+    },
+    lastError: {
+      universalIdentifier: '73eb1ca1-9e6f-4dd5-91d4-418f00a3665f',
+    },
+    threadExternalId: {
+      universalIdentifier: '4f9b4151-9d74-4b2d-bae2-d8e47c6f53fe',
+    },
+    lastSentHeaderMessageId: {
+      universalIdentifier: 'b2983b1f-57dc-45fc-8b0b-e6db8789ca4f',
+    },
+    messages: {
+      universalIdentifier: '82c7d7c6-ee1b-4bff-b79d-c8394c6a9fdf',
+    },
+    channelMessages: {
+      universalIdentifier: '417f8477-4424-4445-aaf9-e34ade45a115',
+    },
+  },
+  channelMessage: {
+    ...buildStandardObjectSystemFields(
+      STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS.channelMessage,
+    ),
+    channel: {
+      universalIdentifier: '152a5da3-5c40-4b02-800f-455ce87876f9',
+    },
+    direction: {
+      universalIdentifier: 'f9684c33-2fcd-46fe-aa8b-db2d2dd8425e',
+    },
+    fromNumber: {
+      universalIdentifier: '36719aa3-1dd7-4724-965c-6cb24b839046',
+    },
+    toNumber: {
+      universalIdentifier: '3d93bee2-ea2e-406b-a925-b851853eab35',
+    },
+    body: {
+      universalIdentifier: 'd7ddb316-767b-4e3f-b040-b8378450bf27',
+    },
+    externalId: {
+      universalIdentifier: '3067c857-2d24-41a3-be98-137a239faa93',
+    },
+    status: {
+      universalIdentifier: 'b6c3de9e-9478-4f56-8e0d-e2c6d4bbcca4',
+    },
+    sentAt: {
+      universalIdentifier: 'e29824e2-b09e-4ade-9cde-9ab1e255ab6f',
+    },
+    receivedAt: {
+      universalIdentifier: 'b95649be-6d3c-42ae-a236-56232bbdf95f',
+    },
+    errorMessage: {
+      universalIdentifier: '01bca018-5eb8-4824-99f1-bca61d951b05',
+    },
+    person: {
+      universalIdentifier: 'e8f8459f-967f-48e9-8504-ab65cfbce64b',
+    },
+    sequenceEnrollment: {
+      universalIdentifier: '2f5733db-856b-4036-8f86-8034f6296fa8',
+    },
+  },
+  leadScoringRule: {
+    ...buildStandardObjectSystemFields(
+      STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS.leadScoringRule,
+    ),
+    name: { universalIdentifier: '1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c01' },
+    ruleType: { universalIdentifier: '1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c02' },
+    property: { universalIdentifier: '1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c03' },
+    operator: { universalIdentifier: '1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c04' },
+    value: { universalIdentifier: '1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c05' },
+    eventType: { universalIdentifier: '1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c06' },
+    points: { universalIdentifier: '1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c07' },
+    isActive: { universalIdentifier: '1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c08' },
+    leadScoreEvents: {
+      universalIdentifier: '1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c09',
+    },
+  },
+  leadScoreEvent: {
+    ...buildStandardObjectSystemFields(
+      STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS.leadScoreEvent,
+    ),
+    person: { universalIdentifier: '1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c10' },
+    rule: { universalIdentifier: '1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c11' },
+    points: { universalIdentifier: '1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c12' },
+    reason: { universalIdentifier: '1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c13' },
+    eventKey: { universalIdentifier: '1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c14' },
+  },
+  priceBookItem: {
+    ...buildStandardObjectSystemFields(
+      STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS.priceBookItem,
+    ),
+    name: { universalIdentifier: '7a7ae7df-6a82-4d48-8c69-14f690d53953' },
+    description: {
+      universalIdentifier: '666bc04d-ae6e-4e04-bfa3-a0b114f0a620',
+    },
+    sku: { universalIdentifier: 'cc867dc8-f0a0-4f80-b0b5-822cdf77148d' },
+    unitPrice: {
+      universalIdentifier: '2137b274-ddfb-41ca-9d3c-90aeb0f2d262',
+    },
+    bulkMinQuantity: {
+      universalIdentifier: 'd6cbd07e-124c-4419-aaef-703f5f6e019a',
+    },
+    bulkUnitPrice: {
+      universalIdentifier: '1a976d7d-914b-47fa-abce-90bfef070d7a',
+    },
+    isActive: { universalIdentifier: 'b22e4d26-850d-40d7-8e75-11adff7f0fc4' },
+    quoteLineItems: {
+      universalIdentifier: 'c1377257-470f-4a41-9326-edb3ab0b3bb3',
+    },
+  },
+  quote: {
+    ...buildStandardObjectSystemFields(
+      STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS.quote,
+    ),
+    quoteNumber: {
+      universalIdentifier: '874ca5c7-c5a6-4e50-9d94-bb78abec42e4',
+    },
+    status: { universalIdentifier: 'abe819eb-470d-4ca8-b65d-4f4316a99b8f' },
+    taxPercent: {
+      universalIdentifier: '5272c6a9-242e-4fe1-9f03-4deda3d18764',
+    },
+    validUntil: {
+      universalIdentifier: 'cdd0f90b-b5f3-4d83-85eb-03075f28e947',
+    },
+    subtotal: { universalIdentifier: '5d82a1f1-d5a4-48fd-95de-a5d2ef522a39' },
+    taxAmount: { universalIdentifier: '89cf389f-a3f5-445a-9a5d-377e49f86280' },
+    total: { universalIdentifier: '303eca39-0bd0-4989-8276-bfd5036119fe' },
+    terms: { universalIdentifier: 'cb8c5009-684e-4d60-9e0c-8104c7a69bca' },
+    company: { universalIdentifier: '6a4a53b0-326c-4568-9e9e-962824cdb661' },
+    person: { universalIdentifier: 'e51db723-f167-4e83-b7ed-0bf1783ed24e' },
+    opportunity: {
+      universalIdentifier: '948b4aff-c752-4aad-8916-12dac899fba0',
+    },
+    lineItems: { universalIdentifier: 'df11f899-dcc1-49b3-994e-eb04d16400f7' },
+  },
+  quoteLineItem: {
+    ...buildStandardObjectSystemFields(
+      STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS.quoteLineItem,
+    ),
+    label: { universalIdentifier: '53e9baf7-7537-406f-b54f-fcbb78df83a0' },
+    description: {
+      universalIdentifier: '4f268389-02e4-4968-8de2-d5b83bd5f05a',
+    },
+    quantity: { universalIdentifier: '4fabf8c0-cf70-4de5-bbdf-776475360191' },
+    unitPrice: { universalIdentifier: '7bcd48ea-892b-45ad-b951-4cb6550cb44e' },
+    discountPercent: {
+      universalIdentifier: 'aa0709e2-e06d-43c9-9adb-7bf332c5e287',
+    },
+    lineTotal: { universalIdentifier: '2cff4648-e7dd-4b99-86ed-35091bac12f1' },
+    quote: { universalIdentifier: 'd465888c-2c73-491e-9d0e-6e23046c3100' },
+    priceBookItem: {
+      universalIdentifier: 'fc4ed78a-79ea-43f5-a567-e9a8d80dfd59',
+    },
+  },
   message: {
     ...buildStandardObjectSystemFields(
       STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS.message,
@@ -650,6 +872,9 @@ export const STANDARD_OBJECT_FIELDS = {
     },
     messageCampaign: {
       universalIdentifier: '77cff00b-a0ba-48d6-80de-0d5ccf14e45b',
+    },
+    sequenceEnrollment: {
+      universalIdentifier: '774039c3-3e0b-480a-9a93-113d878de632',
     },
     deliveryStatus: {
       universalIdentifier: '209254fa-2b89-429d-a72a-c401c4bd5a78',
@@ -777,6 +1002,9 @@ export const STANDARD_OBJECT_FIELDS = {
           STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS.timelineActivity,
       }),
     },
+    quotes: {
+      universalIdentifier: '0e215138-d725-4b03-9a2f-36e28bf939d0',
+    },
   },
   person: {
     ...buildStandardObjectSystemFields(
@@ -843,6 +1071,27 @@ export const STANDARD_OBJECT_FIELDS = {
     },
     listMemberships: {
       universalIdentifier: '8b8d1be0-4c94-4413-a2c9-c7ede205a81d',
+    },
+    sequenceEnrollments: {
+      universalIdentifier: '694bbee9-cadc-47bc-8484-331989fe6b03',
+    },
+    channelMessages: {
+      universalIdentifier: 'b45269c6-96e2-4817-9bad-78029aeb1c31',
+    },
+    leadScore: {
+      universalIdentifier: 'c9f2e7a4-1b5d-4a8e-9c6f-3e7b2d4a1f86',
+    },
+    leadSource: {
+      universalIdentifier: '45d92089-6816-45f9-bc86-da42201d0b01',
+    },
+    leadScoreBand: {
+      universalIdentifier: '6219e364-e137-483c-80d9-7ef805fe6a0d',
+    },
+    leadScoreEvents: {
+      universalIdentifier: 'c9f2e7a4-1b5d-4a8e-9c6f-3e7b2d4a1f87',
+    },
+    quotes: {
+      universalIdentifier: '14b7b82a-98d2-47c8-9a9c-fa683a134945',
     },
   },
   task: {
@@ -1092,6 +1341,9 @@ export const STANDARD_OBJECT_FIELDS = {
     },
     numberFormat: {
       universalIdentifier: '20202020-7f40-4e7f-b126-11c0eda6b141',
+    },
+    sequences: {
+      universalIdentifier: '0846b675-67c7-4e2f-b30b-25632679a811',
     },
   },
 } satisfies Record<string, Record<string, { universalIdentifier: string }>>;

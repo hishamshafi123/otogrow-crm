@@ -11,6 +11,7 @@ import { computeStandardCalendarEventViews } from 'src/engine/workspace-manager/
 import { computeStandardCallRecordingViews } from 'src/engine/workspace-manager/twenty-standard-application/utils/view/compute-standard-call-recording-views.util';
 import { computeStandardCompanyViews } from 'src/engine/workspace-manager/twenty-standard-application/utils/view/compute-standard-company-views.util';
 import { computeStandardDashboardViews } from 'src/engine/workspace-manager/twenty-standard-application/utils/view/compute-standard-dashboard-views.util';
+import { computeStandardLeadScoringRuleViews } from 'src/engine/workspace-manager/twenty-standard-application/utils/view/compute-standard-lead-scoring-rule-views.util';
 import { computeStandardMessageCampaignViews } from 'src/engine/workspace-manager/twenty-standard-application/utils/view/compute-standard-message-campaign-views.util';
 import { computeStandardMessageChannelMessageAssociationMessageFolderViews } from 'src/engine/workspace-manager/twenty-standard-application/utils/view/compute-standard-message-channel-message-association-message-folder-views.util';
 import { computeStandardMessageChannelMessageAssociationViews } from 'src/engine/workspace-manager/twenty-standard-application/utils/view/compute-standard-message-channel-message-association-views.util';
@@ -22,6 +23,10 @@ import { computeStandardNoteTargetViews } from 'src/engine/workspace-manager/twe
 import { computeStandardNoteViews } from 'src/engine/workspace-manager/twenty-standard-application/utils/view/compute-standard-note-views.util';
 import { computeStandardOpportunityViews } from 'src/engine/workspace-manager/twenty-standard-application/utils/view/compute-standard-opportunity-views.util';
 import { computeStandardPersonViews } from 'src/engine/workspace-manager/twenty-standard-application/utils/view/compute-standard-person-views.util';
+import { computeStandardPriceBookItemViews } from 'src/engine/workspace-manager/twenty-standard-application/utils/view/compute-standard-price-book-item-views.util';
+import { computeStandardQuoteLineItemViews } from 'src/engine/workspace-manager/twenty-standard-application/utils/view/compute-standard-quote-line-item-views.util';
+import { computeStandardQuoteViews } from 'src/engine/workspace-manager/twenty-standard-application/utils/view/compute-standard-quote-views.util';
+import { computeStandardSequenceViews } from 'src/engine/workspace-manager/twenty-standard-application/utils/view/compute-standard-sequence-views.util';
 import { computeStandardTaskTargetViews } from 'src/engine/workspace-manager/twenty-standard-application/utils/view/compute-standard-task-target-views.util';
 import { computeStandardTaskViews } from 'src/engine/workspace-manager/twenty-standard-application/utils/view/compute-standard-task-views.util';
 import { computeStandardTimelineActivityViews } from 'src/engine/workspace-manager/twenty-standard-application/utils/view/compute-standard-timeline-activity-views.util';
@@ -46,6 +51,7 @@ const STANDARD_FLAT_VIEW_METADATA_BUILDERS_BY_OBJECT_NAME = {
   callRecording: computeStandardCallRecordingViews,
   company: computeStandardCompanyViews,
   dashboard: computeStandardDashboardViews,
+  leadScoringRule: computeStandardLeadScoringRuleViews,
   message: computeStandardMessageViews,
   messageCampaign: computeStandardMessageCampaignViews,
   messageChannelMessageAssociation:
@@ -59,6 +65,10 @@ const STANDARD_FLAT_VIEW_METADATA_BUILDERS_BY_OBJECT_NAME = {
   noteTarget: computeStandardNoteTargetViews,
   opportunity: computeStandardOpportunityViews,
   person: computeStandardPersonViews,
+  priceBookItem: computeStandardPriceBookItemViews,
+  quote: computeStandardQuoteViews,
+  quoteLineItem: computeStandardQuoteLineItemViews,
+  sequence: computeStandardSequenceViews,
   task: computeStandardTaskViews,
   taskTarget: computeStandardTaskTargetViews,
   timelineActivity: computeStandardTimelineActivityViews,

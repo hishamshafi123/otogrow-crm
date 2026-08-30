@@ -60,6 +60,17 @@ const WORKSPACE_SCOPED_EXEMPTIONS = new Set<string>([
   // The domain column is globally unique across workspaces, so duplicate
   // preflight checks must query cross-workspace; writes stay on the wrapper.
   'EmailingDomainEntity',
+  // Public endpoints resolve forms by publicId before any workspace is known,
+  // so lookups are cross-workspace by design.
+  'FormEntity',
+  // The public Twilio webhook resolves the config from the workspaceId path
+  // param before any auth context exists, so lookups are cross-workspace by
+  // design, mirroring FormEntity.
+  'TwilioConfigEntity',
+  // The public /portal endpoint resolves portal access by token hash before
+  // any workspace is known, so lookups are cross-workspace by design,
+  // mirroring FormEntity.
+  'PortalAccessEntity',
 ]);
 
 // Everything else must use @InjectWorkspaceScopedRepository.

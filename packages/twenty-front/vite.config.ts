@@ -3,6 +3,7 @@ import { isNonEmptyString } from '@sniptt/guards';
 import react from '@vitejs/plugin-react-swc';
 import wyw from '@wyw-in-js/vite';
 import fs from 'fs';
+import { type IncomingMessage } from 'node:http';
 import path from 'path';
 import { visualizer } from 'rollup-plugin-visualizer';
 import {
@@ -14,6 +15,7 @@ import {
 import svgr from 'vite-plugin-svgr';
 
 import { createWywProfilingPlugin } from 'twenty-shared/vite';
+import { ApiPath } from 'twenty-shared/types';
 
 import {
   API_PROXY_PATHS,
@@ -44,7 +46,20 @@ export default defineConfig(({ mode }) => {
   const apiProxy = Object.fromEntries(
     API_PROXY_PATHS.map((apiPath) => [
       buildApiProxyMatcher(apiPath),
-      { target: apiProxyTarget },
+      {
+        target: apiProxyTarget,
+        // /forms/:publicId and /portal/:token are both hosted public pages and
+        // public API prefixes: browser navigations keep the SPA, XHR calls go
+        // to the server
+        ...(apiPath === ApiPath.Forms || apiPath === ApiPath.Portal
+          ? {
+              bypass: (req: IncomingMessage) =>
+                req.headers.accept?.includes('text/html')
+                  ? '/index.html'
+                  : undefined,
+            }
+          : {}),
+      },
     ]),
   );
 

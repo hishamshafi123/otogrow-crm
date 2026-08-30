@@ -27,6 +27,11 @@ import { EmailingModule } from 'src/modules/emailing/emailing.module';
 import { MaterializeCampaignJob } from 'src/modules/emailing/jobs/materialize-campaign.job';
 import { RefreshCampaignStatsJob } from 'src/modules/emailing/jobs/refresh-campaign-stats.job';
 import { SendCampaignEmailJob } from 'src/modules/emailing/jobs/send-campaign-email.job';
+import { SequenceSchedulerCronJob } from 'src/modules/sequences/crons/jobs/sequence-scheduler.cron.job';
+import { SendSequenceStepJob } from 'src/modules/sequences/jobs/send-sequence-step.job';
+import { SequencesModule } from 'src/modules/sequences/sequences.module';
+import { LeadScoringJob } from 'src/modules/lead-scoring/jobs/lead-scoring.job';
+import { LeadScoringModule } from 'src/modules/lead-scoring/lead-scoring.module';
 import { EnterpriseModule } from 'src/engine/core-modules/enterprise/enterprise.module';
 import { EventLogIngestionModule } from 'src/engine/core-modules/event-logs/ingest/event-log-ingestion.module';
 import { FeatureFlagModule } from 'src/engine/core-modules/feature-flag/feature-flag.module';
@@ -96,6 +101,8 @@ import { WorkflowModule } from 'src/modules/workflow/workflow.module';
     LogicFunctionModule,
     EnterpriseModule,
     EmailingModule,
+    SequencesModule,
+    LeadScoringModule,
     ApplicationInstallModule,
     ApplicationManifestModule,
     ApplicationRegistrationModule,
@@ -112,6 +119,9 @@ import { WorkflowModule } from 'src/modules/workflow/workflow.module';
     SendCampaignEmailJob,
     MaterializeCampaignJob,
     RefreshCampaignStatsJob,
+    SendSequenceStepJob,
+    SequenceSchedulerCronJob,
+    LeadScoringJob,
     UpdateSubscriptionQuantityJob,
     HandleWorkspaceMemberDeletedJob,
     WorkspaceDeletionApplicationUninstallJob,

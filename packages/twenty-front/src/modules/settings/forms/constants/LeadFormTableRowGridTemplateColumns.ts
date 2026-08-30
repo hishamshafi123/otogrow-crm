@@ -1,0 +1,1 @@
+export const LEAD_FORM_TABLE_ROW_GRID_TEMPLATE_COLUMNS = '3fr 1fr 2fr 24px';

@@ -28,6 +28,10 @@ import { CreatePersonService } from 'src/modules/contact-creation-manager/servic
     CreatePersonService,
     CreateCompanyAndPersonService,
   ],
-  exports: [CreateCompanyAndPersonService],
+  exports: [
+    CreateCompanyAndPersonService,
+    CreateCompanyService,
+    CreatePersonService,
+  ],
 })
 export class ContactCreationManagerModule {}

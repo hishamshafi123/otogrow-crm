@@ -79,6 +79,10 @@ export {
 } from './schemas/send-email-action-settings-schema';
 export { stepFilterGroupSchema } from './schemas/step-filter-group-schema';
 export { stepFilterSchema } from './schemas/step-filter-schema';
+export { workflowSequenceEnrollActionSchema } from './schemas/sequence-enroll-action-schema';
+export { workflowSequenceEnrollActionSettingsSchema } from './schemas/sequence-enroll-action-settings-schema';
+export { workflowSequenceUnenrollActionSchema } from './schemas/sequence-unenroll-action-schema';
+export { workflowSequenceUnenrollActionSettingsSchema } from './schemas/sequence-unenroll-action-settings-schema';
 export { workflowUpdateRecordActionSchema } from './schemas/update-record-action-schema';
 export { workflowUpdateRecordActionSettingsSchema } from './schemas/update-record-action-settings-schema';
 export { workflowUpsertRecordActionSchema } from './schemas/upsert-record-action-schema';

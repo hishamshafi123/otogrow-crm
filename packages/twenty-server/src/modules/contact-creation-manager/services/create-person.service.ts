@@ -39,6 +39,7 @@ export class CreatePersonService {
         const createdPeople = await personRepository.insert(
           peopleToCreate.map((person, index) => ({
             ...person,
+            leadSource: person.leadSource ?? 'EMAIL_SYNC',
             position: lastPersonPosition + index,
           })),
           undefined,

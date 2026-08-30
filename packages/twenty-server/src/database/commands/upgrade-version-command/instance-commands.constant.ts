@@ -150,6 +150,12 @@ import { AddUninstallLogicFunctionIdToApplicationFastInstanceCommand } from 'src
 import { BackfillUninstallLogicFunctionIdOnApplicationSlowInstanceCommand } from 'src/database/commands/upgrade-version-command/2-32/2-32-instance-command-slow-1786959731001-backfill-uninstall-logic-function-id-on-application';
 import { AddUninstallHookCompletedForRequestedAtToApplicationFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-33/2-33-instance-command-fast-1787151824000-add-uninstall-hook-completed-for-requested-at-to-application';
 import { AddTimelineActivityTypeTableFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-33/2-33-instance-command-fast-1787352088649-add-timeline-activity-type-table';
+import { AddFormEntityFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1787513415342-add-form-entity';
+import { AddSequenceBuilderWidgetTypeFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1787564999401-add-sequence-builder-widget-type';
+import { AddQuoteBuilderWidgetTypeFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1787929626000-add-quote-builder-widget-type';
+import { AddPortalAccessEntityFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1787956726025-add-portal-access-entity';
+import { AddPortalAccessWidgetTypeFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1787957598572-add-portal-access-widget-type';
+import { AddTwilioConfigEntityFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1787593556029-add-twilio-config-entity';
 
 export const INSTANCE_COMMANDS = [
   AddViewFieldGroupIdIndexOnViewFieldFastInstanceCommand,
@@ -302,4 +308,10 @@ export const INSTANCE_COMMANDS = [
   BackfillUninstallLogicFunctionIdOnApplicationSlowInstanceCommand,
   AddUninstallHookCompletedForRequestedAtToApplicationFastInstanceCommand,
   AddTimelineActivityTypeTableFastInstanceCommand,
+  AddFormEntityFastInstanceCommand,
+  AddSequenceBuilderWidgetTypeFastInstanceCommand,
+  AddQuoteBuilderWidgetTypeFastInstanceCommand,
+  AddPortalAccessEntityFastInstanceCommand,
+  AddPortalAccessWidgetTypeFastInstanceCommand,
+  AddTwilioConfigEntityFastInstanceCommand,
 ];

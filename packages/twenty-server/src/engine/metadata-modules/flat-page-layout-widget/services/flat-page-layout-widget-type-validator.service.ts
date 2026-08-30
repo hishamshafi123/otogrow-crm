@@ -107,6 +107,15 @@ export class FlatPageLayoutWidgetTypeValidatorService {
       MESSAGE_CAMPAIGN_DETAILS: validateSimpleRecordPageWidgetForCreation(
         WidgetConfigurationType.MESSAGE_CAMPAIGN_DETAILS,
       ),
+      SEQUENCE_BUILDER: validateSimpleRecordPageWidgetForCreation(
+        WidgetConfigurationType.SEQUENCE_BUILDER,
+      ),
+      QUOTE_BUILDER: validateSimpleRecordPageWidgetForCreation(
+        WidgetConfigurationType.QUOTE_BUILDER,
+      ),
+      PORTAL_ACCESS: validateSimpleRecordPageWidgetForCreation(
+        WidgetConfigurationType.PORTAL_ACCESS,
+      ),
     };
 
   private readonly PAGE_LAYOUT_WIDGET_TYPE_VALIDATOR_FOR_UPDATE_HASHMAP: FlatPageLayoutWidgetTypeValidatorForUpdate =
@@ -172,6 +181,15 @@ export class FlatPageLayoutWidgetTypeValidatorService {
       ),
       MESSAGE_CAMPAIGN_DETAILS: validateSimpleRecordPageWidgetForUpdate(
         WidgetConfigurationType.MESSAGE_CAMPAIGN_DETAILS,
+      ),
+      SEQUENCE_BUILDER: validateSimpleRecordPageWidgetForUpdate(
+        WidgetConfigurationType.SEQUENCE_BUILDER,
+      ),
+      QUOTE_BUILDER: validateSimpleRecordPageWidgetForUpdate(
+        WidgetConfigurationType.QUOTE_BUILDER,
+      ),
+      PORTAL_ACCESS: validateSimpleRecordPageWidgetForUpdate(
+        WidgetConfigurationType.PORTAL_ACCESS,
       ),
     };
 

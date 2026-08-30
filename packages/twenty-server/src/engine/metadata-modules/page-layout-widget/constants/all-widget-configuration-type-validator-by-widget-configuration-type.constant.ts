@@ -16,6 +16,9 @@ import { IframeConfigurationDTO } from 'src/engine/metadata-modules/page-layout-
 import { LineChartConfigurationDTO } from 'src/engine/metadata-modules/page-layout-widget/dtos/line-chart-configuration.dto';
 import { NotesConfigurationDTO } from 'src/engine/metadata-modules/page-layout-widget/dtos/notes-configuration.dto';
 import { RecordTableConfigurationDTO } from 'src/engine/metadata-modules/page-layout-widget/dtos/record-table-configuration.dto';
+import { SequenceBuilderConfigurationDTO } from 'src/engine/metadata-modules/page-layout-widget/dtos/sequence-builder-configuration.dto';
+import { QuoteBuilderConfigurationDTO } from 'src/engine/metadata-modules/page-layout-widget/dtos/quote-builder-configuration.dto';
+import { PortalAccessConfigurationDTO } from 'src/engine/metadata-modules/page-layout-widget/dtos/portal-access-configuration.dto';
 import { PieChartConfigurationDTO } from 'src/engine/metadata-modules/page-layout-widget/dtos/pie-chart-configuration.dto';
 import { StandaloneRichTextConfigurationDTO } from 'src/engine/metadata-modules/page-layout-widget/dtos/standalone-rich-text-configuration.dto';
 import { TasksConfigurationDTO } from 'src/engine/metadata-modules/page-layout-widget/dtos/tasks-configuration.dto';
@@ -43,6 +46,9 @@ export const ALL_WIDGET_CONFIGURATION_TYPE_VALIDATOR_BY_WIDGET_CONFIGURATION_TYP
     CALL_RECORDING_TRANSCRIPT: CallRecordingTranscriptConfigurationDTO,
     MESSAGE_CAMPAIGN_BODY: MessageCampaignBodyConfigurationDTO,
     MESSAGE_CAMPAIGN_DETAILS: MessageCampaignDetailsConfigurationDTO,
+    SEQUENCE_BUILDER: SequenceBuilderConfigurationDTO,
+    QUOTE_BUILDER: QuoteBuilderConfigurationDTO,
+    PORTAL_ACCESS: PortalAccessConfigurationDTO,
     FIELD: FieldConfigurationDTO,
     FIELD_RICH_TEXT: FieldRichTextConfigurationDTO,
     FIELDS: FieldsConfigurationDTO,

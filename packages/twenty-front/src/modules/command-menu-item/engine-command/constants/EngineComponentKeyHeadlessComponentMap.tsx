@@ -15,6 +15,8 @@ import { RestoreRecordsCommand } from '@/command-menu-item/engine-command/record
 import { TriggerWorkflowVersionEngineCommand } from '@/command-menu-item/engine-command/record/components/TriggerWorkflowVersionEngineCommand';
 import { MergeMultipleRecordsCommand } from '@/command-menu-item/engine-command/record/multiple-records/components/MergeMultipleRecordsCommand';
 import { UpdateMultipleRecordsCommand } from '@/command-menu-item/engine-command/record/multiple-records/components/UpdateMultipleRecordsCommand';
+import { EnrollInSequenceRecordCommand } from '@/command-menu-item/engine-command/record/sequences/components/EnrollInSequenceRecordCommand';
+import { UnenrollFromSequenceRecordCommand } from '@/command-menu-item/engine-command/record/sequences/components/UnenrollFromSequenceRecordCommand';
 import { CreateNewIndexRecordNoSelectionRecordCommand } from '@/command-menu-item/engine-command/record/no-selection/components/CreateNewIndexRecordNoSelectionRecordCommand';
 import { CreateNewViewNoSelectionRecordCommand } from '@/command-menu-item/engine-command/record/no-selection/components/CreateNewViewNoSelectionRecordCommand';
 import { HideDeletedRecordsNoSelectionRecordCommand } from '@/command-menu-item/engine-command/record/no-selection/components/HideDeletedRecordsNoSelectionRecordCommand';
@@ -262,6 +264,10 @@ export const ENGINE_COMPONENT_KEY_COMPONENT_MAP: Record<
   ),
   [EngineComponentKey.EMAIL_BLOCK_SETTINGS]: (
     <OpenEmailBlockSettingsSingleRecordCommand />
+  ),
+  [EngineComponentKey.ENROLL_IN_SEQUENCE]: <EnrollInSequenceRecordCommand />,
+  [EngineComponentKey.UNENROLL_FROM_SEQUENCE]: (
+    <UnenrollFromSequenceRecordCommand />
   ),
 
   // Deprecated keys kept for backward compatibility until migration runs

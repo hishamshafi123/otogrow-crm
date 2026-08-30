@@ -19,6 +19,9 @@ import { TimelineWidget } from '@/page-layout/widgets/timeline/components/Timeli
 import { WorkflowRunWidget } from '@/page-layout/widgets/workflow/components/WorkflowRunWidget';
 import { WorkflowVersionWidget } from '@/page-layout/widgets/workflow/components/WorkflowVersionWidget';
 import { RecordTableWidgetRenderer } from '@/page-layout/widgets/record-table/components/RecordTableWidgetRenderer';
+import { SequenceBuilderWidget } from '@/page-layout/widgets/sequence-builder/components/SequenceBuilderWidget';
+import { QuoteBuilderWidget } from '@/page-layout/widgets/quote-builder/components/QuoteBuilderWidget';
+import { ClientPortalWidget } from '@/page-layout/widgets/client-portal/components/ClientPortalWidget';
 import { WorkflowWidget } from '@/page-layout/widgets/workflow/components/WorkflowWidget';
 import { WidgetType } from '~/generated-metadata/graphql';
 
@@ -86,6 +89,15 @@ export const WidgetContentRenderer = ({
 
     case WidgetType.MESSAGE_CAMPAIGN_BODY:
       return <MessageCampaignBodyWidget />;
+
+    case WidgetType.SEQUENCE_BUILDER:
+      return <SequenceBuilderWidget />;
+
+    case WidgetType.QUOTE_BUILDER:
+      return <QuoteBuilderWidget />;
+
+    case WidgetType.PORTAL_ACCESS:
+      return <ClientPortalWidget />;
 
     case WidgetType.CALL_RECORDING_SUMMARY:
       return <CallRecordingSummaryWidget />;

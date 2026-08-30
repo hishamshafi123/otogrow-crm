@@ -147,4 +147,11 @@ export const CONFIG_VARIABLES_GROUP_METADATA: Record<
     isHiddenOnLoad: true,
     isHiddenInAdminPanel: true,
   },
+  [ConfigVariablesGroup.TWILIO_SETTINGS]: {
+    position: 2300,
+    description:
+      'Configure the Twilio driver for WhatsApp/SMS channel messages. Credentials are managed per workspace in Settings.',
+    isHiddenOnLoad: true,
+    isHiddenInAdminPanel: true,
+  },
 };

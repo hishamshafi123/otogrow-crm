@@ -55,6 +55,36 @@ export const STANDARD_NAVIGATION_MENU_ITEMS = {
         .universalIdentifier,
     position: 7,
   },
+  allSequences: {
+    universalIdentifier: '20202020-b00c-4b0c-8b0c-c0aba11c000c',
+    type: NavigationMenuItemType.OBJECT,
+    viewUniversalIdentifier:
+      STANDARD_OBJECTS.sequence.views.allSequences.universalIdentifier,
+    position: 8,
+  },
+  allLeadScoringRules: {
+    universalIdentifier: '20202020-b00d-4b0d-8b0d-c0aba11c000d',
+    type: NavigationMenuItemType.OBJECT,
+    viewUniversalIdentifier:
+      STANDARD_OBJECTS.leadScoringRule.views.allLeadScoringRules
+        .universalIdentifier,
+    position: 9,
+  },
+  allPriceBookItems: {
+    universalIdentifier: '20202020-b00e-4b0e-8b0e-c0aba11c000e',
+    type: NavigationMenuItemType.OBJECT,
+    viewUniversalIdentifier:
+      STANDARD_OBJECTS.priceBookItem.views.allPriceBookItems
+        .universalIdentifier,
+    position: 10,
+  },
+  allQuotes: {
+    universalIdentifier: '20202020-b00f-4b0f-8b0f-c0aba11c000f',
+    type: NavigationMenuItemType.OBJECT,
+    viewUniversalIdentifier:
+      STANDARD_OBJECTS.quote.views.allQuotes.universalIdentifier,
+    position: 11,
+  },
   workflowsFolder: {
     universalIdentifier: '20202020-b007-4b07-8b07-c0aba11c0007',
     type: NavigationMenuItemType.FOLDER,
@@ -101,6 +131,8 @@ export const STANDARD_NAVIGATION_MENU_ITEM_DEFAULT_COLORS: Partial<
   allOpportunities: 'red',
   workflowsFolder: 'orange',
   allMessageCampaigns: 'gray',
+  allSequences: 'gray',
+  allLeadScoringRules: 'gray',
   allDashboards: 'gray',
   workflowsFolderAllWorkflows: 'gray',
   workflowsFolderAllWorkflowRuns: 'gray',

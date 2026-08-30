@@ -18,6 +18,7 @@ import { isNonEmptyString } from '@sniptt/guards';
 import {
   IconApps,
   IconAt,
+  IconBrandWhatsapp,
   IconCalendarEvent,
   IconColorSwatch,
   type IconComponent,
@@ -26,6 +27,7 @@ import {
   IconHelpCircle,
   IconHierarchy2,
   IconLayout,
+  IconListDetails,
   IconMail,
   IconMessage,
   IconMessageCircle,
@@ -152,6 +154,18 @@ const useSettingsNavigationItems = (): SettingsNavigationSection[] => {
           label: t`MCP & APIs`,
           path: SettingsPath.ApiWebhooks,
           Icon: IconPlug,
+          isHidden: !permissionMap[PermissionFlagType.API_KEYS_AND_WEBHOOKS],
+        },
+        {
+          label: t`Lead forms`,
+          path: SettingsPath.LeadForms,
+          Icon: IconListDetails,
+          isHidden: !permissionMap[PermissionFlagType.API_KEYS_AND_WEBHOOKS],
+        },
+        {
+          label: t`Twilio`,
+          path: SettingsPath.Twilio,
+          Icon: IconBrandWhatsapp,
           isHidden: !permissionMap[PermissionFlagType.API_KEYS_AND_WEBHOOKS],
         },
         // TODO: Re-enable when integrations page is ready

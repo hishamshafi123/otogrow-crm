@@ -167,6 +167,18 @@ export type MessageCampaignDetailsConfiguration = {
   configurationType: 'MESSAGE_CAMPAIGN_DETAILS';
 };
 
+export type SequenceBuilderConfiguration = {
+  configurationType: 'SEQUENCE_BUILDER';
+};
+
+export type QuoteBuilderConfiguration = {
+  configurationType: 'QUOTE_BUILDER';
+};
+
+export type PortalAccessConfiguration = {
+  configurationType: 'PORTAL_ACCESS';
+};
+
 export type CallRecordingSummaryConfiguration = {
   configurationType: 'CALL_RECORDING_SUMMARY';
 };
@@ -216,5 +228,8 @@ export type PageLayoutWidgetConfiguration =
   | EmailThreadConfiguration
   | MessageCampaignBodyConfiguration
   | MessageCampaignDetailsConfiguration
+  | SequenceBuilderConfiguration
+  | QuoteBuilderConfiguration
+  | PortalAccessConfiguration
   | CallRecordingSummaryConfiguration
   | CallRecordingTranscriptConfiguration;

@@ -58,6 +58,18 @@ const PasswordReset = lazy(() =>
   })),
 );
 
+const PublicLeadForm = lazy(() =>
+  import('~/pages/forms/PublicLeadForm').then((module) => ({
+    default: module.PublicLeadForm,
+  })),
+);
+
+const ClientPortalPage = lazy(() =>
+  import('~/pages/portal/ClientPortalPage').then((module) => ({
+    default: module.ClientPortalPage,
+  })),
+);
+
 const Authorize = lazy(() =>
   import('~/pages/auth/Authorize').then((module) => ({
     default: module.Authorize,
@@ -292,6 +304,22 @@ const createWorkspaceAppRouter = ({
               }
             />
           </Route>
+          <Route
+            path={AppPath.PublicForm}
+            element={
+              <LazyRoute fallback={null}>
+                <PublicLeadForm />
+              </LazyRoute>
+            }
+          />
+          <Route
+            path={AppPath.Portal}
+            element={
+              <LazyRoute fallback={null}>
+                <ClientPortalPage />
+              </LazyRoute>
+            }
+          />
           <Route
             element={<OnboardingActivationOutlet />}
             loader={preloadOnboardingPages}

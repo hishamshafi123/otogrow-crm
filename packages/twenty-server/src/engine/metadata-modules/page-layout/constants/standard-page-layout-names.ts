@@ -35,6 +35,11 @@ export const getStandardPageLayoutNames = () => [
   msg({ message: `Default Note Layout`, context: 'pageLayout.name' }),
   msg({ message: `Default Opportunity Layout`, context: 'pageLayout.name' }),
   msg({ message: `Default Person Layout`, context: 'pageLayout.name' }),
+  msg({
+    message: `Default Lead Scoring Rule Layout`,
+    context: 'pageLayout.name',
+  }),
+  msg({ message: `Default Sequence Layout`, context: 'pageLayout.name' }),
   msg({ message: `Default Task Layout`, context: 'pageLayout.name' }),
   msg({
     message: `Default Workflow Automated Trigger Layout`,
@@ -47,4 +52,10 @@ export const getStandardPageLayoutNames = () => [
     context: 'pageLayout.name',
   }),
   msg({ message: `My First Dashboard`, context: 'pageLayout.name' }),
+  msg({ message: `Otogrow Analytics`, context: 'pageLayout.name' }),
+  msg({ message: `Default Quote Layout`, context: 'pageLayout.name' }),
+  msg({
+    message: `Default Price Book Item Layout`,
+    context: 'pageLayout.name',
+  }),
 ];

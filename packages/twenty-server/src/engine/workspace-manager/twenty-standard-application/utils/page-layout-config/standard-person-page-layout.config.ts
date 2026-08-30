@@ -63,6 +63,51 @@ const PERSON_PAGE_TABS = {
         fieldUniversalIdentifier:
           STANDARD_OBJECTS.person.fields.listMemberships.universalIdentifier,
       },
+      sequenceEnrollments: {
+        universalIdentifier:
+          STANDARD_PAGE_LAYOUT_UNIVERSAL_IDENTIFIERS.personRecordPage.tabs.home
+            .widgets.sequenceEnrollments.universalIdentifier,
+        title: 'Sequences',
+        type: WidgetType.FIELD,
+        gridPosition: GRID_POSITIONS.FULL_WIDTH,
+        position: VERTICAL_LIST_LAYOUT_POSITIONS.SIXTH,
+        fieldUniversalIdentifier:
+          STANDARD_OBJECTS.person.fields.sequenceEnrollments
+            .universalIdentifier,
+      },
+      channelMessages: {
+        universalIdentifier:
+          STANDARD_PAGE_LAYOUT_UNIVERSAL_IDENTIFIERS.personRecordPage.tabs.home
+            .widgets.channelMessages.universalIdentifier,
+        title: 'Messages',
+        type: WidgetType.FIELD,
+        gridPosition: GRID_POSITIONS.FULL_WIDTH,
+        position: VERTICAL_LIST_LAYOUT_POSITIONS.SEVENTH,
+        fieldUniversalIdentifier:
+          STANDARD_OBJECTS.person.fields.channelMessages.universalIdentifier,
+      },
+      leadScoreEvents: {
+        universalIdentifier:
+          STANDARD_PAGE_LAYOUT_UNIVERSAL_IDENTIFIERS.personRecordPage.tabs.home
+            .widgets.leadScoreEvents.universalIdentifier,
+        title: 'Score history',
+        type: WidgetType.FIELD,
+        gridPosition: GRID_POSITIONS.FULL_WIDTH,
+        position: VERTICAL_LIST_LAYOUT_POSITIONS.EIGHTH,
+        fieldUniversalIdentifier:
+          STANDARD_OBJECTS.person.fields.leadScoreEvents.universalIdentifier,
+      },
+      quotes: {
+        universalIdentifier:
+          STANDARD_PAGE_LAYOUT_UNIVERSAL_IDENTIFIERS.personRecordPage.tabs.home
+            .widgets.quotes.universalIdentifier,
+        title: 'Quotes',
+        type: WidgetType.FIELD,
+        gridPosition: GRID_POSITIONS.FULL_WIDTH,
+        position: VERTICAL_LIST_LAYOUT_POSITIONS.NINTH,
+        fieldUniversalIdentifier:
+          STANDARD_OBJECTS.person.fields.quotes.universalIdentifier,
+      },
     },
   },
   timeline: {

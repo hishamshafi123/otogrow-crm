@@ -15,6 +15,8 @@ export type Message = Omit<
   | 'id'
   | 'messageCampaign'
   | 'messageCampaignId'
+  | 'sequenceEnrollment'
+  | 'sequenceEnrollmentId'
   | 'deliveryStatus'
 > & {
   attachments: {

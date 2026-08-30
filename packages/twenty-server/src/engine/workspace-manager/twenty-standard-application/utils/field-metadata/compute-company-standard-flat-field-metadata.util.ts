@@ -513,6 +513,36 @@ export const buildCompanyStandardFlatFieldMetadatas = ({
     twentyStandardApplicationId,
     now,
   }),
+  quotes: createStandardRelationFieldFlatMetadata({
+    objectName,
+    workspaceId,
+    context: {
+      type: FieldMetadataType.RELATION,
+      morphId: null,
+      fieldName: 'quotes',
+      label: i18nLabel(
+        msg({ message: `Quotes`, context: 'fieldMetadata.label' }),
+      ),
+      description: i18nLabel(
+        msg({
+          message: `Quotes issued for this company`,
+          context: 'fieldMetadata.description',
+        }),
+      ),
+      icon: 'IconFileDollar',
+      isUIEditable: false,
+      isNullable: true,
+      targetObjectName: 'quote',
+      targetFieldName: 'company',
+      settings: {
+        relationType: RelationType.ONE_TO_MANY,
+      },
+    },
+    standardObjectMetadataRelatedEntityIds,
+    dependencyFlatEntityMaps,
+    twentyStandardApplicationId,
+    now,
+  }),
   attachments: createStandardRelationFieldFlatMetadata({
     objectName,
     workspaceId,

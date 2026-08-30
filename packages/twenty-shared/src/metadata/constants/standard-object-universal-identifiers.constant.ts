@@ -34,6 +34,15 @@ export const STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS = {
   messageCampaign: '238acb94-dd4c-4036-bc55-19b99d821efd',
   messageParticipant: '20202020-a433-4456-aa2d-fd9cb26b774a',
   messageThread: '20202020-849a-4c3e-84f5-a25a7d802271',
+  sequence: '44e2be57-b9a0-4b2b-a426-7c8debe8ad46',
+  sequenceStep: 'c3d3ec05-3c86-4f04-bd0f-50d0c154ec83',
+  sequenceEnrollment: '27962ef9-f99f-4e70-b595-8746492b6d9a',
+  channelMessage: 'b7f3c9a1-2d48-4e6f-9a35-1c0d8e7f2b44',
+  leadScoringRule: '7a3f9d21-4c8e-4b6a-9f2d-5e1a8c3b7d90',
+  leadScoreEvent: 'e5b1c8f3-2a7d-4e9b-b3f6-8d2c4a6e1f53',
+  priceBookItem: 'c0aeac1e-6bf1-4c40-b0ff-1e64e068fab0',
+  quote: '13736cdf-3d11-4b83-a40f-f566ccf61da5',
+  quoteLineItem: 'a41a662a-238e-46b7-8d7b-114749af2038',
 } as const;
 
 export type StandardObjectWithUniversalIdentifierName =

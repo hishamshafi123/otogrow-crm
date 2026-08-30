@@ -63,6 +63,17 @@ const OPPORTUNITY_PAGE_TABS = {
         fieldUniversalIdentifier:
           STANDARD_OBJECTS.opportunity.fields.owner.universalIdentifier,
       },
+      quotes: {
+        universalIdentifier:
+          STANDARD_PAGE_LAYOUT_UNIVERSAL_IDENTIFIERS.opportunityRecordPage.tabs
+            .home.widgets.quotes.universalIdentifier,
+        title: 'Quotes',
+        type: WidgetType.FIELD,
+        gridPosition: GRID_POSITIONS.FULL_WIDTH,
+        position: VERTICAL_LIST_LAYOUT_POSITIONS.FIFTH,
+        fieldUniversalIdentifier:
+          STANDARD_OBJECTS.opportunity.fields.quotes.universalIdentifier,
+      },
     },
   },
   timeline: {

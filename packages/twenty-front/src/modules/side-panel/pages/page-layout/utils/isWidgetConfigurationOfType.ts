@@ -17,7 +17,10 @@ import {
   type MessageCampaignDetailsConfiguration,
   type NotesConfiguration,
   type PieChartConfiguration,
+  type PortalAccessConfiguration,
+  type QuoteBuilderConfiguration,
   type RecordTableConfiguration,
+  type SequenceBuilderConfiguration,
   type StandaloneRichTextConfiguration,
   type TasksConfiguration,
   type TimelineConfiguration,
@@ -77,6 +80,24 @@ type WidgetConfigurationTypenameMap = {
     'configurationType'
   > & {
     configurationType: WidgetConfigurationType.MESSAGE_CAMPAIGN_DETAILS;
+  };
+  SequenceBuilderConfiguration: Omit<
+    SequenceBuilderConfiguration,
+    'configurationType'
+  > & {
+    configurationType: WidgetConfigurationType.SEQUENCE_BUILDER;
+  };
+  QuoteBuilderConfiguration: Omit<
+    QuoteBuilderConfiguration,
+    'configurationType'
+  > & {
+    configurationType: WidgetConfigurationType.QUOTE_BUILDER;
+  };
+  PortalAccessConfiguration: Omit<
+    PortalAccessConfiguration,
+    'configurationType'
+  > & {
+    configurationType: WidgetConfigurationType.PORTAL_ACCESS;
   };
   EmailsConfiguration: Omit<EmailsConfiguration, 'configurationType'> & {
     configurationType: WidgetConfigurationType.EMAILS;

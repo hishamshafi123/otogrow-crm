@@ -4,6 +4,7 @@ import { type MessageCampaignWorkspaceEntity } from 'src/modules/emailing/standa
 import { type MessageChannelMessageAssociationWorkspaceEntity } from 'src/modules/messaging/common/standard-objects/message-channel-message-association.workspace-entity';
 import { type MessageParticipantWorkspaceEntity } from 'src/modules/messaging/common/standard-objects/message-participant.workspace-entity';
 import { type MessageThreadWorkspaceEntity } from 'src/modules/messaging/common/standard-objects/message-thread.workspace-entity';
+import { type SequenceEnrollmentWorkspaceEntity } from 'src/modules/sequences/standard-objects/sequence-enrollment.workspace-entity';
 
 export class MessageWorkspaceEntity extends BaseWorkspaceEntity {
   headerMessageId: string | null;
@@ -18,6 +19,8 @@ export class MessageWorkspaceEntity extends BaseWorkspaceEntity {
   >;
   messageCampaign: EntityRelation<MessageCampaignWorkspaceEntity> | null;
   messageCampaignId: string | null;
+  sequenceEnrollment: EntityRelation<SequenceEnrollmentWorkspaceEntity> | null;
+  sequenceEnrollmentId: string | null;
   deliveryStatus: string | null;
   isDraft: boolean;
 }

@@ -206,6 +206,154 @@ export const buildPersonStandardFlatFieldMetadatas = ({
     twentyStandardApplicationId,
     now,
   }),
+  leadScore: createStandardFieldFlatMetadata({
+    objectName,
+    workspaceId,
+    context: {
+      fieldName: 'leadScore',
+      type: FieldMetadataType.NUMBER,
+      label: i18nLabel(
+        msg({ message: `Lead Score`, context: 'fieldMetadata.label' }),
+      ),
+      description: i18nLabel(
+        msg({
+          message: `Computed lead score, recomputed from lead scoring rules`,
+          context: 'fieldMetadata.description',
+        }),
+      ),
+      icon: 'IconChartArrowsVertical',
+      isNullable: true,
+      defaultValue: 0,
+    },
+    standardObjectMetadataRelatedEntityIds,
+    dependencyFlatEntityMaps,
+    twentyStandardApplicationId,
+    now,
+  }),
+  leadSource: createStandardFieldFlatMetadata({
+    objectName,
+    workspaceId,
+    context: {
+      fieldName: 'leadSource',
+      type: FieldMetadataType.SELECT,
+      label: i18nLabel(
+        msg({ message: `Lead Source`, context: 'fieldMetadata.label' }),
+      ),
+      description: i18nLabel(
+        msg({
+          message: `Channel through which the contact was created`,
+          context: 'fieldMetadata.description',
+        }),
+      ),
+      icon: 'IconTag',
+      isNullable: true,
+      defaultValue: "'MANUAL'",
+      options: [
+        {
+          id: '15ec0e1a-97e5-4e2e-94ec-5d71bbfee73b',
+          value: 'FORM',
+          label: i18nLabel(
+            msg({ message: `Form`, context: 'fieldMetadata.label' }),
+          ),
+          position: 0,
+          color: 'green',
+        },
+        {
+          id: 'd3e2ebaa-3cb4-4fbb-b8c1-7d6b8b8a10ab',
+          value: 'MANUAL',
+          label: i18nLabel(
+            msg({ message: `Manual`, context: 'fieldMetadata.label' }),
+          ),
+          position: 1,
+          color: 'gray',
+        },
+        {
+          id: '4bffdd49-a207-4cc4-a856-6cfbcd9884bb',
+          value: 'EMAIL_SYNC',
+          label: i18nLabel(
+            msg({ message: `Email Sync`, context: 'fieldMetadata.label' }),
+          ),
+          position: 2,
+          color: 'blue',
+        },
+        {
+          id: 'fd107b18-5b7d-4259-b670-933a1816a1f9',
+          value: 'IMPORT',
+          label: i18nLabel(
+            msg({ message: `Import`, context: 'fieldMetadata.label' }),
+          ),
+          position: 3,
+          color: 'purple',
+        },
+        {
+          id: '9246e342-7f2c-417a-8746-c86d4a4fb47f',
+          value: 'SEQUENCE',
+          label: i18nLabel(
+            msg({ message: `Sequence`, context: 'fieldMetadata.label' }),
+          ),
+          position: 4,
+          color: 'orange',
+        },
+      ],
+    },
+    standardObjectMetadataRelatedEntityIds,
+    dependencyFlatEntityMaps,
+    twentyStandardApplicationId,
+    now,
+  }),
+  leadScoreBand: createStandardFieldFlatMetadata({
+    objectName,
+    workspaceId,
+    context: {
+      fieldName: 'leadScoreBand',
+      type: FieldMetadataType.SELECT,
+      label: i18nLabel(
+        msg({ message: `Lead Score Band`, context: 'fieldMetadata.label' }),
+      ),
+      description: i18nLabel(
+        msg({
+          message: `Bucket derived from the lead score (Cold 0-19, Warm 20-49, Hot 50+)`,
+          context: 'fieldMetadata.description',
+        }),
+      ),
+      icon: 'IconTemperature',
+      isNullable: true,
+      defaultValue: "'COLD'",
+      options: [
+        {
+          id: '6e3bb683-958e-4506-91d6-d2d2bbc76d2b',
+          value: 'COLD',
+          label: i18nLabel(
+            msg({ message: `Cold`, context: 'fieldMetadata.label' }),
+          ),
+          position: 0,
+          color: 'blue',
+        },
+        {
+          id: '495ae3ff-5f99-46cb-a4ba-2faf02e27e86',
+          value: 'WARM',
+          label: i18nLabel(
+            msg({ message: `Warm`, context: 'fieldMetadata.label' }),
+          ),
+          position: 1,
+          color: 'yellow',
+        },
+        {
+          id: '52c75f2f-3892-4819-a313-43a9fea2c5ff',
+          value: 'HOT',
+          label: i18nLabel(
+            msg({ message: `Hot`, context: 'fieldMetadata.label' }),
+          ),
+          position: 2,
+          color: 'red',
+        },
+      ],
+    },
+    standardObjectMetadataRelatedEntityIds,
+    dependencyFlatEntityMaps,
+    twentyStandardApplicationId,
+    now,
+  }),
   jobTitle: createStandardFieldFlatMetadata({
     objectName,
     workspaceId,
@@ -668,6 +816,138 @@ export const buildPersonStandardFlatFieldMetadatas = ({
       },
       junctionTargetFieldUniversalIdentifier:
         STANDARD_OBJECTS.messageListMember.fields.list.universalIdentifier,
+    },
+    standardObjectMetadataRelatedEntityIds,
+    dependencyFlatEntityMaps,
+    twentyStandardApplicationId,
+    now,
+  }),
+  sequenceEnrollments: createStandardRelationFieldFlatMetadata({
+    objectName,
+    workspaceId,
+    context: {
+      type: FieldMetadataType.RELATION,
+      morphId: null,
+      fieldName: 'sequenceEnrollments',
+      label: i18nLabel(
+        msg({
+          message: `Sequence Enrollments`,
+          context: 'fieldMetadata.label',
+        }),
+      ),
+      description: i18nLabel(
+        msg({
+          message: `Sequences the contact is enrolled in`,
+          context: 'fieldMetadata.description',
+        }),
+      ),
+      icon: 'IconMailFast',
+      isUIEditable: false,
+      isNullable: true,
+      targetObjectName: 'sequenceEnrollment',
+      targetFieldName: 'person',
+      settings: {
+        relationType: RelationType.ONE_TO_MANY,
+      },
+    },
+    standardObjectMetadataRelatedEntityIds,
+    dependencyFlatEntityMaps,
+    twentyStandardApplicationId,
+    now,
+  }),
+  quotes: createStandardRelationFieldFlatMetadata({
+    objectName,
+    workspaceId,
+    context: {
+      type: FieldMetadataType.RELATION,
+      morphId: null,
+      fieldName: 'quotes',
+      label: i18nLabel(
+        msg({
+          message: `Quotes`,
+          context: 'fieldMetadata.label',
+        }),
+      ),
+      description: i18nLabel(
+        msg({
+          message: `Quotes issued for this person`,
+          context: 'fieldMetadata.description',
+        }),
+      ),
+      icon: 'IconFileDollar',
+      isUIEditable: false,
+      isNullable: true,
+      targetObjectName: 'quote',
+      targetFieldName: 'person',
+      settings: {
+        relationType: RelationType.ONE_TO_MANY,
+      },
+    },
+    standardObjectMetadataRelatedEntityIds,
+    dependencyFlatEntityMaps,
+    twentyStandardApplicationId,
+    now,
+  }),
+  channelMessages: createStandardRelationFieldFlatMetadata({
+    objectName,
+    workspaceId,
+    context: {
+      type: FieldMetadataType.RELATION,
+      morphId: null,
+      fieldName: 'channelMessages',
+      label: i18nLabel(
+        msg({
+          message: `Channel Messages`,
+          context: 'fieldMetadata.label',
+        }),
+      ),
+      description: i18nLabel(
+        msg({
+          message: `WhatsApp and SMS messages exchanged with the contact`,
+          context: 'fieldMetadata.description',
+        }),
+      ),
+      icon: 'IconMessage',
+      isUIEditable: false,
+      isNullable: true,
+      targetObjectName: 'channelMessage',
+      targetFieldName: 'person',
+      settings: {
+        relationType: RelationType.ONE_TO_MANY,
+      },
+    },
+    standardObjectMetadataRelatedEntityIds,
+    dependencyFlatEntityMaps,
+    twentyStandardApplicationId,
+    now,
+  }),
+  leadScoreEvents: createStandardRelationFieldFlatMetadata({
+    objectName,
+    workspaceId,
+    context: {
+      type: FieldMetadataType.RELATION,
+      morphId: null,
+      fieldName: 'leadScoreEvents',
+      label: i18nLabel(
+        msg({
+          message: `Score history`,
+          context: 'fieldMetadata.label',
+        }),
+      ),
+      description: i18nLabel(
+        msg({
+          message: `Lead scoring events that make up the contact's score`,
+          context: 'fieldMetadata.description',
+        }),
+      ),
+      icon: 'IconChartArrowsVertical',
+      isUIEditable: false,
+      isNullable: true,
+      targetObjectName: 'leadScoreEvent',
+      targetFieldName: 'person',
+      settings: {
+        relationType: RelationType.ONE_TO_MANY,
+      },
     },
     standardObjectMetadataRelatedEntityIds,
     dependencyFlatEntityMaps,

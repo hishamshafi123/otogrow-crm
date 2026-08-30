@@ -32,6 +32,7 @@ import { CaptchaDriverType } from 'src/engine/core-modules/captcha/interfaces';
 import { CodeInterpreterDriverType } from 'src/engine/core-modules/code-interpreter/code-interpreter.interface';
 import { DpaRegion } from 'src/engine/core-modules/dpa/enums/dpa-region.enum';
 import { EmailDriver } from 'src/engine/core-modules/email/enums/email-driver.enum';
+import { TwilioDriver } from 'src/engine/core-modules/twenty-config/enums/twilio-driver.enum';
 import { EmailingDomainDriver } from 'src/engine/core-modules/emailing-domain/drivers/types/emailing-domain-driver.type';
 import { ExceptionHandlerDriver } from 'src/engine/core-modules/exception-handler/interfaces';
 import { StorageDriverType } from 'src/engine/core-modules/file-storage/interfaces';
@@ -486,7 +487,7 @@ export class ConfigVariables {
     description: 'Name used in the From header for outgoing emails',
     type: ConfigVariableType.STRING,
   })
-  EMAIL_FROM_NAME = 'Felix from Twenty';
+  EMAIL_FROM_NAME = 'Otogrow CRM';
 
   @ConfigVariablesMetadata({
     group: ConfigVariablesGroup.EMAIL_SETTINGS,
@@ -2236,6 +2237,15 @@ export class ConfigVariables {
   })
   @IsOptional()
   RESEND_DOMAIN_REGION: string;
+
+  @ConfigVariablesMetadata({
+    group: ConfigVariablesGroup.TWILIO_SETTINGS,
+    description: 'Driver to use for sending WhatsApp/SMS channel messages',
+    type: ConfigVariableType.ENUM,
+    options: Object.values(TwilioDriver),
+  })
+  @CastToUpperSnakeCase()
+  TWILIO_DRIVER: TwilioDriver = TwilioDriver.LOGGER;
 
   @ConfigVariablesMetadata({
     group: ConfigVariablesGroup.ADVANCED_SETTINGS,

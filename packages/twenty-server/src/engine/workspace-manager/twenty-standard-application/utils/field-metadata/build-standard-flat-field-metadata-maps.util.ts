@@ -11,8 +11,11 @@ import { buildCalendarChannelEventAssociationStandardFlatFieldMetadatas } from '
 import { buildCalendarEventParticipantStandardFlatFieldMetadatas } from 'src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-calendar-event-participant-standard-flat-field-metadata.util';
 import { buildCalendarEventStandardFlatFieldMetadatas } from 'src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-calendar-event-standard-flat-field-metadata.util';
 import { buildCallRecordingStandardFlatFieldMetadatas } from 'src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-call-recording-standard-flat-field-metadata.util';
+import { buildChannelMessageStandardFlatFieldMetadatas } from 'src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-channel-message-standard-flat-field-metadata.util';
 import { buildCompanyStandardFlatFieldMetadatas } from 'src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-company-standard-flat-field-metadata.util';
 import { buildDashboardStandardFlatFieldMetadatas } from 'src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-dashboard-standard-flat-field-metadata.util';
+import { buildLeadScoreEventStandardFlatFieldMetadatas } from 'src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-lead-score-event-standard-flat-field-metadata.util';
+import { buildLeadScoringRuleStandardFlatFieldMetadatas } from 'src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-lead-scoring-rule-standard-flat-field-metadata.util';
 import { buildMessageCampaignStandardFlatFieldMetadatas } from 'src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-message-campaign-standard-flat-field-metadata.util';
 import { buildMessageListStandardFlatFieldMetadatas } from 'src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-message-list-standard-flat-field-metadata.util';
 import { buildMessageListMemberStandardFlatFieldMetadatas } from 'src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-message-list-member-standard-flat-field-metadata.util';
@@ -25,6 +28,12 @@ import { buildNoteStandardFlatFieldMetadatas } from 'src/engine/workspace-manage
 import { buildNoteTargetStandardFlatFieldMetadatas } from 'src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-note-target-standard-flat-field-metadata.util';
 import { buildOpportunityStandardFlatFieldMetadatas } from 'src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-opportunity-standard-flat-field-metadata.util';
 import { buildPersonStandardFlatFieldMetadatas } from 'src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-person-standard-flat-field-metadata.util';
+import { buildPriceBookItemStandardFlatFieldMetadatas } from 'src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-price-book-item-standard-flat-field-metadata.util';
+import { buildQuoteLineItemStandardFlatFieldMetadatas } from 'src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-quote-line-item-standard-flat-field-metadata.util';
+import { buildQuoteStandardFlatFieldMetadatas } from 'src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-quote-standard-flat-field-metadata.util';
+import { buildSequenceEnrollmentStandardFlatFieldMetadatas } from 'src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-sequence-enrollment-standard-flat-field-metadata.util';
+import { buildSequenceStandardFlatFieldMetadatas } from 'src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-sequence-standard-flat-field-metadata.util';
+import { buildSequenceStepStandardFlatFieldMetadatas } from 'src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-sequence-step-standard-flat-field-metadata.util';
 import { buildTaskStandardFlatFieldMetadatas } from 'src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-task-standard-flat-field-metadata.util';
 import { buildTaskTargetStandardFlatFieldMetadatas } from 'src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-task-target-standard-flat-field-metadata.util';
 import { buildTimelineActivityStandardFlatFieldMetadatas } from 'src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-timeline-activity-standard-flat-field-metadata.util';
@@ -48,8 +57,11 @@ const STANDARD_FLAT_FIELD_METADATA_BUILDERS_BY_OBJECT_NAME = {
     buildCalendarEventParticipantStandardFlatFieldMetadatas,
   calendarEvent: buildCalendarEventStandardFlatFieldMetadatas,
   callRecording: buildCallRecordingStandardFlatFieldMetadatas,
+  channelMessage: buildChannelMessageStandardFlatFieldMetadatas,
   company: buildCompanyStandardFlatFieldMetadatas,
   dashboard: buildDashboardStandardFlatFieldMetadatas,
+  leadScoreEvent: buildLeadScoreEventStandardFlatFieldMetadatas,
+  leadScoringRule: buildLeadScoringRuleStandardFlatFieldMetadatas,
   messageCampaign: buildMessageCampaignStandardFlatFieldMetadatas,
   messageList: buildMessageListStandardFlatFieldMetadatas,
   messageListMember: buildMessageListMemberStandardFlatFieldMetadatas,
@@ -64,6 +76,12 @@ const STANDARD_FLAT_FIELD_METADATA_BUILDERS_BY_OBJECT_NAME = {
   noteTarget: buildNoteTargetStandardFlatFieldMetadatas,
   opportunity: buildOpportunityStandardFlatFieldMetadatas,
   person: buildPersonStandardFlatFieldMetadatas,
+  priceBookItem: buildPriceBookItemStandardFlatFieldMetadatas,
+  quote: buildQuoteStandardFlatFieldMetadatas,
+  quoteLineItem: buildQuoteLineItemStandardFlatFieldMetadatas,
+  sequence: buildSequenceStandardFlatFieldMetadatas,
+  sequenceEnrollment: buildSequenceEnrollmentStandardFlatFieldMetadatas,
+  sequenceStep: buildSequenceStepStandardFlatFieldMetadatas,
   task: buildTaskStandardFlatFieldMetadatas,
   taskTarget: buildTaskTargetStandardFlatFieldMetadatas,
   timelineActivity: buildTimelineActivityStandardFlatFieldMetadatas,

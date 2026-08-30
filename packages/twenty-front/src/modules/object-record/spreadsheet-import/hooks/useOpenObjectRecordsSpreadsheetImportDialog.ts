@@ -71,6 +71,15 @@ export const useOpenObjectRecordsSpreadsheetImportDialog = (
               spreadsheetImportFields,
             });
 
+          // Imported people are attributed to the import channel unless the
+          // spreadsheet explicitly maps a leadSource column
+          if (
+            objectNameSingular === 'person' &&
+            !('leadSource' in fieldMapping)
+          ) {
+            fieldMapping.leadSource = 'IMPORT';
+          }
+
           return fieldMapping;
         });
 

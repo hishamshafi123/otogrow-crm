@@ -82,6 +82,9 @@ import { WorkspaceDataSourceService } from 'src/engine/workspace-datasource/work
 import { PrefillLogicFunctionService } from 'src/engine/workspace-manager/standard-objects-prefill-data/services/prefill-logic-function.service';
 import { prefillCompanies } from 'src/engine/workspace-manager/standard-objects-prefill-data/utils/prefill-companies.util';
 import { prefillDashboards } from 'src/engine/workspace-manager/standard-objects-prefill-data/utils/prefill-dashboards.util';
+import { prefillOtogrowAnalyticsDashboard } from 'src/engine/workspace-manager/standard-objects-prefill-data/utils/prefill-otogrow-analytics-dashboard.util';
+import { prefillLeadScoringRules } from 'src/engine/workspace-manager/standard-objects-prefill-data/utils/prefill-lead-scoring-rules.util';
+import { prefillPriceBookItems } from 'src/engine/workspace-manager/standard-objects-prefill-data/utils/prefill-price-book-items.util';
 import { prefillOpportunities } from 'src/engine/workspace-manager/standard-objects-prefill-data/utils/prefill-opportunities.util';
 import { prefillPeople } from 'src/engine/workspace-manager/standard-objects-prefill-data/utils/prefill-people.util';
 import { getCreateCompanyWhenAddingNewPersonCodeStepLogicFunctionDefinitions } from 'src/engine/workspace-manager/standard-objects-prefill-data/utils/prefill-workflow-code-step-logic-functions.util';
@@ -1041,7 +1044,17 @@ export class WorkspaceService {
 
       await prefillOpportunities(queryRunner.manager, schemaName);
 
+      await prefillLeadScoringRules(queryRunner.manager, schemaName);
+
+      await prefillPriceBookItems(queryRunner.manager, schemaName);
+
       await prefillDashboards(
+        queryRunner.manager,
+        schemaName,
+        flatPageLayoutMaps,
+      );
+
+      await prefillOtogrowAnalyticsDashboard(
         queryRunner.manager,
         schemaName,
         flatPageLayoutMaps,

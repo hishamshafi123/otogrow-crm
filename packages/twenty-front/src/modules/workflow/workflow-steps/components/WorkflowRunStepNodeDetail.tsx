@@ -21,6 +21,7 @@ import { WorkflowEditActionHttpRequest } from '@/workflow/workflow-steps/workflo
 import { WorkflowEditActionIfElse } from '@/workflow/workflow-steps/workflow-actions/if-else-action/components/WorkflowEditActionIfElse';
 import { WorkflowEditActionIterator } from '@/workflow/workflow-steps/workflow-actions/iterator-action/components/WorkflowEditActionIterator';
 import { WorkflowEditActionPickRecord } from '@/workflow/workflow-steps/workflow-actions/pick-record-action/components/WorkflowEditActionPickRecord';
+import { WorkflowEditActionSequence } from '@/workflow/workflow-steps/workflow-actions/components/WorkflowEditActionSequence';
 import { WorkflowEditActionLogicFunction } from '@/workflow/workflow-steps/workflow-actions/logic-function-action/components/WorkflowEditActionLogicFunction';
 import { WorkflowEditTriggerCronForm } from '@/workflow/workflow-trigger/components/WorkflowEditTriggerCronForm';
 import { WorkflowEditTriggerDatabaseEventForm } from '@/workflow/workflow-trigger/components/WorkflowEditTriggerDatabaseEventForm';
@@ -306,6 +307,18 @@ export const WorkflowRunStepNodeDetail = ({
         case 'DELAY': {
           return (
             <WorkflowEditActionDelay
+              key={stepId}
+              action={stepDefinition.definition}
+              actionOptions={{
+                readonly: true,
+              }}
+            />
+          );
+        }
+        case 'SEQUENCE_ENROLL':
+        case 'SEQUENCE_UNENROLL': {
+          return (
+            <WorkflowEditActionSequence
               key={stepId}
               action={stepDefinition.definition}
               actionOptions={{

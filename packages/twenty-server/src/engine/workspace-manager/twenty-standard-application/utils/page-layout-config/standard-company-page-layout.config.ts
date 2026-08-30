@@ -51,6 +51,23 @@ const COMPANY_PAGE_TABS = {
         fieldUniversalIdentifier:
           STANDARD_OBJECTS.company.fields.opportunities.universalIdentifier,
       },
+      quotes: {
+        universalIdentifier:
+          STANDARD_PAGE_LAYOUT_UNIVERSAL_IDENTIFIERS.companyRecordPage.tabs.home
+            .widgets.quotes.universalIdentifier,
+        title: 'Quotes',
+        type: WidgetType.FIELD,
+        gridPosition: GRID_POSITIONS.FULL_WIDTH,
+        position: VERTICAL_LIST_LAYOUT_POSITIONS.FOURTH,
+        fieldUniversalIdentifier:
+          STANDARD_OBJECTS.company.fields.quotes.universalIdentifier,
+      },
+      portalAccess: {
+        universalIdentifier:
+          STANDARD_PAGE_LAYOUT_UNIVERSAL_IDENTIFIERS.companyRecordPage.tabs.home
+            .widgets.portalAccess.universalIdentifier,
+        ...WIDGET_PROPS.portalAccess,
+      },
     },
   },
   timeline: {

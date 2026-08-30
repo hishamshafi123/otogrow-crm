@@ -13,6 +13,9 @@ import { MessageCampaignBodyConfigurationDTO } from 'src/engine/metadata-modules
 import { MessageCampaignDetailsConfigurationDTO } from 'src/engine/metadata-modules/page-layout-widget/dtos/message-campaign-details-configuration.dto';
 import { PieChartConfigurationDTO } from 'src/engine/metadata-modules/page-layout-widget/dtos/pie-chart-configuration.dto';
 import { RecordTableConfigurationDTO } from 'src/engine/metadata-modules/page-layout-widget/dtos/record-table-configuration.dto';
+import { SequenceBuilderConfigurationDTO } from 'src/engine/metadata-modules/page-layout-widget/dtos/sequence-builder-configuration.dto';
+import { QuoteBuilderConfigurationDTO } from 'src/engine/metadata-modules/page-layout-widget/dtos/quote-builder-configuration.dto';
+import { PortalAccessConfigurationDTO } from 'src/engine/metadata-modules/page-layout-widget/dtos/portal-access-configuration.dto';
 import { StandaloneRichTextConfigurationDTO } from 'src/engine/metadata-modules/page-layout-widget/dtos/standalone-rich-text-configuration.dto';
 import { WidgetConfigurationType } from 'src/engine/metadata-modules/page-layout-widget/enums/widget-configuration-type.type';
 import {
@@ -153,6 +156,24 @@ export const validateWidgetConfigurationInput = ({
     case WidgetConfigurationType.MESSAGE_CAMPAIGN_DETAILS:
       errors = validateWidgetConfigurationByDto(
         MessageCampaignDetailsConfigurationDTO,
+        configuration,
+      );
+      break;
+    case WidgetConfigurationType.SEQUENCE_BUILDER:
+      errors = validateWidgetConfigurationByDto(
+        SequenceBuilderConfigurationDTO,
+        configuration,
+      );
+      break;
+    case WidgetConfigurationType.QUOTE_BUILDER:
+      errors = validateWidgetConfigurationByDto(
+        QuoteBuilderConfigurationDTO,
+        configuration,
+      );
+      break;
+    case WidgetConfigurationType.PORTAL_ACCESS:
+      errors = validateWidgetConfigurationByDto(
+        PortalAccessConfigurationDTO,
         configuration,
       );
       break;

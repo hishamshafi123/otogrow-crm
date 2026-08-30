@@ -14,6 +14,8 @@ import { ConnectedAccountMetadataModule } from 'src/engine/metadata-modules/conn
 import { CommandMenuItemModule } from 'src/engine/metadata-modules/command-menu-item/command-menu-item.module';
 import { FieldMetadataModule } from 'src/engine/metadata-modules/field-metadata/field-metadata.module';
 import { FlatEntityMapsGraphqlApiExceptionFilter } from 'src/engine/metadata-modules/flat-entity/filters/flat-entity-maps-graphql-api-exception.filter';
+import { FormModule } from 'src/engine/metadata-modules/form/form.module';
+import { TwilioConfigModule } from 'src/engine/metadata-modules/twilio-config/twilio-config.module';
 import { PermissionsGraphqlApiExceptionFilter } from 'src/engine/metadata-modules/permissions/utils/permissions-graphql-api-exception.filter';
 import { FrontComponentModule } from 'src/engine/metadata-modules/front-component/front-component.module';
 import { LogicFunctionLayerModule } from 'src/engine/metadata-modules/logic-function-layer/logic-function-layer.module';
@@ -66,6 +68,8 @@ import { WorkspaceMetadataVersionModule } from 'src/engine/metadata-modules/work
     RouteTriggerModule,
     ServerRouteTriggerModule,
     WebhookModule,
+    FormModule,
+    TwilioConfigModule,
     ConnectedAccountMetadataModule,
     MessageChannelMetadataModule,
     CalendarChannelMetadataModule,
@@ -99,6 +103,8 @@ import { WorkspaceMetadataVersionModule } from 'src/engine/metadata-modules/work
     PermissionsModule,
     PermissionFlagModule,
     WebhookModule,
+    FormModule,
+    TwilioConfigModule,
     ConnectedAccountMetadataModule,
     MessageChannelMetadataModule,
     CalendarChannelMetadataModule,

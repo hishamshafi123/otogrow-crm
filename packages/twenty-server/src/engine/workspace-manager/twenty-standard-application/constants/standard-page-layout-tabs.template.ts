@@ -88,6 +88,22 @@ export const VERTICAL_LIST_LAYOUT_POSITIONS = {
     layoutMode: PageLayoutTabLayoutMode.VERTICAL_LIST,
     index: 4,
   },
+  SIXTH: {
+    layoutMode: PageLayoutTabLayoutMode.VERTICAL_LIST,
+    index: 5,
+  },
+  SEVENTH: {
+    layoutMode: PageLayoutTabLayoutMode.VERTICAL_LIST,
+    index: 6,
+  },
+  EIGHTH: {
+    layoutMode: PageLayoutTabLayoutMode.VERTICAL_LIST,
+    index: 7,
+  },
+  NINTH: {
+    layoutMode: PageLayoutTabLayoutMode.VERTICAL_LIST,
+    index: 8,
+  },
 } as const satisfies Record<string, PageLayoutWidgetVerticalListPosition>;
 
 export const TAB_PROPS = {
@@ -149,6 +165,18 @@ export const TAB_PROPS = {
     title: 'Email',
     position: 15,
     icon: 'IconMail',
+    layoutMode: PageLayoutTabLayoutMode.VERTICAL_LIST,
+  },
+  steps: {
+    title: 'Steps',
+    position: 15,
+    icon: 'IconListNumbers',
+    layoutMode: PageLayoutTabLayoutMode.VERTICAL_LIST,
+  },
+  builder: {
+    title: 'Builder',
+    position: 15,
+    icon: 'IconTool',
     layoutMode: PageLayoutTabLayoutMode.VERTICAL_LIST,
   },
   flowSecondary: {
@@ -225,6 +253,24 @@ export const WIDGET_PROPS = {
     type: WidgetType.MESSAGE_CAMPAIGN_BODY,
     gridPosition: GRID_POSITIONS.RICH_TEXT,
     position: VERTICAL_LIST_LAYOUT_POSITIONS.FIRST,
+  },
+  sequenceBuilder: {
+    title: 'Steps',
+    type: WidgetType.SEQUENCE_BUILDER,
+    gridPosition: GRID_POSITIONS.FULL_WIDTH,
+    position: VERTICAL_LIST_LAYOUT_POSITIONS.FIRST,
+  },
+  quoteBuilder: {
+    title: 'Builder',
+    type: WidgetType.QUOTE_BUILDER,
+    gridPosition: GRID_POSITIONS.FULL_WIDTH,
+    position: VERTICAL_LIST_LAYOUT_POSITIONS.FIRST,
+  },
+  portalAccess: {
+    title: 'Client portal',
+    type: WidgetType.PORTAL_ACCESS,
+    gridPosition: GRID_POSITIONS.FULL_WIDTH,
+    position: VERTICAL_LIST_LAYOUT_POSITIONS.FIFTH,
   },
   workflowVersion: {
     title: 'Flow',

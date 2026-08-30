@@ -19,12 +19,15 @@ describe('apiProxyPrefixes', () => {
     expect(isProxiedPath(`/${apiPath}?query=value`)).toBe(true);
   });
 
-  it.each(Object.values(AppPath))(
-    'should not proxy the SPA route %s',
-    (appPath) => {
-      expect(isProxiedPath(appPath)).toBe(false);
-    },
-  );
+  it.each(
+    // PublicForm and Portal are both SPA routes and public API prefixes; the
+    // vite proxy splits them by Accept header, so they are proxied by design.
+    Object.values(AppPath).filter(
+      (appPath) => appPath !== AppPath.PublicForm && appPath !== AppPath.Portal,
+    ),
+  )('should not proxy the SPA route %s', (appPath) => {
+    expect(isProxiedPath(appPath)).toBe(false);
+  });
 
   const viteDevServerPaths = [
     '/',

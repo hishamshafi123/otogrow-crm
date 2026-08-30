@@ -452,6 +452,41 @@ export const buildMessageStandardFlatFieldMetadatas = ({
     twentyStandardApplicationId,
     now,
   }),
+  sequenceEnrollment: createStandardRelationFieldFlatMetadata({
+    objectName,
+    workspaceId,
+    context: {
+      type: FieldMetadataType.RELATION,
+      morphId: null,
+      fieldName: 'sequenceEnrollment',
+      label: i18nLabel(
+        msg({
+          message: `Sequence Enrollment`,
+          context: 'fieldMetadata.label',
+        }),
+      ),
+      description: i18nLabel(
+        msg({
+          message: `The sequence enrollment this message was sent as part of`,
+          context: 'fieldMetadata.description',
+        }),
+      ),
+      icon: 'IconMailFast',
+      isNullable: true,
+      isUIEditable: false,
+      targetObjectName: 'sequenceEnrollment',
+      targetFieldName: 'messages',
+      settings: {
+        relationType: RelationType.MANY_TO_ONE,
+        onDelete: RelationOnDeleteAction.SET_NULL,
+        joinColumnName: 'sequenceEnrollmentId',
+      },
+    },
+    standardObjectMetadataRelatedEntityIds,
+    dependencyFlatEntityMaps,
+    twentyStandardApplicationId,
+    now,
+  }),
   deliveryStatus: createStandardFieldFlatMetadata({
     objectName,
     workspaceId,

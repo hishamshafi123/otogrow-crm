@@ -180,10 +180,14 @@ export class WorkflowValidationWorkspaceService {
         return step;
       }
 
-      return {
-        ...step,
+      // Spreading TStep distributes over the whole WorkflowAction union,
+      // which overflows the compiler; going through `object` keeps it opaque.
+      const enrichedStep: unknown = {
+        ...(step as object),
         settings: { ...step.settings, outputSchema: computedSchema },
       };
+
+      return enrichedStep as TStep;
     } catch {
       // Output schema enrichment is best-effort: if it cannot be computed,
       // validation still runs against the step's existing settings rather

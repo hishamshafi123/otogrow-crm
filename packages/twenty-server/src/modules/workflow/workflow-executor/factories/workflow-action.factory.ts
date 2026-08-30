@@ -25,6 +25,8 @@ import { FindRecordsWorkflowAction } from 'src/modules/workflow/workflow-executo
 import { PickRecordWorkflowAction } from 'src/modules/workflow/workflow-executor/workflow-actions/record-crud/pick-record.workflow-action';
 import { UpdateRecordWorkflowAction } from 'src/modules/workflow/workflow-executor/workflow-actions/record-crud/update-record.workflow-action';
 import { UpsertRecordWorkflowAction } from 'src/modules/workflow/workflow-executor/workflow-actions/record-crud/upsert-record.workflow-action';
+import { SequenceEnrollWorkflowAction } from 'src/modules/workflow/workflow-executor/workflow-actions/sequence/sequence-enroll.workflow-action';
+import { SequenceUnenrollWorkflowAction } from 'src/modules/workflow/workflow-executor/workflow-actions/sequence/sequence-unenroll.workflow-action';
 import { WorkflowActionType } from 'twenty-shared/workflow';
 
 @Injectable()
@@ -49,6 +51,8 @@ export class WorkflowActionFactory {
     private readonly aiAgentWorkflowAction: AiAgentWorkflowAction,
     private readonly emptyWorkflowAction: EmptyWorkflowAction,
     private readonly delayWorkflowAction: DelayWorkflowAction,
+    private readonly sequenceEnrollWorkflowAction: SequenceEnrollWorkflowAction,
+    private readonly sequenceUnenrollWorkflowAction: SequenceUnenrollWorkflowAction,
   ) {}
 
   get(stepType: WorkflowActionType): WorkflowAction {
@@ -91,6 +95,10 @@ export class WorkflowActionFactory {
         return this.emptyWorkflowAction;
       case WorkflowActionType.DELAY:
         return this.delayWorkflowAction;
+      case WorkflowActionType.SEQUENCE_ENROLL:
+        return this.sequenceEnrollWorkflowAction;
+      case WorkflowActionType.SEQUENCE_UNENROLL:
+        return this.sequenceUnenrollWorkflowAction;
       default:
         throw new WorkflowStepExecutorException(
           `Workflow step executor not found for step type '${stepType}'`,
