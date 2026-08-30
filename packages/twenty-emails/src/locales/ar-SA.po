@@ -65,8 +65,8 @@ msgstr "تأكيد عنوان بريدك الإلكتروني الجديد"
 
 #. js-lingui-explicit-id
 #: src/emails/password-update-notify.email.tsx
-msgid "Connect to Twenty"
-msgstr "الاتصال بـ Twenty"
+msgid "Connect to Otogrow CRM"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/emails/password-update-notify.email.tsx
@@ -119,8 +119,8 @@ msgstr "مرحبًا {userName},"
 
 #. js-lingui-explicit-id
 #: src/emails/billing-trial-converting.email.tsx
-msgid "If Twenty is working for you, you're all set — there's nothing to do. If it's not the right fit, you can cancel in one click before then and you won't be charged."
-msgstr "إذا كانت Twenty مناسبة لك، فأنت جاهز تمامًا — لا تحتاج لفعل أي شيء. وإذا لم تكن كذلك، يمكنك الإلغاء بنقرة واحدة قبل ذلك ولن تُحسَب عليك أي رسوم."
+msgid "If Otogrow CRM is working for you, you're all set — there's nothing to do. If it's not the right fit, you can cancel in one click before then and you won't be charged."
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/emails/password-update-notify.email.tsx
@@ -134,8 +134,8 @@ msgstr "إذا لم تفعل شيئًا، سنُوقف مساحة عملك مؤ�
 
 #. js-lingui-explicit-id
 #: src/emails/clean-suspended-workspace.email.tsx
-msgid "If you'd ever like to give Twenty another try, you can start a fresh workspace in minutes — we'd love to have you back."
-msgstr "إذا رغبت في تجربة Twenty مرة أخرى في أي وقت، يمكنك بدء مساحة عمل جديدة خلال دقائق — سنسعد بعودتك."
+msgid "If you'd ever like to give Otogrow CRM another try, you can start a fresh workspace in minutes — we'd love to have you back."
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/components/WhatIsTwenty.tsx
@@ -149,8 +149,8 @@ msgstr "تمت إزالة بياناتها ولم يَعُد بالإمكان ا
 
 #. js-lingui-explicit-id
 #: src/emails/send-invite-link.email.tsx
-msgid "Join your team on Twenty"
-msgstr "انضم إلى فريقك في Twenty"
+msgid "Join your team on Otogrow CRM"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/emails/billing-subscription-renewing.email.tsx
@@ -167,6 +167,16 @@ msgstr "إدارة الاشتراك"
 #: src/emails/billing-subscription-renewing.email.tsx
 msgid "No action is needed if you'd like to continue. If you'd rather not renew, you can cancel anytime before then."
 msgstr "لا حاجة لاتخاذ أي إجراء إذا أردت الاستمرار. وإذا كنت لا ترغب في التجديد، يمكنك الإلغاء في أي وقت قبل ذلك."
+
+#. js-lingui-explicit-id
+#: src/components/Footer.tsx
+msgid "Otogrow CRM"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/components/Footer.tsx
+msgid "otogrow.com"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/emails/password-update-notify.email.tsx
@@ -197,11 +207,6 @@ msgstr "إعادة تعيين"
 #: src/emails/password-reset-link.email.tsx
 msgid "Reset your password 🗝"
 msgstr "إعادة تعيين كلمة مرورك 🗝"
-
-#. js-lingui-explicit-id
-#: src/components/Footer.tsx
-msgid "San Francisco / Paris"
-msgstr "سان فرانسيسكو / باريس"
 
 #. js-lingui-explicit-id
 #: src/emails/server-admin-access-changed.email.tsx
@@ -265,11 +270,6 @@ msgstr "للاحتفاظ بمساحة عملك وكل ما أنشأته، أضِ
 
 #. js-lingui-explicit-id
 #: src/components/Footer.tsx
-msgid "Twenty.com, Public Benefit Corporation"
-msgstr "Twenty.com، مؤسسة لنشر الفائدة العامة"
-
-#. js-lingui-explicit-id
-#: src/components/Footer.tsx
 msgid "User guide"
 msgstr "دليل المستخدم"
 
@@ -286,6 +286,11 @@ msgstr "تحقق من البريد الإلكتروني"
 
 #. js-lingui-explicit-id
 #: src/components/Footer.tsx
+msgid "Visit Otogrow CRM's website"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/components/Footer.tsx
 msgid "Visit Twenty's developer documentation"
 msgstr "قم بزيارة وثائق المطورين لـTwenty"
 
@@ -293,11 +298,6 @@ msgstr "قم بزيارة وثائق المطورين لـTwenty"
 #: src/components/Footer.tsx
 msgid "Visit Twenty's GitHub repository"
 msgstr "قم بزيارة مخزن جيتهاب لـTwenty"
-
-#. js-lingui-explicit-id
-#: src/components/Footer.tsx
-msgid "Visit Twenty's website"
-msgstr "قم بزيارة موقع Twenty"
 
 #. js-lingui-explicit-id
 #: src/emails/billing-trial-converting.email.tsx
@@ -311,8 +311,8 @@ msgstr "الموقع الإلكتروني"
 
 #. js-lingui-explicit-id
 #: src/components/WhatIsTwenty.tsx
-msgid "What is Twenty?"
-msgstr "ما هو Twenty؟"
+msgid "What is Otogrow CRM?"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/emails/billing-subscription-renewing.email.tsx

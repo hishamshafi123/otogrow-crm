@@ -977,6 +977,11 @@ msgstr "Om appen din"
 msgid "Accepted and signed DPAs for this workspace, with their template version and date."
 msgstr "Godkjente og signerte DPA-er for dette arbeidsområdet, med malversjon og dato."
 
+#. js-lingui-id: ChRway
+#: src/pages/portal/ClientPortalPage.tsx
+msgid "Accepted quotes"
+msgstr ""
+
 #. js-lingui-id: pNW+Rt
 #: src/pages/settings/admin-panel/SettingsAdminNewAiProvider.tsx
 msgid "Access Key ID"
@@ -1017,6 +1022,11 @@ msgstr "Konto lagt til. Synkronisering startet."
 #: src/modules/settings/profile/components/DeleteAccount.tsx
 msgid "Account Deletion"
 msgstr "Kontosletting"
+
+#. js-lingui-id: zmu4+P
+#: src/modules/settings/twilio/components/SettingsTwilioForm.tsx
+msgid "Account SID"
+msgstr ""
 
 #. js-lingui-id: bPwFdf
 #: src/modules/settings/accounts/components/SettingsAccountsEditImapSmtpCaldavConnection.tsx
@@ -1112,11 +1122,18 @@ msgstr "Aktiverer..."
 
 #. js-lingui-id: F6pfE9
 #: src/modules/ai/constants/AgentChatThreadFilterStatusLabels.ts
+#: src/modules/page-layout/widgets/client-portal/components/ClientPortalWidget.tsx
+#: src/modules/sequences/components/SequenceAnalyticsStrip.tsx
 #: src/modules/settings/admin-panel/components/SettingsAdminWorkspaceCreditGrantsTable.tsx
 #: src/modules/settings/admin-panel/health-status/components/SettingsAdminQueueJobsTable.tsx
 #: src/modules/settings/admin-panel/signing-keys/components/SettingsAdminSigningKeysTable.tsx
 #: src/modules/settings/billing/components/SettingsBillingSubscriptionInfo.tsx
 #: src/modules/settings/domains/components/SettingsWorkspaceDomainCard.tsx
+#: src/modules/settings/forms/components/SettingsLeadFormForm.tsx
+#: src/modules/settings/forms/components/SettingsLeadFormForm.tsx
+#: src/modules/settings/forms/components/SettingsLeadFormTableRow.tsx
+#: src/modules/settings/twilio/components/SettingsTwilioForm.tsx
+#: src/modules/settings/twilio/components/SettingsTwilioForm.tsx
 #: src/pages/settings/enterprise/SettingsEnterprise.tsx
 #: src/pages/settings/enterprise/SettingsEnterprise.tsx
 #: src/pages/settings/profile/SettingsProfile.tsx
@@ -1337,6 +1354,11 @@ msgstr "Legg til element"
 msgid "Add item to folder"
 msgstr "Legg til element i mappe"
 
+#. js-lingui-id: 2vqtLo
+#: src/modules/quoting/components/QuoteLineItemsEditor.tsx
+msgid "Add line item"
+msgstr ""
+
 #. js-lingui-id: gaZXkv
 #: src/modules/navigation-menu-item/display/folder/components/NavigationMenuItemFolderDnd.tsx
 #: src/modules/navigation-menu-item/edit/components/WorkspaceSectionAddMenuItemButton.tsx
@@ -1404,6 +1426,11 @@ msgstr "Legg til alternativ"
 msgid "Add or remove users"
 msgstr "Legg til eller fjern brukere"
 
+#. js-lingui-id: KlZ3Jf
+#: src/modules/settings/mcp-and-apis/utils/buildMcpSetupCategories.tsx
+msgid "Add Otogrow CRM as a Streamable HTTP extension in Goose."
+msgstr ""
+
 #. js-lingui-id: 7YdkgZ
 #: src/modules/workflow/workflow-steps/workflow-actions/ai-agent-action/components/WorkflowOutputSchemaBuilder.tsx
 msgid "Add Output Field"
@@ -1458,40 +1485,45 @@ msgstr "Legg til sortering"
 msgid "Add SSO Identity Provider"
 msgstr "Legg til SSO-identitetsleverandør"
 
+#. js-lingui-id: xK4Xoz
+#: src/modules/sequences/components/SequenceStepsEditor.tsx
+msgid "Add step"
+msgstr ""
+
 #. js-lingui-id: 6Tl23V
 #: src/pages/settings/ai/components/SettingsAgentEvalsTab.tsx
 msgid "Add test input for evaluation (e.g., \"Find all customers in NY\")"
 msgstr ""
 
-#. js-lingui-id: FKGcEL
+#. js-lingui-id: +MkrtD
 #: src/modules/settings/mcp-and-apis/utils/buildMcpSetupCategories.tsx
-msgid "Add the Twenty MCP server as a remote context server in Zed."
-msgstr "Legg til Twenty MCP-serveren som ekstern kontekstserver i Zed."
+msgid "Add the Otogrow CRM MCP server as a remote context server in Zed."
+msgstr ""
 
-#. js-lingui-id: iA2nHX
+#. js-lingui-id: 9D3i1V
 #: src/modules/settings/mcp-and-apis/utils/buildMcpSetupCategories.tsx
-msgid "Add the Twenty MCP server from Augment Code settings."
-msgstr "Legg til Twenty MCP-serveren fra Augment Code-innstillingene."
+msgid "Add the Otogrow CRM MCP server from Augment Code settings."
+msgstr ""
 
-#. js-lingui-id: l+NzAk
+#. js-lingui-id: el8ua7
 #: src/modules/settings/mcp-and-apis/utils/buildMcpSetupCategories.tsx
-msgid "Add the Twenty MCP server from Raycast's MCP commands or settings."
-msgstr "Legg til Twenty MCP-serveren fra Raycasts MCP-kommandoer eller -innstillinger."
+msgid "Add the Otogrow CRM MCP server from Raycast's MCP commands or settings."
+msgstr ""
 
-#. js-lingui-id: j6G/yI
+#. js-lingui-id: cXRkAy
 #: src/modules/settings/mcp-and-apis/utils/buildMcpSetupCategories.tsx
-msgid "Add the Twenty MCP server in Gemini CLI settings."
-msgstr "Legg til Twenty MCP-serveren i innstillingene for Gemini CLI."
+msgid "Add the Otogrow CRM MCP server in Gemini CLI settings."
+msgstr ""
 
-#. js-lingui-id: /OyhlM
+#. js-lingui-id: 2VEddU
 #: src/modules/settings/mcp-and-apis/utils/buildMcpSetupCategories.tsx
-msgid "Add the Twenty MCP server to your LibreChat configuration file."
-msgstr "Legg til Twenty MCP-serveren i LibreChat-konfigurasjonsfilen din."
+msgid "Add the Otogrow CRM MCP server to your LibreChat configuration file."
+msgstr ""
 
-#. js-lingui-id: K0DXoj
+#. js-lingui-id: Ce5s48
 #: src/modules/settings/mcp-and-apis/utils/buildMcpSetupCategories.tsx
-msgid "Add the Twenty remote server with LM Studio's install link."
-msgstr "Legg til Twenty-fjernserveren med LM Studios installeringslenke."
+msgid "Add the Otogrow CRM remote server with LM Studio's install link."
+msgstr ""
 
 #. js-lingui-id: 5+ttxv
 #: src/modules/settings/accounts/components/SettingsAccountsBlocklistInput.tsx
@@ -1507,11 +1539,6 @@ msgstr "Legg til i Favoritter"
 #: src/modules/settings/unsubscribe-topics/components/SettingsWorkspaceUnsubscribeTopicSection.tsx
 msgid "Add topic"
 msgstr "Legg til emne"
-
-#. js-lingui-id: 4D/zWv
-#: src/modules/settings/mcp-and-apis/utils/buildMcpSetupCategories.tsx
-msgid "Add Twenty as a Streamable HTTP extension in Goose."
-msgstr "Legg til Twenty som en Streamable HTTP-utvidelse i Goose."
 
 #. js-lingui-id: XnwceV
 #: src/pages/settings/applications/components/SettingsApplicationRegistrationRedirectURIsInput.tsx
@@ -2168,6 +2195,7 @@ msgstr "Ravgul"
 #. js-lingui-id: hehnjM
 #: src/modules/settings/admin-panel/components/SettingsAdminWorkspaceCreditGrantModal.tsx
 #: src/modules/settings/admin-panel/components/SettingsAdminWorkspaceCreditGrantsTable.tsx
+#: src/pages/portal/ClientPortalPage.tsx
 msgid "Amount"
 msgstr "Beløp"
 
@@ -2523,6 +2551,11 @@ msgstr "Godkjent tilgangsdomene validert"
 msgid "Approved Domains"
 msgstr "Godkjente domener"
 
+#. js-lingui-id: 2uY/4i
+#: src/modules/sequences/components/SequenceStepEditor.tsx
+msgid "approved_template_name"
+msgstr ""
+
 #. js-lingui-id: VDvaN2
 #: src/modules/settings/admin-panel/hooks/useSettingsAdminTabs.ts
 #: src/modules/settings/domains/components/SettingPublicDomain.tsx
@@ -2849,6 +2882,16 @@ msgstr "Autentisering"
 #: src/pages/settings/applications/SettingsApplicationConnectionDetail.tsx
 msgid "Auth failed at"
 msgstr "Autentisering mislyktes hos"
+
+#. js-lingui-id: ROlbOM
+#: src/modules/settings/twilio/components/SettingsTwilioForm.tsx
+msgid "Auth token"
+msgstr ""
+
+#. js-lingui-id: M5br1t
+#: src/modules/settings/twilio/hooks/useTwilioConfigForm.ts
+msgid "Auth token is required"
+msgstr ""
 
 #. js-lingui-id: P8fBlG
 #: src/modules/settings/security/components/SettingsSecuritySettings.tsx
@@ -3179,6 +3222,9 @@ msgid "Blue"
 msgstr "Blå"
 
 #. js-lingui-id: bGQplw
+#: src/modules/sequences/components/SequenceStepEditor.tsx
+#: src/modules/sequences/components/SequenceStepEditor.tsx
+#: src/modules/sequences/components/SequenceStepEditor.tsx
 #: src/modules/side-panel/pages/email-block-settings/components/EmailPageStyleSection.tsx
 #: src/modules/workflow/workflow-steps/workflow-actions/components/WorkflowEditActionEmailBase.tsx
 #: src/modules/workflow/workflow-steps/workflow-actions/components/WorkflowRunStepLogsEmailDetail.tsx
@@ -3323,6 +3369,11 @@ msgstr ""
 msgid "Bundled with {applicationName}"
 msgstr "Leveres sammen med {applicationName}"
 
+#. js-lingui-id: U8G6S8
+#: src/modules/sequences/components/SequenceSettingsSection.tsx
+msgid "Business hours time zone"
+msgstr ""
+
 #. js-lingui-id: yjeERL
 #: src/modules/advanced-text-editor/constants/AdvancedTextEditorBlockCatalog.ts
 msgid "button"
@@ -3339,10 +3390,10 @@ msgstr "Knapp"
 msgid "by {author}"
 msgstr "av {author}"
 
-#. js-lingui-id: 8Pfllj
+#. js-lingui-id: vyl77n
 #: src/modules/auth/sign-in-up/components/FooterNote.tsx
-msgid "By using Twenty, you agree to the"
-msgstr "Ved å bruke Twenty, samtykker du til"
+msgid "By using Otogrow CRM, you agree to the"
+msgstr ""
 
 #. js-lingui-id: Yx41df
 #: src/modules/auth/sign-in-up/components/FooterNote.tsx
@@ -3514,6 +3565,7 @@ msgstr "Kan ikke skanne? Kopier "
 
 #. js-lingui-id: dEgA5A
 #: src/modules/applications/components/AuthorizeActionButtons.tsx
+#: src/modules/command-menu-item/engine-command/record/sequences/components/EnrollInSequenceRecordCommand.tsx
 #: src/modules/object-record/record-update-multiple/components/UpdateMultipleRecordsFooter.tsx
 #: src/modules/settings/admin-panel/components/SettingsAdminWorkspaceCreditGrantModal.tsx
 #: src/modules/settings/billing/components/AddCreditCardModal.tsx
@@ -3748,6 +3800,11 @@ msgstr "Endre synlighet?"
 msgid "Changing visibility requires reconnecting this OAuth connection. You will be redirected to authorize it again."
 msgstr "Endring av synlighet krever at denne OAuth-tilkoblingen kobles til på nytt. Du blir omdirigert for å gi tilgang igjen."
 
+#. js-lingui-id: HdE1If
+#: src/modules/sequences/components/SequenceStepEditor.tsx
+msgid "Channel"
+msgstr ""
+
 #. js-lingui-id: lfFsZ4
 #: src/modules/settings/workspace/components/SettingsWorkspaceEmailGroupSection.tsx
 msgid "Channels"
@@ -3892,6 +3949,11 @@ msgstr "Velg hva som skjer når du klikker på en e-postadresse"
 #: src/pages/settings/profile/appearance/components/SettingsExperience.tsx
 msgid "Choose where records open by default. Some objects may use a workspace setting"
 msgstr "Velg hvor oppføringer åpnes som standard. Noen objekter kan bruke en innstilling for arbeidsområdet"
+
+#. js-lingui-id: jl8LZB
+#: src/modules/settings/forms/components/SettingsLeadFormForm.tsx
+msgid "Choose which fields to collect and which are required"
+msgstr ""
 
 #. js-lingui-id: 02EFne
 #: src/modules/settings/security/components/SettingsSecuritySettings.tsx
@@ -4039,6 +4101,11 @@ msgstr "ClickHouse er ikke konfigurert"
 msgid "Client ID"
 msgstr "Klient-ID"
 
+#. js-lingui-id: Giw7e7
+#: src/modules/page-layout/widgets/client-portal/components/ClientPortalWidget.tsx
+msgid "Client portal"
+msgstr ""
+
 #. js-lingui-id: Bdj4LI
 #: src/modules/settings/security/components/SSO/SettingsSSOOIDCForm.tsx
 #: src/pages/settings/applications/tabs/SettingsApplicationRegistrationOAuthTab.tsx
@@ -4076,6 +4143,11 @@ msgstr "Lukk"
 #: src/modules/information-banner/components/InformationBanner.tsx
 msgid "Close banner"
 msgstr "Lukk banner"
+
+#. js-lingui-id: NRF7pg
+#: src/pages/portal/ClientPortalPage.tsx
+msgid "Close date"
+msgstr ""
 
 #. js-lingui-id: vcpc5o
 #: src/modules/blocknote-editor/components/BlockEditor.tsx
@@ -4340,6 +4412,7 @@ msgstr "fullført"
 #. js-lingui-id: qqWcBV
 #: src/modules/activities/calendar/components/CalendarEventCallRecorderAvatar.tsx
 #: src/modules/ai/components/CodeExecutionDisplay.tsx
+#: src/modules/sequences/components/SequenceAnalyticsStrip.tsx
 #: src/modules/settings/admin-panel/components/SettingsAdminWorkspaceContent.tsx
 #: src/modules/settings/admin-panel/health-status/components/SettingsAdminQueueJobsTable.tsx
 #: src/pages/settings/admin-panel/SettingsAdminInstanceStatus.tsx
@@ -4468,6 +4541,16 @@ msgstr "Konfigurer SMTP-innstillinger for å sende e-poster fra kontoen din."
 msgid "Configure the default AI models for all workspaces"
 msgstr "Konfigurer standard AI-modeller for alle arbeidsområder"
 
+#. js-lingui-id: /xDT+q
+#: src/modules/settings/mcp-and-apis/utils/buildMcpSetupCategories.tsx
+msgid "Configure the Otogrow CRM MCP server manually in Cascade."
+msgstr ""
+
+#. js-lingui-id: P5I0oY
+#: src/modules/settings/mcp-and-apis/utils/buildMcpSetupCategories.tsx
+msgid "Configure the Otogrow CRM MCP server manually in Cline."
+msgstr ""
+
 #. js-lingui-id: CcCy4C
 #: src/modules/settings/mcp-and-apis/utils/buildMcpSetupCategories.tsx
 msgid "Configure the remote MCP server through Warp's agent settings."
@@ -4477,16 +4560,6 @@ msgstr "Konfigurer den eksterne MCP-serveren via Warps agentinnstillinger."
 #: src/modules/settings/mcp-and-apis/utils/buildMcpSetupCategories.tsx
 msgid "Configure the remote server in Amazon Q Developer's MCP settings."
 msgstr "Konfigurer den eksterne serveren i MCP-innstillingene til Amazon Q Developer."
-
-#. js-lingui-id: g1/8jH
-#: src/modules/settings/mcp-and-apis/utils/buildMcpSetupCategories.tsx
-msgid "Configure the Twenty MCP server manually in Cascade."
-msgstr "Konfigurer Twenty MCP-serveren manuelt i Cascade."
-
-#. js-lingui-id: XiyvRh
-#: src/modules/settings/mcp-and-apis/utils/buildMcpSetupCategories.tsx
-msgid "Configure the Twenty MCP server manually in Cline."
-msgstr "Konfigurer Twenty MCP-serveren manuelt i Cline."
 
 #. js-lingui-id: qA9AGQ
 #: src/modules/settings/domains/components/SettingsDomainRecords.tsx
@@ -4618,6 +4691,11 @@ msgstr "Koble til med Microsoft"
 msgid "Connect your email and calendar to see your entire network instantly. Takes only 30 seconds."
 msgstr "Koble til e-posten og kalenderen din for å se hele nettverket ditt umiddelbart. Det tar bare 30 sekunder."
 
+#. js-lingui-id: 1ata7T
+#: src/modules/settings/twilio/components/SettingsTwilioForm.tsx
+msgid "Connect your Twilio account to send WhatsApp and SMS messages"
+msgstr ""
+
 #. js-lingui-id: QHcLEN
 #: src/pages/settings/applications/SettingsApplicationConnectionDetail.tsx
 #: src/pages/settings/applications/tabs/SettingsApplicationConnectionsSection.tsx
@@ -4686,6 +4764,11 @@ msgstr "Kontakt administrator"
 #: src/modules/settings/accounts/components/SettingsAccountsMessageChannelDetails.tsx
 msgid "Contact auto-creation"
 msgstr "Automatisk kontaktopprettelse"
+
+#. js-lingui-id: Bhgd0l
+#: src/modules/settings/forms/components/SettingsLeadFormForm.tsx
+msgid "Contact us"
+msgstr ""
 
 #. js-lingui-id: cByGGA
 #: src/modules/information-banner/components/billing/InformationBannerEndTrialPeriod.tsx
@@ -4820,6 +4903,7 @@ msgstr "Kopiert til utklippstavlen"
 
 #. js-lingui-id: he3ygx
 #: src/modules/object-record/record-field/ui/meta-types/input/components/MultiItemFieldMenuItem.tsx
+#: src/modules/page-layout/widgets/client-portal/components/ClientPortalWidget.tsx
 #: src/modules/settings/developers/components/ApiKeyInput.tsx
 #: src/modules/settings/security/components/SSO/SettingsSSOOIDCForm.tsx
 #: src/modules/settings/security/components/SSO/SettingsSSOOIDCForm.tsx
@@ -4849,6 +4933,11 @@ msgstr "Kopier kommandoer"
 #: src/modules/activities/emails/recipients/components/EmailRecipientChipMenuContent.tsx
 msgid "Copy email"
 msgstr "Kopier e-post"
+
+#. js-lingui-id: Sx4kHi
+#: src/modules/settings/forms/components/SettingsLeadFormForm.tsx
+msgid "Copy embed code"
+msgstr ""
 
 #. js-lingui-id: 4jdeR0
 #: src/modules/settings/admin-panel/signing-keys/components/SettingsAdminSigningKeysTable.tsx
@@ -5183,6 +5272,11 @@ msgstr "Opprett tilpasset visning"
 msgid "Create date field"
 msgstr "Opprett datofelt"
 
+#. js-lingui-id: 1Cdh0O
+#: src/pages/settings/forms/SettingsLeadForms.tsx
+msgid "Create embeddable forms to capture leads from your website."
+msgstr ""
+
 #. js-lingui-id: vY2Gfm
 #: src/modules/views/view-picker/components/ViewPickerCreateButton.tsx
 msgid "Create new view"
@@ -5273,6 +5367,7 @@ msgstr "Opprett, rediger, og slett arbeidsområdevisninger"
 #: src/modules/settings/admin-panel/chats/components/SettingsAdminChatsTable.tsx
 #: src/modules/settings/admin-panel/components/SettingsAdminWorkspaceContent.tsx
 #: src/modules/settings/components/SettingsDatabaseEventsForm.tsx
+#: src/modules/settings/forms/components/SettingsLeadFormsTable.tsx
 #: src/pages/settings/admin-panel/SettingsAdminUserDetail.tsx
 #: src/pages/settings/applications/SettingsApplicationConnectionDetail.tsx
 #: src/pages/settings/applications/tabs/SettingsApplicationCommandMenuItemSettingsTab.tsx
@@ -5304,6 +5399,8 @@ msgstr "Opprettet av"
 
 #. js-lingui-id: t3sqJR
 #. placeholder {0}: beautifyExactDateTime(signingKey.createdAt)
+#. placeholder {0}: new Date(portalAccess.createdAt).toLocaleDateString()
+#: src/modules/page-layout/widgets/client-portal/components/ClientPortalWidget.tsx
 #: src/modules/settings/admin-panel/signing-keys/components/SettingsAdminSigningKeysTable.tsx
 msgid "Created on {0}"
 msgstr "Opprettet {0}"
@@ -5325,6 +5422,7 @@ msgid "Creating your <0>workspace</0>..."
 msgstr "Oppretter <0>arbeidsområdet</0>..."
 
 #. js-lingui-id: HAzhV7
+#: src/modules/settings/twilio/components/SettingsTwilioForm.tsx
 #: src/pages/settings/admin-panel/SettingsAdminAiProviderDetail.tsx
 #: src/pages/settings/admin-panel/SettingsAdminAiProviderDetail.tsx
 msgid "Credentials"
@@ -5736,6 +5834,16 @@ msgstr "Tsjekkisk"
 msgid "Daily AI Usage"
 msgstr "Daglig AI-bruk"
 
+#. js-lingui-id: EJ9bkL
+#: src/modules/sequences/components/SequenceSettingsSection.tsx
+msgid "Daily send cap"
+msgstr ""
+
+#. js-lingui-id: mPurzX
+#: src/modules/sequences/components/SequenceSettingsSection.tsx
+msgid "Daily send cap must be a number"
+msgstr ""
+
 #. js-lingui-id: KXQkvT
 #: src/modules/settings/usage/components/SettingsUsageAnalyticsSection.tsx
 #: src/pages/settings/billing/SettingsUsageUserDetail.tsx
@@ -5745,9 +5853,11 @@ msgstr "Daglig bruk"
 #. js-lingui-id: Zz6Cxn
 #: src/modules/settings/data-model/object-details/components/tabs/ObjectSettings.tsx
 #: src/modules/settings/developers/components/SettingsDevelopersWebhookForm.tsx
+#: src/modules/settings/forms/components/SettingsLeadFormForm.tsx
 #: src/modules/settings/profile/components/DeleteAccount.tsx
 #: src/modules/settings/profile/components/DeleteWorkspace.tsx
 #: src/modules/settings/roles/role-settings/components/SettingsRoleSettings.tsx
+#: src/modules/settings/twilio/components/SettingsTwilioForm.tsx
 #: src/pages/settings/admin-panel/SettingsAdminAiProviderDetail.tsx
 #: src/pages/settings/admin-panel/SettingsAdminApplicationRegistrationDangerZone.tsx
 #: src/pages/settings/ai/components/SettingsAgentSettingsTab.tsx
@@ -6010,6 +6120,11 @@ msgstr "Deaktiver dette feltet"
 msgid "Deactivated"
 msgstr "Deaktivert"
 
+#. js-lingui-id: xOfb7M
+#: src/pages/portal/ClientPortalPage.tsx
+msgid "Deals by stage"
+msgstr ""
+
 #. js-lingui-id: Iotuxe
 #: src/modules/ai/components/RoutingDebugDisplay.tsx
 msgid "Debug Info"
@@ -6159,8 +6274,12 @@ msgstr "slett"
 #: src/modules/settings/developers/components/SettingsDevelopersWebhookForm.tsx
 #: src/modules/settings/developers/components/SettingsDevelopersWebhookForm.tsx
 #: src/modules/settings/domains/components/SettingPublicDomainRowDropdownMenu.tsx
+#: src/modules/settings/forms/components/SettingsLeadFormForm.tsx
+#: src/modules/settings/forms/components/SettingsLeadFormForm.tsx
 #: src/modules/settings/logic-functions/components/tabs/SettingsLogicFunctionTabEnvironmentVariableTableRow.tsx
 #: src/modules/settings/security/components/SSO/SettingsSecuritySSORowDropdownMenu.tsx
+#: src/modules/settings/twilio/components/SettingsTwilioForm.tsx
+#: src/modules/settings/twilio/components/SettingsTwilioForm.tsx
 #: src/modules/side-panel/pages/page-layout/components/RegularTabSettingsContent.tsx
 #: src/modules/side-panel/pages/page-layout/components/SoloTabSettingsContent.tsx
 #: src/modules/views/view-picker/components/ViewPickerCreateButton.tsx
@@ -6268,6 +6387,11 @@ msgstr "Slett felt"
 msgid "Delete Folder"
 msgstr "Slett mappe"
 
+#. js-lingui-id: lUVmwT
+#: src/modules/settings/forms/components/SettingsLeadFormForm.tsx
+msgid "Delete form"
+msgstr ""
+
 #. js-lingui-id: k/RLDM
 #: src/modules/workflow/workflow-steps/filters/components/WorkflowStepFilterGroupOptionsDropdown.tsx
 msgid "Delete group"
@@ -6314,6 +6438,11 @@ msgstr "Slett ferdighet"
 msgid "Delete this agent"
 msgstr "Slett denne agenten"
 
+#. js-lingui-id: dyYrtb
+#: src/modules/settings/forms/components/SettingsLeadFormForm.tsx
+msgid "Delete this form"
+msgstr ""
+
 #. js-lingui-id: +RYIn9
 #: src/modules/settings/data-model/object-details/components/tabs/SettingsObjectIndexesSection.tsx
 msgid "Delete this index?"
@@ -6334,6 +6463,11 @@ msgstr "Slett denne rollen og tildel en ny rolle til medlemmene"
 msgid "Delete this tool"
 msgstr "Slett dette verktøyet"
 
+#. js-lingui-id: Qv5CPc
+#: src/modules/settings/twilio/components/SettingsTwilioForm.tsx
+msgid "Delete this Twilio configuration"
+msgstr ""
+
 #. js-lingui-id: KSOhjo
 #: src/modules/settings/developers/components/SettingsDevelopersWebhookForm.tsx
 msgid "Delete this webhook"
@@ -6343,6 +6477,11 @@ msgstr "Slett denne webhooken"
 #: src/pages/settings/ai/SettingsToolDetail.tsx
 msgid "Delete Tool"
 msgstr "Slett verktøy"
+
+#. js-lingui-id: Ake/kd
+#: src/modules/settings/twilio/components/SettingsTwilioForm.tsx
+msgid "Delete Twilio configuration"
+msgstr ""
 
 #. js-lingui-id: jPvFKE
 #: src/modules/settings/two-factor-authentication/components/DeleteTwoFactorAuthenticationMethod.tsx
@@ -6571,6 +6710,11 @@ msgstr "Deaktiver imitasjon"
 #: src/modules/page-layout/components/PageLayoutTabListNewTabDropdownContent.tsx
 msgid "Disabled"
 msgstr "Deaktivert"
+
+#. js-lingui-id: dbvhri
+#: src/modules/quoting/components/QuoteLineItemRow.tsx
+msgid "Disc. %"
+msgstr ""
 
 #. js-lingui-id: bzSI52
 #: src/modules/side-panel/pages/compose-email/components/SidePanelComposeEmailPage.tsx
@@ -6803,6 +6947,11 @@ msgstr "Utkast"
 #: src/modules/workflow/workflow-steps/workflow-actions/components/WorkflowRunStepLogsEmailDetail.tsx
 msgid "Draft email"
 msgstr "E-postutkast"
+
+#. js-lingui-id: ib/1tm
+#: src/pages/portal/ClientPortalPage.tsx
+msgid "Draft quote"
+msgstr ""
 
 #. js-lingui-id: fdUFex
 #: src/modules/workflow/workflow-steps/workflow-actions/components/WorkflowRunStepLogsEmailDetail.tsx
@@ -7136,6 +7285,7 @@ msgstr "ellers hvis"
 #. js-lingui-id: O3oNi5
 #: src/modules/auth/sign-in-up/components/internal/SignInUpEmailField.tsx
 #: src/modules/object-record/record-field/ui/meta-types/input/components/EmailsFieldInput.tsx
+#: src/modules/sequences/components/SequenceStepEditor.tsx
 #: src/modules/settings/admin-panel/components/SettingsAdminGeneral.tsx
 #: src/modules/settings/members/components/MemberInfosTab.tsx
 #: src/modules/settings/roles/role-assignment/components/SettingsRoleAssignmentTable.tsx
@@ -7294,6 +7444,11 @@ msgstr "E-poster kan ikke være tomme"
 #: src/modules/advanced-text-editor/constants/AdvancedTextEditorBlockCatalog.ts
 msgid "embed"
 msgstr "bygg inn"
+
+#. js-lingui-id: ETv+Uw
+#: src/modules/settings/forms/components/SettingsLeadFormForm.tsx
+msgid "Embed code copied to clipboard"
+msgstr ""
 
 #. js-lingui-id: eXoH4Q
 #: src/modules/settings/data-model/fields/forms/components/SettingsDataModelFieldIconLabelForm.tsx
@@ -7458,6 +7613,21 @@ msgstr "Berik leadsene dine med People Data Labs"
 #: src/modules/onboarding/constants/OnboardingInstallableApps.ts
 msgid "Enrichment"
 msgstr "Berikelse"
+
+#. js-lingui-id: j2Eqn3
+#: src/modules/command-menu-item/engine-command/record/sequences/components/EnrollInSequenceRecordCommand.tsx
+msgid "Enroll"
+msgstr ""
+
+#. js-lingui-id: hYe0ov
+#: src/modules/command-menu-item/engine-command/record/sequences/components/EnrollInSequenceRecordCommand.tsx
+msgid "Enroll in sequence"
+msgstr ""
+
+#. js-lingui-id: LTUOLf
+#: src/modules/sequences/hooks/useEnrollInSequence.ts
+msgid "Enrolled {enrolledCount} person(s) in the sequence"
+msgstr ""
 
 #. js-lingui-id: T/N+2Z
 #: src/modules/object-record/record-field/ui/form-types/components/FormRawJsonFieldInput.tsx
@@ -7762,6 +7932,7 @@ msgstr "Sletting av mykslettede poster"
 
 #. js-lingui-id: SlfejT
 #: src/modules/page-layout/widgets/components/PageLayoutWidgetErrorDisplay.tsx
+#: src/modules/sequences/components/SequenceAnalyticsStrip.tsx
 #: src/modules/settings/admin-panel/chats/components/SettingsAdminChatsTableRow.tsx
 #: src/modules/ui/feedback/snack-bar-manager/components/SnackBar.tsx
 #: src/modules/workflow/workflow-steps/workflow-actions/code-action/components/WorkflowRunStepLogsCodeDetail.tsx
@@ -8300,6 +8471,16 @@ msgstr "Kunne ikke legge til modell"
 msgid "Failed to add provider"
 msgstr "Kunne ikke legge til tilbyder"
 
+#. js-lingui-id: G3KOxb
+#: src/modules/quoting/hooks/useQuoteLineItemMutations.ts
+msgid "Failed to add the line item"
+msgstr ""
+
+#. js-lingui-id: u4+f9g
+#: src/modules/sequences/hooks/useSequenceStepMutations.ts
+msgid "Failed to add the step"
+msgstr ""
+
 #. js-lingui-id: E2CkaQ
 #: src/pages/settings/admin-panel/SettingsAdminApplicationRegistrationDangerZone.tsx
 msgid "Failed to claim ownership."
@@ -8329,6 +8510,16 @@ msgstr "Mislyktes å slette jobber. Vennligst prøv igjen senere."
 #: src/pages/settings/ai/components/SettingsAgentSkillsTab.tsx
 msgid "Failed to delete skill"
 msgstr "Kunne ikke slette ferdighet"
+
+#. js-lingui-id: dMTn/Q
+#: src/modules/quoting/hooks/useQuoteLineItemMutations.ts
+msgid "Failed to delete the line item"
+msgstr ""
+
+#. js-lingui-id: SO88kK
+#: src/modules/sequences/hooks/useSequenceStepMutations.ts
+msgid "Failed to delete the step"
+msgstr ""
 
 #. js-lingui-id: AUprM8
 #: src/pages/settings/ai/SettingsToolDetail.tsx
@@ -8380,6 +8571,11 @@ msgstr "Kunne ikke laste faktureringsplaner"
 msgid "Failed to load chats. Please try again."
 msgstr "Kunne ikke laste inn chatter. Prøv igjen."
 
+#. js-lingui-id: tObIM3
+#: src/modules/settings/forms/hooks/useLeadFormForm.ts
+msgid "Failed to load form"
+msgstr ""
+
 #. js-lingui-id: mvgFp1
 #. placeholder {0}: error.message
 #: src/modules/front-components/components/FrontComponentRenderer.tsx
@@ -8400,6 +8596,11 @@ msgstr "Kunne ikke laste inn flere chatter."
 #: src/modules/settings/admin-panel/components/SettingsAdminServerAdmins.tsx
 msgid "Failed to load server administrators."
 msgstr "Kunne ikke laste serveradministratorer."
+
+#. js-lingui-id: sPts6U
+#: src/modules/settings/twilio/hooks/useTwilioConfigForm.ts
+msgid "Failed to load Twilio configuration"
+msgstr ""
 
 #. js-lingui-id: nKkohy
 #: src/modules/settings/developers/hooks/useWebhookForm.ts
@@ -8479,6 +8680,16 @@ msgstr ""
 #: src/modules/activities/emails/hooks/usePersistedCampaignDraft.ts
 msgid "Failed to save the campaign"
 msgstr "Kunne ikke lagre kampanjen"
+
+#. js-lingui-id: kacSws
+#: src/modules/sequences/components/SequenceSettingsSection.tsx
+msgid "Failed to save the sequence"
+msgstr ""
+
+#. js-lingui-id: ZrJUEo
+#: src/modules/sequences/hooks/useSequenceStepDraft.ts
+msgid "Failed to save the step"
+msgstr ""
 
 #. js-lingui-id: 9ryUyP
 #: src/pages/settings/ai/components/SettingsAiOverviewTab.tsx
@@ -8578,6 +8789,16 @@ msgstr "Kunne ikke oppdatere avsendernavn."
 #: src/modules/settings/admin-panel/components/SettingsAdminServerAdminAccess.tsx
 msgid "Failed to update server administrator access."
 msgstr "Kunne ikke oppdatere serveradministrator-tilgang."
+
+#. js-lingui-id: 7QC8Mh
+#: src/modules/quoting/hooks/useQuoteLineItemMutations.ts
+msgid "Failed to update the line item"
+msgstr ""
+
+#. js-lingui-id: tXl5fZ
+#: src/modules/quoting/components/QuoteTotalsSection.tsx
+msgid "Failed to update the quote"
+msgstr ""
 
 #. js-lingui-id: 16Z+3L
 #: src/pages/settings/communications/SettingsWorkspaceUnsubscribeTopicDetail.tsx
@@ -8739,6 +8960,7 @@ msgstr "felter"
 #: src/modules/object-record/object-options-dropdown/components/ObjectOptionsDropdownFieldsContent.tsx
 #: src/modules/settings/data-model/new-object/components/SettingsAvailableStandardObjectsSection.tsx
 #: src/modules/settings/data-model/object-details/components/tabs/ObjectFields.tsx
+#: src/modules/settings/forms/components/SettingsLeadFormForm.tsx
 #: src/modules/settings/roles/role-permissions/object-level-permissions/record-level-permissions/components/SettingsRolePermissionsObjectLevelRecordLevelPermissionFieldSelectFieldMenu.tsx
 #: src/modules/side-panel/pages/page-layout/components/dashboard/SidePanelDashboardRecordTableSettings.tsx
 #: src/modules/side-panel/pages/page-layout/components/record-page/SidePanelRecordPageFieldSettings.tsx
@@ -9035,10 +9257,47 @@ msgstr "for {objectLabel}"
 msgid "Forgot your password?"
 msgstr "Glemt passordet ditt?"
 
+#. js-lingui-id: ES2Obs
+#. placeholder {0}: formValues.name
+#: src/modules/settings/forms/hooks/useLeadFormForm.ts
+msgid "Form {0} created successfully"
+msgstr ""
+
+#. js-lingui-id: jnWJdo
+#. placeholder {0}: formValues.name
+#: src/modules/settings/forms/hooks/useLeadFormForm.ts
+msgid "Form {0} updated successfully"
+msgstr ""
+
 #. js-lingui-id: L/tgbO
 #: src/modules/workflow/workflow-steps/workflow-actions/http-request-action/components/BodyInput.tsx
 msgid "Form Data"
 msgstr "Skjemadata"
+
+#. js-lingui-id: gziKl1
+#: src/modules/settings/forms/hooks/useLeadFormForm.ts
+msgid "Form deleted successfully"
+msgstr ""
+
+#. js-lingui-id: qxJ36p
+#: src/modules/settings/forms/hooks/useLeadFormForm.ts
+msgid "Form ID is required for deletion"
+msgstr ""
+
+#. js-lingui-id: NdJWXh
+#: src/modules/settings/forms/hooks/useLeadFormForm.ts
+msgid "Form ID is required for updates"
+msgstr ""
+
+#. js-lingui-id: wa4Ic5
+#: src/pages/forms/PublicLeadForm.tsx
+msgid "Form unavailable"
+msgstr ""
+
+#. js-lingui-id: ykFBHT
+#: src/modules/settings/forms/components/SettingsLeadFormForm.tsx
+msgid "Form URL copied to clipboard"
+msgstr ""
 
 #. js-lingui-id: kI1qVD
 #: src/modules/settings/data-model/fields/forms/currency/components/SettingsDataModelFieldCurrencyForm.tsx
@@ -9101,6 +9360,11 @@ msgstr "gratis kreditter ({creditsRewardPerApp} per verktøy)"
 #: src/pages/onboarding/InviteTeam.tsx
 msgid "free credits per user"
 msgstr "gratis kreditter per bruker"
+
+#. js-lingui-id: N4lEuW
+#: src/modules/sequences/components/SequenceStepEditor.tsx
+msgid "Free-form WhatsApp messages are only delivered within 24 hours of the person's last reply. Outside that window, a pre-approved template is required."
+msgstr ""
 
 #. js-lingui-id: nLC6tu
 #: src/localization/hooks/useLocaleOptions.ts
@@ -9239,6 +9503,11 @@ msgstr "Generelt - Innstillinger"
 msgid "Generate"
 msgstr "Generer"
 
+#. js-lingui-id: aYmwfT
+#: src/modules/page-layout/widgets/client-portal/components/ClientPortalWidget.tsx
+msgid "Generate a read-only portal link to share this company's opportunities and quotes."
+msgstr ""
+
 #. js-lingui-id: H3rta9
 #: src/pages/settings/legal/SettingsLegalDpa.tsx
 #: src/pages/settings/legal/SettingsLegalDpaNew.tsx
@@ -9249,6 +9518,16 @@ msgstr "Generer DPA"
 #: src/modules/workflow/workflow-steps/workflow-actions/code-action/components/WorkflowEditActionCode.tsx
 msgid "Generate Function Output"
 msgstr "Generer funksjonsutdata"
+
+#. js-lingui-id: 7WZpOX
+#: src/modules/quoting/components/QuoteActionsBar.tsx
+msgid "Generate PDF"
+msgstr ""
+
+#. js-lingui-id: GOT0xq
+#: src/modules/page-layout/widgets/client-portal/components/ClientPortalWidget.tsx
+msgid "Generate portal link"
+msgstr ""
 
 #. js-lingui-id: wu9eMO
 #: src/modules/ai/components/CodeExecutionDisplay.tsx
@@ -9691,10 +9970,10 @@ msgstr "Skjul etikett"
 msgid "Hide system indexes"
 msgstr "Skjul systemindekser"
 
-#. js-lingui-id: 1ETc0T
+#. js-lingui-id: Jlk0yV
 #: src/pages/settings/community/SettingsCommunity.tsx
-msgid "Hire a partner to help you implement and customize Twenty."
-msgstr "Lei inn en partner for å hjelpe deg med å implementere og tilpasse Twenty."
+msgid "Hire a partner to help you implement and customize Otogrow CRM."
+msgstr ""
 
 #. js-lingui-id: i0qMbr
 #: src/modules/navigation/components/MainNavigationDrawerTabsRow.tsx
@@ -10129,14 +10408,27 @@ msgstr "In-Reply-To"
 #. js-lingui-id: NoNwIX
 #: src/modules/settings/data-model/object-details/components/SettingsObjectRelationsTable.tsx
 #: src/modules/settings/domains/components/SettingsWorkspaceDomainCard.tsx
+#: src/modules/settings/forms/components/SettingsLeadFormForm.tsx
+#: src/modules/settings/forms/components/SettingsLeadFormTableRow.tsx
+#: src/modules/settings/twilio/components/SettingsTwilioForm.tsx
 #: src/pages/settings/data-model/SettingsObjectFieldTable.tsx
 msgid "Inactive"
 msgstr "Inaktiv"
+
+#. js-lingui-id: qVkvtt
+#: src/modules/settings/twilio/components/SettingsTwilioForm.tsx
+msgid "Inactive configurations no longer send or receive messages"
+msgstr ""
 
 #. js-lingui-id: d/HoE2
 #: src/modules/settings/data-model/object-details/components/SettingsObjectFieldDisabledActionDropdown.tsx
 msgid "Inactive Field Options"
 msgstr "Inaktive feltalternativer"
+
+#. js-lingui-id: X2HcWW
+#: src/modules/settings/forms/components/SettingsLeadFormForm.tsx
+msgid "Inactive forms no longer accept submissions"
+msgstr ""
 
 #. js-lingui-id: aNaNTH
 #: src/modules/settings/data-model/objects/components/SettingsObjectInactiveMenuDropDown.tsx
@@ -10147,6 +10439,11 @@ msgstr "Inaktive objektalternativer"
 #: src/pages/settings/ai/components/SettingsSkillInactiveMenuDropDown.tsx
 msgid "Inactive Skill Options"
 msgstr "Alternativer for inaktiv ferdighet"
+
+#. js-lingui-id: NPP2h4
+#: src/modules/settings/twilio/components/SettingsTwilioForm.tsx
+msgid "Inbound webhook"
+msgstr ""
 
 #. js-lingui-id: j8Bj7e
 #: src/modules/settings/security/components/SettingsSecuritySettings.tsx
@@ -10854,6 +11151,7 @@ msgid "Korean"
 msgstr "Koreansk"
 
 #. js-lingui-id: 87a/t/
+#: src/modules/settings/forms/components/SettingsLeadFormForm.tsx
 #: src/modules/settings/translations/components/SidePanelSettingsMetadataTranslationsPage.tsx
 #: src/modules/workflow/workflow-steps/workflow-actions/form-action/components/WorkflowFormFieldSettingsDate.tsx
 #: src/modules/workflow/workflow-steps/workflow-actions/form-action/components/WorkflowFormFieldSettingsNumber.tsx
@@ -11164,6 +11462,15 @@ msgstr "Oppsettmodus: {0}"
 msgid "Layouts"
 msgstr "Oppsett"
 
+#. js-lingui-id: v2lCWy
+#: src/modules/settings/forms/components/SettingsLeadFormForm.tsx
+#: src/modules/settings/hooks/useSettingsNavigationItems.tsx
+#: src/pages/settings/forms/SettingsLeadForms.tsx
+#: src/pages/settings/forms/SettingsLeadForms.tsx
+#: src/pages/settings/forms/SettingsLeadForms.tsx
+msgid "Lead forms"
+msgstr ""
+
 #. js-lingui-id: zwWKhA
 #: src/modules/information-banner/components/maintenance/InformationBannerMaintenance.tsx
 #: src/modules/workflow/workflow-steps/workflow-actions/form-action/components/WorkflowEditActionFormBuilder.tsx
@@ -11332,6 +11639,11 @@ msgstr "Linjediagram"
 msgid "Line height"
 msgstr "Linjehøyde"
 
+#. js-lingui-id: bUFTuf
+#: src/modules/quoting/components/QuoteLineItemsEditor.tsx
+msgid "Line items"
+msgstr ""
+
 #. js-lingui-id: LdyooL
 #: src/modules/advanced-text-editor/constants/AdvancedTextEditorBlockCatalog.ts
 msgid "link"
@@ -11364,6 +11676,11 @@ msgstr "Lenke kopiert til utklippstavlen"
 #: src/modules/side-panel/components/SidePanelLinkInfo.tsx
 msgid "Link label"
 msgstr "Etikett for lenke"
+
+#. js-lingui-id: vp2cmR
+#: src/modules/settings/forms/components/SettingsLeadFormForm.tsx
+msgid "Link to the hosted form or embed it on your website"
+msgstr ""
 
 #. js-lingui-id: roAe2K
 #: src/modules/advanced-text-editor/constants/AdvancedTextEditorBlockCatalog.ts
@@ -11537,6 +11854,12 @@ msgstr "Laster tråd"
 #: src/modules/views/hooks/useComputeRecordRelationFilterDisplayValue.tsx
 msgid "Loading..."
 msgstr "Laster inn..."
+
+#. js-lingui-id: Pwqkdw
+#: src/pages/forms/PublicLeadForm.tsx
+#: src/pages/portal/ClientPortalPage.tsx
+msgid "Loading…"
+msgstr ""
 
 #. js-lingui-id: 7VBQ2j
 #: src/modules/settings/billing/constants/SettingsBillingPlanComparisonRows.ts
@@ -11803,6 +12126,21 @@ msgstr "Manuell konfigurasjon"
 #: src/modules/advanced-text-editor/constants/AdvancedTextEditorBlockCatalog.ts
 msgid "Margin"
 msgstr "Marg"
+
+#. js-lingui-id: ZInGoE
+#: src/modules/quoting/components/QuoteActionsBar.tsx
+msgid "Mark as accepted"
+msgstr ""
+
+#. js-lingui-id: SmJMCX
+#: src/modules/quoting/components/QuoteActionsBar.tsx
+msgid "Mark as rejected"
+msgstr ""
+
+#. js-lingui-id: 6/ygjH
+#: src/modules/quoting/components/QuoteActionsBar.tsx
+msgid "Mark as sent"
+msgstr ""
 
 #. js-lingui-id: fI1Tll
 #: src/pages/settings/admin-panel/SettingsAdminApplicationRegistrationGeneralToggles.tsx
@@ -12390,6 +12728,8 @@ msgstr "N/A"
 #: src/modules/settings/data-model/object-details/components/SettingsObjectRelationsTable.tsx
 #: src/modules/settings/data-model/object-details/components/tabs/SettingsObjectSearchSection.tsx
 #: src/modules/settings/developers/components/SettingsApiKeysTable.tsx
+#: src/modules/settings/forms/components/SettingsLeadFormForm.tsx
+#: src/modules/settings/forms/components/SettingsLeadFormsTable.tsx
 #: src/modules/settings/logic-functions/components/SettingsLogicFunctionNewForm.tsx
 #: src/modules/settings/logic-functions/components/tabs/SettingsLogicFunctionTabEnvironmentVariableTableRow.tsx
 #: src/modules/settings/members/components/MemberInfosTab.tsx
@@ -12405,6 +12745,7 @@ msgstr "N/A"
 #: src/modules/settings/security/components/SSO/SettingsSSOIdentitiesProvidersForm.tsx
 #: src/modules/settings/usage/components/UsageByUserTableSection.tsx
 #: src/modules/settings/workspace/components/NameField.tsx
+#: src/pages/portal/ClientPortalPage.tsx
 #: src/pages/settings/admin-panel/SettingsAdminAiProviderDetail.tsx
 #: src/pages/settings/admin-panel/SettingsAdminUserDetail.tsx
 #: src/pages/settings/admin-panel/SettingsAdminWorkspaceDetail.tsx
@@ -12520,6 +12861,7 @@ msgstr "Vises aldri ved pålogging. Medlemmer bruker URL-en til arbeidsområdet.
 #. js-lingui-id: isRobC
 #: src/modules/object-record/record-board/record-board-column/components/RecordBoardColumnNewRecordButton.tsx
 #: src/modules/settings/developers/components/SettingsDevelopersWebhookForm.tsx
+#: src/modules/settings/forms/components/SettingsLeadFormForm.tsx
 #: src/modules/ui/navigation/navigation-drawer/components/NavigationDrawerItem.tsx
 #: src/pages/settings/accounts/SettingsNewAccount.tsx
 #: src/pages/settings/data-model/SettingsNewObject.tsx
@@ -12623,6 +12965,12 @@ msgstr "Nytt felt"
 #: src/modules/side-panel/components/SidePanelFolderInfo.tsx
 msgid "New folder"
 msgstr "Ny mappe"
+
+#. js-lingui-id: nvV00A
+#: src/modules/settings/forms/components/SettingsLeadFormForm.tsx
+#: src/pages/settings/forms/SettingsLeadForms.tsx
+msgid "New form"
+msgstr ""
 
 #. js-lingui-id: k+LZc0
 #: src/modules/object-record/object-options-dropdown/components/ObjectOptionsDropdownAddRecordGroupContent.tsx
@@ -12923,6 +13271,11 @@ msgstr "Ingen faktureringsdata er tilgjengelig for dette arbeidsområdet."
 #: src/modules/workflow/workflow-steps/workflow-actions/http-request-action/components/BodyInput.tsx
 msgid "No body"
 msgstr "Ingen body"
+
+#. js-lingui-id: dfawaZ
+#: src/modules/sequences/components/SequenceSettingsSection.tsx
+msgid "No business hours"
+msgstr ""
 
 #. js-lingui-id: O7I76L
 #: src/modules/page-layout/widgets/call-recording-summary/components/CallRecordingSummaryBody.tsx
@@ -13261,6 +13614,16 @@ msgstr "Ingen notater"
 msgid "No objects with views found"
 msgstr "Ingen objekter med visninger funnet"
 
+#. js-lingui-id: 3wqJyG
+#: src/modules/sequences/hooks/useEnrollInSequence.ts
+msgid "No one was enrolled"
+msgstr ""
+
+#. js-lingui-id: N3Y6ci
+#: src/pages/portal/ClientPortalPage.tsx
+msgid "No opportunities yet."
+msgstr ""
+
 #. js-lingui-id: daCzI1
 #: src/modules/ui/field/input/components/MultiSelectInput.tsx
 msgid "No option found"
@@ -13308,6 +13671,11 @@ msgstr "Ingen tillatelser er satt for individuelle objekter."
 #: src/pages/settings/applications/utils/getClaimErrorContent.ts
 msgid "No provenance attestation was found for this package. Publish it from GitHub Actions with npm trusted publishing, then try claiming again."
 msgstr "Det ble ikke funnet noen proveniensattest for denne pakken. Publiser den fra GitHub Actions med npm trusted publishing, og prøv deretter å kreve eierskap igjen."
+
+#. js-lingui-id: N1V8YT
+#: src/pages/portal/ClientPortalPage.tsx
+msgid "No quotes yet."
+msgstr ""
 
 #. js-lingui-id: 5sv+ia
 #: src/modules/activities/emails/hooks/useSendMessageCampaign.ts
@@ -13931,6 +14299,11 @@ msgstr ""
 msgid "Omit zero values"
 msgstr "Utelat nullverdier"
 
+#. js-lingui-id: Z5HWHd
+#: src/modules/settings/forms/components/SettingsLeadFormForm.tsx
+msgid "On"
+msgstr ""
+
 #. js-lingui-id: UCQiqt
 #. placeholder {0}: appObject.labelSingular
 #. placeholder {0}: item.labelSingular
@@ -14024,10 +14397,10 @@ msgstr "Introduksjonsbelønning"
 msgid "One or more filters reference deactivated or deleted fields and will be automatically removed on save."
 msgstr "Ett eller flere filtre refererer til deaktiverte eller slettede felt og vil automatisk bli fjernet ved lagring."
 
-#. js-lingui-id: 2l4SGU
+#. js-lingui-id: kpTBE6
 #: src/pages/settings/enterprise/SettingsEnterprise.tsx
-msgid "One subscription provides one enterprise key that powers one production instance and one potential staging or test instance. To run a staging or test environment, install Twenty on a second server, activate it with this same enterprise key, then register that server as a development instance. Development instances unlock enterprise features without extra billing and do not count toward your production seats."
-msgstr "Ett abonnement gir én enterprise-nøkkel som driver én produksjonsinstans og én eventuell staging- eller testinstans. For å kjøre et staging- eller testmiljø installerer du Twenty på en annen server, aktiverer den med den samme enterprise-nøkkelen, og registrerer deretter den serveren som en utviklingsinstans. Utviklingsinstanser låser opp enterprise-funksjoner uten ekstra fakturering og teller ikke mot produksjonssetene dine."
+msgid "One subscription provides one enterprise key that powers one production instance and one potential staging or test instance. To run a staging or test environment, install Otogrow CRM on a second server, activate it with this same enterprise key, then register that server as a development instance. Development instances unlock enterprise features without extra billing and do not count toward your production seats."
+msgstr ""
 
 #. js-lingui-id: oFTo3P
 #: src/modules/settings/event-logs/components/SettingsLogs.tsx
@@ -14120,15 +14493,15 @@ msgstr "Åpne en e-postredigerer for å redigere blokkinnstillinger."
 msgid "Open as link"
 msgstr "Åpne som lenke"
 
-#. js-lingui-id: n0vVgf
+#. js-lingui-id: TOpB/o
 #: src/modules/settings/mcp-and-apis/utils/buildMcpSetupCategories.tsx
-msgid "Open Claude with the Twenty connector name and MCP URL prefilled."
-msgstr "Åpne Claude med Twenty-koblingsnavn og MCP-URL forhåndsutfylt."
+msgid "Open Claude with the Otogrow CRM connector name and MCP URL prefilled."
+msgstr ""
 
-#. js-lingui-id: +n2jpB
+#. js-lingui-id: 6+2zGY
 #: src/modules/settings/mcp-and-apis/utils/buildMcpSetupCategories.tsx
-msgid "Open Cursor's MCP installer with the Twenty remote server config."
-msgstr "Åpne Cursors MCP-installer med Twenty-fjernserverkonfigurasjonen."
+msgid "Open Cursor's MCP installer with the Otogrow CRM remote server config."
+msgstr ""
 
 #. js-lingui-id: pZZH4Q
 #: src/modules/auth/sign-in-up/components/EmailVerificationSent.tsx
@@ -14145,10 +14518,20 @@ msgstr "Åpne i appen"
 msgid "Open in Roles"
 msgstr "Åpne i roller"
 
+#. js-lingui-id: x5X4tS
+#: src/modules/settings/mcp-and-apis/utils/buildMcpSetupCategories.tsx
+msgid "Open Otogrow CRM's official ChatGPT integration for your workspace."
+msgstr ""
+
 #. js-lingui-id: xGd6Ih
 #: src/modules/auth/sign-in-up/components/EmailVerificationSent.tsx
 msgid "Open Outlook"
 msgstr "Åpne Outlook"
+
+#. js-lingui-id: YCTW8+
+#: src/pages/portal/ClientPortalPage.tsx
+msgid "Open pipeline"
+msgstr ""
 
 #. js-lingui-id: VL5vJy
 #: src/modules/object-record/record-list/components/RecordListRow.tsx
@@ -14167,15 +14550,10 @@ msgstr "Åpne oppføringer ved siden av den nåværende siden"
 msgid "Open records on a dedicated page"
 msgstr "Åpne oppføringer på en egen side"
 
-#. js-lingui-id: q170S2
+#. js-lingui-id: p+WVzP
 #: src/modules/settings/mcp-and-apis/utils/buildMcpSetupCategories.tsx
-msgid "Open Replit with the Twenty remote server config."
-msgstr "Åpne Replit med Twenty-fjernserverkonfigurasjonen."
-
-#. js-lingui-id: sBd/cl
-#: src/modules/settings/mcp-and-apis/utils/buildMcpSetupCategories.tsx
-msgid "Open Twenty's official ChatGPT integration for your workspace."
-msgstr "Åpne Twentys offisielle ChatGPT-integrasjon for arbeidsområdet ditt."
+msgid "Open Replit with the Otogrow CRM remote server config."
+msgstr ""
 
 #. js-lingui-id: OV5wZZ
 #: src/modules/navigation-menu-item/display/sections/components/NavigationDrawerOpenedSection.tsx
@@ -14191,6 +14569,11 @@ msgstr "Operand"
 #: src/modules/settings/admin-panel/health-status/components/SettingsAdminHealthStatusRightContainer.tsx
 msgid "Operational"
 msgstr "Operativ"
+
+#. js-lingui-id: 4MyDFl
+#: src/pages/portal/ClientPortalPage.tsx
+msgid "Opportunities"
+msgstr ""
 
 #. js-lingui-id: lVa1Xn
 #: src/modules/settings/data-model/fields/forms/select/hooks/useSelectSettingsFormInitialValues.ts
@@ -14329,6 +14712,17 @@ msgstr "Andre arbeidsområder"
 #: src/modules/side-panel/pages/workflow/trigger-type/components/SidePanelWorkflowSelectTriggerTypeContent.tsx
 msgid "Others"
 msgstr "Annet"
+
+#. js-lingui-id: G9OYjD
+#: src/modules/spreadsheet-import/steps/components/MatchColumnsStep/components/ColumnGrid.tsx
+msgid "Otogrow CRM fields"
+msgstr ""
+
+#. js-lingui-id: LKrnRv
+#: src/pages/forms/PublicLeadForm.tsx
+#: src/pages/portal/ClientPortalPage.tsx
+msgid "Otogrow logo"
+msgstr ""
 
 #. js-lingui-id: HCBMeA
 #: src/modules/auth/sign-in-up/hooks/useTwoFactorAuthenticationForm.ts
@@ -14685,6 +15079,11 @@ msgstr "Tillatelser"
 msgid "Permissions · {objectLabelSingular}"
 msgstr "Tillatelser · {objectLabelSingular}"
 
+#. js-lingui-id: OZdaTZ
+#: src/modules/workflow/workflow-steps/workflow-actions/components/WorkflowEditActionSequence.tsx
+msgid "Person"
+msgstr ""
+
 #. js-lingui-id: qrGMTi
 #: src/modules/activities/emails/recipients/components/EmailRecipientChipMenuContent.tsx
 msgid "Person created"
@@ -14710,6 +15109,11 @@ msgstr "Telefonnummer"
 #: src/modules/object-record/record-table/record-table-cell/hooks/useGetSecondaryRecordTableCellButton.ts
 msgid "Phone number copied to clipboard"
 msgstr "Telefonnummer kopiert til utklippstavlen"
+
+#. js-lingui-id: /IzkfC
+#: src/modules/settings/twilio/components/SettingsTwilioForm.tsx
+msgid "Phone numbers used for WhatsApp and SMS sequence steps, in E.164 format"
+msgstr ""
 
 #. js-lingui-id: vqKcU0
 #: src/modules/workflow/workflow-steps/components/WorkflowDropdownStepOutputItems.tsx
@@ -14864,6 +15268,16 @@ msgstr "Skriv \"{confirmationValue}\" for å bekrefte at du vil slette denne app
 msgid "Please type \"{confirmationValue}\" to confirm you want to uninstall this application."
 msgstr ""
 
+#. js-lingui-id: e5oSn2
+#: src/modules/settings/forms/components/SettingsLeadFormForm.tsx
+msgid "Please type \"yes\" to confirm you want to delete this form."
+msgstr ""
+
+#. js-lingui-id: Kx+Tnd
+#: src/modules/settings/twilio/components/SettingsTwilioForm.tsx
+msgid "Please type \"yes\" to confirm you want to delete this Twilio configuration."
+msgstr ""
+
 #. js-lingui-id: GbtYRD
 #: src/modules/settings/developers/components/SettingsDevelopersWebhookForm.tsx
 msgid "Please type \"yes\" to confirm you want to delete this webhook."
@@ -14889,6 +15303,21 @@ msgstr "Flertall"
 #: src/localization/hooks/useLocaleOptions.ts
 msgid "Polish"
 msgstr "Polsk"
+
+#. js-lingui-id: MBDJKz
+#: src/modules/page-layout/widgets/client-portal/components/ClientPortalWidget.tsx
+msgid "Portal link copied to clipboard"
+msgstr ""
+
+#. js-lingui-id: 6Cvp7+
+#: src/modules/page-layout/widgets/client-portal/hooks/usePortalAccess.ts
+msgid "Portal link revoked"
+msgstr ""
+
+#. js-lingui-id: T69mYb
+#: src/pages/portal/ClientPortalPage.tsx
+msgid "Portal unavailable"
+msgstr ""
 
 #. js-lingui-id: 0nsqwk
 #: src/localization/hooks/useLocaleOptions.ts
@@ -15001,6 +15430,11 @@ msgstr "Siste 7 dager"
 #: src/modules/object-record/record-calendar/components/RecordCalendarTopBar.tsx
 msgid "Previous period"
 msgstr "Forrige periode"
+
+#. js-lingui-id: 5k8iG7
+#: src/modules/quoting/components/QuoteLineItemRow.tsx
+msgid "Price book item"
+msgstr ""
 
 #. js-lingui-id: aHCEmh
 #: src/pages/settings/admin-panel/SettingsAdminNewAiModel.tsx
@@ -15203,6 +15637,11 @@ msgstr "Lilla"
 msgid "Python Code Execution"
 msgstr "Kjøring av Python-kode"
 
+#. js-lingui-id: oWXNE5
+#: src/modules/quoting/components/QuoteLineItemRow.tsx
+msgid "Qty"
+msgstr ""
+
 #. js-lingui-id: 2vudsu
 #: src/modules/side-panel/pages/page-layout/utils/getDateGranularityLabel.ts
 msgid "Quarter"
@@ -15248,6 +15687,27 @@ msgstr "Kø: {queueName}"
 #: src/modules/settings/mcp-and-apis/utils/buildMcpSetupCategories.tsx
 msgid "Quick install"
 msgstr "Hurtiginstallasjon"
+
+#. js-lingui-id: ZhhOwV
+#: src/modules/quoting/components/QuoteActionsBar.tsx
+msgid "Quote"
+msgstr ""
+
+#. js-lingui-id: NrMDPB
+#. placeholder {0}: quote.quoteNumber
+#: src/modules/quoting/components/QuoteActionsBar.tsx
+msgid "Quote {0}"
+msgstr ""
+
+#. js-lingui-id: +K/xBZ
+#: src/modules/quoting/hooks/useQuoteActions.ts
+msgid "Quote status updated"
+msgstr ""
+
+#. js-lingui-id: eWLklq
+#: src/pages/portal/ClientPortalPage.tsx
+msgid "Quotes"
+msgstr ""
 
 #. js-lingui-id: 4JbV5W
 #: src/modules/ai/utils/tool-display/build-generic-tool-status-message.util.ts
@@ -15564,6 +16024,11 @@ msgstr "Omdirigerings-URI"
 msgid "Refresh status"
 msgstr "Oppdater status"
 
+#. js-lingui-id: 6exX+8
+#: src/modules/page-layout/widgets/client-portal/components/ClientPortalWidget.tsx
+msgid "Regenerate"
+msgstr ""
+
 #. js-lingui-id: vpZcGd
 #: src/pages/settings/developers/api-keys/SettingsDevelopersApiKeyDetail.tsx
 #: src/pages/settings/developers/api-keys/SettingsDevelopersApiKeyDetail.tsx
@@ -15579,6 +16044,11 @@ msgstr "Generer nøkkel på nytt"
 #: src/pages/settings/developers/api-keys/SettingsDevelopersApiKeyDetail.tsx
 msgid "Regenerate Key"
 msgstr "Generer Nøkkel på Nytt"
+
+#. js-lingui-id: fwKapx
+#: src/modules/page-layout/widgets/client-portal/components/ClientPortalWidget.tsx
+msgid "Regenerate the portal link? The current link will stop working immediately."
+msgstr ""
 
 #. js-lingui-id: uJ+Ve2
 #: src/pages/settings/admin-panel/SettingsAdminAiProviderDetail.tsx
@@ -15855,6 +16325,11 @@ msgstr "Endre rekkefølgen på alternativer"
 msgid "Replace widget"
 msgstr "Erstatt widget"
 
+#. js-lingui-id: 7KxR8x
+#: src/modules/sequences/components/SequenceAnalyticsStrip.tsx
+msgid "Replied"
+msgstr ""
+
 #. js-lingui-id: N8UzTV
 #: src/modules/settings/admin-panel/chats/components/SettingsAdminChatsTable.tsx
 msgid "Replies"
@@ -15913,6 +16388,7 @@ msgid "Require authentication"
 msgstr "Krev autentisering"
 
 #. js-lingui-id: TMLAx2
+#: src/modules/settings/forms/components/SettingsLeadFormForm.tsx
 #: src/pages/settings/ai/components/SettingsToolParameterTable.tsx
 msgid "Required"
 msgstr "Påkrevd"
@@ -16089,6 +16565,7 @@ msgid "reverse alphabetical"
 msgstr "omvendt alfabetisk"
 
 #. js-lingui-id: GXsAby
+#: src/modules/page-layout/widgets/client-portal/components/ClientPortalWidget.tsx
 #: src/modules/settings/admin-panel/components/SettingsAdminWorkspaceCreditGrantRowDropdownMenu.tsx
 #: src/modules/settings/admin-panel/components/SettingsAdminWorkspaceCreditGrantsTable.tsx
 #: src/modules/settings/admin-panel/signing-keys/components/SettingsAdminRevokeSigningKeyConfirmationModal.tsx
@@ -16116,7 +16593,13 @@ msgstr "Opphev kredittildeling"
 msgid "Revoke signing key"
 msgstr "Tilbakekall signeringsnøkkel"
 
+#. js-lingui-id: TWLRpO
+#: src/modules/page-layout/widgets/client-portal/components/ClientPortalWidget.tsx
+msgid "Revoke this portal link? Anyone using it will lose access immediately."
+msgstr ""
+
 #. js-lingui-id: xGiT1z
+#: src/modules/page-layout/widgets/client-portal/components/ClientPortalWidget.tsx
 #: src/modules/settings/admin-panel/components/SettingsAdminWorkspaceCreditGrantsTable.tsx
 #: src/modules/settings/admin-panel/signing-keys/components/SettingsAdminSigningKeysTable.tsx
 #: src/modules/settings/admin-panel/signing-keys/components/SettingsAdminSigningKeysTable.tsx
@@ -16957,6 +17440,11 @@ msgstr "Velg en seksjon, kolonner, knapp eller skillelinje i e-postinnholdet for
 msgid "Select a sender"
 msgstr "Velg en avsender"
 
+#. js-lingui-id: +OWmnu
+#: src/modules/command-menu-item/engine-command/record/sequences/components/EnrollInSequenceRecordCommand.tsx
+msgid "Select a sequence"
+msgstr ""
+
 #. js-lingui-id: jL3gox
 #: src/modules/object-record/record-field/ui/form-types/components/FormBooleanFieldInput.tsx
 msgid "Select a value"
@@ -16978,6 +17466,11 @@ msgstr "Velg handling"
 #: src/modules/object-record/record-table/record-table-header/components/RecordTableHeaderCheckboxColumn.tsx
 msgid "Select all rows"
 msgstr "Velg alle rader"
+
+#. js-lingui-id: AftEEM
+#: src/modules/quoting/components/QuoteLineItemRow.tsx
+msgid "Select an item"
+msgstr ""
 
 #. js-lingui-id: hVPa4O
 #: src/modules/spreadsheet-import/steps/components/MatchColumnsStep/components/UnmatchColumn.tsx
@@ -17167,6 +17660,11 @@ msgstr "Send test-e-post"
 msgid "Sender name"
 msgstr "Avsendernavn"
 
+#. js-lingui-id: 9AoD4u
+#: src/modules/settings/twilio/components/SettingsTwilioForm.tsx
+msgid "Sender numbers"
+msgstr ""
+
 #. js-lingui-id: ULtHaJ
 #: src/pages/settings/communications/SettingsWorkspaceCommunicationGroupChannelDetail.tsx
 msgid "Sending domain"
@@ -17189,6 +17687,7 @@ msgid "Sending..."
 msgstr "Sender..."
 
 #. js-lingui-id: h69WC6
+#: src/modules/sequences/components/SequenceAnalyticsStrip.tsx
 #: src/modules/settings/accounts/components/SettingsAccountsMessageAutoCreationCard.tsx
 #: src/modules/workflow/workflow-steps/workflow-actions/components/WorkflowRunStepLogsEmailDetail.tsx
 msgid "Sent"
@@ -17208,6 +17707,12 @@ msgstr "Sendte e-post"
 #: src/modules/advanced-text-editor/constants/AdvancedTextEditorBlockCatalog.ts
 msgid "separator"
 msgstr "skillelinje"
+
+#. js-lingui-id: ipQKNM
+#: src/modules/command-menu-item/engine-command/record/sequences/components/EnrollInSequenceRecordCommand.tsx
+#: src/modules/workflow/workflow-steps/workflow-actions/components/WorkflowEditActionSequence.tsx
+msgid "Sequence"
+msgstr ""
 
 #. js-lingui-id: 6oxz/y
 #: src/localization/hooks/useLocaleOptions.ts
@@ -17296,6 +17801,11 @@ msgstr "Angi navnet på ditt tilpassede domene og konfigurer DNS-oppføringene d
 msgid "Set the name of your subdomain"
 msgstr "Angi navnet på underdomenet ditt"
 
+#. js-lingui-id: q9Yx6G
+#: src/modules/settings/twilio/components/SettingsTwilioForm.tsx
+msgid "Set this URL in your Twilio console to receive replies"
+msgstr ""
+
 #. js-lingui-id: tG3Y2G
 #: src/modules/views/view-picker/components/ViewPickerContentCreateMode.tsx
 msgid "Set up a Date field on {objectLabel} to create a Calendar"
@@ -17331,6 +17841,7 @@ msgstr "Konfigurerer <0>databasen</0>..."
 #: src/modules/navigation/components/SettingsNavigationDrawer.tsx
 #: src/modules/navigation/components/SettingsNavigationDrawer.tsx
 #: src/modules/object-record/record-merge/hooks/useMergeRecordsContainerTabs.ts
+#: src/modules/sequences/components/SequenceSettingsSection.tsx
 #: src/modules/settings/accounts/components/SettingsAccountsSettingsSection.tsx
 #: src/modules/settings/mcp-and-apis/utils/buildMcpSetupCategories.tsx
 #: src/modules/settings/mcp-and-apis/utils/buildMcpSetupCategories.tsx
@@ -17389,6 +17900,11 @@ msgstr "Syvende"
 #: src/modules/activities/emails/components/EmailThreadBottomBar.tsx
 msgid "Share"
 msgstr "Del"
+
+#. js-lingui-id: mSFOF2
+#: src/modules/settings/forms/components/SettingsLeadFormForm.tsx
+msgid "Share & embed"
+msgstr ""
 
 #. js-lingui-id: Vy9kmk
 #: src/pages/settings/members/tabs/SettingsWorkspaceMembersInviteTab.tsx
@@ -17487,6 +18003,11 @@ msgstr "Vis postene til dette objektet i kommandomenyen (⌘K)."
 #. js-lingui-id: TJ4tz9
 #: src/modules/side-panel/pages/page-layout/constants/settings/ChartConfigurationSettingLabels.ts
 msgid "Show value in center"
+msgstr ""
+
+#. js-lingui-id: 3YtjYy
+#: src/modules/settings/forms/components/SettingsLeadFormForm.tsx
+msgid "Shown to visitors after they submit the form"
 msgstr ""
 
 #. js-lingui-id: P7rcbf
@@ -17678,6 +18199,16 @@ msgstr "Mindre"
 msgid "Smart Model"
 msgstr "Smart modell"
 
+#. js-lingui-id: TEERTx
+#: src/modules/sequences/components/SequenceStepEditor.tsx
+msgid "SMS"
+msgstr ""
+
+#. js-lingui-id: hjK32W
+#: src/modules/settings/twilio/components/SettingsTwilioForm.tsx
+msgid "SMS number"
+msgstr ""
+
 #. js-lingui-id: w+rJId
 #: src/modules/settings/accounts/components/SettingsAccountsConnectionForm.tsx
 msgid "SMTP Configuration"
@@ -17760,6 +18291,12 @@ msgstr "Noe gikk galt under opprettelsen av arbeidsområdet ditt. Prøv igjen."
 #: src/modules/settings/event-logs/components/SettingsLogs.tsx
 msgid "Something went wrong while loading logs. Please try again."
 msgstr "Noe gikk galt under innlasting av logger. Prøv igjen."
+
+#. js-lingui-id: fWsBTs
+#: src/pages/forms/PublicLeadForm.tsx
+#: src/pages/forms/PublicLeadForm.tsx
+msgid "Something went wrong. Please try again."
+msgstr ""
 
 #. js-lingui-id: yHwG3y
 #: src/modules/object-record/object-options-dropdown/components/ObjectOptionsDropdownCalendarViewContent.tsx
@@ -17891,6 +18428,11 @@ msgstr "Stablede stolper"
 msgid "Stacked lines"
 msgstr ""
 
+#. js-lingui-id: 3PRxO3
+#: src/pages/portal/ClientPortalPage.tsx
+msgid "Stage"
+msgstr ""
+
 #. js-lingui-id: ErU1td
 #: src/modules/views/view-picker/components/ViewPickerContentCreateMode.tsx
 msgid "Stages"
@@ -17954,6 +18496,7 @@ msgstr "Tilstand"
 #: src/modules/ai/components/AiChatThreadFilterDropdownRootMenu.tsx
 #: src/modules/ai/components/AiChatThreadFilterDropdownStatusMenu.tsx
 #: src/modules/object-core/workflows/constants/WorkflowCoreTableColumns.tsx
+#: src/modules/sequences/components/SequenceSettingsSection.tsx
 #: src/modules/settings/accounts/components/SettingsConnectedAccountsTableHeader.tsx
 #: src/modules/settings/admin-panel/components/SettingsAdminWorkspaceBillingContent.tsx
 #: src/modules/settings/admin-panel/components/SettingsAdminWorkspaceContent.tsx
@@ -17961,6 +18504,7 @@ msgstr "Tilstand"
 #: src/modules/settings/admin-panel/components/SettingsAdminWorkspaceCreditGrantsTable.tsx
 #: src/modules/settings/admin-panel/signing-keys/components/SettingsAdminSigningKeysTable.tsx
 #: src/modules/settings/components/SettingsDnsRecordsTable.tsx
+#: src/modules/settings/forms/components/SettingsLeadFormsTable.tsx
 #: src/pages/settings/admin-panel/SettingsAdminApplicationRegistrationClaims.tsx
 #: src/pages/settings/admin-panel/SettingsAdminIndicatorHealthStatus.tsx
 #: src/pages/settings/admin-panel/SettingsAdminInstanceStatus.tsx
@@ -17980,6 +18524,11 @@ msgstr "Status"
 msgid "Stay up to date with product news and community updates."
 msgstr "Hold deg oppdatert på produktnyheter og oppdateringer fra fellesskapet."
 
+#. js-lingui-id: cj1/wV
+#: src/modules/sequences/components/SequenceStepEditor.tsx
+msgid "Step"
+msgstr ""
+
 #. js-lingui-id: lATgy+
 #: src/modules/workflow/workflow-steps/filters/components/WorkflowStepFilterGroupOptionsDropdown.tsx
 msgid "Step filter group options"
@@ -17989,6 +18538,11 @@ msgstr "Alternativer for trinnfiltergruppe"
 #: src/modules/workflow/workflow-steps/filters/components/WorkflowStepFilterOptionsDropdown.tsx
 msgid "Step filter options"
 msgstr "Alternativer for trinnfilter"
+
+#. js-lingui-id: A9onc2
+#: src/modules/sequences/components/SequenceStepsEditor.tsx
+msgid "Steps"
+msgstr ""
 
 #. js-lingui-id: I8EmDx
 #: src/modules/information-banner/components/impersonate/InformationBannerIsImpersonating.tsx
@@ -18100,6 +18654,7 @@ msgstr ""
 #: src/modules/activities/emails/components/CampaignSentEnvelope.tsx
 #: src/modules/activities/emails/components/EmailComposerFields.tsx
 #: src/modules/activities/emails/components/EmailComposerFields.tsx
+#: src/modules/sequences/components/SequenceStepEditor.tsx
 #: src/modules/workflow/workflow-steps/workflow-actions/components/WorkflowEditActionEmailBase.tsx
 msgid "Subject"
 msgstr "Emne"
@@ -18113,6 +18668,11 @@ msgstr "Emne og metadata"
 #: src/modules/settings/accounts/components/SettingsAccountsMessageVisibilityCard.tsx
 msgid "Subject and metadata will be shared with your team."
 msgstr "Emne og metadata vil bli delt med teamet ditt."
+
+#. js-lingui-id: 0gPczG
+#: src/modules/sequences/components/SequenceStepEditor.tsx
+msgid "Subject line"
+msgstr ""
 
 #. js-lingui-id: DvSvG9
 #: src/modules/activities/timeline-activities/rows/message/components/EventCardMessage.tsx
@@ -18129,8 +18689,14 @@ msgstr "Emne, kropp og vedlegg vil bli delt med teamet ditt."
 #: src/modules/auth/sign-in-up/components/internal/SignInUpTwoFactorAuthenticationVerification.tsx
 #: src/modules/spreadsheet-import/steps/components/ValidationStep/ValidationStep.tsx
 #: src/modules/workflow/workflow-steps/workflow-actions/form-action/components/WorkflowEditActionFormFiller.tsx
+#: src/pages/forms/PublicLeadForm.tsx
 msgid "Submit"
 msgstr "Send inn"
+
+#. js-lingui-id: MDqQmP
+#: src/pages/forms/PublicLeadForm.tsx
+msgid "Submitting…"
+msgstr ""
 
 #. js-lingui-id: EDl9kS
 #: src/modules/information-banner/components/billing/InformationBannerNoBillingSubscription.tsx
@@ -18154,9 +18720,13 @@ msgstr "Abonnement"
 msgid "Subscription activated."
 msgstr "Abonnement aktivert."
 
+#. js-lingui-id: mmqCqG
+#: src/modules/settings/billing/components/AddPaymentMethodForm.tsx
+#: src/modules/settings/billing/components/AddPaymentMethodForm.tsx
+msgid "Subscription error. Please retry or contact Otogrow CRM team"
+msgstr ""
+
 #. js-lingui-id: 0okvpx
-#: src/modules/settings/billing/components/AddPaymentMethodForm.tsx
-#: src/modules/settings/billing/components/AddPaymentMethodForm.tsx
 #: src/modules/settings/billing/hooks/useSubmitSubscriptionPayment.ts
 #: src/modules/settings/billing/hooks/useSubmitSubscriptionPayment.ts
 msgid "Subscription error. Please retry or contact Twenty team"
@@ -18201,11 +18771,21 @@ msgstr ""
 msgid "Subtitle"
 msgstr "Undertittel"
 
+#. js-lingui-id: X2rrlw
+#: src/modules/quoting/components/QuoteTotalsSection.tsx
+msgid "Subtotal"
+msgstr ""
+
 #. js-lingui-id: zzDlyQ
 #: src/modules/ui/feedback/snack-bar-manager/components/SnackBar.tsx
 #: src/modules/workflow/workflow-steps/workflow-actions/code-action/components/WorkflowRunStepLogsCodeDetail.tsx
 msgid "Success"
 msgstr "Vellykket"
+
+#. js-lingui-id: BERhj/
+#: src/modules/settings/forms/components/SettingsLeadFormForm.tsx
+msgid "Success message"
+msgstr ""
 
 #. js-lingui-id: OjK1bU
 #: src/modules/object-record/record-merge/hooks/useMergeRecordsActions.ts
@@ -18462,6 +19042,16 @@ msgstr "Oppgavetittel"
 msgid "Task Title"
 msgstr "Oppgavetittel"
 
+#. js-lingui-id: JpohL9
+#: src/modules/quoting/components/QuoteTotalsSection.tsx
+msgid "Tax"
+msgstr ""
+
+#. js-lingui-id: NWF5NR
+#: src/modules/quoting/components/QuoteTotalsSection.tsx
+msgid "Tax %"
+msgstr ""
+
 #. js-lingui-id: KM6m8p
 #: src/pages/settings/members/SettingsWorkspaceMembers.tsx
 msgid "Team"
@@ -18472,6 +19062,16 @@ msgstr "Team"
 #: src/modules/activities/emails/recipients/hooks/useEmailRecipientSuggestions.ts
 msgid "Team member"
 msgstr "Teammedlem"
+
+#. js-lingui-id: d99KZg
+#: src/modules/sequences/components/SequenceStepEditor.tsx
+msgid "Template name (required outside the 24h window)"
+msgstr ""
+
+#. js-lingui-id: 81YByI
+#: src/modules/sequences/components/SequenceStepEditor.tsx
+msgid "Template parameters (JSON)"
+msgstr ""
 
 #. js-lingui-id: lKXcJz
 #: src/pages/settings/emailing-domains/utils/getEmailingDomainStatusText.ts
@@ -18500,6 +19100,11 @@ msgstr "Bruksvilkår"
 #: src/pages/settings/logic-functions/SettingsLogicFunctionDetail.tsx
 msgid "Test"
 msgstr "Test"
+
+#. js-lingui-id: e2zZ3E
+#: src/modules/settings/twilio/components/SettingsTwilioForm.tsx
+msgid "Test connection"
+msgstr ""
 
 #. js-lingui-id: 1QHjf8
 #. placeholder {0}: params.toAddress
@@ -18547,6 +19152,12 @@ msgstr "Tekst kopiert til utklippstavlen"
 #: src/modules/advanced-text-editor/components/FormAdvancedTextFieldInput.tsx
 msgid "Text Editor"
 msgstr "Tekstredigering"
+
+#. js-lingui-id: cEkosV
+#: src/modules/settings/forms/components/SettingsLeadFormForm.tsx
+#: src/pages/forms/PublicLeadForm.tsx
+msgid "Thank you! Your submission has been received."
+msgstr ""
 
 #. js-lingui-id: Z4WP0F
 #: src/modules/settings/accounts/components/SettingsAccountsNewEmailGroupChannel.tsx
@@ -18694,6 +19305,11 @@ msgstr "Modellidentifikatoren brukt av tilbyderens API"
 msgid "The name and icon of this field"
 msgstr "Navnet og ikonet til dette feltet"
 
+#. js-lingui-id: ApqXyj
+#: src/modules/settings/forms/components/SettingsLeadFormForm.tsx
+msgid "The name of this form, displayed on the hosted page"
+msgstr ""
+
 #. js-lingui-id: e/dfFe
 #: src/modules/settings/security/components/SSO/SettingsSSOIdentitiesProvidersForm.tsx
 msgid "The name of your connection"
@@ -18725,10 +19341,10 @@ msgstr "Navnet mottakerne ser ved siden av adressen din. Det blir satt når kana
 msgid "The page you're seeking is either gone or never was. Let's get you back on track"
 msgstr "Siden du søker etter er enten borte eller var aldri. La oss få deg tilbake på sporet"
 
-#. js-lingui-id: Ya1wb4
+#. js-lingui-id: ip+Cmx
 #: src/pages/settings/legal/SettingsLegalDpaNew.tsx
-msgid "The PDF is pre-signed by Twenty and executed with your legal entity and authorized signatory."
-msgstr "PDF-en er forhåndssignert av Twenty og inngått med din juridiske enhet og autoriserte undertegner."
+msgid "The PDF is pre-signed by Otogrow CRM and executed with your legal entity and authorized signatory."
+msgstr ""
 
 #. js-lingui-id: wxyrqd
 #: src/modules/workflow/workflow-steps/workflow-actions/pick-record-action/components/WorkflowEditActionPickRecord.tsx
@@ -18989,6 +19605,11 @@ msgstr "Denne enterprise-nøkkelen er for øyeblikket bundet til en annen server
 msgid "This feature is part of the Enterprise Plan"
 msgstr "Denne funksjonen er en del av Enterprise-planen"
 
+#. js-lingui-id: B8AaMI
+#: src/pages/forms/PublicLeadForm.tsx
+msgid "This field is required"
+msgstr ""
+
 #. js-lingui-id: own57K
 #: src/modules/activities/files/components/DocumentViewer.tsx
 msgid "This file cannot be previewed because it is hosted locally."
@@ -18998,6 +19619,11 @@ msgstr "Denne filen kan ikke forhåndsvises fordi den er lagret lokalt."
 #: src/modules/activities/files/components/DocumentViewer.tsx
 msgid "This file type cannot be previewed. Please download the file to view it."
 msgstr "Denne filtypen kan ikke forhåndsvises. Last ned filen for å se den."
+
+#. js-lingui-id: BaBl1i
+#: src/pages/forms/PublicLeadForm.tsx
+msgid "This form does not exist or is no longer active."
+msgstr ""
 
 #. js-lingui-id: 3eMupJ
 #: src/modules/workflow/workflow-steps/workflow-actions/form-action/components/WorkflowEditActionFormBuilder.tsx
@@ -19034,6 +19660,11 @@ msgstr "Dette er den gjeldende signeringsnøkkelen. Tilbakekalling av den vil ug
 msgid "This key should be set through body input"
 msgstr "Denne nøkkelen bør angis via body-inndata"
 
+#. js-lingui-id: 5tO2+L
+#: src/modules/page-layout/widgets/client-portal/components/ClientPortalWidget.tsx
+msgid "This link is shown only once. Copy it now — it cannot be recovered later."
+msgstr ""
+
 #. js-lingui-id: Wuvfgw
 #: src/pages/settings/admin-panel/SettingsAdminAiProviderDetail.tsx
 msgid "This model will be removed from the provider. You can re-add it later."
@@ -19043,6 +19674,11 @@ msgstr "Denne modellen vil bli fjernet fra tilbyderen. Du kan legge den til igje
 #: src/modules/page-layout/widgets/components/StandaloneWidgetPlaceholder.tsx
 msgid "This page has no content"
 msgstr "Denne siden har ikke noe innhold"
+
+#. js-lingui-id: GxTuta
+#: src/pages/portal/ClientPortalPage.tsx
+msgid "This portal does not exist or is no longer active."
+msgstr ""
 
 #. js-lingui-id: R/PuIn
 #: src/pages/settings/admin-panel/SettingsAdminNewAiProvider.tsx
@@ -19345,6 +19981,11 @@ msgstr "Tomat"
 msgid "Tomorrow"
 msgstr "I morgen"
 
+#. js-lingui-id: aT928U
+#: src/pages/forms/PublicLeadForm.tsx
+msgid "Too many attempts. Please wait a few minutes and try again."
+msgstr ""
+
 #. js-lingui-id: x+3/CM
 #. placeholder {0}: composerState.recipientCount
 #. placeholder {1}: composerState.maxRecipients
@@ -19426,6 +20067,7 @@ msgstr "Emner"
 
 #. js-lingui-id: 72c5Qo
 #: src/modules/page-layout/widgets/graph/graph-widget-pie-chart/hooks/usePieChartCenterMetricData.ts
+#: src/modules/quoting/components/QuoteTotalsSection.tsx
 #: src/modules/settings/billing/components/internal/SettingsBillingSubscriptionInfoCard.tsx
 msgid "Total"
 msgstr ""
@@ -19445,6 +20087,11 @@ msgstr "Totalt antall jobber"
 #: src/modules/ai/components/RoutingDebugDisplay.tsx
 msgid "Total time"
 msgstr "Total tid"
+
+#. js-lingui-id: 6AGtrI
+#: src/modules/quoting/components/QuoteTotalsSection.tsx
+msgid "Totals"
+msgstr ""
 
 #. js-lingui-id: BxecEJ
 #: src/pages/settings/ai/components/SettingsAiUsageTab.tsx
@@ -19658,10 +20305,37 @@ msgstr ""
 msgid "Turquoise"
 msgstr "Turkis"
 
-#. js-lingui-id: JnaRPe
-#: src/modules/spreadsheet-import/steps/components/MatchColumnsStep/components/ColumnGrid.tsx
-msgid "Twenty fields"
-msgstr "Twenty-felter"
+#. js-lingui-id: Wy25yg
+#: src/modules/settings/hooks/useSettingsNavigationItems.tsx
+#: src/modules/settings/twilio/components/SettingsTwilioForm.tsx
+#: src/modules/settings/twilio/components/SettingsTwilioForm.tsx
+msgid "Twilio"
+msgstr ""
+
+#. js-lingui-id: MUFkd7
+#: src/modules/settings/twilio/components/SettingsTwilioForm.tsx
+msgid "Twilio auth token"
+msgstr ""
+
+#. js-lingui-id: ut+HDQ
+#: src/modules/settings/twilio/hooks/useTwilioConfigForm.ts
+msgid "Twilio configuration deleted successfully"
+msgstr ""
+
+#. js-lingui-id: LddBYi
+#: src/modules/settings/twilio/hooks/useTwilioConfigForm.ts
+msgid "Twilio configuration saved successfully"
+msgstr ""
+
+#. js-lingui-id: NWp3kO
+#: src/modules/settings/twilio/hooks/useTwilioConfigForm.ts
+msgid "Twilio connection failed"
+msgstr ""
+
+#. js-lingui-id: PCB+Bj
+#: src/modules/settings/twilio/hooks/useTwilioConfigForm.ts
+msgid "Twilio connection successful"
+msgstr ""
 
 #. js-lingui-id: YIjS4q
 #: src/modules/ai/components/SettingsAgentModelCapabilities.tsx
@@ -19712,6 +20386,7 @@ msgstr "Tofaktorautentiseringsoppsett fullført!"
 #: src/modules/settings/components/SettingsDnsRecordsTable.tsx
 #: src/modules/settings/data-model/indexes/forms/components/SettingsObjectIndexOptionsForm.tsx
 #: src/modules/settings/data-model/object-details/components/SettingsObjectRelationsTable.tsx
+#: src/modules/settings/forms/components/SettingsLeadFormForm.tsx
 #: src/modules/settings/security/components/SSO/SettingsSSOIdentitiesProvidersForm.tsx
 #: src/modules/workflow/workflow-steps/workflow-actions/ai-agent-action/components/WorkflowOutputFieldTypeSelector.tsx
 #: src/modules/workflow/workflow-steps/workflow-actions/form-action/components/WorkflowEditActionFormFieldSettings.tsx
@@ -19741,6 +20416,7 @@ msgstr "Skriv hva som helst..."
 #. js-lingui-id: LaEX5I
 #: src/modules/activities/emails/components/CampaignBodyField.tsx
 #: src/modules/activities/emails/components/EmailComposerFields.tsx
+#: src/modules/sequences/components/SequenceStepEditor.tsx
 msgid "Type something or press \"/\" to see commands"
 msgstr "Skriv noe eller trykk \"/\" for å se kommandoer"
 
@@ -19748,6 +20424,12 @@ msgstr "Skriv noe eller trykk \"/\" for å se kommandoer"
 #: src/modules/navigation-menu-item/edit/side-panel/components/SidePanelNewSidebarItemRecordSubPage.tsx
 msgid "Type to search records"
 msgstr "Skriv for å søke i poster"
+
+#. js-lingui-id: Lfm+rt
+#: src/modules/sequences/components/SequenceStepEditor.tsx
+#: src/modules/sequences/components/SequenceStepEditor.tsx
+msgid "Type your message. Use '{{name.firstName}}' to insert variables."
+msgstr ""
 
 #. js-lingui-id: SILT51
 #: src/modules/ai/components/internal/AiChatQuestionOtherOption.tsx
@@ -19801,6 +20483,12 @@ msgstr "Fjern fra arkiv"
 msgid "Unavailable"
 msgstr "Utilgjengelig"
 
+#. js-lingui-id: 4LOSze
+#. placeholder {0}: twilioConfig.authTokenLastFour
+#: src/modules/settings/twilio/components/SettingsTwilioForm.tsx
+msgid "unchanged (••••{0})"
+msgstr ""
+
 #. js-lingui-id: NYFASA
 #: src/pages/settings/applications/components/SettingsApplicationRegistrationGeneralInfo.tsx
 msgid "Unclaimed"
@@ -19829,6 +20517,11 @@ msgstr ""
 #. js-lingui-id: 0LZhoy
 #: src/modules/side-panel/pages/page-layout/utils/getChartLimitMessage.ts
 msgid "Undisplayed data: max {maxItems} slices per chart."
+msgstr ""
+
+#. js-lingui-id: ApaMbR
+#: src/modules/sequences/hooks/useUnenrollFromSequence.ts
+msgid "Unenrolled from the sequence"
 msgstr ""
 
 #. js-lingui-id: fo0VXg
@@ -19870,6 +20563,11 @@ msgstr "Unike felt"
 #: src/modules/side-panel/pages/page-layout/constants/settings/SuffixSetting.ts
 msgid "unit"
 msgstr "enhet"
+
+#. js-lingui-id: aSwfbR
+#: src/modules/sequences/components/SequenceStepEditor.tsx
+msgid "Unit"
+msgstr ""
 
 #. js-lingui-id: fMyWEp
 #: src/pages/settings/applications/components/SettingsApplicationRegistrationGeneralInfo.tsx
@@ -19945,6 +20643,7 @@ msgid "Unknown workspace"
 msgstr "Ukjent arbeidsområde"
 
 #. js-lingui-id: NIuIk1
+#: src/modules/sequences/components/SequenceSettingsSection.tsx
 #: src/modules/settings/billing/constants/SettingsBillingPlanComparisonRows.ts
 #: src/modules/settings/billing/constants/SettingsBillingPlanComparisonRows.ts
 #: src/modules/settings/billing/constants/SettingsBillingPlanComparisonRows.ts
@@ -20049,6 +20748,7 @@ msgid "Unsubscribe topics"
 msgstr "Emner for avmelding"
 
 #. js-lingui-id: 8JplJJ
+#: src/modules/sequences/components/SequenceAnalyticsStrip.tsx
 #: src/modules/settings/unsubscribers/utils/getMessageSuppressionReasonBadge.ts
 msgid "Unsubscribed"
 msgstr "Avmeldt"
@@ -20657,6 +21357,8 @@ msgid "Using default value. Set a custom value to override."
 msgstr "Bruker standardverdi. Angi en tilpasset verdi for å overstyre."
 
 #. js-lingui-id: zzp4XX
+#: src/modules/quoting/components/QuoteTotalsSection.tsx
+#: src/pages/portal/ClientPortalPage.tsx
 #: src/pages/settings/enterprise/SettingsEnterprise.tsx
 #: src/pages/settings/enterprise/SettingsEnterprise.tsx
 msgid "Valid until"
@@ -20899,6 +21601,11 @@ msgstr "Vis jobber"
 msgid "View not shared"
 msgstr "Visning ikke delt"
 
+#. js-lingui-id: X3nDCj
+#: src/pages/portal/ClientPortalPage.tsx
+msgid "View PDF"
+msgstr ""
+
 #. js-lingui-id: hAAsm/
 #: src/modules/workflow/workflow-steps/workflow-actions/ai-agent-action/components/WorkflowEditActionAiAgent.tsx
 msgid "View role"
@@ -21002,6 +21709,11 @@ msgstr "Visualiser datamodell"
 #: src/modules/settings/mcp-and-apis/utils/buildMcpSetupCategories.tsx
 msgid "VS Code"
 msgstr "VS Code"
+
+#. js-lingui-id: hQOBwU
+#: src/modules/sequences/components/SequenceStepEditor.tsx
+msgid "Wait"
+msgstr ""
 
 #. js-lingui-id: mVkP/D
 #: src/modules/ai/hooks/useSubmitQuestionAnswer.ts
@@ -21216,6 +21928,11 @@ msgstr "Webhook-ID er nødvendig for sletting"
 msgid "Webhook ID is required for updates"
 msgstr "Webhook-ID er nødvendig for oppdateringer"
 
+#. js-lingui-id: RLiHU1
+#: src/modules/settings/twilio/components/SettingsTwilioForm.tsx
+msgid "Webhook URL copied to clipboard"
+msgstr ""
+
 #. js-lingui-id: v1kQyJ
 #: src/modules/settings/billing/constants/SettingsBillingPlanComparisonRows.ts
 #: src/pages/settings/api-webhooks/SettingsApiWebhooks.tsx
@@ -21253,10 +21970,10 @@ msgstr ""
 msgid "Weight"
 msgstr "Vekt"
 
-#. js-lingui-id: nTuObL
+#. js-lingui-id: /WCeBf
 #: src/pages/auth/SignInUp.tsx
-msgid "Welcome to Twenty"
-msgstr "Velkommen til Twenty"
+msgid "Welcome to Otogrow CRM"
+msgstr ""
 
 #. js-lingui-id: t8ZvkC
 #: src/modules/onboarding/constants/WelcomeTitleMessage.ts
@@ -21299,6 +22016,16 @@ msgstr "Hva som er installert og i bruk i arbeidsområdet ditt"
 #: src/pages/settings/communications/SettingsWorkspaceCommunications.tsx
 msgid "Whatsapp"
 msgstr "WhatsApp"
+
+#. js-lingui-id: 2+ExvJ
+#: src/modules/sequences/components/SequenceStepEditor.tsx
+msgid "WhatsApp"
+msgstr ""
+
+#. js-lingui-id: Z2plSx
+#: src/modules/settings/twilio/components/SettingsTwilioForm.tsx
+msgid "WhatsApp sender number"
+msgstr ""
 
 #. js-lingui-id: m7GziZ
 #: src/modules/ai/components/suggested-prompts/default-suggested-prompts.ts
@@ -21453,11 +22180,13 @@ msgstr "Arbeidsflyter"
 #: src/modules/settings/domains/components/SettingPublicDomain.tsx
 #: src/modules/settings/domains/components/SettingsCustomDomain.tsx
 #: src/modules/settings/domains/components/SettingsSubdomain.tsx
+#: src/modules/settings/forms/components/SettingsLeadFormForm.tsx
 #: src/modules/settings/hooks/useSettingsNavigationItems.tsx
 #: src/modules/settings/roles/role-permissions/object-level-permissions/object-form/components/SettingsRolePermissionsObjectLevelObjectForm.tsx
 #: src/modules/settings/roles/role-permissions/object-level-permissions/object-form/components/SettingsRolePermissionsObjectLevelObjectForm.tsx
 #: src/modules/settings/roles/role-permissions/permission-flags/hooks/useSettingsRolePermissionFlagConfig.ts
 #: src/modules/settings/roles/role/components/SettingsRole.tsx
+#: src/modules/settings/twilio/components/SettingsTwilioForm.tsx
 #: src/modules/views/view-picker/components/ViewPickerListContent.tsx
 #: src/pages/settings/admin-panel/SettingsAdminApplicationRegistrationClaims.tsx
 #: src/pages/settings/admin-panel/SettingsAdminWorkspaceChatThread.tsx
@@ -21500,6 +22229,7 @@ msgstr "Arbeidsflyter"
 #: src/pages/settings/developers/playground/SettingsRestPlayground.tsx
 #: src/pages/settings/developers/webhooks/components/SettingsWebhooks.tsx
 #: src/pages/settings/enterprise/SettingsEnterprise.tsx
+#: src/pages/settings/forms/SettingsLeadForms.tsx
 #: src/pages/settings/general/SettingsGeneral.tsx
 #: src/pages/settings/layout/components/SettingsLayoutDetailScaffold.tsx
 #: src/pages/settings/layout/SettingsLayout.tsx
@@ -21690,6 +22420,10 @@ msgstr "Gul"
 #. js-lingui-id: 3d1wCB
 #: src/modules/settings/developers/components/SettingsDevelopersWebhookForm.tsx
 #: src/modules/settings/developers/components/SettingsDevelopersWebhookForm.tsx
+#: src/modules/settings/forms/components/SettingsLeadFormForm.tsx
+#: src/modules/settings/forms/components/SettingsLeadFormForm.tsx
+#: src/modules/settings/twilio/components/SettingsTwilioForm.tsx
+#: src/modules/settings/twilio/components/SettingsTwilioForm.tsx
 #: src/pages/settings/admin-panel/SettingsAdminApplicationRegistrationDangerZone.tsx
 #: src/pages/settings/applications/tabs/SettingsApplicationDetailAboutTab.tsx
 #: src/pages/settings/applications/tabs/SettingsApplicationRegistrationOAuthTab.tsx
@@ -22000,6 +22734,11 @@ msgstr "Arbeidsområdet ditt har nådd AI-bruksgrensen. Be en administrator om �
 #: src/modules/settings/billing/components/SettingsBillingContent.tsx
 msgid "Your workspace will be disabled"
 msgstr "Ditt arbeidsområde vil bli deaktivert"
+
+#. js-lingui-id: 2dhgET
+#: src/modules/quoting/components/QuoteTotalsSection.tsx
+msgid "YYYY-MM-DD"
+msgstr ""
 
 #. js-lingui-id: ZGbFnN
 #: src/modules/settings/mcp-and-apis/utils/buildMcpSetupCategories.tsx
