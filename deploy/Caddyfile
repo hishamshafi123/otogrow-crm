@@ -1,0 +1,32 @@
+crm.otogrow.com {
+	encode gzip zstd
+
+	# /forms/:publicId and /portal/:token are both hosted public SPA pages and
+	# public REST prefixes. The Nest controllers answer on those paths no matter
+	# what, so browser navigations (Accept: text/html) must be steered to the
+	# SPA's index.html here; XHR/fetch calls (Accept: */* or application/json)
+	# pass through untouched and reach the API. The SPA fetches portal PDFs as
+	# XHR blobs, and the regexp limits the rewrite to exactly one path segment,
+	# so deeper API paths like /portal/:token/quotes/:quoteId/pdf always hit the
+	# API even on direct navigation.
+	@publicPages {
+		path_regexp ^/(forms|portal)/[^/]+/?$
+		header Accept *text/html*
+	}
+	rewrite @publicPages /index.html
+
+	reverse_proxy app:3000
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

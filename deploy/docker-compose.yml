@@ -1,0 +1,111 @@
+name: otogrow-crm
+
+# Production stack for the Otogrow CRM fork. The app image is built from this
+# repo's source (packages/twenty-docker/twenty/Dockerfile, target "twenty" =
+# server + frontend) because the fork carries custom code the public
+# twentycrm/twenty registry images do not have.
+
+services:
+  app:
+    build:
+      # repo root; run compose from the deploy/ directory
+      context: ..
+      dockerfile: packages/twenty-docker/twenty/Dockerfile
+      target: twenty
+      args:
+        APP_VERSION: ${APP_VERSION:-0.0.0}
+    image: otogrow-crm/app:local
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      NODE_PORT: 3000
+      PG_DATABASE_URL: postgres://${PG_DATABASE_USER}:${PG_DATABASE_PASSWORD}@db:5432/${PG_DATABASE_NAME}
+      REDIS_URL: redis://redis:6379
+      SERVER_URL: ${SERVER_URL}
+      FRONTEND_URL: ${SERVER_URL}
+      DISABLE_DB_MIGRATIONS: "false"
+    volumes:
+      - app-storage:/app/packages/twenty-server/.local-storage
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: curl --fail http://localhost:3000/healthz
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+    restart: unless-stopped
+
+  worker:
+    image: otogrow-crm/app:local
+    env_file: .env
+    command: ["yarn", "worker:prod"]
+    environment:
+      NODE_ENV: production
+      PG_DATABASE_URL: postgres://${PG_DATABASE_USER}:${PG_DATABASE_PASSWORD}@db:5432/${PG_DATABASE_NAME}
+      REDIS_URL: redis://redis:6379
+      SERVER_URL: ${SERVER_URL}
+      FRONTEND_URL: ${SERVER_URL}
+      # the app container owns schema migrations and cron registration
+      DISABLE_DB_MIGRATIONS: "true"
+      DISABLE_CRON_JOBS_REGISTRATION: "true"
+    volumes:
+      - app-storage:/app/packages/twenty-server/.local-storage
+    depends_on:
+      app:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    env_file: .env
+    environment:
+      POSTGRES_DB: ${PG_DATABASE_NAME}
+      POSTGRES_USER: ${PG_DATABASE_USER}
+      POSTGRES_PASSWORD: ${PG_DATABASE_PASSWORD}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    # no published ports: reachable only on the internal compose network
+    healthcheck:
+      test: pg_isready -U ${PG_DATABASE_USER} -d ${PG_DATABASE_NAME}
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    # noeviction: bullmq jobs must never be evicted
+    command: ["--maxmemory-policy", "noeviction"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      app:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  db-data:
+  redis-data:
+  app-storage:
+  caddy-data:
+  caddy-config:
