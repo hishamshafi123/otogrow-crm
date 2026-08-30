@@ -18,9 +18,9 @@ export const Footer = ({ i18n }: FooterProps) => {
         <Column>
           <ShadowText>
             <Link
-              href="https://twenty.com/"
+              href="https://otogrow.com/"
               value={i18n._('Website')}
-              aria-label={i18n._("Visit Twenty's website")}
+              aria-label={i18n._("Visit Otogrow CRM's website")}
             />
           </ShadowText>
         </Column>
@@ -54,9 +54,9 @@ export const Footer = ({ i18n }: FooterProps) => {
       </Row>
       <ShadowText>
         <>
-          {i18n._('Twenty.com, Public Benefit Corporation')}
+          {i18n._('Otogrow CRM')}
           <br />
-          {i18n._('San Francisco / Paris')}
+          {i18n._('otogrow.com')}
         </>
       </ShadowText>
     </Container>

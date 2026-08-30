@@ -16,8 +16,8 @@ export const ACCENT_DARK = {
   accent6: RadixColors.indigoDarkP3.indigo6,
   accent7: RadixColors.indigoDarkP3.indigo7,
   accent8: RadixColors.indigoDarkP3.indigo8,
-  accent9: RadixColors.indigoDarkP3.indigo9,
-  accent10: RadixColors.indigoDarkP3.indigo10,
-  accent11: RadixColors.indigoDarkP3.indigo11,
-  accent12: RadixColors.indigoDarkP3.indigo12,
+  accent9: '#4668d8',
+  accent10: '#5a7ce0',
+  accent11: '#8fa8ec',
+  accent12: '#d6e0fa',
 };

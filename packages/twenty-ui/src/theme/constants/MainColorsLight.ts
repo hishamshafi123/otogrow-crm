@@ -20,7 +20,7 @@ export const MAIN_COLORS_LIGHT = {
   turquoise: RadixColors.tealP3.teal9,
   cyan: RadixColors.cyanP3.cyan9,
   sky: RadixColors.skyP3.sky9,
-  blue: RadixColors.indigoP3.indigo9,
+  blue: '#1e3a8c',
 
   iris: RadixColors.irisP3.iris9,
   violet: RadixColors.violetP3.violet9,
