@@ -1,0 +1,291 @@
+name: Deploy crm.otogrow.com
+
+# Build on the runner (NEVER on the 2 vCPU VPS -- the frontend build alone
+# asks for an 8 GB Node heap and would OOM-kill BON), package immutable
+# archives, ship them over Tailscale to crmdeploy@<server>, and let the
+# root-owned installer run migrations and swap the release symlink atomically
+# with an automatic rollback on health-check failure.
+#
+# Two archives are produced:
+#   otogrow-crm-<sha>.tar.gz        compiled code + built SPA, no node_modules
+#   otogrow-crm-deps-<key>.tar.gz   production node_modules, keyed by content
+# The deps archive is uploaded ONLY when the server does not already have
+# that key, so a deploy that leaves yarn.lock alone ships code alone.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: otogrow-crm-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    env:
+      CI: 'true'
+      NX_DAEMON: 'false'
+      COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+      # Matches packages/twenty-docker/twenty/Dockerfile and the runtime
+      # installed at /opt/nodejs/24 on the VPS. Native addons are compiled
+      # against this ABI, so runner and server must agree on the major.
+      NODE_VERSION: '24.18.0'
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      # The dependency tree is keyed by everything that determines its
+      # contents: the lockfile, the workspace manifests of the packages that
+      # end up in production, and the yarn config itself.
+      - name: Compute dependency key
+        id: deps
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          key="$(
+            cat yarn.lock .yarnrc.yml package.json \
+                packages/twenty-server/package.json \
+                packages/twenty-shared/package.json \
+                packages/twenty-emails/package.json \
+                packages/twenty-client-sdk/package.json \
+              | sha256sum | awk '{print $1}'
+          )"
+          echo "key=$key" >> "$GITHUB_OUTPUT"
+          echo "Dependency key: $key"
+
+      - name: Cache Yarn artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            .yarn/cache
+            .nx/cache
+          key: crm-yarn-${{ steps.deps.outputs.key }}
+          restore-keys: crm-yarn-
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Compile translations
+        run: |
+          set -Eeuo pipefail
+          npx nx run twenty-server:lingui:extract
+          npx nx run twenty-server:lingui:compile
+          npx nx run twenty-emails:lingui:extract
+          npx nx run twenty-emails:lingui:compile
+          npx nx run twenty-front:lingui:extract
+          npx nx run twenty-front:lingui:compile
+
+      - name: Build server
+        run: npx nx run twenty-server:build
+
+      - name: Build frontend
+        env:
+          # The SPA reads its configuration at runtime from window._env_ and
+          # is served from the same origin as the API, so no URL is baked in
+          # here. Only the heap size matters.
+          NODE_OPTIONS: '--max-old-space-size=8192'
+        run: npx nx build twenty-front
+
+      # OAuth client issued from the tailnet that OWNS bon-test, so the
+      # ephemeral runner node is tagged and reaches the server directly.
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: ${{ vars.OTOGROW_CI_TAG }}
+          version: '1.94.2'
+
+      - name: Install pinned SSH identity
+        shell: bash
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.CRM_DEPLOY_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SERVER_SSH_KNOWN_HOSTS }}
+        run: |
+          set -Eeuo pipefail
+          test -n "$SSH_PRIVATE_KEY"
+          test -n "$SSH_KNOWN_HOSTS"
+          install -d -m 0700 "$HOME/.ssh"
+          printf '%s\n' "$SSH_PRIVATE_KEY" > "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 0600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
+          cat >> "$HOME/.ssh/config" <<'SSHEOF'
+          Host crm-target
+            User crmdeploy
+            IdentityFile ~/.ssh/id_ed25519
+            IdentitiesOnly yes
+            BatchMode yes
+            StrictHostKeyChecking yes
+            UserKnownHostsFile ~/.ssh/known_hosts
+            ConnectTimeout 15
+            ServerAliveInterval 30
+          SSHEOF
+          printf '  HostName %s\n' "${{ vars.SERVER_TAILSCALE_HOST }}" \
+            >> "$HOME/.ssh/config"
+
+      - name: Check whether the server already has this dependency tree
+        id: remote_deps
+        shell: bash
+        env:
+          DEPS_KEY: ${{ steps.deps.outputs.key }}
+        run: |
+          set -Eeuo pipefail
+          if ssh crm-target "test -d /opt/otogrow-crm/deps/${DEPS_KEY}/node_modules"; then
+            echo 'needed=false' >> "$GITHUB_OUTPUT"
+            echo 'Server already has this dependency tree; shipping code only.'
+          else
+            echo 'needed=true' >> "$GITHUB_OUTPUT"
+            echo 'Server needs this dependency tree; it will be uploaded.'
+          fi
+
+      # Everything below mirrors the layout the Dockerfile's `twenty` target
+      # assembles, so the runtime tree on the VPS matches the image byte for
+      # byte in structure. Keep the two in step when merging upstream.
+      - name: Prune to production dependencies
+        env:
+          # The production focus removes @yarnpkg/types, a root devDependency
+          # that yarn.config.cjs requires. With enableConstraintsChecks on,
+          # post-install validation then loads that file and dies with
+          # "Cannot find module '@yarnpkg/types'". The Dockerfile avoids this
+          # by never copying yarn.config.cjs into its build stage; we disable
+          # the check for this one step instead. The full install above still
+          # runs constraints normally.
+          YARN_ENABLE_CONSTRAINTS_CHECKS: '0'
+        run: |
+          set -Eeuo pipefail
+          # Type declarations and compiled tests are not needed at runtime.
+          find packages/twenty-server/dist -name '*.d.ts' -delete
+          rm -rf packages/twenty-server/dist/packages/twenty-server/test
+          yarn workspaces focus --production \
+            twenty-emails twenty-shared twenty-client-sdk twenty-server
+
+      - name: Assemble the release
+        shell: bash
+        env:
+          DEPS_KEY: ${{ steps.deps.outputs.key }}
+        run: |
+          set -Eeuo pipefail
+          stage="$RUNNER_TEMP/stage"
+          rm -rf "$stage"
+          mkdir -p "$stage/packages"
+
+          # Workspace root config
+          cp package.json yarn.lock .yarnrc.yml tsconfig.base.json nx.json "$stage/"
+          cp -a .yarn "$stage/.yarn"
+
+          # Server package: compiled dist + manifest only, no src/
+          mkdir -p "$stage/packages/twenty-server"
+          cp -a packages/twenty-server/package.json "$stage/packages/twenty-server/"
+          cp -a packages/twenty-server/dist         "$stage/packages/twenty-server/"
+          cp -a packages/twenty-server/patches      "$stage/packages/twenty-server/"
+          cp -a packages/twenty-server/scripts      "$stage/packages/twenty-server/"
+          chmod +x "$stage/packages/twenty-server/scripts/upgrade-background.sh"
+
+          # Workspace packages the node_modules symlinks resolve to
+          for pkg in twenty-shared twenty-emails twenty-client-sdk; do
+            mkdir -p "$stage/packages/$pkg"
+            cp -a "packages/$pkg/package.json" "$stage/packages/$pkg/"
+            cp -a "packages/$pkg/dist"         "$stage/packages/$pkg/"
+          done
+
+          # The built SPA, served by @nestjs/serve-static from dist/front
+          cp -a packages/twenty-front/build "$stage/packages/twenty-server/dist/front"
+
+          printf '%s\n' "$GITHUB_SHA" > "$stage/REVISION"
+          printf '%s\n' "$DEPS_KEY"   > "$stage/DEPS_KEY"
+
+          test -f "$stage/packages/twenty-server/dist/main.js"
+          test -f "$stage/packages/twenty-server/dist/front/index.html"
+          test ! -e "$stage/node_modules"
+
+          SOURCE_DATE_EPOCH="$(git show -s --format=%ct "$GITHUB_SHA")"
+          export SOURCE_DATE_EPOCH
+          tar --sort=name --mtime="@${SOURCE_DATE_EPOCH}" \
+            --owner=0 --group=0 --numeric-owner \
+            -czf "otogrow-crm-${GITHUB_SHA}.tar.gz" -C "$stage" .
+          ls -lh "otogrow-crm-${GITHUB_SHA}.tar.gz"
+
+      - name: Assemble the dependency archive
+        if: steps.remote_deps.outputs.needed == 'true'
+        shell: bash
+        env:
+          DEPS_KEY: ${{ steps.deps.outputs.key }}
+        run: |
+          set -Eeuo pipefail
+          # Permissions are preserved: node_modules/.bin entries and package
+          # scripts carry exec bits the installer relies on. Symlinks are
+          # stored as symlinks (yarn's relative workspace links), which the
+          # installer re-validates on the server.
+          tar --sort=name --owner=0 --group=0 --numeric-owner \
+            -czf "otogrow-crm-deps-${DEPS_KEY}.tar.gz" node_modules
+          ls -lh "otogrow-crm-deps-${DEPS_KEY}.tar.gz"
+
+      - name: Upload and activate release
+        shell: bash
+        env:
+          DEPS_KEY: ${{ steps.deps.outputs.key }}
+          DEPS_NEEDED: ${{ steps.remote_deps.outputs.needed }}
+        run: |
+          set -Eeuo pipefail
+          incoming='/home/crmdeploy/incoming'
+
+          # Upload an archive to <name>.part, verify its checksum on the far
+          # side, then rename. The installer only ever sees complete files.
+          ship() {
+            local file="$1" remote="$incoming/$1" expected actual
+            expected="$(sha256sum "$file" | awk '{print $1}')"
+            scp "$file" "crm-target:${remote}.part"
+            actual="$(ssh crm-target "sha256sum -- '${remote}.part'" | awk '{print $1}')"
+            if [[ "$actual" != "$expected" ]]; then
+              ssh crm-target "rm -f -- '${remote}.part'" || true
+              echo "Remote checksum mismatch for $file" >&2
+              exit 1
+            fi
+            ssh crm-target "mv -- '${remote}.part' '${remote}'"
+            echo "Uploaded $file"
+          }
+
+          if [[ "$DEPS_NEEDED" == 'true' ]]; then
+            ship "otogrow-crm-deps-${DEPS_KEY}.tar.gz"
+          fi
+          ship "otogrow-crm-${GITHUB_SHA}.tar.gz"
+
+          # Migrations, restart, health check and rollback all happen here.
+          ssh crm-target \
+            "sudo -n /usr/local/sbin/otogrow-crm-install-release '${GITHUB_SHA}'"
+
+      - name: Smoke-test through Cloudflare
+        shell: bash
+        env:
+          PUBLIC_URL: ${{ vars.CRM_PUBLIC_URL }}
+        run: |
+          set -Eeuo pipefail
+          test -n "$PUBLIC_URL"
+          curl --fail --location --silent --show-error \
+            --retry 5 --retry-delay 3 --retry-all-errors --max-time 30 \
+            "${PUBLIC_URL}/healthz" >/dev/null
+          echo "healthz OK at ${PUBLIC_URL}"
+
+      - name: Clean up stale uploads on failure
+        if: failure()
+        continue-on-error: true
+        run: ssh crm-target "rm -f /home/crmdeploy/incoming/*.part" || true

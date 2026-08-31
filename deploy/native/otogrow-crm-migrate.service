@@ -1,0 +1,52 @@
+[Unit]
+Description=Otogrow CRM schema setup, upgrade and cron registration
+Documentation=https://github.com/hishamshafi123/otogrow-crm
+After=network-online.target postgresql.service redis-otogrow-crm.service
+Requires=redis-otogrow-crm.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=no
+User=crmapp
+Group=crmapp
+WorkingDirectory=/opt/otogrow-crm/current/packages/twenty-server
+EnvironmentFile=/etc/otogrow-crm/crm.env
+UMask=0027
+
+ExecStart=/usr/local/sbin/otogrow-crm-migrate
+
+# Twenty's `command:prod upgrade` walks every workspace and can run long on a
+# 2 vCPU box. The installer waits on this unit, so the timeout is also the
+# deploy's ceiling.
+TimeoutStartSec=1800s
+
+# Migrations are the heaviest thing this app does. Give the heap room, but
+# still bound it so a runaway upgrade cannot reach BON or otogrow.com.
+MemoryHigh=1600M
+MemoryMax=1900M
+CPUWeight=60
+TasksMax=512
+LimitNOFILE=65535
+
+NoNewPrivileges=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+RestrictNamespaces=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+LockPersonality=true
+SystemCallArchitectures=native
+
+ReadWritePaths=/var/lib/otogrow-crm/storage
+ReadWritePaths=/var/cache/otogrow-crm

@@ -1,0 +1,60 @@
+[Unit]
+Description=Redis instance dedicated to Otogrow CRM (BullMQ + cache)
+Documentation=https://github.com/hishamshafi123/otogrow-crm
+After=network.target
+Before=otogrow-crm.service otogrow-crm-worker.service
+
+# Why a second Redis rather than the existing one on 6379:
+#
+#   * BullMQ requires maxmemory-policy=noeviction -- a dropped key is a lost
+#     job. That policy is server-global, not per-database, so pointing the CRM
+#     at the shared instance would impose the CRM's requirement on whatever
+#     already uses it (BON). Changing BON's Redis is out of scope.
+#   * The shared instance requires AUTH with a password owned by BON.
+#
+# A second instance costs ~10 MB RSS and keeps the two completely separate.
+
+[Service]
+Type=notify
+User=redis
+Group=redis
+RuntimeDirectory=redis-otogrow-crm
+RuntimeDirectoryMode=0750
+ExecStart=/usr/bin/redis-server /etc/redis/otogrow-crm.conf --supervised systemd
+ExecStop=/bin/kill -s TERM $MAINPID
+Restart=always
+RestartSec=5s
+TimeoutStartSec=60s
+TimeoutStopSec=60s
+
+MemoryHigh=192M
+MemoryMax=256M
+TasksMax=64
+LimitNOFILE=65535
+OOMScoreAdjust=-200
+
+NoNewPrivileges=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+RestrictNamespaces=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+LockPersonality=true
+SystemCallArchitectures=native
+
+ReadWritePaths=/var/lib/redis-otogrow-crm
+ReadWritePaths=/var/log/redis-otogrow-crm
+
+[Install]
+WantedBy=multi-user.target

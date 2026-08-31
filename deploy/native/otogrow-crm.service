@@ -1,0 +1,61 @@
+[Unit]
+Description=Otogrow CRM API + SPA (Twenty fork)
+Documentation=https://github.com/hishamshafi123/otogrow-crm
+After=network-online.target postgresql.service redis-otogrow-crm.service
+Wants=network-online.target
+Requires=redis-otogrow-crm.service
+
+[Service]
+Type=simple
+User=crmapp
+Group=crmapp
+WorkingDirectory=/opt/otogrow-crm/current/packages/twenty-server
+EnvironmentFile=/etc/otogrow-crm/crm.env
+UMask=0027
+
+# Node 24 lives under its own prefix. /usr/bin/node is Node 22 and belongs to
+# otogrow.com's unit -- this must never resolve to it.
+ExecStart=/opt/nodejs/24/bin/node dist/main
+
+Restart=on-failure
+RestartSec=5s
+TimeoutStartSec=180s
+TimeoutStopSec=45s
+KillSignal=SIGTERM
+
+# 2 vCPU / 8 GB box shared with Postgres, Redis, BON and otogrow.com.
+# NODE_OPTIONS in the env file caps the JS heap below MemoryHigh so V8 does
+# GC pressure before the cgroup does reclaim.
+MemoryHigh=1200M
+MemoryMax=1400M
+CPUWeight=100
+TasksMax=512
+LimitNOFILE=65535
+
+NoNewPrivileges=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+RestrictNamespaces=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+LockPersonality=true
+SystemCallArchitectures=native
+
+# Releases are root-owned and read-only at runtime. These are the only
+# writable paths: uploaded files and a scratch/cache dir.
+ReadWritePaths=/var/lib/otogrow-crm/storage
+ReadWritePaths=/var/cache/otogrow-crm
+
+[Install]
+WantedBy=multi-user.target

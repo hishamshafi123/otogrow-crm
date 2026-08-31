@@ -14,6 +14,10 @@ defaults:
 
 jobs:
   dispatch-tag:
+    # Fork guard: this dispatches deploys of twentyhq's own infrastructure
+    # and cannot work here. Left in place rather than deleted so upstream
+    # merges do not conflict on every pull.
+    if: github.repository == 'twentyhq/twenty'
     timeout-minutes: 3
     runs-on: ubuntu-latest
     steps:

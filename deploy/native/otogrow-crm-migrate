@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# Native equivalent of packages/twenty-docker/twenty/entrypoint.sh.
+#
+# The Docker entrypoint runs this logic in-process before `node dist/main`.
+# Here it is a separate oneshot unit (otogrow-crm-migrate.service) that the
+# release installer runs *between* extracting a release and restarting the
+# API, so a failed migration is visible as a failed unit and the installer
+# can roll the release back instead of leaving a half-migrated database
+# behind a running server.
+#
+# Invoked only by systemd. Environment comes from /etc/otogrow-crm/crm.env.
+set -Eeuo pipefail
+
+node='/opt/nodejs/24/bin/node'
+
+# `yarn <script>` is not available: yarn is deliberately not installed on the
+# VPS. These are the same commands package.json maps those scripts to.
+#   database:init:prod  -> setup-db.js && command run-instance-commands --force --include-slow
+#   command:prod        -> dist/command/command
+run_command() { "$node" dist/command/command "$@"; }
+
+if [[ "${DISABLE_DB_MIGRATIONS:-false}" == 'true' ]]; then
+  echo 'DISABLE_DB_MIGRATIONS=true, skipping schema setup and migrations'
+else
+  : "${PG_DATABASE_URL:?PG_DATABASE_URL is not set}"
+
+  echo 'Checking whether the core schema exists...'
+  has_schema="$(
+    psql -tAc \
+      "SELECT EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = 'core')" \
+      "$PG_DATABASE_URL"
+  )"
+
+  if [[ "$has_schema" == 'f' ]]; then
+    echo 'Database is empty; running first-time initialisation.'
+    "$node" dist/database/scripts/setup-db.js
+    run_command run-instance-commands --force --include-slow
+  else
+    echo 'Core schema present; skipping initialisation.'
+  fi
+
+  # A cache left over from the previous release describes the old metadata.
+  # Flush on both sides of the upgrade, exactly as the Docker entrypoint does.
+  run_command cache:flush || echo 'Warning: pre-upgrade cache flush failed, continuing'
+
+  # Unlike the Docker entrypoint, an upgrade failure is fatal here. The
+  # installer treats it as a failed deploy and restores the previous release
+  # rather than starting a server against a partially migrated database.
+  run_command upgrade
+
+  run_command cache:flush || echo 'Warning: post-upgrade cache flush failed, continuing'
+
+  echo 'Database migration complete.'
+fi
+
+if [[ "${DISABLE_CRON_JOBS_REGISTRATION:-false}" == 'true' ]]; then
+  echo 'DISABLE_CRON_JOBS_REGISTRATION=true, skipping cron registration'
+else
+  echo 'Registering background sync jobs...'
+  run_command cron:register:all || echo 'Warning: cron registration failed, continuing'
+fi
+
+echo 'otogrow-crm-migrate finished.'

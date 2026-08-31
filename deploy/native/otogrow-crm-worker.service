@@ -1,0 +1,62 @@
+[Unit]
+Description=Otogrow CRM background worker (BullMQ)
+Documentation=https://github.com/hishamshafi123/otogrow-crm
+After=network-online.target postgresql.service redis-otogrow-crm.service otogrow-crm.service
+Wants=network-online.target
+Requires=redis-otogrow-crm.service
+# The API owns schema migrations and cron registration. The worker must not
+# start against a database the API has not finished upgrading.
+After=otogrow-crm-migrate.service
+
+[Service]
+Type=simple
+User=crmapp
+Group=crmapp
+WorkingDirectory=/opt/otogrow-crm/current/packages/twenty-server
+EnvironmentFile=/etc/otogrow-crm/crm.env
+# Mirrors the compose file: only the API container runs migrations and
+# registers cron jobs, so the worker overrides both.
+Environment=DISABLE_DB_MIGRATIONS=true
+Environment=DISABLE_CRON_JOBS_REGISTRATION=true
+UMask=0027
+
+ExecStart=/opt/nodejs/24/bin/node dist/queue-worker/queue-worker
+
+Restart=on-failure
+RestartSec=10s
+TimeoutStartSec=180s
+TimeoutStopSec=90s
+KillSignal=SIGTERM
+
+MemoryHigh=800M
+MemoryMax=1000M
+# Jobs are latency-tolerant; the API and the two other sites win the CPU.
+CPUWeight=40
+TasksMax=512
+LimitNOFILE=65535
+
+NoNewPrivileges=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+RestrictNamespaces=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+LockPersonality=true
+SystemCallArchitectures=native
+
+ReadWritePaths=/var/lib/otogrow-crm/storage
+ReadWritePaths=/var/cache/otogrow-crm
+
+[Install]
+WantedBy=multi-user.target

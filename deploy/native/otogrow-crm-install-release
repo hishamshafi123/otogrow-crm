@@ -1,0 +1,342 @@
+#!/usr/bin/env bash
+# Atomic release installer for crm.otogrow.com (Twenty fork).
+#
+# Modelled on otogrow.com's /usr/local/sbin/otogrow-install-release, but
+# deliberately independent: it shares no file, user, unit, port or lock with
+# the BON apps or otogrow.com, so a failure here can never affect them.
+#
+# CI drops one or two immutable archives in /home/crmdeploy/incoming and calls:
+#   sudo -n /usr/local/sbin/otogrow-crm-install-release <40-char-git-sha>
+#
+# Sequence: extract -> materialise node_modules -> swap the `current` symlink
+# -> run migrations as a oneshot unit -> restart API and worker -> health
+# check. Any failure after the swap restores the previous release.
+#
+# ---------------------------------------------------------------------------
+# THE DEPENDENCY STORE
+#
+# Twenty's production node_modules is several hundred MB. Shipping it on every
+# deploy would mean a multi-minute upload for a one-line change, so it is
+# content-addressed instead:
+#
+#   /opt/otogrow-crm/deps/<sha256-of-yarn.lock>/node_modules
+#
+# The code archive carries a DEPS_KEY file naming the tree it needs. CI
+# uploads the matching deps archive ONLY when the store does not already have
+# that key, so a deploy that does not touch yarn.lock ships code alone.
+#
+# The tree is then hard-linked (`cp -al`) into the release rather than
+# symlinked. That matters: yarn writes relative workspace links such as
+#   node_modules/twenty-shared -> ../packages/twenty-shared
+# which only resolve correctly when node_modules sits directly beside
+# packages/ inside the release. Hard links give each release a real, correctly
+# rooted tree for almost no extra disk.
+# ---------------------------------------------------------------------------
+#
+# ---------------------------------------------------------------------------
+# ROLLBACK CAVEAT -- read before relying on the automatic rollback.
+#
+# Twenty's `command:prod upgrade` is forward-only; it has no down migrations.
+# The automatic rollback restores the previous *code* against a database that
+# may already carry the new schema. That is the right move for an app that
+# fails to boot, but it is not a true point-in-time revert. If a deploy fails
+# during or after the migrate step, restore the pre-deploy database dump
+# (deploy/native/README.md, "Rollback") rather than trusting the symlink swap
+# alone.
+# ---------------------------------------------------------------------------
+set -Eeuo pipefail
+umask 022
+
+if [[ "$#" -ne 1 ]]; then
+  echo "Usage: otogrow-crm-install-release <40-char-git-sha>" >&2
+  exit 64
+fi
+
+revision="$1"
+if [[ ! "$revision" =~ ^[0-9a-f]{40}$ ]]; then
+  echo 'Invalid Git revision' >&2
+  exit 65
+fi
+
+app='otogrow-crm'
+api_unit='otogrow-crm.service'
+worker_unit='otogrow-crm-worker.service'
+migrate_unit='otogrow-crm-migrate.service'
+redis_unit='redis-otogrow-crm.service'
+health_url='http://127.0.0.1:3002/healthz'
+required_file='packages/twenty-server/dist/main.js'
+required_front='packages/twenty-server/dist/front/index.html'
+storage_dir='/var/lib/otogrow-crm/storage'
+cache_dir='/var/cache/otogrow-crm'
+service_user='crmapp'
+deploy_user='crmdeploy'
+
+base='/opt/otogrow-crm'
+releases="$base/releases"
+release="$releases/$revision"
+current="$base/current"
+deps_store="$base/deps"
+incoming="/home/$deploy_user/incoming"
+archive="$incoming/$app-$revision.tar.gz"
+lock='/run/lock/otogrow-crm-deploy.lock'
+
+release_created='false'
+switched='false'
+previous=''
+
+restore_previous() {
+  if [[ -n "$previous" && -d "$previous" ]]; then
+    echo "Restoring previous release: $previous" >&2
+    rollback_link="$base/.rollback-$revision"
+    ln -sfn "$previous" "$rollback_link"
+    mv -Tf "$rollback_link" "$current"
+    systemctl restart "$api_unit" || true
+    systemctl restart "$worker_unit" || true
+  else
+    echo 'No previous release to restore; stopping the units' >&2
+    systemctl stop "$worker_unit" || true
+    systemctl stop "$api_unit" || true
+  fi
+}
+
+cleanup_on_exit() {
+  status="$?"
+  trap - EXIT
+  if [[ "$status" -ne 0 && "$release_created" == 'true' && "$switched" == 'false' ]]; then
+    case "$release" in
+      "$releases"/*) rm -rf -- "$release" ;;
+    esac
+  fi
+  exit "$status"
+}
+trap cleanup_on_exit EXIT
+
+# Reject absolute paths and parent traversal in any archive before extraction.
+assert_archive_is_safe() {
+  local path="$1" member
+  [[ -f "$path" && ! -L "$path" ]] || {
+    echo "Missing regular archive: $path" >&2
+    exit 66
+  }
+  [[ "$(stat -c '%U' "$path")" == "$deploy_user" ]] || {
+    echo "Archive is not owned by $deploy_user: $path" >&2
+    exit 66
+  }
+  while IFS= read -r member; do
+    case "$member" in
+      /*|../*|*/../*|*/..)
+        echo "Unsafe archive member in $path: $member" >&2
+        exit 65
+        ;;
+    esac
+  done < <(tar -tzf "$path")
+}
+
+exec 9>"$lock"
+flock -w 2400 9 || {
+  echo 'Another otogrow-crm deployment is still running' >&2
+  exit 75
+}
+
+# --- Validate and extract the code archive --------------------------------
+
+assert_archive_is_safe "$archive"
+
+[[ ! -e "$release" ]] || {
+  echo "Release already exists: $release" >&2
+  exit 73
+}
+
+# A failed backup must block activation once backup automation exists.
+if systemctl cat otogrow-crm-backup.service >/dev/null 2>&1; then
+  systemctl start otogrow-crm-backup.service
+fi
+
+install -d -o root -g root -m 0755 "$release"
+release_created='true'
+
+# Permissions are preserved (unlike the otogrow.com installer, which flattens
+# them): this tree contains node_modules/.bin entries and shell scripts whose
+# exec bits are load-bearing. Ownership is still dropped, and setuid/setgid
+# and group/other write bits are stripped below.
+tar --extract --gzip --file "$archive" \
+  --directory "$release" \
+  --no-same-owner
+
+for required in "$required_file" "$required_front" REVISION DEPS_KEY; do
+  [[ -f "$release/$required" ]] || {
+    echo "Release is missing $required" >&2
+    exit 65
+  }
+done
+[[ "$(tr -d '\r\n' < "$release/REVISION")" == "$revision" ]] || {
+  echo 'REVISION does not match archive name' >&2
+  exit 65
+}
+[[ ! -e "$release/node_modules" ]] || {
+  echo 'Code archive must not carry node_modules; it comes from the store' >&2
+  exit 65
+}
+
+# --- Materialise node_modules from the dependency store -------------------
+
+deps_key="$(tr -d '\r\n' < "$release/DEPS_KEY")"
+[[ "$deps_key" =~ ^[0-9a-f]{64}$ ]] || {
+  echo 'DEPS_KEY is not a sha256 hex digest' >&2
+  exit 65
+}
+
+deps_dir="$deps_store/$deps_key"
+if [[ ! -d "$deps_dir/node_modules" ]]; then
+  deps_archive="$incoming/$app-deps-$deps_key.tar.gz"
+  echo "Dependency tree $deps_key is not in the store; installing it."
+  assert_archive_is_safe "$deps_archive"
+
+  staging="$deps_store/.staging-$deps_key.$$"
+  rm -rf -- "$staging"
+  install -d -o root -g root -m 0755 "$deps_store" "$staging"
+  tar --extract --gzip --file "$deps_archive" \
+    --directory "$staging" \
+    --no-same-owner
+  [[ -d "$staging/node_modules" ]] || {
+    rm -rf -- "$staging"
+    echo 'Dependency archive does not contain node_modules' >&2
+    exit 65
+  }
+  chown -R root:root "$staging"
+  chmod -R a-s,go-w "$staging"
+  # Another deploy may have won the race; keep whichever landed first.
+  if [[ -d "$deps_dir/node_modules" ]]; then
+    rm -rf -- "$staging"
+  else
+    mv -T "$staging" "$deps_dir"
+  fi
+  rm -f -- "$deps_archive"
+else
+  echo "Reusing dependency tree $deps_key from the store."
+fi
+
+# Hard links, not a symlink: yarn's relative workspace links inside
+# node_modules only resolve when it sits beside packages/ in this release.
+cp -al "$deps_dir/node_modules" "$release/node_modules"
+
+# --- Validate the assembled tree ------------------------------------------
+
+# Every symlink must resolve inside this release. The workspace links yarn
+# writes into node_modules are relative and pass; an absolute or escaping
+# link is rejected.
+while IFS= read -r -d '' link; do
+  resolved="$(readlink -m "$link")"
+  case "$resolved" in
+    "$release"|"$release"/*) ;;
+    *)
+      echo "Symlink escapes release: $link -> $resolved" >&2
+      exit 65
+      ;;
+  esac
+done < <(find "$release" -type l -print0)
+
+chown -R root:root "$release"
+chmod -R a-s,go-w "$release"
+
+# Persistent state lives outside the release tree, so deploys and rollbacks
+# never touch uploaded files. The units grant write access to exactly these.
+install -d -o "$service_user" -g "$service_user" -m 0750 "$storage_dir"
+install -d -o "$service_user" -g "$service_user" -m 0750 "$cache_dir"
+
+# --- Swap ------------------------------------------------------------------
+
+if [[ -L "$current" ]]; then
+  previous="$(readlink -f "$current")"
+fi
+
+next_link="$base/.current-$revision"
+ln -sfn "$release" "$next_link"
+mv -Tf "$next_link" "$current"
+switched='true'
+
+# --- Migrate ---------------------------------------------------------------
+
+systemctl start "$redis_unit"
+
+# Stop the worker first: it must not process jobs against a schema that is
+# mid-upgrade. The API keeps serving the old code until the migration ends.
+systemctl stop "$worker_unit" || true
+
+echo 'Running schema setup and upgrade...'
+if ! systemctl start "$migrate_unit"; then
+  echo 'Migration failed; rolling the release back' >&2
+  journalctl -u "$migrate_unit" -n 200 --no-pager >&2 || true
+  echo 'NOTE: the database may be partially upgraded. See the ROLLBACK' >&2
+  echo '      CAVEAT at the top of this script before retrying.' >&2
+  restore_previous
+  exit 1
+fi
+
+# --- Restart and health-check ---------------------------------------------
+
+systemctl restart "$api_unit" || true
+systemctl restart "$worker_unit" || true
+
+healthy='false'
+# Twenty boots considerably slower than a Next.js server: 60 attempts x 5s
+# gives it five minutes on a 2 vCPU box before the deploy is called failed.
+for attempt in $(seq 1 60); do
+  if systemctl is-active --quiet "$api_unit" \
+    && curl --fail --silent --max-time 5 "$health_url" >/dev/null; then
+    healthy='true'
+    break
+  fi
+  sleep 5
+done
+
+if [[ "$healthy" != 'true' ]]; then
+  echo "New $app release failed its health check; rolling back" >&2
+  journalctl -u "$api_unit" -n 200 --no-pager >&2 || true
+  restore_previous
+  exit 1
+fi
+
+if ! systemctl is-active --quiet "$worker_unit"; then
+  echo 'Warning: the API is healthy but the worker is not running.' >&2
+  journalctl -u "$worker_unit" -n 100 --no-pager >&2 || true
+fi
+
+rm -f -- "$archive"
+
+# --- Retention -------------------------------------------------------------
+
+# Keep the three newest releases. Never delete the active one. Three rather
+# than otogrow.com's five: each release materialises its own node_modules.
+# The trees are hard-linked so the extra disk is small, but inode count is
+# not free.
+active="$(readlink -f "$current")"
+mapfile -t old_releases < <(
+  find "$releases" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' \
+    | sort -rn \
+    | awk 'NR > 3 { $1=""; sub(/^ /, ""); print }'
+)
+for old_release in "${old_releases[@]}"; do
+  [[ -n "$old_release" && "$old_release" != "$active" ]] || continue
+  case "$old_release" in
+    "$releases"/*) rm -rf -- "$old_release" ;;
+  esac
+done
+
+# Drop dependency trees no surviving release refers to.
+mapfile -t live_keys < <(
+  find "$releases" -mindepth 2 -maxdepth 2 -name DEPS_KEY -exec cat {} + \
+    | tr -d '\r' | sort -u
+)
+while IFS= read -r stored; do
+  key="$(basename -- "$stored")"
+  [[ "$key" =~ ^[0-9a-f]{64}$ ]] || continue
+  for live in "${live_keys[@]}"; do
+    [[ "$key" == "$live" ]] && continue 2
+  done
+  echo "Removing unreferenced dependency tree $key"
+  rm -rf -- "$stored"
+done < <(find "$deps_store" -mindepth 1 -maxdepth 1 -type d)
+
+trap - EXIT
+echo "Activated $app revision $revision (deps $deps_key)"
