@@ -16,6 +16,7 @@ import { isDefined } from 'twenty-shared/utils';
 import {
   DeleteTwilioConfigDocument,
   GetTwilioConfigDocument,
+  ProvisionTwilioCallingDocument,
   TestTwilioConnectionDocument,
   UpsertTwilioConfigDocument,
 } from '~/generated-metadata/graphql';
@@ -127,6 +128,26 @@ export const useTwilioConfigForm = () => {
     }
   };
 
+  const [provisionTwilioCalling, { loading: isProvisioningCalling }] =
+    useMutation(ProvisionTwilioCallingDocument);
+
+  const handleEnableCalling = async () => {
+    try {
+      await provisionTwilioCalling({
+        refetchQueries: [GetTwilioConfigDocument],
+        awaitRefetchQueries: true,
+      });
+
+      enqueueSuccessSnackBar({
+        message: t`Calling enabled — browser calls are ready`,
+      });
+    } catch (error) {
+      enqueueErrorSnackBar({
+        apolloError: CombinedGraphQLErrors.is(error) ? error : undefined,
+      });
+    }
+  };
+
   const handleDelete = async () => {
     try {
       await deleteTwilioConfig({
@@ -153,6 +174,8 @@ export const useTwilioConfigForm = () => {
     handleSave,
     handleDelete,
     handleTestConnection,
+    handleEnableCalling,
+    isProvisioningCalling,
     twilioConfig,
     isConfigExisting,
     error,

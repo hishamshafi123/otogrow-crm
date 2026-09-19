@@ -35,6 +35,7 @@ import { EmailingDomainModule } from 'src/engine/core-modules/emailing-domain/em
 import { EmailingModule } from 'src/modules/emailing/emailing.module';
 import { LeadScoringModule } from 'src/modules/lead-scoring/lead-scoring.module';
 import { ChannelsModule } from 'src/modules/messaging/channels/channels.module';
+import { CallingModule } from 'src/modules/calling/calling.module';
 import { PortalModule } from 'src/modules/portal/portal.module';
 import { QuotingModule } from 'src/modules/quoting/quoting.module';
 import { SequencesModule } from 'src/modules/sequences/sequences.module';
@@ -130,6 +131,7 @@ import { FileModule } from './file/file.module';
     QuotingModule,
     PortalModule,
     ChannelsModule,
+    CallingModule,
     PublicDomainModule,
     CloudflareModule,
     DnsManagerModule,

@@ -86,6 +86,17 @@ const PERSON_PAGE_TABS = {
         fieldUniversalIdentifier:
           STANDARD_OBJECTS.person.fields.channelMessages.universalIdentifier,
       },
+      calls: {
+        universalIdentifier:
+          STANDARD_PAGE_LAYOUT_UNIVERSAL_IDENTIFIERS.personRecordPage.tabs.home
+            .widgets.calls.universalIdentifier,
+        title: 'Calls',
+        type: WidgetType.FIELD,
+        gridPosition: GRID_POSITIONS.FULL_WIDTH,
+        position: VERTICAL_LIST_LAYOUT_POSITIONS.TENTH,
+        fieldUniversalIdentifier:
+          STANDARD_OBJECTS.person.fields.calls.universalIdentifier,
+      },
       leadScoreEvents: {
         universalIdentifier:
           STANDARD_PAGE_LAYOUT_UNIVERSAL_IDENTIFIERS.personRecordPage.tabs.home

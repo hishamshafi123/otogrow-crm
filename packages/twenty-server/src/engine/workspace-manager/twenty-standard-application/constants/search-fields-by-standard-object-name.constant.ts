@@ -51,6 +51,10 @@ export const SEARCH_FIELDS_BY_STANDARD_OBJECT_NAME = {
   sequenceStep: [{ name: 'id', type: FieldMetadataType.UUID }],
   sequenceEnrollment: [{ name: 'id', type: FieldMetadataType.UUID }],
   channelMessage: [{ name: 'body', type: FieldMetadataType.TEXT }],
+  call: [
+    { name: 'fromNumber', type: FieldMetadataType.TEXT },
+    { name: 'toNumber', type: FieldMetadataType.TEXT },
+  ],
   leadScoringRule: [{ name: 'name', type: FieldMetadataType.TEXT }],
   leadScoreEvent: [{ name: 'reason', type: FieldMetadataType.TEXT }],
   priceBookItem: [{ name: 'name', type: FieldMetadataType.TEXT }],

@@ -9,6 +9,8 @@ export const GET_TWILIO_CONFIG = gql`
       authTokenLastFour
       whatsappSenderNumber
       smsNumber
+      voiceNumber
+      callingEnabled
       isActive
     }
   }

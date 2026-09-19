@@ -14,9 +14,10 @@ import { styled } from '@linaria/react';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { SettingsPath } from 'twenty-shared/types';
 import { getSettingsPath, isDefined } from 'twenty-shared/utils';
-import { IconCopy, IconTrash } from 'twenty-ui/icon';
+import { IconCopy, IconPhone, IconTrash } from 'twenty-ui/icon';
 import { Button, Toggle } from 'twenty-ui/input';
 import { Section } from 'twenty-ui/layout';
+import { Status } from 'twenty-ui/data-display';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
 import { H2Title } from 'twenty-ui/typography';
 import { REACT_APP_SERVER_BASE_URL } from '~/config';
@@ -48,6 +49,8 @@ export const SettingsTwilioForm = () => {
     handleSave,
     handleDelete,
     handleTestConnection,
+    handleEnableCalling,
+    isProvisioningCalling,
     twilioConfig,
     isConfigExisting,
     error,
@@ -205,6 +208,28 @@ export const SettingsTwilioForm = () => {
               />
             </Section>
           )}
+          <Section>
+            <H2Title
+              title={t`Calling`}
+              description={t`Make and receive phone calls from the browser through your Twilio account`}
+            />
+            {twilioConfig?.callingEnabled === true ? (
+              <StyledActiveRow>
+                <Status color="green" text={t`Calling enabled`} />
+                {isDefined(twilioConfig.voiceNumber) && (
+                  <span>{twilioConfig.voiceNumber}</span>
+                )}
+              </StyledActiveRow>
+            ) : (
+              <Button
+                title={isProvisioningCalling ? t`Enabling…` : t`Enable calling`}
+                variant="secondary"
+                Icon={IconPhone}
+                disabled={!isConfigExisting || isProvisioningCalling}
+                onClick={handleEnableCalling}
+              />
+            )}
+          </Section>
           <Section>
             <H2Title
               title={t`Active`}

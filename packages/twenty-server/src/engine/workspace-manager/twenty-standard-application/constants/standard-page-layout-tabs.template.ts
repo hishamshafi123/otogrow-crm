@@ -104,6 +104,10 @@ export const VERTICAL_LIST_LAYOUT_POSITIONS = {
     layoutMode: PageLayoutTabLayoutMode.VERTICAL_LIST,
     index: 8,
   },
+  TENTH: {
+    layoutMode: PageLayoutTabLayoutMode.VERTICAL_LIST,
+    index: 9,
+  },
 } as const satisfies Record<string, PageLayoutWidgetVerticalListPosition>;
 
 export const TAB_PROPS = {

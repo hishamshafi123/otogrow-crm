@@ -14,6 +14,7 @@ import { type CalendarEventParticipantWorkspaceEntity } from 'src/modules/calend
 import { type CompanyWorkspaceEntity } from 'src/modules/company/standard-objects/company.workspace-entity';
 import { type MessageListMemberWorkspaceEntity } from 'src/modules/emailing/standard-objects/message-list-member.workspace-entity';
 import { type ChannelMessageWorkspaceEntity } from 'src/modules/messaging/channels/standard-objects/channel-message.workspace-entity';
+import { type CallWorkspaceEntity } from 'src/modules/calling/standard-objects/call.workspace-entity';
 import { type LeadScoreEventWorkspaceEntity } from 'src/modules/lead-scoring/standard-objects/lead-score-event.workspace-entity';
 import { type MessageParticipantWorkspaceEntity } from 'src/modules/messaging/common/standard-objects/message-participant.workspace-entity';
 import { type NoteTargetWorkspaceEntity } from 'src/modules/note/standard-objects/note-target.workspace-entity';
@@ -51,6 +52,7 @@ export class PersonWorkspaceEntity extends BaseWorkspaceEntity {
   listMemberships: EntityRelation<MessageListMemberWorkspaceEntity[]>;
   sequenceEnrollments: EntityRelation<SequenceEnrollmentWorkspaceEntity[]>;
   channelMessages: EntityRelation<ChannelMessageWorkspaceEntity[]>;
+  calls: EntityRelation<CallWorkspaceEntity[]>;
   leadScore: number | null;
   leadSource: string | null;
   leadScoreBand: string | null;

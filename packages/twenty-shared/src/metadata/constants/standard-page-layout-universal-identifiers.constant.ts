@@ -132,6 +132,7 @@ export const STANDARD_PAGE_LAYOUT_UNIVERSAL_IDENTIFIERS = {
           listMemberships: 'Lists',
           sequenceEnrollments: 'Sequences',
           channelMessages: 'Messages',
+          calls: 'Calls',
           leadScoreEvents: 'Score history',
           quotes: 'Quotes',
         },

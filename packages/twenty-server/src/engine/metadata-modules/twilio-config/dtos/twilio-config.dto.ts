@@ -44,6 +44,17 @@ export class TwilioConfigDTO {
   @Field(() => String, { nullable: true })
   smsNumber: string | null;
 
+  @IsString()
+  @IsOptional()
+  @Field(() => String, { nullable: true })
+  voiceNumber: string | null;
+
+  // True once the TwiML app + API key pair exist; the secret itself never
+  // leaves the server.
+  @IsBoolean()
+  @Field()
+  callingEnabled: boolean;
+
   @IsBoolean()
   @Field()
   isActive: boolean;

@@ -427,6 +427,9 @@ export const STANDARD_OBJECT_FIELDS = {
     quotes: {
       universalIdentifier: 'bc2c5e39-908e-4688-b7c1-78feb1d58c42',
     },
+    calls: {
+      universalIdentifier: '7a1e67cb-d4ae-434b-9473-527ace78020b',
+    },
     attachments: {
       universalIdentifier: getSystemRelationFieldUniversalIdentifier({
         applicationUniversalIdentifier:
@@ -756,6 +759,50 @@ export const STANDARD_OBJECT_FIELDS = {
       universalIdentifier: '2f5733db-856b-4036-8f86-8034f6296fa8',
     },
   },
+  call: {
+    ...buildStandardObjectSystemFields(
+      STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS.call,
+    ),
+    direction: {
+      universalIdentifier: 'ab9df3fd-031a-4e9b-9c0e-1dc14aa478b0',
+    },
+    status: {
+      universalIdentifier: 'f6082a7d-d752-4cd5-ad8b-53ad33741686',
+    },
+    fromNumber: {
+      universalIdentifier: 'd17d0221-f35b-4428-8391-4bc6d6d1dd50',
+    },
+    toNumber: {
+      universalIdentifier: 'cff8432d-69dd-4d47-b200-71eb84f02c0b',
+    },
+    durationSeconds: {
+      universalIdentifier: '67cd8233-9cf3-4995-8ebf-d9b669168230',
+    },
+    startedAt: {
+      universalIdentifier: '7501ad19-314c-4813-9093-4c9c77e0b131',
+    },
+    answeredAt: {
+      universalIdentifier: 'cab3de85-9583-483f-ab1c-dcd0add3c04d',
+    },
+    endedAt: {
+      universalIdentifier: 'a346bc79-72ce-4626-80ef-6628e7d1ba19',
+    },
+    externalId: {
+      universalIdentifier: '3c9796ec-8bd7-44d5-80e9-119c84f981ab',
+    },
+    recordingSid: {
+      universalIdentifier: 'a20d1433-2b45-4e6c-8e8e-208ef3ec3549',
+    },
+    errorMessage: {
+      universalIdentifier: '13fe4327-e851-4f80-a367-a7b2167c2f73',
+    },
+    person: {
+      universalIdentifier: '2c990c1b-c764-42d7-853b-d8ca75400d40',
+    },
+    company: {
+      universalIdentifier: 'eda91468-ca3a-4330-bd9d-8c01408d3f0a',
+    },
+  },
   leadScoringRule: {
     ...buildStandardObjectSystemFields(
       STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS.leadScoringRule,
@@ -1077,6 +1124,9 @@ export const STANDARD_OBJECT_FIELDS = {
     },
     channelMessages: {
       universalIdentifier: 'b45269c6-96e2-4817-9bad-78029aeb1c31',
+    },
+    calls: {
+      universalIdentifier: 'd0eb757d-e4c8-42e4-a21f-34088c480927',
     },
     leadScore: {
       universalIdentifier: 'c9f2e7a4-1b5d-4a8e-9c6f-3e7b2d4a1f86',

@@ -94,4 +94,46 @@ export class TwilioConfigService {
       workspaceId: config.workspaceId,
     });
   }
+
+  decryptApiKeySecret(config: TwilioConfigEntity): PlaintextString | null {
+    if (!isDefined(config.apiKeySecret)) {
+      return null;
+    }
+
+    return this.twilioConfigEncryptionService.decrypt({
+      ciphertext: config.apiKeySecret,
+      workspaceId: config.workspaceId,
+    });
+  }
+
+  async saveCallingConfig({
+    workspaceId,
+    voiceNumber,
+    apiKeySid,
+    apiKeySecret,
+    twimlAppSid,
+  }: {
+    workspaceId: string;
+    voiceNumber: string;
+    apiKeySid: string;
+    apiKeySecret: PlaintextString;
+    twimlAppSid: string;
+  }): Promise<TwilioConfigEntity> {
+    const existing = await this.findByWorkspaceId(workspaceId);
+
+    if (!isDefined(existing)) {
+      throw new NotFoundException('Twilio is not configured');
+    }
+
+    return this.twilioConfigRepository.save({
+      ...existing,
+      voiceNumber,
+      apiKeySid,
+      apiKeySecret: this.twilioConfigEncryptionService.encrypt({
+        plaintext: apiKeySecret,
+        workspaceId,
+      }),
+      twimlAppSid,
+    });
+  }
 }

@@ -16,6 +16,10 @@ import { WorkspaceRelatedEntity } from 'src/engine/workspace-manager/types/works
 // every channel message the workspace sends.
 @Index('IDX_TWILIO_CONFIG_WORKSPACE_ID', ['workspaceId'], { unique: true })
 @Check('CHK_twilioConfig_authToken_encrypted', `"authToken" LIKE 'enc:v2:%'`)
+@Check(
+  'CHK_twilioConfig_apiKeySecret_encrypted',
+  `"apiKeySecret" IS NULL OR "apiKeySecret" LIKE 'enc:v2:%'`,
+)
 @Entity({ name: 'twilioConfig', schema: 'core' })
 export class TwilioConfigEntity extends WorkspaceRelatedEntity {
   @PrimaryGeneratedColumn('uuid')
@@ -32,6 +36,20 @@ export class TwilioConfigEntity extends WorkspaceRelatedEntity {
 
   @Column({ type: 'text', nullable: true })
   smsNumber: string | null;
+
+  // E.164 number used as caller id for browser calls; picked during calling
+  // provisioning from the account's voice-capable numbers.
+  @Column({ type: 'text', nullable: true })
+  voiceNumber: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  apiKeySid: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  apiKeySecret: EncryptedString | null;
+
+  @Column({ type: 'text', nullable: true })
+  twimlAppSid: string | null;
 
   @Column({ type: 'boolean', default: true })
   isActive: boolean;

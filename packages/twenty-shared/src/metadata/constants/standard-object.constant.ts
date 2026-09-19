@@ -836,6 +836,32 @@ export const STANDARD_OBJECTS = {
       }),
     },
   },
+  call: {
+    universalIdentifier: STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS.call,
+    fields: STANDARD_OBJECT_FIELDS.call,
+    indexes: {
+      personIdIndex: {
+        universalIdentifier: '5902f3c9-61ad-4f71-a008-0ab39fc287e5',
+      },
+      externalIdIndex: {
+        universalIdentifier: '8f6cbb90-bcec-454a-8536-030e2542d0b0',
+      },
+    },
+    views: {
+      allCalls: buildStandardObjectIndexView({
+        objectUniversalIdentifier: STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS.call,
+        fields: STANDARD_OBJECT_FIELDS.call,
+        viewFieldNames: [
+          'direction',
+          'fromNumber',
+          'toNumber',
+          'status',
+          'durationSeconds',
+          'createdAt',
+        ],
+      }),
+    },
+  },
   message: {
     universalIdentifier: STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS.message,
     fields: STANDARD_OBJECT_FIELDS.message,

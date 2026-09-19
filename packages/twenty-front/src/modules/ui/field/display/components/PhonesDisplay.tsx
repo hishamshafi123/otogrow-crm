@@ -7,7 +7,9 @@ import { ExpandableList } from '@/ui/layout/expandable-list/components/Expandabl
 import { styled } from '@linaria/react';
 import { parsePhoneNumber } from 'libphonenumber-js';
 import { isDefined } from 'twenty-shared/utils';
+import { IconPhone } from 'twenty-ui/icon';
 import { RoundedLink } from 'twenty-ui/navigation';
+import { themeCssVariables } from 'twenty-ui/theme-constants';
 import { logError } from '~/utils/logError';
 
 type PhonesDisplayProps = {
@@ -17,6 +19,7 @@ type PhonesDisplayProps = {
     phoneNumber: string,
     event: React.MouseEvent<HTMLElement>,
   ) => void;
+  onCallNumberClick?: (phoneNumber: string) => void;
 };
 
 const StyledContainer = styled.div`
@@ -32,10 +35,31 @@ const StyledContainer = styled.div`
   width: 100%;
 `;
 
+const StyledNumberRow = styled.span`
+  align-items: center;
+  display: inline-flex;
+  gap: 2px;
+`;
+
+const StyledCallButton = styled.button`
+  align-items: center;
+  background: transparent;
+  border: none;
+  color: ${themeCssVariables.font.color.tertiary};
+  cursor: pointer;
+  display: inline-flex;
+  padding: 2px;
+
+  &:hover {
+    color: ${themeCssVariables.color.blue};
+  }
+`;
+
 export const PhonesDisplay = ({
   value,
   isFocused,
   onPhoneNumberClick,
+  onCallNumberClick,
 }: PhonesDisplayProps) => {
   const phones = useMemo(
     () =>
@@ -80,16 +104,26 @@ export const PhonesDisplay = ({
           parsePhoneNumberOrReturnInvalidValue(callingCode + number);
         const URI = parsedPhone?.getURI();
         return (
-          <RoundedLink
-            key={index}
-            href={URI || ''}
-            label={
-              parsedPhone ? parsedPhone.formatInternational() : invalidPhone
-            }
-            onClick={(event) =>
-              onPhoneNumberClick?.(callingCode + number, event)
-            }
-          />
+          <StyledNumberRow key={index}>
+            <RoundedLink
+              href={URI || ''}
+              label={
+                parsedPhone ? parsedPhone.formatInternational() : invalidPhone
+              }
+              onClick={(event) =>
+                onPhoneNumberClick?.(callingCode + number, event)
+              }
+            />
+            {isDefined(onCallNumberClick) && (
+              <StyledCallButton
+                type="button"
+                onClick={() => onCallNumberClick(callingCode + number)}
+                aria-label={t`Call this number`}
+              >
+                <IconPhone size={14} />
+              </StyledCallButton>
+            )}
+          </StyledNumberRow>
         );
       })}
     </ExpandableList>
@@ -100,16 +134,26 @@ export const PhonesDisplay = ({
           parsePhoneNumberOrReturnInvalidValue(callingCode + number);
         const URI = parsedPhone?.getURI();
         return (
-          <RoundedLink
-            key={index}
-            href={URI || ''}
-            label={
-              parsedPhone ? parsedPhone.formatInternational() : invalidPhone
-            }
-            onClick={(event) =>
-              onPhoneNumberClick?.(callingCode + number, event)
-            }
-          />
+          <StyledNumberRow key={index}>
+            <RoundedLink
+              href={URI || ''}
+              label={
+                parsedPhone ? parsedPhone.formatInternational() : invalidPhone
+              }
+              onClick={(event) =>
+                onPhoneNumberClick?.(callingCode + number, event)
+              }
+            />
+            {isDefined(onCallNumberClick) && (
+              <StyledCallButton
+                type="button"
+                onClick={() => onCallNumberClick(callingCode + number)}
+                aria-label={t`Call this number`}
+              >
+                <IconPhone size={14} />
+              </StyledCallButton>
+            )}
+          </StyledNumberRow>
         );
       })}
     </StyledContainer>

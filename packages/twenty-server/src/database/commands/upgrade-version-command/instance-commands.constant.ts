@@ -156,6 +156,7 @@ import { AddQuoteBuilderWidgetTypeFastInstanceCommand } from 'src/database/comma
 import { AddPortalAccessEntityFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1787956726025-add-portal-access-entity';
 import { AddPortalAccessWidgetTypeFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1787957598572-add-portal-access-widget-type';
 import { AddTwilioConfigEntityFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1787593556029-add-twilio-config-entity';
+import { AddTwilioCallingColumnsFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1789793812030-add-twilio-calling-columns';
 
 export const INSTANCE_COMMANDS = [
   AddViewFieldGroupIdIndexOnViewFieldFastInstanceCommand,
@@ -314,4 +315,5 @@ export const INSTANCE_COMMANDS = [
   AddPortalAccessEntityFastInstanceCommand,
   AddPortalAccessWidgetTypeFastInstanceCommand,
   AddTwilioConfigEntityFastInstanceCommand,
+  AddTwilioCallingColumnsFastInstanceCommand,
 ];

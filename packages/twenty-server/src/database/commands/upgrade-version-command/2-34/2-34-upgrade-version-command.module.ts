@@ -5,6 +5,7 @@ import { SyncChannelMessageStandardObjectsCommand } from 'src/database/commands/
 import { SyncLeadScoringStandardObjectsCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-workspace-command-1787600000000-sync-lead-scoring-standard-objects.command';
 import { SyncQuotingStandardObjectsCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-workspace-command-1787929627000-sync-quoting-standard-objects.command';
 import { SyncClientPortalWidgetCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-workspace-command-1787957598573-sync-client-portal-widget.command';
+import { SyncCallStandardObjectsCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-workspace-command-1789793812031-sync-call-standard-objects.command';
 import { SyncOtogrowAnalyticsCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-workspace-command-1787856793000-sync-otogrow-analytics.command';
 import { SyncSequenceStandardObjectsCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-workspace-command-1787525000000-sync-sequence-standard-objects.command';
 import { WorkspaceManyOrAllFlatEntityMapsCacheModule } from 'src/engine/metadata-modules/flat-entity/services/workspace-many-or-all-flat-entity-maps-cache.module';
@@ -22,6 +23,7 @@ import { TwentyStandardApplicationModule } from 'src/engine/workspace-manager/tw
     SyncLeadScoringStandardObjectsCommand,
     SyncQuotingStandardObjectsCommand,
     SyncClientPortalWidgetCommand,
+    SyncCallStandardObjectsCommand,
     SyncOtogrowAnalyticsCommand,
   ],
 })
