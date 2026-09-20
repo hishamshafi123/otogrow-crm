@@ -294,6 +294,15 @@ export const buildPersonStandardFlatFieldMetadatas = ({
           position: 4,
           color: 'orange',
         },
+        {
+          id: '56323479-001a-4a6a-874f-0f027b1a84b5',
+          value: 'META_AD',
+          label: i18nLabel(
+            msg({ message: `Meta ad`, context: 'fieldMetadata.label' }),
+          ),
+          position: 5,
+          color: 'sky',
+        },
       ],
     },
     standardObjectMetadataRelatedEntityIds,

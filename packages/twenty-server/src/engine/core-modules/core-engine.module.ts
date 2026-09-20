@@ -34,9 +34,11 @@ import { EmailModule } from 'src/engine/core-modules/email/email.module';
 import { EmailingDomainModule } from 'src/engine/core-modules/emailing-domain/emailing-domain.module';
 import { EmailingModule } from 'src/modules/emailing/emailing.module';
 import { LeadScoringModule } from 'src/modules/lead-scoring/lead-scoring.module';
+import { LeadAssignmentModule } from 'src/modules/lead-assignment/lead-assignment.module';
 import { ChannelsModule } from 'src/modules/messaging/channels/channels.module';
 import { CallingModule } from 'src/modules/calling/calling.module';
 import { PortalModule } from 'src/modules/portal/portal.module';
+import { MeetingBookingModule } from 'src/modules/meeting-booking/meeting-booking.module';
 import { QuotingModule } from 'src/modules/quoting/quoting.module';
 import { SequencesModule } from 'src/modules/sequences/sequences.module';
 import { EnvironmentModule } from 'src/engine/core-modules/environment/environment.module';
@@ -128,7 +130,9 @@ import { FileModule } from './file/file.module';
     EmailingModule,
     SequencesModule,
     LeadScoringModule,
+    LeadAssignmentModule,
     QuotingModule,
+    MeetingBookingModule,
     PortalModule,
     ChannelsModule,
     CallingModule,

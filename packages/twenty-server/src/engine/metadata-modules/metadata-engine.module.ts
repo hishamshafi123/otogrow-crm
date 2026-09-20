@@ -16,6 +16,8 @@ import { FieldMetadataModule } from 'src/engine/metadata-modules/field-metadata/
 import { FlatEntityMapsGraphqlApiExceptionFilter } from 'src/engine/metadata-modules/flat-entity/filters/flat-entity-maps-graphql-api-exception.filter';
 import { FormModule } from 'src/engine/metadata-modules/form/form.module';
 import { TwilioConfigModule } from 'src/engine/metadata-modules/twilio-config/twilio-config.module';
+import { MetaAdsConfigModule } from 'src/engine/metadata-modules/meta-ads-config/meta-ads-config.module';
+import { LeadAssignmentModule } from 'src/modules/lead-assignment/lead-assignment.module';
 import { PermissionsGraphqlApiExceptionFilter } from 'src/engine/metadata-modules/permissions/utils/permissions-graphql-api-exception.filter';
 import { FrontComponentModule } from 'src/engine/metadata-modules/front-component/front-component.module';
 import { LogicFunctionLayerModule } from 'src/engine/metadata-modules/logic-function-layer/logic-function-layer.module';
@@ -70,6 +72,8 @@ import { WorkspaceMetadataVersionModule } from 'src/engine/metadata-modules/work
     WebhookModule,
     FormModule,
     TwilioConfigModule,
+    MetaAdsConfigModule,
+    LeadAssignmentModule,
     ConnectedAccountMetadataModule,
     MessageChannelMetadataModule,
     CalendarChannelMetadataModule,
@@ -105,6 +109,7 @@ import { WorkspaceMetadataVersionModule } from 'src/engine/metadata-modules/work
     WebhookModule,
     FormModule,
     TwilioConfigModule,
+    MetaAdsConfigModule,
     ConnectedAccountMetadataModule,
     MessageChannelMetadataModule,
     CalendarChannelMetadataModule,

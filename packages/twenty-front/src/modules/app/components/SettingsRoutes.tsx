@@ -495,6 +495,20 @@ const SettingsTwilio = lazy(() =>
   })),
 );
 
+const SettingsMetaAds = lazy(() =>
+  import('~/pages/settings/meta-ads/SettingsMetaAds').then((module) => ({
+    default: module.SettingsMetaAds,
+  })),
+);
+
+const SettingsSettersTelegram = lazy(() =>
+  import(
+    '~/pages/settings/setters-telegram/SettingsSettersTelegram'
+  ).then((module) => ({
+    default: module.SettingsSettersTelegram,
+  })),
+);
+
 const SettingsObjectNewFieldSelect = lazy(() =>
   import('~/pages/settings/data-model/new-field/SettingsObjectNewFieldSelect').then(
     (module) => ({
@@ -993,6 +1007,11 @@ export const SettingsRoutes = ({ isAdminPageEnabled }: SettingsRoutesProps) => (
           element={<SettingsLeadFormDetail />}
         />
         <Route path={SettingsPath.Twilio} element={<SettingsTwilio />} />
+        <Route path={SettingsPath.MetaAds} element={<SettingsMetaAds />} />
+        <Route
+          path={SettingsPath.SettersTelegram}
+          element={<SettingsSettersTelegram />}
+        />
       </Route>
 
       <Route

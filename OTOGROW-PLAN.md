@@ -87,6 +87,22 @@ Shared context for every phase (already true in this repo):
 
 > Deploy Otogrow CRM to a production VPS. Steps: (1) production env config — real APP_SECRET, SMTP (transactional + sequences deliverability: SPF/DKIM/DMARC for the sending domain), file storage (S3-compatible), Turnstile captcha; (2) use Twenty's production Docker Compose (packages/twenty-docker) with pinned version tags, behind Caddy or nginx with TLS; (3) automated Postgres backups (daily dump + offsite copy) and a tested restore; (4) monitoring: uptime check on /healthz, log shipping, disk alerts; (5) DNS for the chosen subdomain (e.g. crm.autogrow.com) once decided; (6) smoke test: signup, email sync, form submission, sequence send, quote PDF. Document the runbook (deploy, rollback, backup restore) in the repo. **Gotcha from Phase 2:** `/forms/:publicId` is both the SPA page (Accept: text/html) and the public REST endpoint (XHR) — the dev vite proxy splits them by Accept header; prod nginx/Caddy ingress needs the same split (or the hosted form page would serve JSON). Also update the email header logo URL (currently Twenty's CDN) to the production domain.
 
+### Phase 10 — Voice calling (done)
+
+> Browser softphone (Twilio Voice SDK): click-to-call dialer with ringback, mute, DTMF, timer; inbound calls ring the CRM with accept/decline + voicemail; call records on the timeline with dual-channel recordings; one-click provisioning; preflight connection test; E.164 normalization.
+
+### Phase 11 — Meta lead ads intake
+
+> Connect Meta lead ads so leads land in the CRM instead of a Google Sheet. Requirements: (1) core entity `metaAdsConfig` (app id, encrypted app secret, page id, encrypted page access token, verify token, isActive) + Settings page section mirroring the Twilio settings pattern; (2) webhook `/webhooks/meta/:workspaceId/leadgen` — GET verification (hub.challenge) and POST with X-Hub-Signature-256 verification, rate-limited, PublicEndpointGuard; (3) on leadgen event fetch lead fields from the Graph API and upsert a Person (+Company) deduped by email, reusing the form-submission pipeline's patterns; tag `leadSource = 'META_AD'` (new SELECT option, with a workspace upgrade command for existing workspaces) and store campaign/adset/ad + form names; (4) timeline note on the Person; (5) assignment engine from Phase 12 picks the lead up via the person-created listener. Verify with Meta's Lead Ads Testing Tool through the dev tunnel.
+
+### Phase 12 — Setter assignment + Telegram ping
+
+> Speed-to-lead assignment. Requirements: (1) setter roster — core entity `setterProfile` (workspaceId, workspaceMemberId, isSetter, active days, active hours start/end, daily lead cap, telegramChatId) + Settings page to manage it; (2) assignment engine — listener on person creation picks the next eligible setter (active now, under daily cap, round-robin by last assignment), sets the lead's owner, creates a native Task ("Call new lead", due now) assigned to the setter; (3) Telegram bot — bot token stored encrypted per workspace, each setter links their chat by opening a t.me deep link with their member id (long-polling getUpdates in the queue worker, no webhook needed), on assignment send the setter a message with lead name, phone, source and a link to the Person page; (4) caps and schedule actually enforced (count today's assignments). Verify end-to-end with a real bot.
+
+### Phase 13 — One-click meeting booking + reminders
+
+> Book a Google Meet mid-call. Requirements: (1) `bookMeeting` mutation (personId, startTime, durationMinutes) that creates a Google Calendar event on the calling member's connected Google account (reuse Twenty's connected-account/Calendar API token plumbing) with the lead's email as attendee, a Meet conference link, and Google reminder overrides (email at 24h, 12h, 30min — Google sends them, no worker needed); (2) creates a native activity + timeline entry and returns the Meet link; (3) "Book meeting" action on the Person record page (engine-command pattern like the sequence enroll action) with a simple date/time picker; (4) clear errors when no Google account is connected or the calendar scope is missing; (5) no-show follow-up = existing email sequences, enrolled manually or via workflow trigger — document it. Verify with a real booking to a real calendar.
+
 ---
 
 ## Local environment reference

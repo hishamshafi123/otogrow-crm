@@ -6,6 +6,7 @@ import { MessageQueueModule } from 'src/engine/core-modules/message-queue/messag
 import { GlobalWorkspaceDataSourceModule } from 'src/engine/twenty-orm/global-workspace-datasource/global-workspace-datasource.module';
 import { TwentyORMModule } from 'src/engine/twenty-orm/twenty-orm.module';
 import { WorkspaceEventEmitterModule } from 'src/engine/workspace-event-emitter/workspace-event-emitter.module';
+import { TelegramPollingModule } from 'src/modules/lead-assignment/polling/telegram-polling.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { WorkspaceEventEmitterModule } from 'src/engine/workspace-event-emitter/
     JobsModule,
     TwentyORMModule,
     GlobalWorkspaceDataSourceModule,
+    TelegramPollingModule,
   ],
 })
 export class QueueWorkerModule {}

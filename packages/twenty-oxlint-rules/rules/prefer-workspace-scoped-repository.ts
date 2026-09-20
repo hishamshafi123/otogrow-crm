@@ -67,6 +67,9 @@ const WORKSPACE_SCOPED_EXEMPTIONS = new Set<string>([
   // param before any auth context exists, so lookups are cross-workspace by
   // design, mirroring FormEntity.
   'TwilioConfigEntity',
+  // The public Meta leadgen webhook resolves the config from the workspaceId
+  // path param before any auth context exists, mirroring TwilioConfigEntity.
+  'MetaAdsConfigEntity',
   // The public /portal endpoint resolves portal access by token hash before
   // any workspace is known, so lookups are cross-workspace by design,
   // mirroring FormEntity.

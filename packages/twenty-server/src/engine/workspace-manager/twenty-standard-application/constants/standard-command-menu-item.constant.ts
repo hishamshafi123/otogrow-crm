@@ -1512,4 +1512,23 @@ export const STANDARD_COMMAND_MENU_ITEMS = {
     engineComponentKey: EngineComponentKey.UNENROLL_FROM_SEQUENCE,
     hotKeys: null,
   },
+  bookMeeting: {
+    universalIdentifier: 'c15d4bcb-6fd2-48a4-8c2a-48ddebd20940',
+    label: i18nLabel(
+      msg({ message: `Book meeting`, context: 'commandMenuItem.label' }),
+    ),
+    icon: 'IconVideo',
+    isPinned: true,
+    position: 71,
+    shortLabel: i18nLabel(
+      msg({ message: `Book`, context: 'commandMenuItem.shortLabel' }),
+    ),
+    availabilityType: CommandMenuItemAvailabilityType.RECORD_SELECTION,
+    conditionalAvailabilityExpression: 'numberOfSelectedRecords == 1',
+    availabilityObjectMetadataUniversalIdentifier:
+      STANDARD_OBJECTS.person.universalIdentifier,
+    frontComponentUniversalIdentifier: null,
+    engineComponentKey: EngineComponentKey.BOOK_MEETING,
+    hotKeys: null,
+  },
 } as const;

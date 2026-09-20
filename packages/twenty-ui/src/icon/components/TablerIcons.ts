@@ -51,6 +51,7 @@ export {
   IconBrandGoogle,
   IconBrandGraphql,
   IconBrandLinkedin,
+  IconBrandMeta,
   IconBrandNpm,
   IconBrandOpenai,
   IconBrandWhatsapp,

@@ -70,6 +70,8 @@ export enum SettingsPath {
   NewLeadForm = 'lead-forms/new',
   LeadFormDetail = 'lead-forms/:formId',
   Twilio = 'twilio',
+  MetaAds = 'meta-ads',
+  SettersTelegram = 'setters-telegram',
   Integrations = 'integrations',
   Security = 'general#security',
   Logs = 'general#logs',

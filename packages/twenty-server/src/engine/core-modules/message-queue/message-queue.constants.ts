@@ -21,4 +21,5 @@ export enum MessageQueue {
   aiQueue = 'ai-queue',
   aiStreamQueue = 'ai-stream-queue',
   leadScoringQueue = 'lead-scoring-queue',
+  leadAssignmentQueue = 'lead-assignment-queue',
 }

@@ -56,6 +56,7 @@ export enum EngineComponentKey {
   EMAIL_BLOCK_SETTINGS = 'EMAIL_BLOCK_SETTINGS',
   ENROLL_IN_SEQUENCE = 'ENROLL_IN_SEQUENCE',
   UNENROLL_FROM_SEQUENCE = 'UNENROLL_FROM_SEQUENCE',
+  BOOK_MEETING = 'BOOK_MEETING',
 
   // TODO: Remove deprecated keys once upgrade:1-21:refactor-navigation-commands has run on all workspaces
   // Deprecated: replaced by NAVIGATION engine key with payload

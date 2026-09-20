@@ -1635,6 +1635,7 @@ export enum EngineComponentKey {
   ADD_NODE_WORKFLOW = 'ADD_NODE_WORKFLOW',
   ADD_TO_FAVORITES = 'ADD_TO_FAVORITES',
   ASK_AI = 'ASK_AI',
+  BOOK_MEETING = 'BOOK_MEETING',
   CANCEL_DASHBOARD_LAYOUT = 'CANCEL_DASHBOARD_LAYOUT',
   COMPOSE_CAMPAIGN = 'COMPOSE_CAMPAIGN',
   COMPOSE_EMAIL = 'COMPOSE_EMAIL',
@@ -2593,6 +2594,22 @@ export enum MessageSuppressionSource {
   WEBHOOK = 'WEBHOOK'
 }
 
+export type MetaAdsConfig = {
+  __typename?: 'MetaAdsConfig';
+  appId: Scalars['String']['output'];
+  appSecretLastFour?: Maybe<Scalars['String']['output']>;
+  createdAt: Scalars['DateTime']['output'];
+  formId?: Maybe<Scalars['String']['output']>;
+  hasAppSecret: Scalars['Boolean']['output'];
+  hasPageAccessToken: Scalars['Boolean']['output'];
+  id: Scalars['UUID']['output'];
+  isActive: Scalars['Boolean']['output'];
+  pageAccessTokenLastFour?: Maybe<Scalars['String']['output']>;
+  pageId: Scalars['String']['output'];
+  updatedAt: Scalars['DateTime']['output'];
+  verifyToken: Scalars['String']['output'];
+};
+
 export type MetadataEvent = {
   __typename?: 'MetadataEvent';
   metadataName: Scalars['String']['output'];
@@ -2754,6 +2771,7 @@ export type Mutation = {
   deleteForm: Form;
   deleteFrontComponent: FrontComponent;
   deleteManyNavigationMenuItems: Array<NavigationMenuItem>;
+  deleteMetaAdsConfig: MetaAdsConfig;
   deleteNavigationMenuItem: NavigationMenuItem;
   deleteOneAgent: Agent;
   deleteOneField: Field;
@@ -2765,6 +2783,7 @@ export type Mutation = {
   deleteQueuedChatMessage: Scalars['Boolean']['output'];
   deleteSSOIdentityProvider: DeleteSso;
   deleteSkill: Skill;
+  deleteTelegramConfig: TelegramConfig;
   deleteTwilioConfig: TwilioConfig;
   deleteTwoFactorAuthenticationMethod: DeleteTwoFactorAuthenticationMethod;
   deleteUnsubscribeTopic: Scalars['Boolean']['output'];
@@ -2861,6 +2880,8 @@ export type Mutation = {
   switchSubscriptionInterval: BillingUpdate;
   syncApplication: WorkspaceMigration;
   syncMarketplaceCatalog: Scalars['Boolean']['output'];
+  testMetaAdsConnection: Scalars['Boolean']['output'];
+  testTelegramConnection: Scalars['Boolean']['output'];
   testTwilioConnection: Scalars['Boolean']['output'];
   trackAnalytics: Analytics;
   transferApplicationRegistrationOwnership: ApplicationRegistration;
@@ -2922,9 +2943,12 @@ export type Mutation = {
   uploadWorkspaceMemberProfilePicture: FileWithSignedUrl;
   upsertFieldPermissions: Array<FieldPermission>;
   upsertFieldsWidget: View;
+  upsertMetaAdsConfig: MetaAdsConfig;
   upsertObjectPermissions: Array<ObjectPermission>;
   upsertPermissionFlags: Array<RolePermissionFlag>;
   upsertRowLevelPermissionPredicates: UpsertRowLevelPermissionPredicatesResult;
+  upsertSetterProfile: SetterProfile;
+  upsertTelegramConfig: TelegramConfig;
   upsertTwilioConfig: TwilioConfig;
   upsertViewWidget: View;
   validateApprovedAccessDomain: ApprovedAccessDomain;
@@ -4113,6 +4137,11 @@ export type MutationUpsertFieldsWidgetArgs = {
 };
 
 
+export type MutationUpsertMetaAdsConfigArgs = {
+  input: UpsertMetaAdsConfigInput;
+};
+
+
 export type MutationUpsertObjectPermissionsArgs = {
   upsertObjectPermissionsInput: UpsertObjectPermissionsInput;
 };
@@ -4125,6 +4154,16 @@ export type MutationUpsertPermissionFlagsArgs = {
 
 export type MutationUpsertRowLevelPermissionPredicatesArgs = {
   input: UpsertRowLevelPermissionPredicatesInput;
+};
+
+
+export type MutationUpsertSetterProfileArgs = {
+  input: UpsertSetterProfileInput;
+};
+
+
+export type MutationUpsertTelegramConfigArgs = {
+  input: UpsertTelegramConfigInput;
 };
 
 
@@ -4773,6 +4812,7 @@ export type Query = {
   lineChartData: LineChartData;
   listPlans: Array<BillingPlan>;
   messageSuppressions: MessageSuppressionList;
+  metaAdsConfig?: Maybe<MetaAdsConfig>;
   metadataTranslations: Array<MetadataTranslation>;
   minimalMetadata: MinimalMetadata;
   mostlyEmptyFieldMetadataIds: Array<Scalars['UUID']['output']>;
@@ -4790,8 +4830,10 @@ export type Query = {
   publicMarketplaceAppDetail: MarketplaceAppDetail;
   publicMarketplaceApps: Array<MarketplaceApp>;
   sequenceAnalytics: SequenceAnalyticsDto;
+  setterProfiles: Array<SetterProfile>;
   skill?: Maybe<Skill>;
   skills: Array<Skill>;
+  telegramConfig?: Maybe<TelegramConfig>;
   timelineActivityTypes: Array<TimelineActivityType>;
   twilioConfig?: Maybe<TwilioConfig>;
   unsubscribeTopics: Array<UnsubscribeTopic>;
@@ -5578,6 +5620,22 @@ export type SetAppKeyValueInput = {
   value?: InputMaybe<Scalars['JSON']['input']>;
 };
 
+export type SetterProfile = {
+  __typename?: 'SetterProfile';
+  activeDays: Scalars['String']['output'];
+  activeEndHour: Scalars['Float']['output'];
+  activeStartHour: Scalars['Float']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  dailyLeadCap?: Maybe<Scalars['Float']['output']>;
+  hasTelegramChatId: Scalars['Boolean']['output'];
+  id?: Maybe<Scalars['UUID']['output']>;
+  isSetter: Scalars['Boolean']['output'];
+  memberEmail?: Maybe<Scalars['String']['output']>;
+  memberName: Scalars['String']['output'];
+  updatedAt: Scalars['DateTime']['output'];
+  workspaceMemberId: Scalars['UUID']['output'];
+};
+
 export type SetupOidcSsoInput = {
   clientID: Scalars['String']['input'];
   clientSecret: Scalars['String']['input'];
@@ -5712,6 +5770,17 @@ export enum SupportDriver {
 export type TasksConfiguration = {
   __typename?: 'TasksConfiguration';
   configurationType: WidgetConfigurationType;
+};
+
+export type TelegramConfig = {
+  __typename?: 'TelegramConfig';
+  botTokenLastFour?: Maybe<Scalars['String']['output']>;
+  botUsername?: Maybe<Scalars['String']['output']>;
+  createdAt: Scalars['DateTime']['output'];
+  hasBotToken: Scalars['Boolean']['output'];
+  id: Scalars['UUID']['output'];
+  isActive: Scalars['Boolean']['output'];
+  updatedAt: Scalars['DateTime']['output'];
 };
 
 export type TimelineActivityType = {
@@ -6314,6 +6383,16 @@ export type UpsertFieldsWidgetInput = {
   widgetId: Scalars['UUID']['input'];
 };
 
+export type UpsertMetaAdsConfigInput = {
+  appId: Scalars['String']['input'];
+  appSecret?: InputMaybe<Scalars['String']['input']>;
+  formId?: InputMaybe<Scalars['String']['input']>;
+  isActive?: InputMaybe<Scalars['Boolean']['input']>;
+  pageAccessToken?: InputMaybe<Scalars['String']['input']>;
+  pageId: Scalars['String']['input'];
+  verifyToken?: InputMaybe<Scalars['String']['input']>;
+};
+
 export type UpsertObjectPermissionsInput = {
   objectPermissions: Array<ObjectPermissionInput>;
   roleId: Scalars['UUID']['input'];
@@ -6335,6 +6414,21 @@ export type UpsertRowLevelPermissionPredicatesResult = {
   __typename?: 'UpsertRowLevelPermissionPredicatesResult';
   predicateGroups: Array<RowLevelPermissionPredicateGroup>;
   predicates: Array<RowLevelPermissionPredicate>;
+};
+
+export type UpsertSetterProfileInput = {
+  activeDays: Scalars['String']['input'];
+  activeEndHour: Scalars['Float']['input'];
+  activeStartHour: Scalars['Float']['input'];
+  dailyLeadCap?: InputMaybe<Scalars['Float']['input']>;
+  isSetter: Scalars['Boolean']['input'];
+  workspaceMemberId: Scalars['String']['input'];
+};
+
+export type UpsertTelegramConfigInput = {
+  botToken?: InputMaybe<Scalars['String']['input']>;
+  botUsername?: InputMaybe<Scalars['String']['input']>;
+  isActive?: InputMaybe<Scalars['Boolean']['input']>;
 };
 
 export type UpsertTwilioConfigInput = {
@@ -9046,6 +9140,28 @@ export type UploadWorkspaceMemberProfilePictureMutationVariables = Exact<{
 
 export type UploadWorkspaceMemberProfilePictureMutation = { __typename?: 'Mutation', uploadWorkspaceMemberProfilePicture: { __typename?: 'FileWithSignedUrl', id: string, url: string } };
 
+export type DeleteMetaAdsConfigMutationVariables = Exact<{ [key: string]: never; }>;
+
+
+export type DeleteMetaAdsConfigMutation = { __typename?: 'Mutation', deleteMetaAdsConfig: { __typename?: 'MetaAdsConfig', id: string } };
+
+export type TestMetaAdsConnectionMutationVariables = Exact<{ [key: string]: never; }>;
+
+
+export type TestMetaAdsConnectionMutation = { __typename?: 'Mutation', testMetaAdsConnection: boolean };
+
+export type UpsertMetaAdsConfigMutationVariables = Exact<{
+  input: UpsertMetaAdsConfigInput;
+}>;
+
+
+export type UpsertMetaAdsConfigMutation = { __typename?: 'Mutation', upsertMetaAdsConfig: { __typename?: 'MetaAdsConfig', id: string, appId: string, hasAppSecret: boolean, appSecretLastFour?: string | null, pageId: string, hasPageAccessToken: boolean, pageAccessTokenLastFour?: string | null, verifyToken: string, formId?: string | null, isActive: boolean } };
+
+export type GetMetaAdsConfigQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type GetMetaAdsConfigQuery = { __typename?: 'Query', metaAdsConfig?: { __typename?: 'MetaAdsConfig', id: string, appId: string, hasAppSecret: boolean, appSecretLastFour?: string | null, pageId: string, hasPageAccessToken: boolean, pageAccessTokenLastFour?: string | null, verifyToken: string, formId?: string | null, isActive: boolean } | null };
+
 export type RevokeAllOtherUserSessionsMutationVariables = Exact<{ [key: string]: never; }>;
 
 
@@ -9212,6 +9328,35 @@ export type GetSsoIdentityProvidersQueryVariables = Exact<{ [key: string]: never
 
 
 export type GetSsoIdentityProvidersQuery = { __typename?: 'Query', getSSOIdentityProviders: Array<{ __typename?: 'FindAvailableSSOIDP', type: IdentityProviderType, id: string, name: string, issuer: string, status: SsoIdentityProviderStatus }> };
+
+export type TestTelegramConnectionMutationVariables = Exact<{ [key: string]: never; }>;
+
+
+export type TestTelegramConnectionMutation = { __typename?: 'Mutation', testTelegramConnection: boolean };
+
+export type UpsertSetterProfileMutationVariables = Exact<{
+  input: UpsertSetterProfileInput;
+}>;
+
+
+export type UpsertSetterProfileMutation = { __typename?: 'Mutation', upsertSetterProfile: { __typename?: 'SetterProfile', id?: string | null, workspaceMemberId: string, isSetter: boolean, activeDays: string, activeStartHour: number, activeEndHour: number, dailyLeadCap?: number | null, hasTelegramChatId: boolean } };
+
+export type UpsertTelegramConfigMutationVariables = Exact<{
+  input: UpsertTelegramConfigInput;
+}>;
+
+
+export type UpsertTelegramConfigMutation = { __typename?: 'Mutation', upsertTelegramConfig: { __typename?: 'TelegramConfig', id: string, hasBotToken: boolean, botTokenLastFour?: string | null, botUsername?: string | null, isActive: boolean } };
+
+export type GetSetterProfilesQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type GetSetterProfilesQuery = { __typename?: 'Query', setterProfiles: Array<{ __typename?: 'SetterProfile', id?: string | null, workspaceMemberId: string, memberName: string, memberEmail?: string | null, isSetter: boolean, activeDays: string, activeStartHour: number, activeEndHour: number, dailyLeadCap?: number | null, hasTelegramChatId: boolean }> };
+
+export type GetTelegramConfigQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type GetTelegramConfigQuery = { __typename?: 'Query', telegramConfig?: { __typename?: 'TelegramConfig', id: string, hasBotToken: boolean, botTokenLastFour?: string | null, botUsername?: string | null, isActive: boolean } | null };
 
 export type MetadataTranslationsQueryVariables = Exact<{
   input: MetadataTranslationsInput;
@@ -10035,6 +10180,10 @@ export const GetFormDocument = {"kind":"Document","definitions":[{"kind":"Operat
 export const GetFormsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetForms"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"forms"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"FormFragment"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"FormFragment"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"Form"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"publicId"}},{"kind":"Field","name":{"kind":"Name","value":"fields"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"key"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"type"}},{"kind":"Field","name":{"kind":"Name","value":"required"}}]}},{"kind":"Field","name":{"kind":"Name","value":"successMessage"}},{"kind":"Field","name":{"kind":"Name","value":"isActive"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]} as unknown as DocumentNode<GetFormsQuery, GetFormsQueryVariables>;
 export const UpdateLabPublicFeatureFlagDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateLabPublicFeatureFlag"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UpdateLabPublicFeatureFlagInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateLabPublicFeatureFlag"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"key"}},{"kind":"Field","name":{"kind":"Name","value":"value"}}]}}]}}]} as unknown as DocumentNode<UpdateLabPublicFeatureFlagMutation, UpdateLabPublicFeatureFlagMutationVariables>;
 export const UploadWorkspaceMemberProfilePictureDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UploadWorkspaceMemberProfilePicture"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"file"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Upload"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"uploadWorkspaceMemberProfilePicture"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"file"},"value":{"kind":"Variable","name":{"kind":"Name","value":"file"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"url"}}]}}]}}]} as unknown as DocumentNode<UploadWorkspaceMemberProfilePictureMutation, UploadWorkspaceMemberProfilePictureMutationVariables>;
+export const DeleteMetaAdsConfigDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DeleteMetaAdsConfig"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deleteMetaAdsConfig"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<DeleteMetaAdsConfigMutation, DeleteMetaAdsConfigMutationVariables>;
+export const TestMetaAdsConnectionDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"TestMetaAdsConnection"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"testMetaAdsConnection"}}]}}]} as unknown as DocumentNode<TestMetaAdsConnectionMutation, TestMetaAdsConnectionMutationVariables>;
+export const UpsertMetaAdsConfigDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpsertMetaAdsConfig"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UpsertMetaAdsConfigInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"upsertMetaAdsConfig"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"appId"}},{"kind":"Field","name":{"kind":"Name","value":"hasAppSecret"}},{"kind":"Field","name":{"kind":"Name","value":"appSecretLastFour"}},{"kind":"Field","name":{"kind":"Name","value":"pageId"}},{"kind":"Field","name":{"kind":"Name","value":"hasPageAccessToken"}},{"kind":"Field","name":{"kind":"Name","value":"pageAccessTokenLastFour"}},{"kind":"Field","name":{"kind":"Name","value":"verifyToken"}},{"kind":"Field","name":{"kind":"Name","value":"formId"}},{"kind":"Field","name":{"kind":"Name","value":"isActive"}}]}}]}}]} as unknown as DocumentNode<UpsertMetaAdsConfigMutation, UpsertMetaAdsConfigMutationVariables>;
+export const GetMetaAdsConfigDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetMetaAdsConfig"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"metaAdsConfig"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"appId"}},{"kind":"Field","name":{"kind":"Name","value":"hasAppSecret"}},{"kind":"Field","name":{"kind":"Name","value":"appSecretLastFour"}},{"kind":"Field","name":{"kind":"Name","value":"pageId"}},{"kind":"Field","name":{"kind":"Name","value":"hasPageAccessToken"}},{"kind":"Field","name":{"kind":"Name","value":"pageAccessTokenLastFour"}},{"kind":"Field","name":{"kind":"Name","value":"verifyToken"}},{"kind":"Field","name":{"kind":"Name","value":"formId"}},{"kind":"Field","name":{"kind":"Name","value":"isActive"}}]}}]}}]} as unknown as DocumentNode<GetMetaAdsConfigQuery, GetMetaAdsConfigQueryVariables>;
 export const RevokeAllOtherUserSessionsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"RevokeAllOtherUserSessions"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"revokeAllOtherUserSessions"}}]}}]} as unknown as DocumentNode<RevokeAllOtherUserSessionsMutation, RevokeAllOtherUserSessionsMutationVariables>;
 export const RevokeUserSessionDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"RevokeUserSession"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"userSessionId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UUID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"revokeUserSession"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"userSessionId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"userSessionId"}}}]}]}}]} as unknown as DocumentNode<RevokeUserSessionMutation, RevokeUserSessionMutationVariables>;
 export const CurrentUserSessionsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"CurrentUserSessions"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"currentUserSessions"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"authProvider"}},{"kind":"Field","name":{"kind":"Name","value":"isImpersonating"}},{"kind":"Field","name":{"kind":"Name","value":"userAgent"}},{"kind":"Field","name":{"kind":"Name","value":"ipAddress"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"lastActiveAt"}},{"kind":"Field","name":{"kind":"Name","value":"expiresAt"}},{"kind":"Field","name":{"kind":"Name","value":"isCurrent"}}]}}]}}]} as unknown as DocumentNode<CurrentUserSessionsQuery, CurrentUserSessionsQueryVariables>;
@@ -10058,6 +10207,11 @@ export const EditSsoIdentityProviderDocument = {"kind":"Document","definitions":
 export const ValidateApprovedAccessDomainDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"ValidateApprovedAccessDomain"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ValidateApprovedAccessDomainInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"validateApprovedAccessDomain"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"isValidated"}},{"kind":"Field","name":{"kind":"Name","value":"domain"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}}]}}]} as unknown as DocumentNode<ValidateApprovedAccessDomainMutation, ValidateApprovedAccessDomainMutationVariables>;
 export const GetApprovedAccessDomainsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetApprovedAccessDomains"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"getApprovedAccessDomains"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"domain"}},{"kind":"Field","name":{"kind":"Name","value":"isValidated"}}]}}]}}]} as unknown as DocumentNode<GetApprovedAccessDomainsQuery, GetApprovedAccessDomainsQueryVariables>;
 export const GetSsoIdentityProvidersDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetSSOIdentityProviders"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"getSSOIdentityProviders"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"type"}},{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"issuer"}},{"kind":"Field","name":{"kind":"Name","value":"status"}}]}}]}}]} as unknown as DocumentNode<GetSsoIdentityProvidersQuery, GetSsoIdentityProvidersQueryVariables>;
+export const TestTelegramConnectionDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"TestTelegramConnection"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"testTelegramConnection"}}]}}]} as unknown as DocumentNode<TestTelegramConnectionMutation, TestTelegramConnectionMutationVariables>;
+export const UpsertSetterProfileDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpsertSetterProfile"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UpsertSetterProfileInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"upsertSetterProfile"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"workspaceMemberId"}},{"kind":"Field","name":{"kind":"Name","value":"isSetter"}},{"kind":"Field","name":{"kind":"Name","value":"activeDays"}},{"kind":"Field","name":{"kind":"Name","value":"activeStartHour"}},{"kind":"Field","name":{"kind":"Name","value":"activeEndHour"}},{"kind":"Field","name":{"kind":"Name","value":"dailyLeadCap"}},{"kind":"Field","name":{"kind":"Name","value":"hasTelegramChatId"}}]}}]}}]} as unknown as DocumentNode<UpsertSetterProfileMutation, UpsertSetterProfileMutationVariables>;
+export const UpsertTelegramConfigDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpsertTelegramConfig"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UpsertTelegramConfigInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"upsertTelegramConfig"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"hasBotToken"}},{"kind":"Field","name":{"kind":"Name","value":"botTokenLastFour"}},{"kind":"Field","name":{"kind":"Name","value":"botUsername"}},{"kind":"Field","name":{"kind":"Name","value":"isActive"}}]}}]}}]} as unknown as DocumentNode<UpsertTelegramConfigMutation, UpsertTelegramConfigMutationVariables>;
+export const GetSetterProfilesDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetSetterProfiles"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"setterProfiles"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"workspaceMemberId"}},{"kind":"Field","name":{"kind":"Name","value":"memberName"}},{"kind":"Field","name":{"kind":"Name","value":"memberEmail"}},{"kind":"Field","name":{"kind":"Name","value":"isSetter"}},{"kind":"Field","name":{"kind":"Name","value":"activeDays"}},{"kind":"Field","name":{"kind":"Name","value":"activeStartHour"}},{"kind":"Field","name":{"kind":"Name","value":"activeEndHour"}},{"kind":"Field","name":{"kind":"Name","value":"dailyLeadCap"}},{"kind":"Field","name":{"kind":"Name","value":"hasTelegramChatId"}}]}}]}}]} as unknown as DocumentNode<GetSetterProfilesQuery, GetSetterProfilesQueryVariables>;
+export const GetTelegramConfigDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetTelegramConfig"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"telegramConfig"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"hasBotToken"}},{"kind":"Field","name":{"kind":"Name","value":"botTokenLastFour"}},{"kind":"Field","name":{"kind":"Name","value":"botUsername"}},{"kind":"Field","name":{"kind":"Name","value":"isActive"}}]}}]}}]} as unknown as DocumentNode<GetTelegramConfigQuery, GetTelegramConfigQueryVariables>;
 export const MetadataTranslationsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"MetadataTranslations"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"MetadataTranslationsInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"metadataTranslations"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"metadataName"}},{"kind":"Field","name":{"kind":"Name","value":"recordId"}},{"kind":"Field","name":{"kind":"Name","value":"objectMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"property"}},{"kind":"Field","name":{"kind":"Name","value":"locale"}},{"kind":"Field","name":{"kind":"Name","value":"sourceValue"}},{"kind":"Field","name":{"kind":"Name","value":"canonicalValue"}},{"kind":"Field","name":{"kind":"Name","value":"value"}},{"kind":"Field","name":{"kind":"Name","value":"provenance"}}]}}]}}]} as unknown as DocumentNode<MetadataTranslationsQuery, MetadataTranslationsQueryVariables>;
 export const DeleteTwilioConfigDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DeleteTwilioConfig"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deleteTwilioConfig"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<DeleteTwilioConfigMutation, DeleteTwilioConfigMutationVariables>;
 export const GenerateTwilioVoiceTokenDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"GenerateTwilioVoiceToken"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"generateTwilioVoiceToken"}}]}}]} as unknown as DocumentNode<GenerateTwilioVoiceTokenMutation, GenerateTwilioVoiceTokenMutationVariables>;

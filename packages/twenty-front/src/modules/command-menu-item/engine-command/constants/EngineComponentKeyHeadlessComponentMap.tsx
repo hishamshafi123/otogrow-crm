@@ -16,6 +16,7 @@ import { TriggerWorkflowVersionEngineCommand } from '@/command-menu-item/engine-
 import { MergeMultipleRecordsCommand } from '@/command-menu-item/engine-command/record/multiple-records/components/MergeMultipleRecordsCommand';
 import { UpdateMultipleRecordsCommand } from '@/command-menu-item/engine-command/record/multiple-records/components/UpdateMultipleRecordsCommand';
 import { EnrollInSequenceRecordCommand } from '@/command-menu-item/engine-command/record/sequences/components/EnrollInSequenceRecordCommand';
+import { BookMeetingRecordCommand } from '@/command-menu-item/engine-command/record/meeting-booking/components/BookMeetingRecordCommand';
 import { UnenrollFromSequenceRecordCommand } from '@/command-menu-item/engine-command/record/sequences/components/UnenrollFromSequenceRecordCommand';
 import { CreateNewIndexRecordNoSelectionRecordCommand } from '@/command-menu-item/engine-command/record/no-selection/components/CreateNewIndexRecordNoSelectionRecordCommand';
 import { CreateNewViewNoSelectionRecordCommand } from '@/command-menu-item/engine-command/record/no-selection/components/CreateNewViewNoSelectionRecordCommand';
@@ -266,6 +267,7 @@ export const ENGINE_COMPONENT_KEY_COMPONENT_MAP: Record<
     <OpenEmailBlockSettingsSingleRecordCommand />
   ),
   [EngineComponentKey.ENROLL_IN_SEQUENCE]: <EnrollInSequenceRecordCommand />,
+  [EngineComponentKey.BOOK_MEETING]: <BookMeetingRecordCommand />,
   [EngineComponentKey.UNENROLL_FROM_SEQUENCE]: (
     <UnenrollFromSequenceRecordCommand />
   ),

@@ -18,6 +18,7 @@ import { isNonEmptyString } from '@sniptt/guards';
 import {
   IconApps,
   IconAt,
+  IconBrandMeta,
   IconBrandWhatsapp,
   IconCalendarEvent,
   IconColorSwatch,
@@ -36,6 +37,7 @@ import {
   IconSettings,
   IconSparkles,
   IconUserCircle,
+  IconUserPin,
   IconUsers,
 } from 'twenty-ui/icon';
 import { PermissionFlagType } from '~/generated-metadata/graphql';
@@ -166,6 +168,18 @@ const useSettingsNavigationItems = (): SettingsNavigationSection[] => {
           label: t`Twilio`,
           path: SettingsPath.Twilio,
           Icon: IconBrandWhatsapp,
+          isHidden: !permissionMap[PermissionFlagType.API_KEYS_AND_WEBHOOKS],
+        },
+        {
+          label: t`Meta ads`,
+          path: SettingsPath.MetaAds,
+          Icon: IconBrandMeta,
+          isHidden: !permissionMap[PermissionFlagType.API_KEYS_AND_WEBHOOKS],
+        },
+        {
+          label: t`Setters & Telegram`,
+          path: SettingsPath.SettersTelegram,
+          Icon: IconUserPin,
           isHidden: !permissionMap[PermissionFlagType.API_KEYS_AND_WEBHOOKS],
         },
         // TODO: Re-enable when integrations page is ready
