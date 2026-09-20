@@ -7,7 +7,10 @@ import { isDefined } from 'twenty-shared/utils';
 import { type DeepPartial } from 'typeorm';
 import { v4 } from 'uuid';
 
-import { type FormFieldKey } from 'src/engine/metadata-modules/form/constants/form-field-definition.constant';
+import {
+  FORM_PERSON_MAPPED_FIELD_KEYS,
+  type FormFieldKey,
+} from 'src/engine/metadata-modules/form/constants/form-field-definition.constant';
 import { type FormEntity } from 'src/engine/metadata-modules/form/entities/form.entity';
 import {
   TwentyORMException,
@@ -39,6 +42,8 @@ const isDuplicateEntryError = (error: unknown) =>
 
 type SanitizedFormValues = Partial<Record<FormFieldKey, string>>;
 
+type LeadFormAnswer = { label: string; value: string };
+
 @Injectable()
 export class FormSubmissionService {
   constructor(
@@ -49,8 +54,17 @@ export class FormSubmissionService {
   async submit(
     form: FormEntity,
     values: Record<string, string>,
+    pageUrl?: string,
   ): Promise<void> {
     const sanitizedValues = this.sanitizeAndValidateValues(form, values);
+    const leadCaptureUrl =
+      typeof pageUrl === 'string' && isNonEmptyString(pageUrl.trim())
+        ? pageUrl.trim()
+        : null;
+    const leadFormAnswers = this.computeLeadFormAnswers(
+      form,
+      sanitizedValues,
+    );
     const workspaceId = form.workspaceId;
     const authContext = buildSystemAuthContext(workspaceId);
 
@@ -69,7 +83,10 @@ export class FormSubmissionService {
 
       const personId = await this.findOrCreatePerson(
         personRepository,
+        form,
         sanitizedValues,
+        leadFormAnswers,
+        leadCaptureUrl,
         companyId,
       );
 
@@ -80,6 +97,19 @@ export class FormSubmissionService {
         workspaceId,
       );
     }, authContext);
+  }
+
+  private computeLeadFormAnswers(
+    form: FormEntity,
+    sanitizedValues: SanitizedFormValues,
+  ): LeadFormAnswer[] {
+    return form.fields
+      .filter((field) => !FORM_PERSON_MAPPED_FIELD_KEYS.includes(field.key))
+      .filter((field) => isNonEmptyString(sanitizedValues[field.key]))
+      .map((field) => ({
+        label: field.label,
+        value: sanitizedValues[field.key] ?? '',
+      }));
   }
 
   private sanitizeAndValidateValues(
@@ -151,7 +181,10 @@ export class FormSubmissionService {
 
   private async findOrCreatePerson(
     personRepository: WorkspaceRepository<PersonWorkspaceEntity>,
+    form: FormEntity,
     sanitizedValues: SanitizedFormValues,
+    leadFormAnswers: LeadFormAnswer[],
+    leadCaptureUrl: string | null,
     companyId: string | null,
   ): Promise<string> {
     const existingPerson = await this.findExistingPerson(
@@ -163,7 +196,10 @@ export class FormSubmissionService {
       await this.restoreAndFillEmptyPersonFields(
         personRepository,
         existingPerson,
+        form,
         sanitizedValues,
+        leadFormAnswers,
+        leadCaptureUrl,
         companyId,
       );
 
@@ -173,7 +209,10 @@ export class FormSubmissionService {
     try {
       return await this.createPerson(
         personRepository,
+        form,
         sanitizedValues,
+        leadFormAnswers,
+        leadCaptureUrl,
         companyId,
       );
     } catch (error) {
@@ -226,7 +265,10 @@ export class FormSubmissionService {
 
   private async createPerson(
     personRepository: WorkspaceRepository<PersonWorkspaceEntity>,
+    form: FormEntity,
     sanitizedValues: SanitizedFormValues,
+    leadFormAnswers: LeadFormAnswer[],
+    leadCaptureUrl: string | null,
     companyId: string | null,
   ): Promise<string> {
     const lastPersonPosition =
@@ -253,6 +295,10 @@ export class FormSubmissionService {
       jobTitle: sanitizedValues.jobTitle ?? null,
       companyId,
       leadSource: 'FORM',
+      leadStatus: 'NEW',
+      leadFormName: form.name,
+      leadFormAnswers,
+      leadCaptureUrl,
       createdBy: FORM_SUBMISSION_ACTOR,
       position: lastPersonPosition + 1,
     });
@@ -264,7 +310,10 @@ export class FormSubmissionService {
   private async restoreAndFillEmptyPersonFields(
     personRepository: WorkspaceRepository<PersonWorkspaceEntity>,
     person: PersonWorkspaceEntity,
+    form: FormEntity,
     sanitizedValues: SanitizedFormValues,
+    leadFormAnswers: LeadFormAnswer[],
+    leadCaptureUrl: string | null,
     companyId: string | null,
   ): Promise<void> {
     const partialEntity: DeepPartial<PersonWorkspaceEntity> = {};
@@ -315,6 +364,20 @@ export class FormSubmissionService {
 
     if (!isDefined(person.leadSource)) {
       partialEntity.leadSource = 'FORM';
+    }
+
+    // leadStatus is owned by the lifecycle once set; intake only stamps it on
+    // newly created people
+    if (!isDefined(person.leadFormName)) {
+      partialEntity.leadFormName = form.name;
+    }
+
+    if (!isDefined(person.leadFormAnswers)) {
+      partialEntity.leadFormAnswers = leadFormAnswers;
+    }
+
+    if (!isDefined(person.leadCaptureUrl) && isDefined(leadCaptureUrl)) {
+      partialEntity.leadCaptureUrl = leadCaptureUrl;
     }
 
     if (Object.keys(partialEntity).length === 0) {

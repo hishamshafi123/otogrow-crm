@@ -278,6 +278,9 @@ describe('MetaLeadgenWebhookController', () => {
             additionalEmails: null,
           },
           leadSource: 'META_AD',
+          leadStatus: 'NEW',
+          leadFormName: 'Spring Promo Form',
+          leadFormAnswers: [{ label: 'car_model', value: 'Model S' }],
           companyId: 'company-id',
         }),
       );
@@ -326,6 +329,9 @@ describe('MetaLeadgenWebhookController', () => {
         phones: { primaryPhoneNumber: '+15559876543' },
         companyId: null,
         leadSource: 'META_AD',
+        leadStatus: 'WARM',
+        leadFormName: null,
+        leadFormAnswers: null,
         deletedAt: null,
       };
 
@@ -347,12 +353,20 @@ describe('MetaLeadgenWebhookController', () => {
         [
           {
             criteria: 'existing-person-id',
-            partialEntity: { companyId: 'company-id' },
+            partialEntity: {
+              companyId: 'company-id',
+              leadFormName: 'Spring Promo Form',
+              leadFormAnswers: [{ label: 'car_model', value: 'Model S' }],
+            },
           },
         ],
         undefined,
         ['id'],
       );
+      const partialEntity = personRepository.updateMany.mock.calls[0][0][0]
+        .partialEntity as Record<string, unknown>;
+
+      expect(partialEntity).not.toHaveProperty('leadStatus');
       expect(noteTargetRepository.insert).toHaveBeenCalledWith(
         expect.objectContaining({ targetPersonId: 'existing-person-id' }),
       );

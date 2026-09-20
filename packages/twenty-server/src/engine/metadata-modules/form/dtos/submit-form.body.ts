@@ -1,4 +1,4 @@
-import { IsObject, IsOptional, IsString } from 'class-validator';
+import { IsObject, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class SubmitFormBodyDto {
   @IsObject()
@@ -8,4 +8,10 @@ export class SubmitFormBodyDto {
   @IsOptional()
   @IsString()
   _hp?: string;
+
+  // Untrusted free text: stored verbatim as person.leadCaptureUrl
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  pageUrl?: string;
 }

@@ -8,6 +8,7 @@ import { SyncClientPortalWidgetCommand } from 'src/database/commands/upgrade-ver
 import { SyncCallStandardObjectsCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-workspace-command-1789793812031-sync-call-standard-objects.command';
 import { SyncMeetingBookingCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-workspace-command-1789878659246-sync-meeting-booking.command';
 import { SyncMetaAdLeadSourceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-workspace-command-1790000001001-sync-meta-ad-lead-source.command';
+import { SyncLeadLifecycleFieldsCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-workspace-command-1790000002001-sync-lead-lifecycle-fields.command';
 import { SyncOtogrowAnalyticsCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-workspace-command-1787856793000-sync-otogrow-analytics.command';
 import { SyncSequenceStandardObjectsCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-workspace-command-1787525000000-sync-sequence-standard-objects.command';
 import { WorkspaceManyOrAllFlatEntityMapsCacheModule } from 'src/engine/metadata-modules/flat-entity/services/workspace-many-or-all-flat-entity-maps-cache.module';
@@ -29,6 +30,7 @@ import { TwentyStandardApplicationModule } from 'src/engine/workspace-manager/tw
     SyncOtogrowAnalyticsCommand,
     SyncMeetingBookingCommand,
     SyncMetaAdLeadSourceCommand,
+    SyncLeadLifecycleFieldsCommand,
   ],
 })
 export class V2_34_UpgradeVersionCommandModule {}

@@ -56,6 +56,10 @@ export class PersonWorkspaceEntity extends BaseWorkspaceEntity {
   leadScore: number | null;
   leadSource: string | null;
   leadScoreBand: string | null;
+  leadStatus: string | null;
+  leadFormName: string | null;
+  leadFormAnswers: { label: string; value: string }[] | null;
+  leadCaptureUrl: string | null;
   leadScoreEvents: EntityRelation<LeadScoreEventWorkspaceEntity[]>;
   quotes: EntityRelation<QuoteWorkspaceEntity[]>;
   searchVector: string;

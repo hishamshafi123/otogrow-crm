@@ -1137,6 +1137,18 @@ export const STANDARD_OBJECT_FIELDS = {
     leadScoreBand: {
       universalIdentifier: '6219e364-e137-483c-80d9-7ef805fe6a0d',
     },
+    leadStatus: {
+      universalIdentifier: '30bc6d77-2ce1-425e-8bb9-8ec6b1e28690',
+    },
+    leadFormName: {
+      universalIdentifier: 'f0dcb5eb-b662-4512-8eec-687ff16c6df8',
+    },
+    leadFormAnswers: {
+      universalIdentifier: 'b311f5ff-78a3-45d1-acf3-f8b690867779',
+    },
+    leadCaptureUrl: {
+      universalIdentifier: 'd6429551-8194-4ebb-b29e-61890b485069',
+    },
     leadScoreEvents: {
       universalIdentifier: 'c9f2e7a4-1b5d-4a8e-9c6f-3e7b2d4a1f87',
     },

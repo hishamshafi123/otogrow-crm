@@ -21,3 +21,13 @@ export type FormFieldDefinition = {
   type: FormFieldType;
   required: boolean;
 };
+
+// Keys mapped onto dedicated Person fields on submission; the rest are stored
+// verbatim in person.leadFormAnswers
+export const FORM_PERSON_MAPPED_FIELD_KEYS: readonly FormFieldKey[] = [
+  'firstName',
+  'lastName',
+  'email',
+  'phone',
+  'jobTitle',
+];

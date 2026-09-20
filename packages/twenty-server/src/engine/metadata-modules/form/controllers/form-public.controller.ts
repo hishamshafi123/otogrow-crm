@@ -95,7 +95,7 @@ export class FormPublicController {
       throw error;
     }
 
-    await this.formSubmissionService.submit(form, body.values);
+    await this.formSubmissionService.submit(form, body.values, body.pageUrl);
 
     return { success: true };
   }

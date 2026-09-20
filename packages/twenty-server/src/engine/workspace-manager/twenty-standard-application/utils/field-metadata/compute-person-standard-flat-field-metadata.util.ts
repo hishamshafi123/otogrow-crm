@@ -363,6 +363,172 @@ export const buildPersonStandardFlatFieldMetadatas = ({
     twentyStandardApplicationId,
     now,
   }),
+  leadStatus: createStandardFieldFlatMetadata({
+    objectName,
+    workspaceId,
+    context: {
+      fieldName: 'leadStatus',
+      type: FieldMetadataType.SELECT,
+      label: i18nLabel(
+        msg({ message: `Lead status`, context: 'fieldMetadata.label' }),
+      ),
+      description: i18nLabel(
+        msg({
+          message: `Stage of the contact in the lead lifecycle`,
+          context: 'fieldMetadata.description',
+        }),
+      ),
+      icon: 'IconProgress',
+      isNullable: true,
+      options: [
+        {
+          id: '587c137d-4be3-4d32-a11e-014c31ac94b9',
+          value: 'NEW',
+          label: i18nLabel(
+            msg({ message: `New`, context: 'fieldMetadata.label' }),
+          ),
+          position: 0,
+          color: 'green',
+        },
+        {
+          id: '33289f2d-b457-4287-80e0-836d86b91cee',
+          value: 'COLD',
+          label: i18nLabel(
+            msg({ message: `Cold`, context: 'fieldMetadata.label' }),
+          ),
+          position: 1,
+          color: 'blue',
+        },
+        {
+          id: '4c5727e9-2f0d-4e78-80d2-006f91ae2783',
+          value: 'WARM',
+          label: i18nLabel(
+            msg({ message: `Warm`, context: 'fieldMetadata.label' }),
+          ),
+          position: 2,
+          color: 'yellow',
+        },
+        {
+          id: '7e45378c-f403-4192-872d-6798c06f810a',
+          value: 'INTERESTED',
+          label: i18nLabel(
+            msg({ message: `Interested`, context: 'fieldMetadata.label' }),
+          ),
+          position: 3,
+          color: 'orange',
+        },
+        {
+          id: '448c9c36-a57c-4c2d-9ae5-68240af3944a',
+          value: 'MEETING_BOOKED',
+          label: i18nLabel(
+            msg({ message: `Meeting booked`, context: 'fieldMetadata.label' }),
+          ),
+          position: 4,
+          color: 'purple',
+        },
+        {
+          id: '9dde0f90-2c2c-4145-a8c8-471fb94b43be',
+          value: 'CONVERTED',
+          label: i18nLabel(
+            msg({ message: `Converted`, context: 'fieldMetadata.label' }),
+          ),
+          position: 5,
+          color: 'grass',
+        },
+        {
+          id: 'cfe8bb7b-6c24-43d3-ac25-b4403a02975a',
+          value: 'NOT_INTERESTED',
+          label: i18nLabel(
+            msg({ message: `Not interested`, context: 'fieldMetadata.label' }),
+          ),
+          position: 6,
+          color: 'red',
+        },
+        {
+          id: 'eda5b5b4-0611-4d95-8cdb-a5ef8b488cce',
+          value: 'NURTURE',
+          label: i18nLabel(
+            msg({ message: `Nurture`, context: 'fieldMetadata.label' }),
+          ),
+          position: 7,
+          color: 'gray',
+        },
+      ],
+    },
+    standardObjectMetadataRelatedEntityIds,
+    dependencyFlatEntityMaps,
+    twentyStandardApplicationId,
+    now,
+  }),
+  leadFormName: createStandardFieldFlatMetadata({
+    objectName,
+    workspaceId,
+    context: {
+      fieldName: 'leadFormName',
+      type: FieldMetadataType.TEXT,
+      label: i18nLabel(
+        msg({ message: `Lead form`, context: 'fieldMetadata.label' }),
+      ),
+      description: i18nLabel(
+        msg({
+          message: `Name of the intake form the contact was captured through`,
+          context: 'fieldMetadata.description',
+        }),
+      ),
+      icon: 'IconForms',
+      isNullable: true,
+    },
+    standardObjectMetadataRelatedEntityIds,
+    dependencyFlatEntityMaps,
+    twentyStandardApplicationId,
+    now,
+  }),
+  leadFormAnswers: createStandardFieldFlatMetadata({
+    objectName,
+    workspaceId,
+    context: {
+      fieldName: 'leadFormAnswers',
+      type: FieldMetadataType.RAW_JSON,
+      label: i18nLabel(
+        msg({ message: `Lead form answers`, context: 'fieldMetadata.label' }),
+      ),
+      description: i18nLabel(
+        msg({
+          message: `Question and answer pairs submitted on the intake form`,
+          context: 'fieldMetadata.description',
+        }),
+      ),
+      icon: 'IconListDetails',
+      isNullable: true,
+    },
+    standardObjectMetadataRelatedEntityIds,
+    dependencyFlatEntityMaps,
+    twentyStandardApplicationId,
+    now,
+  }),
+  leadCaptureUrl: createStandardFieldFlatMetadata({
+    objectName,
+    workspaceId,
+    context: {
+      fieldName: 'leadCaptureUrl',
+      type: FieldMetadataType.TEXT,
+      label: i18nLabel(
+        msg({ message: `Lead capture URL`, context: 'fieldMetadata.label' }),
+      ),
+      description: i18nLabel(
+        msg({
+          message: `Page URL the intake form was submitted from`,
+          context: 'fieldMetadata.description',
+        }),
+      ),
+      icon: 'IconLink',
+      isNullable: true,
+    },
+    standardObjectMetadataRelatedEntityIds,
+    dependencyFlatEntityMaps,
+    twentyStandardApplicationId,
+    now,
+  }),
   jobTitle: createStandardFieldFlatMetadata({
     objectName,
     workspaceId,

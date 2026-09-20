@@ -51,7 +51,8 @@ type MappedLeadValues = {
   lastName: string;
   email: string | null;
   phone: string | null;
-  extraFields: { label: string; value: string }[];
+  formName: string | null;
+  extraFields: NonNullable<PersonWorkspaceEntity['leadFormAnswers']>;
 };
 
 const isDuplicateEntryError = (error: unknown) =>
@@ -193,6 +194,7 @@ export class MetaLeadIntakeService {
       lastName,
       email,
       phone,
+      formName: lead.formName,
       extraFields: lead.fieldData
         .filter((datum) => !consumedKeys.has(datum.name.toLowerCase()))
         .map((datum) => ({
@@ -334,6 +336,9 @@ export class MetaLeadIntakeService {
       },
       companyId,
       leadSource: 'META_AD',
+      leadStatus: 'NEW',
+      leadFormName: mappedValues.formName,
+      leadFormAnswers: mappedValues.extraFields,
       createdBy: META_ADS_LEAD_ACTOR,
       position: lastPersonPosition + 1,
     });
@@ -385,6 +390,16 @@ export class MetaLeadIntakeService {
 
     if (!isDefined(person.leadSource)) {
       partialEntity.leadSource = 'META_AD';
+    }
+
+    // leadStatus is owned by the lifecycle once set; intake only stamps it on
+    // newly created people
+    if (!isDefined(person.leadFormName)) {
+      partialEntity.leadFormName = mappedValues.formName;
+    }
+
+    if (!isDefined(person.leadFormAnswers)) {
+      partialEntity.leadFormAnswers = mappedValues.extraFields;
     }
 
     if (Object.keys(partialEntity).length === 0) {
