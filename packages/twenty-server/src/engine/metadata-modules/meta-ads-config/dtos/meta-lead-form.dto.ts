@@ -36,6 +36,9 @@ export class MetaSheetLeadAnswerDTO {
 @ObjectType('MetaSheetLead')
 export class MetaSheetLeadDTO {
   @Field()
+  isUnread: boolean;
+
+  @Field()
   id: string;
 
   @Field()
@@ -58,4 +61,16 @@ export class MetaSheetLeadDTO {
 
   @Field()
   createdAt: Date;
+}
+
+@ObjectType('MetaLeadFormActivity')
+export class MetaLeadFormActivityDTO {
+  @Field()
+  formId: string;
+
+  @Field(() => Int)
+  totalCount: number;
+
+  @Field(() => Int)
+  unreadCount: number;
 }

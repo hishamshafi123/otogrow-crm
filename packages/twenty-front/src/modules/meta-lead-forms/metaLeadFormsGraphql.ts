@@ -2,6 +2,11 @@ import { gql } from '@apollo/client';
 
 export const GET_META_LEAD_FORMS = gql`
   query MetaLeadForms {
+    metaLeadFormActivity {
+      formId
+      totalCount
+      unreadCount
+    }
     metaLeadForms {
       id
       name
@@ -19,6 +24,7 @@ export const GET_META_SHEET_LEADS = gql`
       id
       leadId
       personId
+      isUnread
       name
       email
       phone
@@ -64,6 +70,7 @@ export type MetaLeadForm = {
   lastError: string | null;
 };
 export type MetaSheetLead = {
+  isUnread: boolean;
   id: string;
   leadId: string;
   personId: string | null;
@@ -72,4 +79,15 @@ export type MetaSheetLead = {
   phone: string;
   answers: { label: string; value: string }[];
   createdAt: string;
+};
+
+export const MARK_META_SHEET_LEADS_READ = gql`
+  mutation MarkMetaSheetLeadsRead($formId: UUID!, $leadIds: [UUID!]!) {
+    markMetaSheetLeadsRead(formId: $formId, leadIds: $leadIds)
+  }
+`;
+export type MetaLeadFormActivity = {
+  formId: string;
+  totalCount: number;
+  unreadCount: number;
 };

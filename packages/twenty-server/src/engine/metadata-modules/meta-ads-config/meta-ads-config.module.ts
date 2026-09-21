@@ -1,3 +1,6 @@
+import { KeyValuePairModule } from 'src/engine/core-modules/key-value-pair/key-value-pair.module';
+import { KeyValuePairEntity } from 'src/engine/core-modules/key-value-pair/key-value-pair.entity';
+import { MetaLeadFormReadService } from 'src/engine/metadata-modules/meta-ads-config/services/meta-lead-form-read.service';
 import { MetaLeadFormEntity } from 'src/engine/metadata-modules/meta-ads-config/entities/meta-lead-form.entity';
 import { MetaSheetLeadEntity } from 'src/engine/metadata-modules/meta-ads-config/entities/meta-sheet-lead.entity';
 import { MetaLeadFormResolver } from 'src/engine/metadata-modules/meta-ads-config/meta-lead-form.resolver';
@@ -26,8 +29,10 @@ import { ContactCreationManagerModule } from 'src/modules/contact-creation-manag
       MetaAdsConfigEntity,
       MetaLeadFormEntity,
       MetaSheetLeadEntity,
+      KeyValuePairEntity,
     ]),
     LeadAssignmentModule,
+    KeyValuePairModule,
     SecretEncryptionModule,
     TwentyConfigModule,
     PermissionsModule,
@@ -37,6 +42,7 @@ import { ContactCreationManagerModule } from 'src/modules/contact-creation-manag
   controllers: [MetaLeadgenWebhookController],
   providers: [
     MetaLeadFormResolver,
+    MetaLeadFormReadService,
     MetaLeadFormService,
     MetaSheetReaderService,
     MetaAdsConfigService,

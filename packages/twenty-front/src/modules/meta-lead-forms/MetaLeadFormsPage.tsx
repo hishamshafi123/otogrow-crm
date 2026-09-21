@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
+import { MetaLeadFormTabs } from '@/meta-lead-forms/MetaLeadFormTabs';
 import { useMutation, useQuery } from '@apollo/client/react';
 import { styled } from '@linaria/react';
 import { Trans, useLingui } from '@lingui/react/macro';
@@ -12,6 +13,8 @@ import { PageBody } from '@/ui/layout/page/components/PageBody';
 import { PageContainer } from '@/ui/layout/page/components/PageContainer';
 import {
   CREATE_META_LEAD_FORM,
+  MARK_META_SHEET_LEADS_READ,
+  type MetaLeadFormActivity,
   GET_META_LEAD_FORMS,
   GET_META_SHEET_LEADS,
   SET_META_LEAD_FORM_ACTIVE,
@@ -83,9 +86,29 @@ const StyledError = styled.div`
   padding: 12px 0;
 `;
 
+const StyledEmptyState = styled.div`
+  border: 1px dashed ${themeCssVariables.border.color.medium};
+  border-radius: 8px;
+  margin: 24px 0;
+  max-width: 680px;
+  padding: 32px;
+`;
+const StyledLeadRow = styled.tr`
+  &[data-unread='true'] {
+    background: ${themeCssVariables.background.secondary};
+  }
+`;
+const StyledNewLabel = styled.span`
+  color: ${themeCssVariables.color.blue};
+  font-size: 12px;
+  margin-left: 8px;
+`;
+
 export const MetaLeadFormsPage = () => {
   const { t } = useLingui();
-  const [selectedId, setSelectedId] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedId = searchParams.get('form') ?? '';
+  const setSelectedId = (formId: string) => setSearchParams({ form: formId });
   const [offset, setOffset] = useState(0);
   const [showCreate, setShowCreate] = useState(false);
   const [name, setName] = useState('');
@@ -93,10 +116,10 @@ export const MetaLeadFormsPage = () => {
   const [serviceAccountJson, setServiceAccountJson] = useState('');
   const [importExisting, setImportExisting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const formsQuery = useQuery<{ metaLeadForms: MetaLeadForm[] }>(
-    GET_META_LEAD_FORMS,
-    { pollInterval: 30000 },
-  );
+  const formsQuery = useQuery<{
+    metaLeadForms: MetaLeadForm[];
+    metaLeadFormActivity: MetaLeadFormActivity[];
+  }>(GET_META_LEAD_FORMS, { pollInterval: 15000 });
   const forms = formsQuery.data?.metaLeadForms ?? [];
   const selected = forms.find((form) => form.id === selectedId) ?? forms.at(0);
   const leadsQuery = useQuery<{ metaSheetLeads: MetaSheetLead[] }>(
@@ -110,10 +133,24 @@ export const MetaLeadFormsPage = () => {
   const [createForm, createState] = useMutation<{
     createMetaLeadForm: { id: string };
   }>(CREATE_META_LEAD_FORM);
+  const [markLeadsRead, markReadState] = useMutation(
+    MARK_META_SHEET_LEADS_READ,
+  );
   const [syncForm, syncState] = useMutation(SYNC_META_LEAD_FORM);
   const [setActive, activeState] = useMutation(SET_META_LEAD_FORM_ACTIVE);
-  const busy = createState.loading || syncState.loading || activeState.loading;
+  const busy =
+    createState.loading ||
+    syncState.loading ||
+    activeState.loading ||
+    markReadState.loading;
   const leads = leadsQuery.data?.metaSheetLeads ?? [];
+  const activity = formsQuery.data?.metaLeadFormActivity ?? [];
+  const selectedActivity = activity.find(
+    (item) => item.formId === selected?.id,
+  );
+  const displayedUnreadIds = leads
+    .filter((lead) => lead.isUnread)
+    .map((lead) => lead.id);
 
   const perform = async (operation: () => Promise<unknown>) => {
     setErrorMessage('');
@@ -137,31 +174,12 @@ export const MetaLeadFormsPage = () => {
           </h1>
           <p>
             <Trans>
-              Connect each Meta lead form to its Google Sheet. New leads become
-              CRM contacts and are assigned to available setters.
+              Each form connects to one Google Sheet tab. Switch forms below to
+              see their leads here. Red badges show leads you have not marked as
+              read.
             </Trans>
           </p>
           <StyledToolbar>
-            <label>
-              <Trans>Lead form</Trans>
-              <select
-                aria-label={t`Lead form`}
-                value={selected?.id ?? ''}
-                onChange={(event) => {
-                  setSelectedId(event.target.value);
-                  setOffset(0);
-                }}
-              >
-                {forms.length === 0 && (
-                  <option value="">{t`No forms connected`}</option>
-                )}
-                {forms.map((form) => (
-                  <option key={form.id} value={form.id}>
-                    {form.name}
-                  </option>
-                ))}
-              </select>
-            </label>
             <Button
               title={t`Add lead form`}
               variant="primary"
@@ -171,6 +189,39 @@ export const MetaLeadFormsPage = () => {
               <Trans>Setters and Telegram</Trans>
             </Link>
           </StyledToolbar>
+          {forms.length > 0 && (
+            <MetaLeadFormTabs
+              forms={forms}
+              activity={activity}
+              selectedId={selected?.id}
+              onSelect={(formId) => {
+                setSelectedId(formId);
+                setOffset(0);
+              }}
+            />
+          )}
+          {!formsQuery.loading &&
+            !formsQuery.error &&
+            forms.length === 0 &&
+            !showCreate && (
+              <StyledEmptyState>
+                <h2>
+                  <Trans>Your Meta form leads will appear here</Trans>
+                </h2>
+                <p>
+                  <Trans>
+                    Add a form and connect the Google Sheet tab that receives
+                    its leads. Each connected form gets its own tab, lead list,
+                    and new-lead badge.
+                  </Trans>
+                </p>
+                <Button
+                  title={t`Connect your first form`}
+                  variant="primary"
+                  onClick={() => setShowCreate(true)}
+                />
+              </StyledEmptyState>
+            )}
           {(errorMessage || formsQuery.error || leadsQuery.error) && (
             <StyledError role="alert">
               {errorMessage ||
@@ -297,9 +348,20 @@ export const MetaLeadFormsPage = () => {
             </StyledForm>
           )}
           {selected && (
-            <>
+            <section
+              role="tabpanel"
+              id="meta-form-leads-panel"
+              aria-labelledby={`meta-form-tab-${selected.id}`}
+            >
+              <p>
+                <Trans>
+                  Leads from this form stay in this list. Open a contact only
+                  when you want their full CRM record.
+                </Trans>
+              </p>
               <StyledToolbar>
                 <h2>{selected.name}</h2>
+                <span>{t`${selectedActivity?.totalCount ?? 0} leads`}</span>
                 <a
                   href={`https://docs.google.com/spreadsheets/d/${selected.spreadsheetId}/edit#gid=${selected.sheetId}`}
                   target="_blank"
@@ -344,6 +406,34 @@ export const MetaLeadFormsPage = () => {
                   ? t`Last synced: ${new Date(selected.lastSyncedAt).toLocaleString()}`
                   : t`Waiting for the first sync.`}
               </p>
+              <StyledToolbar>
+                <span
+                  role="status"
+                  aria-live="polite"
+                >{t`${selectedActivity?.unreadCount ?? 0} unread leads`}</span>
+                <Button
+                  title={t`Mark displayed leads as read`}
+                  disabled={
+                    busy ||
+                    leadsQuery.loading ||
+                    displayedUnreadIds.length === 0
+                  }
+                  onClick={() =>
+                    void perform(async () => {
+                      await markLeadsRead({
+                        variables: {
+                          formId: selected.id,
+                          leadIds: displayedUnreadIds,
+                        },
+                      });
+                      await Promise.all([
+                        formsQuery.refetch(),
+                        leadsQuery.refetch(),
+                      ]);
+                    })
+                  }
+                />
+              </StyledToolbar>
               {selected.lastError && (
                 <StyledError role="alert">{selected.lastError}</StyledError>
               )}
@@ -374,14 +464,20 @@ export const MetaLeadFormsPage = () => {
                   </thead>
                   <tbody>
                     {leads.map((lead) => (
-                      <tr key={lead.id}>
+                      <StyledLeadRow key={lead.id} data-unread={lead.isUnread}>
                         <td>
-                          {lead.personId ? (
-                            <Link to={`/objects/people/${lead.personId}`}>
-                              {lead.name || lead.leadId}
-                            </Link>
-                          ) : (
-                            lead.name || lead.leadId
+                          <strong>{lead.name || lead.leadId}</strong>
+                          {lead.isUnread && (
+                            <StyledNewLabel>
+                              <Trans>New</Trans>
+                            </StyledNewLabel>
+                          )}
+                          {lead.personId && (
+                            <div>
+                              <Link to={`/objects/people/${lead.personId}`}>
+                                <Trans>Open contact</Trans>
+                              </Link>
+                            </div>
                           )}
                         </td>
                         <td>{lead.email}</td>
@@ -402,7 +498,7 @@ export const MetaLeadFormsPage = () => {
                             </dl>
                           </details>
                         </td>
-                      </tr>
+                      </StyledLeadRow>
                     ))}
                     {leads.length === 0 && (
                       <tr>
@@ -429,7 +525,7 @@ export const MetaLeadFormsPage = () => {
                   onClick={() => setOffset(offset + 50)}
                 />
               </StyledToolbar>
-            </>
+            </section>
           )}
         </StyledContent>
       </PageBody>

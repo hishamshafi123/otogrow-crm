@@ -12,6 +12,12 @@ The workspace navigation includes **Meta lead forms** for members with the API k
 
 The first sheet row must include `id`, `lead_id`, or `leadgen_id`, and at least one of `email`, `phone_number`, or `phone`. Use plain text for Meta IDs and phone numbers to preserve digits and leading plus signs. `full_name`, `first_name`, and `last_name` are recognized; other columns remain available in the submission's answers. Header spaces and hyphens are normalized to underscores. A Meta `l:` ID prefix is removed.
 
+## Form tabs and unread leads
+
+Each connected form has a tab inside **Meta lead forms**, with its total lead count and a red unread badge. Selecting a tab shows that form’s leads and answers in place. The selected form is preserved in the page URL. Tabs support arrow keys, Home, and End.
+
+Counts and leads refresh every 15 seconds. New imported submissions are unread for each user separately. **Mark displayed leads as read** clears only the current page’s unread leads; other forms, other pages, and leads arriving concurrently stay unread. Read state persists across sessions. Updating an existing submission does not make it unread again.
+
 ## Sync behavior
 
 - The queue worker polls active connections approximately every 30 seconds after the previous pass finishes. Meta's delivery into Sheets adds its own delay. This is not an instantaneous push integration.
