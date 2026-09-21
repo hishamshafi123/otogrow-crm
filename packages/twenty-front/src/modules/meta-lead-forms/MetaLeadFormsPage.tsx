@@ -9,6 +9,7 @@ import { themeCssVariables } from 'twenty-ui/theme-constants';
 import { SettingsPath } from 'twenty-shared/types';
 import { getSettingsPath } from 'twenty-shared/utils';
 
+import { SettingsTextInput } from '@/ui/input/components/SettingsTextInput';
 import { PageBody } from '@/ui/layout/page/components/PageBody';
 import { PageContainer } from '@/ui/layout/page/components/PageContainer';
 import {
@@ -265,21 +266,23 @@ export const MetaLeadFormsPage = () => {
               </h2>
               <label>
                 <Trans>Form name</Trans>
-                <input
+                <SettingsTextInput
+                  instanceId="meta-lead-form-name"
                   required
                   maxLength={200}
                   value={name}
-                  onChange={(event) => setName(event.target.value)}
+                  onChange={setName}
                 />
               </label>
               <label>
                 <Trans>Google Sheet link</Trans>
-                <input
+                <SettingsTextInput
+                  instanceId="meta-lead-form-sheet-url"
                   required
                   type="url"
                   placeholder="https://docs.google.com/spreadsheets/d/…/edit#gid=0"
                   value={sheetUrl}
-                  onChange={(event) => setSheetUrl(event.target.value)}
+                  onChange={setSheetUrl}
                 />
               </label>
               <p>
