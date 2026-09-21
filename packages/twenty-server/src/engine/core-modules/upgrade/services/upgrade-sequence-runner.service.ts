@@ -6,6 +6,7 @@ import {
   WorkspaceIteratorService,
 } from 'src/database/commands/command-runners/workspace-iterator.service';
 import { type ParsedUpgradeCommandOptions } from 'src/database/commands/upgrade-version-command/upgrade.command';
+import { TWENTY_CURRENT_VERSION } from 'src/engine/core-modules/upgrade/constants/twenty-current-version.constant';
 import { InstanceCommandRunnerService } from 'src/engine/core-modules/upgrade/services/instance-command-runner.service';
 import {
   UpgradeMigrationService,
@@ -93,6 +94,39 @@ export class UpgradeSequenceRunnerService {
     let workspaceCursors = await this.fetchWorkspaceCursors(
       allProvisionedWorkspaceIds,
     );
+
+    // Same-version releases can add fast DDL before an already-completed workspace segment.
+    // Preserve workspace cursors so repairing that DDL does not replay completed workspace work.
+    for (const step of sequence.slice(0, startCursor)) {
+      if (
+        step.kind !== 'fast-instance' ||
+        step.version !== TWENTY_CURRENT_VERSION
+      )
+        continue;
+      const completed =
+        await this.upgradeMigrationService.isLastAttemptCompleted({
+          name: step.name,
+          workspaceId: null,
+        });
+      if (completed) continue;
+      if (
+        options.dryRun ||
+        options.workspaceIds?.length ||
+        options.startFromWorkspaceId ||
+        options.workspaceCountLimit
+      ) {
+        throw new Error(
+          `Pending instance command "${step.name}" requires an unfiltered upgrade without --dry-run.`,
+        );
+      }
+      if (this.commandShutdownService.isShutdownRequested())
+        return { totalSuccesses, totalFailures };
+      await this.runInstanceStep({
+        instanceStep: step,
+        skipDataMigration: allProvisionedWorkspaceIds.length === 0,
+      });
+      await this.upgradeAwareEntityMetadataAdapter.refresh();
+    }
 
     while (cursor < sequence.length) {
       const step = sequence[cursor];

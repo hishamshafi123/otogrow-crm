@@ -117,6 +117,7 @@ export const MetaLeadFormsPage = () => {
   const [serviceAccountJson, setServiceAccountJson] = useState('');
   const [importExisting, setImportExisting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const formsQuery = useQuery<{
     metaLeadForms: MetaLeadForm[];
     metaLeadFormActivity: MetaLeadFormActivity[];
@@ -155,6 +156,7 @@ export const MetaLeadFormsPage = () => {
 
   const perform = async (operation: () => Promise<unknown>) => {
     setErrorMessage('');
+    setSuccessMessage('');
     try {
       await operation();
     } catch (error) {
@@ -223,13 +225,16 @@ export const MetaLeadFormsPage = () => {
                 />
               </StyledEmptyState>
             )}
-          {(errorMessage || formsQuery.error || leadsQuery.error) && (
+          {((!showCreate && errorMessage) ||
+            formsQuery.error ||
+            leadsQuery.error) && (
             <StyledError role="alert">
-              {errorMessage ||
+              {(!showCreate && errorMessage) ||
                 formsQuery.error?.message ||
                 leadsQuery.error?.message}
             </StyledError>
           )}
+          {successMessage && <p role="status">{successMessage}</p>}
           {formsQuery.loading && (
             <p role="status">
               <Trans>Loading forms…</Trans>
@@ -250,7 +255,16 @@ export const MetaLeadFormsPage = () => {
                       },
                     },
                   });
-                  setSelectedId(result.data?.createMetaLeadForm.id ?? '');
+                  if (result.error) throw result.error;
+                  const createdId = result.data?.createMetaLeadForm?.id;
+                  if (!createdId)
+                    throw new Error(
+                      t`The connection was not confirmed. Check the form list before retrying.`,
+                    );
+                  setSelectedId(createdId);
+                  setSuccessMessage(
+                    t`Form connected. Its leads will appear after the next sync.`,
+                  );
                   setOffset(0);
                   setShowCreate(false);
                   setServiceAccountJson('');
@@ -332,6 +346,14 @@ export const MetaLeadFormsPage = () => {
                   answers. Keep lead IDs as plain text.
                 </Trans>
               </p>
+              {errorMessage && (
+                <StyledError role="alert">{errorMessage}</StyledError>
+              )}
+              {createState.loading && (
+                <p role="status">
+                  <Trans>Checking sheet access and saving your form…</Trans>
+                </p>
+              )}
               <StyledToolbar>
                 <Button
                   type="submit"
