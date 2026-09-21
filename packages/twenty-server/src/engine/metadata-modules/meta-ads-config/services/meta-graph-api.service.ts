@@ -2,7 +2,8 @@ import { Injectable } from '@nestjs/common';
 
 import { isDefined } from 'twenty-shared/utils';
 
-const GRAPH_API_BASE_URL = 'https://graph.facebook.com/v21.0';
+const GRAPH_API_VERSION = process.env.META_GRAPH_API_VERSION ?? 'v26.0';
+const GRAPH_API_BASE_URL = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
 
 export type MetaLeadFieldDatum = {
   name: string;
