@@ -1,3 +1,5 @@
+import { MetaLeadDetailPanel } from '@/meta-lead-forms/MetaLeadDetailPanel';
+import { useOpenDialer } from '@/calling/hooks/useOpenDialer';
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { MetaLeadFormTabs } from '@/meta-lead-forms/MetaLeadFormTabs';
@@ -48,6 +50,15 @@ const StyledContent = styled.div`
     color: inherit;
     font: inherit;
     padding: 10px;
+  }
+  td > button {
+    background: none;
+    border: 0;
+    color: ${themeCssVariables.color.blue};
+    cursor: pointer;
+    font: inherit;
+    padding: 0;
+    text-align: left;
   }
   table {
     border-collapse: collapse;
@@ -107,6 +118,8 @@ const StyledNewLabel = styled.span`
 
 export const MetaLeadFormsPage = () => {
   const { t } = useLingui();
+  const { openDialer } = useOpenDialer();
+  const [activeLeadId, setActiveLeadId] = useState<string | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedId = searchParams.get('form') ?? '';
   const setSelectedId = (formId: string) => setSearchParams({ form: formId });
@@ -146,6 +159,7 @@ export const MetaLeadFormsPage = () => {
     activeState.loading ||
     markReadState.loading;
   const leads = leadsQuery.data?.metaSheetLeads ?? [];
+  const activeLead = leads.find((lead) => lead.id === activeLeadId);
   const activity = formsQuery.data?.metaLeadFormActivity ?? [];
   const selectedActivity = activity.find(
     (item) => item.formId === selected?.id,
@@ -198,6 +212,7 @@ export const MetaLeadFormsPage = () => {
               activity={activity}
               selectedId={selected?.id}
               onSelect={(formId) => {
+                setActiveLeadId(null);
                 setSelectedId(formId);
                 setOffset(0);
               }}
@@ -380,8 +395,9 @@ export const MetaLeadFormsPage = () => {
             >
               <p>
                 <Trans>
-                  Leads from this form stay in this list. Open a contact only
-                  when you want their full CRM record.
+                  Click a lead to update their status or book a meeting. Click a
+                  phone number to open the CRM dialer. Imported leads are
+                  already saved in People.
                 </Trans>
               </p>
               <StyledToolbar>
@@ -462,6 +478,13 @@ export const MetaLeadFormsPage = () => {
               {selected.lastError && (
                 <StyledError role="alert">{selected.lastError}</StyledError>
               )}
+              {activeLead && (
+                <MetaLeadDetailPanel
+                  key={activeLead.id}
+                  lead={activeLead}
+                  onClose={() => setActiveLeadId(null)}
+                />
+              )}
               {leadsQuery.loading ? (
                 <p role="status">
                   <Trans>Loading leads…</Trans>
@@ -491,7 +514,13 @@ export const MetaLeadFormsPage = () => {
                     {leads.map((lead) => (
                       <StyledLeadRow key={lead.id} data-unread={lead.isUnread}>
                         <td>
-                          <strong>{lead.name || lead.leadId}</strong>
+                          <button
+                            type="button"
+                            onClick={() => setActiveLeadId(lead.id)}
+                            aria-expanded={activeLeadId === lead.id}
+                          >
+                            {lead.name || lead.leadId}
+                          </button>
                           {lead.isUnread && (
                             <StyledNewLabel>
                               <Trans>New</Trans>
@@ -500,15 +529,36 @@ export const MetaLeadFormsPage = () => {
                           {lead.personId && (
                             <div>
                               <Link to={`/objects/people/${lead.personId}`}>
-                                <Trans>Open contact</Trans>
+                                <Trans>Saved in People</Trans>
                               </Link>
                             </div>
                           )}
                         </td>
                         <td>{lead.email}</td>
-                        <td>{lead.phone}</td>
+                        <td>
+                          {lead.phone ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                openDialer({
+                                  phoneNumber: lead.phone,
+                                  personId: lead.personId,
+                                })
+                              }
+                              aria-label={t`Call ${lead.phone}`}
+                            >
+                              {lead.phone}
+                            </button>
+                          ) : (
+                            '—'
+                          )}
+                        </td>
                         <td>{new Date(lead.createdAt).toLocaleString()}</td>
                         <td>
+                          <Button
+                            title={t`Manage lead`}
+                            onClick={() => setActiveLeadId(lead.id)}
+                          />
                           <details>
                             <summary>
                               <Trans>View answers</Trans>

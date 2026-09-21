@@ -1,3 +1,7 @@
+import { MeetingAvailabilityService } from 'src/modules/meeting-booking/services/meeting-availability.service';
+import { WorkspaceMemberWorkspaceEntity } from 'src/modules/workspace-member/standard-objects/workspace-member.workspace-entity';
+import { TaskWorkspaceEntity } from 'src/modules/task/standard-objects/task.workspace-entity';
+import { TaskTargetWorkspaceEntity } from 'src/modules/task/standard-objects/task-target.workspace-entity';
 import {
   BadRequestException,
   Injectable,
@@ -42,6 +46,7 @@ export class MeetingBookingService {
     private readonly calendarChannelRepository: Repository<CalendarChannelEntity>,
     private readonly googleOAuth2ClientProvider: GoogleOAuth2ClientProvider,
     private readonly calendarSaveEventsService: CalendarSaveEventsService,
+    private readonly meetingAvailabilityService: MeetingAvailabilityService,
   ) {}
 
   async bookMeeting({
@@ -82,6 +87,28 @@ export class MeetingBookingService {
       );
     }
 
+    const assignee = input.assigneeWorkspaceMemberId
+      ? await this.globalWorkspaceOrmManager.executeInWorkspaceContext(
+          async () => {
+            const repository =
+              await this.globalWorkspaceOrmManager.getRepository(
+                workspaceId,
+                WorkspaceMemberWorkspaceEntity,
+                { shouldBypassPermissionChecks: true },
+              );
+            const member = await repository.findOne({
+              where: { id: input.assigneeWorkspaceMemberId },
+            });
+            if (!member?.userEmail)
+              throw new BadRequestException(
+                'Choose a workspace member with an email address.',
+              );
+            return member;
+          },
+          buildSystemAuthContext(workspaceId),
+        )
+      : null;
+
     const connectedAccount = await this.findMemberGoogleAccount(
       workspaceId,
       userWorkspaceId,
@@ -117,13 +144,29 @@ export class MeetingBookingService {
         .filter(isNonEmptyString)
         .join(' ') || leadEmail;
 
-    const createdEvent = await this.insertGoogleCalendarEvent({
-      connectedAccountId: connectedAccount.id,
-      personName,
-      leadEmail,
-      startsAt: startsAt.toISOString(),
-      endsAt: endsAt.toISOString(),
-    });
+    const createdEvent =
+      await this.connectedAccountRepository.manager.transaction(
+        async (manager) => {
+          // Serialize bookings from this CRM so concurrent requests cannot both claim the same slot.
+          await manager.query(
+            'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+            [`meeting-booking:${workspaceId}:${connectedAccount.id}`],
+          );
+          await this.meetingAvailabilityService.assertAvailable(
+            connectedAccount.id,
+            startsAt,
+            endsAt,
+          );
+          return this.insertGoogleCalendarEvent({
+            connectedAccountId: connectedAccount.id,
+            personName,
+            leadEmail,
+            assigneeEmail: assignee?.userEmail ?? undefined,
+            startsAt: startsAt.toISOString(),
+            endsAt: endsAt.toISOString(),
+          });
+        },
+      );
 
     await this.persistCalendarEvent({
       createdEvent,
@@ -136,15 +179,60 @@ export class MeetingBookingService {
       createdEvent.hangoutLink ??
       null;
 
-    await createMeetingNote({
-      globalWorkspaceOrmManager: this.globalWorkspaceOrmManager,
-      workspaceId,
-      personId: person.id,
-      title: `Meeting booked for ${startsAt.toUTCString()}`,
-      markdown: `Meeting booked for ${startsAt.toUTCString()} (${durationMinutes} min) with ${personName}.${meetLink ? ` Meet link: ${meetLink}` : ''}`,
-    });
+    let warning: string | null = null;
+    try {
+      await this.globalWorkspaceOrmManager.executeInWorkspaceContext(
+        async () => {
+          await createMeetingNote({
+            globalWorkspaceOrmManager: this.globalWorkspaceOrmManager,
+            workspaceId,
+            personId: person.id,
+            title: `Meeting booked for ${startsAt.toUTCString()}`,
+            markdown: `Meeting booked for ${startsAt.toUTCString()} (${durationMinutes} min) with ${personName}.${meetLink ? ` Meet link: ${meetLink}` : ''}`,
+          });
+          const repository = await this.globalWorkspaceOrmManager.getRepository(
+            workspaceId,
+            PersonWorkspaceEntity,
+            { shouldBypassPermissionChecks: true },
+          );
+          await repository.update(person.id, { leadStatus: 'MEETING_BOOKED' });
+          if (assignee) {
+            const tasks = await this.globalWorkspaceOrmManager.getRepository(
+              workspaceId,
+              TaskWorkspaceEntity,
+              { shouldBypassPermissionChecks: true },
+            );
+            const targets = await this.globalWorkspaceOrmManager.getRepository(
+              workspaceId,
+              TaskTargetWorkspaceEntity,
+              { shouldBypassPermissionChecks: true },
+            );
+            const taskId = v4();
+            await tasks.insert({
+              id: taskId,
+              title: `Meeting with ${personName}`,
+              dueAt: startsAt,
+              status: 'TODO',
+              assigneeId: assignee.id,
+            });
+            await targets.insert({
+              id: v4(),
+              taskId,
+              targetPersonId: person.id,
+            });
+          }
+        },
+        buildSystemAuthContext(workspaceId),
+      );
+    } catch {
+      // The invitation already exists; returning a booking error would encourage duplicate invitations.
+      warning =
+        'The calendar meeting was booked, but some CRM updates failed. Check the contact and assigned task before retrying.';
+      this.logger.warn(warning);
+    }
 
     return {
+      warning,
       eventId: createdEvent.id ?? '',
       meetLink,
       htmlLink: createdEvent.htmlLink ?? null,
@@ -169,12 +257,14 @@ export class MeetingBookingService {
     connectedAccountId,
     personName,
     leadEmail,
+    assigneeEmail,
     startsAt,
     endsAt,
   }: {
     connectedAccountId: string;
     personName: string;
     leadEmail: string;
+    assigneeEmail?: string;
     startsAt: string;
     endsAt: string;
   }): Promise<calendarV3.Schema$Event> {
@@ -190,7 +280,9 @@ export class MeetingBookingService {
       summary: `Meeting with ${personName}`,
       start: { dateTime: startsAt, timeZone: 'UTC' },
       end: { dateTime: endsAt, timeZone: 'UTC' },
-      attendees: [{ email: leadEmail }],
+      attendees: [
+        ...new Set([leadEmail, assigneeEmail].filter(isNonEmptyString)),
+      ].map((email) => ({ email })),
       conferenceData: {
         createRequest: {
           requestId: v4(),
@@ -206,12 +298,15 @@ export class MeetingBookingService {
       },
     };
 
-    const { data } = await googleCalendarClient.events.insert({
-      calendarId: GOOGLE_CALENDAR_ID,
-      conferenceDataVersion: 1,
-      sendUpdates: 'all',
-      requestBody,
-    });
+    const { data } = await googleCalendarClient.events.insert(
+      {
+        calendarId: GOOGLE_CALENDAR_ID,
+        conferenceDataVersion: 1,
+        sendUpdates: 'all',
+        requestBody,
+      },
+      { timeout: 15000 },
+    );
 
     return data;
   }

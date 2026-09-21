@@ -31,6 +31,14 @@ Counts and leads refresh every 15 seconds. New imported submissions are unread f
 - Telegram delivery is recorded on the assignment. Sheet polling retries pending notifications without creating another assignment. Concurrent sends are serialized; a crash after Telegram accepts a message but before its delivery timestamp is committed can still cause a repeat alert.
 - The selected sheet tab must have no more than 50,000 allocated rows; reads cover columns A through ZZ.
 
+## Lead actions and meeting booking
+
+Click a lead name or **Manage lead** to open its details on the form page. Phone numbers open the existing CRM dialer with the linked person; placing calls requires the existing Twilio setup. Imported leads already exist in People, and the status selector edits that record using its configured status options and normal record permissions.
+
+**Book a meeting** reads the signed-in member’s primary Google calendar live, expands recurring events, excludes busy/all-day/past times, and displays slots in the calendar’s timezone. Meeting hours default to 09:00–18:00 and can be changed in the planner. Date and duration changes clear the selected time. Calendar access failures block booking rather than showing unverified availability.
+
+The server checks availability again before inserting the event and serializes CRM booking requests per calendar. External calendar changes can still race the final check because Google does not provide atomic slot reservations. Meetings remain on the booking member’s calendar. Selecting a teammate adds them as an attendee and creates a CRM meeting task assigned to them; their calendar availability is not checked. Invitations are sent to the person’s primary CRM email. Booking updates the person to `MEETING_BOOKED` and adds a timeline note. A failure in these CRM updates is reported as a warning alongside the successful calendar booking, avoiding an invitation retry.
+
 ## Deployment and verification
 
 Use the repository's Node version (`.nvmrc`). Generate and apply the new fast instance command through the normal upgrade pipeline before starting the updated API and worker. Keep the workspace encryption key stable. Regenerate the frontend metadata GraphQL schema after the API is rebuilt.

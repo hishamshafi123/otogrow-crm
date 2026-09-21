@@ -58,6 +58,7 @@ export const useBookMeeting = () => {
           : undefined,
       });
 
+      if (booked.warning) enqueueErrorSnackBar({ message: booked.warning });
       return booked;
     } catch (error) {
       // The server exception filter masks errors behind a generic

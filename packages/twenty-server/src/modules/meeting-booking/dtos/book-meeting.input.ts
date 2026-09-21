@@ -13,6 +13,11 @@ import { UUIDScalarType } from 'src/engine/api/graphql/workspace-schema-builder/
 
 @InputType()
 export class BookMeetingInput {
+  @Field(() => UUIDScalarType, { nullable: true })
+  @IsUUID()
+  @IsOptional()
+  assigneeWorkspaceMemberId?: string;
+
   @Field(() => UUIDScalarType)
   @IsUUID()
   personId: string;

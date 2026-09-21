@@ -1,5 +1,10 @@
+import { MeetingAvailabilityService } from 'src/modules/meeting-booking/services/meeting-availability.service';
+import {
+  MeetingAvailabilityDTO,
+  MeetingAvailabilityInput,
+} from 'src/modules/meeting-booking/dtos/meeting-availability.dto';
 import { UseFilters, UseGuards, UsePipes } from '@nestjs/common';
-import { Args, Mutation } from '@nestjs/graphql';
+import { Args, Mutation, Query } from '@nestjs/graphql';
 
 import { CoreResolver } from 'src/engine/api/graphql/graphql-config/decorators/core-resolver.decorator';
 import { AuthGraphqlApiExceptionFilter } from 'src/engine/core-modules/auth/filters/auth-graphql-api-exception.filter';
@@ -21,7 +26,23 @@ import { MeetingBookingService } from 'src/modules/meeting-booking/services/meet
 @UseGuards(WorkspaceAuthGuard, NoPermissionGuard)
 @UsePipes(ResolverValidationPipe)
 export class MeetingBookingResolver {
-  constructor(private readonly meetingBookingService: MeetingBookingService) {}
+  constructor(
+    private readonly meetingBookingService: MeetingBookingService,
+    private readonly availabilityService: MeetingAvailabilityService,
+  ) {}
+
+  @Query(() => MeetingAvailabilityDTO)
+  meetingAvailability(
+    @AuthWorkspace() workspace: WorkspaceEntity,
+    @AuthUserWorkspaceId() userWorkspaceId: string,
+    @Args('input') input: MeetingAvailabilityInput,
+  ) {
+    return this.availabilityService.getAvailability(
+      workspace.id,
+      userWorkspaceId,
+      input,
+    );
+  }
 
   @Mutation(() => BookMeetingOutputDTO)
   async bookMeeting(

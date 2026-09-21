@@ -1,3 +1,4 @@
+import { MeetingAvailabilityService } from 'src/modules/meeting-booking/services/meeting-availability.service';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
@@ -14,7 +15,11 @@ import { OAuth2ClientManagerModule } from 'src/modules/connected-account/oauth2-
     OAuth2ClientManagerModule,
     CalendarEventImportManagerModule,
   ],
-  providers: [MeetingBookingService, MeetingBookingResolver],
+  providers: [
+    MeetingBookingService,
+    MeetingBookingResolver,
+    MeetingAvailabilityService,
+  ],
   exports: [MeetingBookingService],
 })
 export class MeetingBookingModule {}

@@ -1,3 +1,5 @@
+import { PersonWorkspaceEntity } from 'src/modules/person/standard-objects/person.workspace-entity';
+import { WorkspaceMemberWorkspaceEntity } from 'src/modules/workspace-member/standard-objects/workspace-member.workspace-entity';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 
 import { ConnectedAccountProvider } from 'twenty-shared/types';
@@ -8,6 +10,7 @@ import { type ConnectedAccountEntity } from 'src/engine/metadata-modules/connect
 import { type GlobalWorkspaceOrmManager } from 'src/engine/twenty-orm/global-workspace-datasource/global-workspace-orm.manager';
 import { type CalendarSaveEventsService } from 'src/modules/calendar/calendar-event-import-manager/services/calendar-save-events.service';
 import { type GoogleOAuth2ClientProvider } from 'src/modules/connected-account/oauth2-client-manager/drivers/google/google-oauth2-client.provider';
+import { type MeetingAvailabilityService } from 'src/modules/meeting-booking/services/meeting-availability.service';
 import { MeetingBookingService } from 'src/modules/meeting-booking/services/meeting-booking.service';
 import { createMeetingNote } from 'src/modules/meeting-booking/utils/create-meeting-note.util';
 
@@ -55,8 +58,14 @@ const CREATED_GOOGLE_EVENT = {
 
 describe('MeetingBookingService', () => {
   let service: MeetingBookingService;
-  let personRepository: { findOne: jest.Mock };
-  let connectedAccountRepository: { findOne: jest.Mock };
+  let personRepository: { findOne: jest.Mock; update: jest.Mock };
+  const availability = { assertAvailable: jest.fn() };
+  const members = { findOne: jest.fn() };
+  const tasks = { insert: jest.fn() };
+  let connectedAccountRepository: {
+    findOne: jest.Mock;
+    manager: { transaction: jest.Mock };
+  };
   let calendarChannelRepository: { findOne: jest.Mock };
   let calendarSaveEventsService: {
     saveCalendarEventsAndEnqueueContactCreationJob: jest.Mock;
@@ -67,6 +76,7 @@ describe('MeetingBookingService', () => {
       personId: string;
       startTime: string;
       durationMinutes: number;
+      assigneeWorkspaceMemberId: string;
     }> = {},
   ) =>
     service.bookMeeting({
@@ -81,10 +91,24 @@ describe('MeetingBookingService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    members.findOne.mockResolvedValue({
+      id: 'teammate',
+      userEmail: 'teammate@example.com',
+    });
 
-    personRepository = { findOne: jest.fn().mockResolvedValue(PERSON) };
+    personRepository = {
+      findOne: jest.fn().mockResolvedValue(PERSON),
+      update: jest.fn(),
+    };
     connectedAccountRepository = {
       findOne: jest.fn().mockResolvedValue(GOOGLE_ACCOUNT),
+      manager: {
+        transaction: jest.fn(
+          async (
+            callback: (manager: { query: jest.Mock }) => Promise<unknown>,
+          ) => callback({ query: jest.fn() }),
+        ),
+      },
     };
     calendarChannelRepository = {
       findOne: jest.fn().mockResolvedValue({ id: 'channel-1' }),
@@ -99,7 +123,13 @@ describe('MeetingBookingService', () => {
 
     const globalWorkspaceOrmManager = {
       executeInWorkspaceContext: jest.fn((callback) => callback()),
-      getRepository: jest.fn().mockResolvedValue(personRepository),
+      getRepository: jest.fn(async (_workspaceId: string, entity: unknown) =>
+        entity === PersonWorkspaceEntity
+          ? personRepository
+          : entity === WorkspaceMemberWorkspaceEntity
+            ? members
+            : tasks,
+      ),
     } as unknown as GlobalWorkspaceOrmManager;
 
     const googleOAuth2ClientProvider = {
@@ -112,7 +142,50 @@ describe('MeetingBookingService', () => {
       calendarChannelRepository as unknown as Repository<CalendarChannelEntity>,
       googleOAuth2ClientProvider,
       calendarSaveEventsService as unknown as CalendarSaveEventsService,
+      availability as unknown as MeetingAvailabilityService,
     );
+  });
+
+  it('invites the selected teammate and links an assigned task to the lead', async () => {
+    const result = await bookMeeting({ assigneeWorkspaceMemberId: 'teammate' });
+    expect(result.warning).toBeNull();
+    expect(members.findOne).toHaveBeenCalledWith({ where: { id: 'teammate' } });
+    expect(
+      mockEventsInsert.mock.calls[0][0].requestBody.attendees,
+    ).toContainEqual({ email: 'teammate@example.com' });
+    expect(tasks.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ assigneeId: 'teammate', status: 'TODO' }),
+    );
+    expect(tasks.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ targetPersonId: PERSON_ID }),
+    );
+    expect(personRepository.update).toHaveBeenCalledWith(PERSON_ID, {
+      leadStatus: 'MEETING_BOOKED',
+    });
+  });
+
+  it('rejects an assignee outside the workspace before sending invitations', async () => {
+    members.findOne.mockResolvedValue(null);
+    await expect(
+      bookMeeting({ assigneeWorkspaceMemberId: 'outside-member' }),
+    ).rejects.toThrow('Choose a workspace member');
+    expect(mockEventsInsert).not.toHaveBeenCalled();
+  });
+
+  it('rechecks availability and refuses to send an invitation for a busy slot', async () => {
+    availability.assertAvailable.mockRejectedValueOnce(
+      new BadRequestException('Slot is busy'),
+    );
+    await expect(bookMeeting()).rejects.toThrow('Slot is busy');
+    expect(mockEventsInsert).not.toHaveBeenCalled();
+  });
+
+  it('keeps a successful calendar booking successful if the CRM update fails', async () => {
+    personRepository.update.mockRejectedValueOnce(new Error('CRM unavailable'));
+    const result = await bookMeeting();
+    expect(result.eventId).toBe('evt-1');
+    expect(result.warning).toContain('calendar meeting was booked');
+    expect(mockEventsInsert).toHaveBeenCalledTimes(1);
   });
 
   it('creates a Google event with Meet conferencing, the lead as attendee and email reminders', async () => {
@@ -150,6 +223,7 @@ describe('MeetingBookingService', () => {
     });
 
     expect(result).toEqual({
+      warning: null,
       eventId: 'evt-1',
       meetLink: 'https://meet.google.com/abc-defg-hij',
       htmlLink: 'https://calendar.google.com/event?eid=evt-1',
