@@ -49,6 +49,9 @@ export class LeadAssignmentService {
     });
 
     if (isDefined(existingAssignment)) {
+      if (!isDefined(existingAssignment.notificationSentAt)) {
+        await this.retryAssignmentNotification(workspaceId, existingAssignment);
+      }
       return;
     }
 
@@ -178,6 +181,41 @@ export class LeadAssignmentService {
     }, authContext);
   }
 
+  private async retryAssignmentNotification(
+    workspaceId: string,
+    assignment: SetterAssignmentEntity,
+  ): Promise<void> {
+    const setter = (
+      await this.setterProfileService.findByWorkspaceId(workspaceId)
+    ).find((profile) => profile.id === assignment.setterProfileId);
+
+    if (!setter) return;
+    await this.globalWorkspaceOrmManager.executeInWorkspaceContext(async () => {
+      const personRepository =
+        await this.globalWorkspaceOrmManager.getRepository(
+          workspaceId,
+          PersonWorkspaceEntity,
+          { shouldBypassPermissionChecks: true },
+        );
+      const person = await personRepository.findOne({
+        where: { id: assignment.personId },
+      });
+
+      if (!person) return;
+      await this.sendTelegramPing({
+        workspaceId,
+        telegramChatId: setter.telegramChatId,
+        leadName:
+          [person.name?.firstName, person.name?.lastName]
+            .filter(isNonEmptyString)
+            .join(' ') || 'lead',
+        leadPhone: person.phones?.primaryPhoneNumber ?? null,
+        leadSource: person.leadSource ?? '',
+        personId: assignment.personId,
+      });
+    }, buildSystemAuthContext(workspaceId));
+  }
+
   private async sendTelegramPing({
     workspaceId,
     telegramChatId,
@@ -192,16 +230,16 @@ export class LeadAssignmentService {
     leadPhone: string | null;
     leadSource: string;
     personId: string;
-  }): Promise<void> {
+  }): Promise<boolean> {
     if (!isNonEmptyString(telegramChatId)) {
-      return;
+      return false;
     }
 
     const config =
       await this.telegramConfigService.findByWorkspaceId(workspaceId);
 
     if (!isDefined(config) || !config.isActive) {
-      return;
+      return false;
     }
 
     const baseUrl =
@@ -209,22 +247,40 @@ export class LeadAssignmentService {
       this.twentyConfigService.get('SERVER_URL');
 
     // A Telegram outage must not fail the assignment: the Task already
-    // carries the lead, the ping is best-effort
+    // carries the lead; sheet polling retries while notificationSentAt is empty
     try {
-      await this.telegramService.sendLeadAssignmentMessage(
-        config,
-        telegramChatId,
-        {
-          leadName,
-          leadPhone,
-          leadSource,
-          personUrl: `${baseUrl}/objects/people/${personId}`,
+      return await this.setterAssignmentRepository.manager.transaction(
+        async (manager) => {
+          const repository = manager.getRepository(SetterAssignmentEntity);
+          // The creation job and sheet poller can reach notification delivery together.
+          const pending = await repository.findOne({
+            where: { workspaceId, personId },
+            lock: { mode: 'pessimistic_write' },
+          });
+
+          if (!pending || isDefined(pending.notificationSentAt)) return false;
+          await this.telegramService.sendLeadAssignmentMessage(
+            config,
+            telegramChatId,
+            {
+              leadName,
+              leadPhone,
+              leadSource,
+              personUrl: `${baseUrl}/objects/people/${personId}`,
+            },
+          );
+          await repository.update(
+            { workspaceId, personId },
+            { notificationSentAt: new Date() },
+          );
+          return true;
         },
       );
     } catch (error) {
       this.logger.warn(
         `Failed to send Telegram assignment ping for person ${personId}: ${error instanceof Error ? error.message : String(error)}`,
       );
+      return false;
     }
   }
 }

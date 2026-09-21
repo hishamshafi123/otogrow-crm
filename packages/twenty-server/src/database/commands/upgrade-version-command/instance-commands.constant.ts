@@ -159,6 +159,8 @@ import { AddTwilioConfigEntityFastInstanceCommand } from 'src/database/commands/
 import { AddTwilioCallingColumnsFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1789793812030-add-twilio-calling-columns';
 import { AddMetaAdsConfigEntityFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1790000001000-add-meta-ads-config-entity';
 import { AddLeadAssignmentEntitiesFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1790000000001-add-lead-assignment-entities';
+import { AddMetaSheetLeadFormsFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1790000002002-add-meta-sheet-lead-forms';
+import { AddMetaLeadNotificationStatusFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1790000002003-add-meta-lead-notification-status';
 
 export const INSTANCE_COMMANDS = [
   AddViewFieldGroupIdIndexOnViewFieldFastInstanceCommand,
@@ -320,4 +322,6 @@ export const INSTANCE_COMMANDS = [
   AddTwilioCallingColumnsFastInstanceCommand,
   AddMetaAdsConfigEntityFastInstanceCommand,
   AddLeadAssignmentEntitiesFastInstanceCommand,
+  AddMetaSheetLeadFormsFastInstanceCommand,
+  AddMetaLeadNotificationStatusFastInstanceCommand,
 ];

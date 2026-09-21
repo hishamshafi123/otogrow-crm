@@ -37,6 +37,11 @@ import { TelegramService } from 'src/modules/lead-assignment/services/telegram.s
     LeadAssignmentPersonListener,
     LeadAssignmentResolver,
   ],
-  exports: [SetterProfileService, TelegramConfigService, TelegramService],
+  exports: [
+    LeadAssignmentService,
+    SetterProfileService,
+    TelegramConfigService,
+    TelegramService,
+  ],
 })
 export class LeadAssignmentModule {}

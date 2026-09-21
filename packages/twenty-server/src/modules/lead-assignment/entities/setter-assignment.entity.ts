@@ -32,6 +32,9 @@ export class SetterAssignmentEntity extends WorkspaceRelatedEntity {
   @Column({ type: 'uuid', nullable: false })
   personId: string;
 
+  @Column({ type: 'timestamptz', nullable: true })
+  notificationSentAt: Date | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 }

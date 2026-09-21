@@ -1,3 +1,4 @@
+import { MetaSheetPollingModule } from 'src/engine/metadata-modules/meta-ads-config/meta-sheet-polling.module';
 import { Module } from '@nestjs/common';
 
 import { CoreEngineModule } from 'src/engine/core-modules/core-engine.module';
@@ -17,6 +18,7 @@ import { TelegramPollingModule } from 'src/modules/lead-assignment/polling/teleg
     TwentyORMModule,
     GlobalWorkspaceDataSourceModule,
     TelegramPollingModule,
+    MetaSheetPollingModule,
   ],
 })
 export class QueueWorkerModule {}

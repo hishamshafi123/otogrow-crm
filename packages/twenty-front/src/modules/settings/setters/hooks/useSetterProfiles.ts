@@ -57,10 +57,10 @@ export const useSetterProfiles = () => {
       activeStartHour < 0 ||
       activeStartHour > 23 ||
       activeEndHour < 0 ||
-      activeEndHour > 23
+      activeEndHour > 24
     ) {
       enqueueErrorSnackBar({
-        message: t`Hours must be whole numbers between 0 and 23`,
+        message: t`Start hour must be between 0 and 23; end hour may be 24 for midnight`,
       });
       return;
     }

@@ -38,9 +38,24 @@ const buildService = ({
   person?: object | null;
   insertError?: unknown;
 } = {}) => {
+  const notificationUpdate = jest.fn().mockResolvedValue(undefined);
   const setterAssignmentRepository = {
     findOne: jest.fn().mockResolvedValue(existingAssignment),
     count: jest.fn().mockResolvedValue(0),
+    update: notificationUpdate,
+    manager: {
+      transaction: jest.fn(
+        async (operation: (manager: unknown) => Promise<boolean>) =>
+          operation({
+            getRepository: () => ({
+              findOne: jest
+                .fn()
+                .mockResolvedValue({ notificationSentAt: null }),
+              update: notificationUpdate,
+            }),
+          }),
+      ),
+    },
     insert: insertError
       ? jest.fn().mockRejectedValue(insertError)
       : jest.fn().mockResolvedValue(undefined),
@@ -105,6 +120,13 @@ const buildService = ({
 };
 
 describe('LeadAssignmentService', () => {
+  beforeEach(() => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-09-21T12:00:00Z'));
+  });
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   it('creates a task for the picked setter and marks lastAssignedAt', async () => {
     const {
       service,
@@ -211,5 +233,37 @@ describe('LeadAssignmentService', () => {
     ).resolves.toBeUndefined();
     expect(mocks.taskRepository.insert).toHaveBeenCalled();
     expect(mocks.setterProfileService.updateLastAssignedAt).toHaveBeenCalled();
+  });
+  it('retries an unsent Telegram notification without creating another task', async () => {
+    const mocks = buildService({
+      existingAssignment: {
+        id: 'assignment-1',
+        setterProfileId: SETTER.id,
+        personId: PERSON_ID,
+        notificationSentAt: null,
+      },
+    });
+    await mocks.service.assignPersonToSetter(WORKSPACE_ID, PERSON_ID);
+    expect(mocks.taskRepository.insert).not.toHaveBeenCalled();
+    expect(
+      mocks.telegramService.sendLeadAssignmentMessage,
+    ).toHaveBeenCalledTimes(1);
+    expect(mocks.setterAssignmentRepository.update).toHaveBeenCalledWith(
+      { workspaceId: WORKSPACE_ID, personId: PERSON_ID },
+      { notificationSentAt: expect.any(Date) },
+    );
+  });
+
+  it('does not resend a notification already recorded as delivered', async () => {
+    const mocks = buildService({
+      existingAssignment: {
+        id: 'assignment-1',
+        notificationSentAt: new Date(),
+      },
+    });
+    await mocks.service.assignPersonToSetter(WORKSPACE_ID, PERSON_ID);
+    expect(
+      mocks.telegramService.sendLeadAssignmentMessage,
+    ).not.toHaveBeenCalled();
   });
 });

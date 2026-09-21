@@ -5,6 +5,7 @@ module.exports = {
     (process.env.REACT_APP_SERVER_BASE_URL ?? 'http://localhost:3000') +
     '/metadata',
   documents: [
+    './src/modules/meta-lead-forms/metaLeadFormsGraphql.ts',
     './src/modules/auth/graphql/**/*.{ts,tsx}',
     './src/modules/users/graphql/**/*.{ts,tsx}',
     './src/modules/views/graphql/**/*.{ts,tsx}',

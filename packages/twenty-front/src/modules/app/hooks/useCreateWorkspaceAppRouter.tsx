@@ -142,6 +142,12 @@ const MobileHomePage = lazy(() =>
   })),
 );
 
+const MetaLeadFormsPage = lazy(() =>
+  import('@/meta-lead-forms/MetaLeadFormsPage').then((module) => ({
+    default: module.MetaLeadFormsPage,
+  })),
+);
+
 const NotFound = lazy(() =>
   import('~/pages/not-found/NotFound').then((module) => ({
     default: module.NotFound,
@@ -180,6 +186,14 @@ const createWorkspaceAppRouter = ({
         <Route element={<MinimalMetadataGate />}>
           <Route element={<DefaultLayout />}>
             <Route element={<MainAppLayoutWithSidePanel />}>
+              <Route
+                path="/meta-lead-forms"
+                element={
+                  <LazyRoute>
+                    <MetaLeadFormsPage />
+                  </LazyRoute>
+                }
+              />
               {isWorkflowCoreIndexPageEnabled && (
                 <Route
                   path={AppPath.WorkflowCoreIndexPage}

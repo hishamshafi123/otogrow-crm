@@ -36,7 +36,7 @@ export class UpsertSetterProfileInput {
 
   @IsInt()
   @Min(0)
-  @Max(23)
+  @Max(24)
   @Field()
   activeEndHour: number;
 

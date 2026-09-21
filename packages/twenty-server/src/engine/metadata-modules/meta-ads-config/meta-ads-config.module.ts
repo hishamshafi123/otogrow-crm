@@ -1,3 +1,9 @@
+import { MetaLeadFormEntity } from 'src/engine/metadata-modules/meta-ads-config/entities/meta-lead-form.entity';
+import { MetaSheetLeadEntity } from 'src/engine/metadata-modules/meta-ads-config/entities/meta-sheet-lead.entity';
+import { MetaLeadFormResolver } from 'src/engine/metadata-modules/meta-ads-config/meta-lead-form.resolver';
+import { MetaLeadFormService } from 'src/engine/metadata-modules/meta-ads-config/services/meta-lead-form.service';
+import { MetaSheetReaderService } from 'src/engine/metadata-modules/meta-ads-config/services/meta-sheet-reader.service';
+import { LeadAssignmentModule } from 'src/modules/lead-assignment/lead-assignment.module';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
@@ -16,7 +22,12 @@ import { ContactCreationManagerModule } from 'src/modules/contact-creation-manag
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([MetaAdsConfigEntity]),
+    TypeOrmModule.forFeature([
+      MetaAdsConfigEntity,
+      MetaLeadFormEntity,
+      MetaSheetLeadEntity,
+    ]),
+    LeadAssignmentModule,
     SecretEncryptionModule,
     TwentyConfigModule,
     PermissionsModule,
@@ -25,12 +36,15 @@ import { ContactCreationManagerModule } from 'src/modules/contact-creation-manag
   ],
   controllers: [MetaLeadgenWebhookController],
   providers: [
+    MetaLeadFormResolver,
+    MetaLeadFormService,
+    MetaSheetReaderService,
     MetaAdsConfigService,
     MetaAdsConfigEncryptionService,
     MetaGraphApiService,
     MetaLeadIntakeService,
     MetaAdsConfigResolver,
   ],
-  exports: [MetaAdsConfigService],
+  exports: [MetaAdsConfigService, MetaLeadFormService],
 })
 export class MetaAdsConfigModule {}

@@ -161,6 +161,85 @@ export class MetaLeadIntakeService {
     }
   }
 
+  async importSheetLead(
+    workspaceId: string,
+    lead: MetaLead,
+    previous?: { personId: string | null; answers: MetaLead },
+  ): Promise<string> {
+    return this.globalWorkspaceOrmManager.executeInWorkspaceContext(
+      async () => {
+        const personRepository =
+          await this.globalWorkspaceOrmManager.getRepository(
+            workspaceId,
+            PersonWorkspaceEntity,
+            { shouldBypassPermissionChecks: true },
+          );
+        const mappedValues = this.mapFieldData(lead);
+        const person = previous?.personId
+          ? await personRepository.findOne({ where: { id: previous.personId } })
+          : null;
+
+        if (person && previous) {
+          const before = this.mapFieldData(previous.answers);
+          const partialEntity: DeepPartial<PersonWorkspaceEntity> = {};
+
+          // Preserve CRM edits while applying changes to fields still owned by the sheet.
+          if (
+            person.name?.firstName === before.firstName &&
+            person.name?.lastName === before.lastName
+          ) {
+            partialEntity.name = {
+              firstName: mappedValues.firstName,
+              lastName: mappedValues.lastName,
+            };
+          }
+          if (
+            person.emails.primaryEmail === (before.email?.toLowerCase() ?? '')
+          ) {
+            partialEntity.emails = {
+              ...person.emails,
+              primaryEmail: mappedValues.email?.toLowerCase() ?? '',
+            };
+          }
+          if (person.phones.primaryPhoneNumber === (before.phone ?? '')) {
+            partialEntity.phones = {
+              ...person.phones,
+              primaryPhoneNumber: mappedValues.phone ?? '',
+            };
+          }
+          if (
+            person.leadFormName === lead.formName &&
+            JSON.stringify(person.leadFormAnswers) ===
+              JSON.stringify(before.extraFields)
+          ) {
+            partialEntity.leadFormAnswers = mappedValues.extraFields;
+          }
+          if (Object.keys(partialEntity).length > 0) {
+            await personRepository.updateMany(
+              [{ criteria: person.id, partialEntity }],
+              undefined,
+              ['id'],
+            );
+          }
+          return person.id;
+        }
+        // A deleted CRM contact must not be resurrected by an unchanged sheet row.
+        if (previous?.personId) return previous.personId;
+        const companyId = await this.findOrCreateCompanyId(
+          mappedValues,
+          workspaceId,
+        );
+
+        return this.findOrCreatePerson(
+          personRepository,
+          mappedValues,
+          companyId,
+        );
+      },
+      buildSystemAuthContext(workspaceId),
+    );
+  }
+
   private mapFieldData(lead: MetaLead): MappedLeadValues {
     const valueByName = new Map<string, string>();
 
