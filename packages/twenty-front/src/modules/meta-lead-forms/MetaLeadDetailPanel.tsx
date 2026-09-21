@@ -1,3 +1,5 @@
+import { AppPath } from 'twenty-shared/types';
+import { getAppPath } from 'twenty-shared/utils';
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { styled } from '@linaria/react';
@@ -125,7 +127,12 @@ export const MetaLeadDetailPanel = ({
         )}
         {lead.email && <a href={`mailto:${lead.email}`}>{lead.email}</a>}
         {record && (
-          <Link to={`/objects/people/${lead.personId}`}>
+          <Link
+            to={getAppPath(AppPath.RecordShowPage, {
+              objectNameSingular: 'person',
+              objectRecordId: lead.personId ?? '',
+            })}
+          >
             <Trans>View in People</Trans>
           </Link>
         )}

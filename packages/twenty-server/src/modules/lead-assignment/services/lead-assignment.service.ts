@@ -2,7 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 
 import { isNonEmptyString } from '@sniptt/guards';
-import { isDefined } from 'twenty-shared/utils';
+import { AppPath } from 'twenty-shared/types';
+import { getAppPath, isDefined } from 'twenty-shared/utils';
 import { Between, QueryFailedError, type Repository } from 'typeorm';
 import { v4 } from 'uuid';
 
@@ -266,7 +267,7 @@ export class LeadAssignmentService {
               leadName,
               leadPhone,
               leadSource,
-              personUrl: `${baseUrl}/objects/people/${personId}`,
+              personUrl: `${baseUrl}${getAppPath(AppPath.RecordShowPage, { objectNameSingular: 'person', objectRecordId: personId })}`,
             },
           );
           await repository.update(

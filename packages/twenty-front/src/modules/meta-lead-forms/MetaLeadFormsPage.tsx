@@ -8,8 +8,8 @@ import { styled } from '@linaria/react';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { Button } from 'twenty-ui/input';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
-import { SettingsPath } from 'twenty-shared/types';
-import { getSettingsPath } from 'twenty-shared/utils';
+import { AppPath, SettingsPath } from 'twenty-shared/types';
+import { getAppPath, getSettingsPath } from 'twenty-shared/utils';
 
 import { SettingsTextInput } from '@/ui/input/components/SettingsTextInput';
 import { PageBody } from '@/ui/layout/page/components/PageBody';
@@ -528,7 +528,12 @@ export const MetaLeadFormsPage = () => {
                           )}
                           {lead.personId && (
                             <div>
-                              <Link to={`/objects/people/${lead.personId}`}>
+                              <Link
+                                to={getAppPath(AppPath.RecordShowPage, {
+                                  objectNameSingular: 'person',
+                                  objectRecordId: lead.personId ?? '',
+                                })}
+                              >
                                 <Trans>Saved in People</Trans>
                               </Link>
                             </div>

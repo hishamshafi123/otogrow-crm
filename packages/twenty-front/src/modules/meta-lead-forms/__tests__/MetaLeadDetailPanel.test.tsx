@@ -79,7 +79,7 @@ describe('Meta lead actions', () => {
     });
     expect(
       screen.getByRole('link', { name: 'View in People' }),
-    ).toHaveAttribute('href', '/objects/people/person');
+    ).toHaveAttribute('href', '/object/person/person');
   });
   it('updates status on the existing People record', async () => {
     setup();

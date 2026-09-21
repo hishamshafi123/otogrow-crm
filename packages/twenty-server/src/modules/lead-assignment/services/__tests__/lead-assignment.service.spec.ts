@@ -169,7 +169,7 @@ describe('LeadAssignmentService', () => {
         leadName: 'Jane Doe',
         leadPhone: '+15551234567',
         leadSource: 'FORM',
-        personUrl: `http://localhost:3001/objects/people/${PERSON_ID}`,
+        personUrl: `http://localhost:3001/object/person/${PERSON_ID}`,
       }),
     );
   });
