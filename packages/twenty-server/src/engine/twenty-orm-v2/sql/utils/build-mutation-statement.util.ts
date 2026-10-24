@@ -1,3 +1,4 @@
+import { deliveryTaskIsolationCondition } from 'src/engine/twenty-orm/utils/delivery-task-isolation.util';
 import { escapeIdentifier } from 'src/engine/workspace-manager/workspace-migration/utils/remove-sql-injection.util';
 import {
   TwentyOrmV2Exception,
@@ -58,7 +59,17 @@ const buildSetClause = (state: MutationStatementState): string =>
 export const buildMutationStatement = (
   state: MutationStatementState,
 ): string => {
-  const whereExpression = renderUserWhereExpression(state.whereClauses);
+  const userExpression = renderUserWhereExpression(state.whereClauses);
+  const deliveryCondition = deliveryTaskIsolationCondition(
+    state.tableShape.nameSingular,
+    state.alias,
+    { schemaName: state.tableShape.schemaName },
+  );
+  const whereExpression = deliveryCondition
+    ? userExpression
+      ? `(${userExpression}) AND ${deliveryCondition}`
+      : deliveryCondition
+    : userExpression;
   const returningClause = buildReturningClause(state);
 
   if (state.kind === 'delete') {

@@ -64,6 +64,12 @@ const PublicLeadForm = lazy(() =>
   })),
 );
 
+const DeliveryClientPortal = lazy(() =>
+  import('@/delivery/DeliveryClientPortal').then((module) => ({
+    default: module.DeliveryClientPortal,
+  })),
+);
+
 const ClientPortalPage = lazy(() =>
   import('~/pages/portal/ClientPortalPage').then((module) => ({
     default: module.ClientPortalPage,
@@ -142,6 +148,12 @@ const MobileHomePage = lazy(() =>
   })),
 );
 
+const DeliveryWorkspacePage = lazy(() =>
+  import('@/delivery/DeliveryWorkspacePage').then((module) => ({
+    default: module.DeliveryWorkspacePage,
+  })),
+);
+
 const MetaLeadFormsPage = lazy(() =>
   import('@/meta-lead-forms/MetaLeadFormsPage').then((module) => ({
     default: module.MetaLeadFormsPage,
@@ -186,6 +198,14 @@ const createWorkspaceAppRouter = ({
         <Route element={<MinimalMetadataGate />}>
           <Route element={<DefaultLayout />}>
             <Route element={<MainAppLayoutWithSidePanel />}>
+              <Route
+                path="/delivery"
+                element={
+                  <LazyRoute>
+                    <DeliveryWorkspacePage />
+                  </LazyRoute>
+                }
+              />
               <Route
                 path="/meta-lead-forms"
                 element={
@@ -323,6 +343,14 @@ const createWorkspaceAppRouter = ({
             element={
               <LazyRoute fallback={null}>
                 <PublicLeadForm />
+              </LazyRoute>
+            }
+          />
+          <Route
+            path="/delivery-client"
+            element={
+              <LazyRoute fallback={null}>
+                <DeliveryClientPortal />
               </LazyRoute>
             }
           />

@@ -1,3 +1,4 @@
+import { deliveryTaskIsolationCondition } from 'src/engine/twenty-orm/utils/delivery-task-isolation.util';
 import { isDefined } from 'twenty-shared/utils';
 
 import { RelationType } from 'src/engine/metadata-modules/field-metadata/interfaces/relation-type.interface';
@@ -307,6 +308,13 @@ const renderExistsFilter = (
     ...existsFilterClause.additionalOnConditions,
   ];
 
+  const deliveryCondition = deliveryTaskIsolationCondition(
+    existsFilterClause.targetTableShape.nameSingular,
+    existsFilterClause.alias,
+    { schemaName: existsFilterClause.targetTableShape.schemaName },
+  );
+  if (deliveryCondition) conditions.push(deliveryCondition);
+
   if (existsFilterClause.conditionSql.length > 0) {
     conditions.push(existsFilterClause.conditionSql);
   }
@@ -361,13 +369,24 @@ export const buildWhereExpression = (
     collectStatementAliases(state),
   );
 
-  const userExpression = substituteExistsFilters
+  const filteredUserExpression = substituteExistsFilters
     ? substituteExistsFilterTokens({
         expression: renderedWhereClauses,
         existsFilterClauses: state.existsFilterClauses,
         includeDeleted: state.includeDeleted,
       })
     : renderedWhereClauses;
+
+  const deliveryCondition = deliveryTaskIsolationCondition(
+    state.tableShape.nameSingular,
+    state.alias,
+    { schemaName: state.tableShape.schemaName },
+  );
+  const userExpression = deliveryCondition
+    ? filteredUserExpression
+      ? `(${filteredUserExpression}) AND ${deliveryCondition}`
+      : deliveryCondition
+    : filteredUserExpression;
 
   const shouldAddSoftDeletePredicate =
     includeSoftDeletePredicate &&
@@ -447,6 +466,12 @@ export const buildJoinClause = (state: SelectStatementState): string =>
           : undefined;
 
       const onConditions = [condition, ...joinClause.additionalOnConditions];
+      const deliveryCondition = deliveryTaskIsolationCondition(
+        joinClause.targetTableShape.nameSingular,
+        joinClause.alias,
+        { schemaName: joinClause.targetTableShape.schemaName },
+      );
+      if (deliveryCondition) onConditions.push(deliveryCondition);
 
       if (
         softDeletePredicateApplies &&

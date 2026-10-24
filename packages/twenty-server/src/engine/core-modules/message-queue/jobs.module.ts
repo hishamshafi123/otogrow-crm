@@ -1,5 +1,8 @@
+import { DeliveryMediaJob } from 'src/modules/delivery/creative/delivery-media.job';
 import { Module } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
+import { DeliveryModule } from 'src/modules/delivery/delivery.module';
+import { DeliveryAgentJob } from 'src/modules/delivery/agents/delivery-agent.job';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { TypeORMModule } from 'src/database/typeorm/typeorm.module';
@@ -66,6 +69,7 @@ import { WorkflowModule } from 'src/modules/workflow/workflow.module';
 
 @Module({
   imports: [
+    DeliveryModule,
     TypeOrmModule.forFeature([
       WorkspaceEntity,
       BillingSubscriptionEntity,
@@ -112,6 +116,8 @@ import { WorkflowModule } from 'src/modules/workflow/workflow.module';
     BillingReminderModule,
   ],
   providers: [
+    DeliveryAgentJob,
+    DeliveryMediaJob,
     BillingReminderCronJob,
     CleanSuspendedWorkspacesJob,
     CleanOnboardingWorkspacesJob,

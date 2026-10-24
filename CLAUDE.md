@@ -4,6 +4,10 @@ Twenty is an open-source CRM — an Nx / Yarn 4 monorepo. Main packages: `twenty
 
 Match the surrounding code — the adjacent files in the directory you are editing beat any written rule, including for file naming, which varies by area.
 
+## Otogrow OS delivery process
+
+Before Otogrow OS work, read `OTOGROW-OS-ROADMAP.md` and the applicable phase plan. The user's latest instruction authorizes continuing the remaining phases without phase-by-phase approval; it supersedes the earlier sequential approval process. Record implementation status, validation, and remaining work in the tracker. Ask only for missing setup details or external-action authorization not already provided. The original `OTOGROW-PLAN.md` is historical CRM scope; the OS roadmap governs new OS work.
+
 ## House rules
 
 Where this repo differs from your defaults:

@@ -1,3 +1,4 @@
+import { deliveryTaskIsolationCondition } from 'src/engine/twenty-orm/utils/delivery-task-isolation.util';
 import { isNonEmptyString } from '@sniptt/guards';
 import { type ObjectsPermissions } from 'twenty-shared/types';
 import { isDefined } from 'twenty-shared/utils';
@@ -480,6 +481,17 @@ export class WorkspaceSelectQueryBuilder<
         continue;
       }
 
+      const deliveryCondition = deliveryTaskIsolationCondition(
+        joinedObjectMetadata.nameSingular,
+        joinAttribute.alias.name,
+        { workspaceId: this.internalContext.workspaceId },
+      );
+      if (deliveryCondition && this.authContext.type !== 'system') {
+        joinAttribute.condition = andWithExistingJoinCondition(
+          joinAttribute.condition,
+          deliveryCondition,
+        );
+      }
       const recordFilter = resolveRowLevelPermissionRecordFilter({
         internalContext: this.internalContext,
         authContext: this.authContext,

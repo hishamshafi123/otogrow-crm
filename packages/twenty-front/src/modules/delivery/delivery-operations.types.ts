@@ -1,0 +1,72 @@
+import { type DeliveryTask } from '@/delivery/delivery.types';
+export type RecurringTemplate = {
+  id: string;
+  projectId: string;
+  fields: {
+    title: string;
+    assigneeId: string;
+    reviewerId: string;
+    brief: string;
+    service: string;
+    priority: 'LOW' | 'NORMAL' | 'HIGH';
+    scheduledDate: string | null;
+    dueAt: string | null;
+    checklist: DeliveryTask['details']['checklist'];
+    evidence: string[];
+  };
+  frequency: 'DAILY' | 'WEEKLY' | 'MONTHLY';
+  weekdays: number[];
+  monthDay: number;
+  time: string;
+  startDate: string;
+  endDate: string | null;
+  paused: boolean;
+  dueHours: number;
+  skipped: number;
+  error: string | null;
+  lastDate: string | null;
+  lastTaskId: string | null;
+};
+export type OperationsSnapshot = {
+  enabled: boolean;
+  timezone: string;
+  telegramEnabled: boolean;
+  founderId: string | null;
+  botAvailable: boolean;
+  link?: string | null;
+  templates: RecurringTemplate[];
+  notices: {
+    id: string;
+    taskId: string;
+    recipientId: string;
+    senderId: string;
+    kind: string;
+    text: string;
+    createdAt: string;
+    remindAt: string;
+    seenAt: string | null;
+    acknowledgedAt: string | null;
+    sendState: string;
+    error: string | null;
+  }[];
+  fulfilments: {
+    taskId: string;
+    status: string;
+    deliveredAt: string;
+    nextCheckAt: string | null;
+    cycle: number;
+    history: { at: string; actorId: string; action: string; note: string }[];
+  }[];
+  alerts: {
+    id: string;
+    taskId: string;
+    category: string;
+    severity: string;
+    reason: string;
+    ownerId: string;
+    createdAt: string;
+    acknowledgedAt: string | null;
+    resolvedAt: string | null;
+  }[];
+  connections: { memberId: string; linkedAt: string }[];
+};

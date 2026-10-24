@@ -1,3 +1,4 @@
+import { DeliveryModule } from 'src/modules/delivery/delivery.module';
 import { Module } from '@nestjs/common';
 import { APP_FILTER, HttpAdapterHost } from '@nestjs/core';
 import { EventEmitterModule } from '@nestjs/event-emitter';
@@ -131,6 +132,7 @@ import { FileModule } from './file/file.module';
     SequencesModule,
     LeadScoringModule,
     LeadAssignmentModule,
+    DeliveryModule,
     QuotingModule,
     MeetingBookingModule,
     PortalModule,

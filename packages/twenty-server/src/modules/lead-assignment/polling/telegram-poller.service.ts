@@ -1,3 +1,4 @@
+import { DeliveryOperationsService } from 'src/modules/delivery/operations/delivery-operations.service';
 import {
   Injectable,
   Logger,
@@ -26,6 +27,7 @@ export class TelegramPollerService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly telegramConfigService: TelegramConfigService,
     private readonly telegramService: TelegramService,
+    private readonly deliveryOperations: DeliveryOperationsService,
   ) {}
 
   onModuleInit() {
@@ -81,7 +83,14 @@ export class TelegramPollerService implements OnModuleInit, OnModuleDestroy {
 
         for (const update of updates) {
           offset = update.update_id + 1;
-          await this.telegramService.handleUpdate(config, update);
+          if (update.message?.text?.includes('delivery_')) {
+            await this.deliveryOperations.handleTelegramUpdate(
+              workspaceId,
+              update,
+            );
+          } else {
+            await this.telegramService.handleUpdate(config, update);
+          }
         }
       } catch (error) {
         // A Telegram outage or bad token must never crash the worker

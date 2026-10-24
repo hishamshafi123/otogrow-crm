@@ -1,3 +1,4 @@
+import { deliveryTaskIsolationCondition } from 'src/engine/twenty-orm/utils/delivery-task-isolation.util';
 import { type ObjectsPermissions } from 'twenty-shared/types';
 import { isDefined } from 'twenty-shared/utils';
 import {
@@ -171,6 +172,28 @@ export class WorkspaceInsertQueryBuilder<
         mainAliasTarget,
         this.internalContext,
       );
+
+      if (
+        objectMetadata.nameSingular === 'task' &&
+        this.authContext.type !== 'system'
+      ) {
+        // Upsert must not bypass the review boundary through ON CONFLICT.
+        if (this.expressionMap.onConflict) {
+          throw new TwentyORMException(
+            'Raw task conflict updates are not supported.',
+            TwentyORMExceptionCode.METHOD_NOT_ALLOWED,
+          );
+        }
+        const condition = deliveryTaskIsolationCondition('task', 'task', {
+          workspaceId: this.internalContext.workspaceId,
+        });
+        if (this.expressionMap.onUpdate && condition) {
+          this.expressionMap.onUpdate.overwriteCondition = [
+            ...(this.expressionMap.onUpdate.overwriteCondition ?? []),
+            { type: 'and', condition },
+          ];
+        }
+      }
 
       let filesFieldFileIds = null;
 

@@ -1,3 +1,4 @@
+import { deliveryTaskIsolationCondition } from 'src/engine/twenty-orm/utils/delivery-task-isolation.util';
 /* @license Enterprise */
 
 import { isDefined } from 'twenty-shared/utils';
@@ -28,6 +29,15 @@ export const applyRowLevelPermissionPredicates = <T extends ObjectLiteral>({
   authContext,
   featureFlagMap: _featureFlagMap,
 }: ApplyRowLevelPermissionPredicatesArgs<T>): void => {
+  const deliveryCondition = deliveryTaskIsolationCondition(
+    objectMetadata.nameSingular,
+    queryBuilder.expressionMap.queryType === 'select'
+      ? queryBuilder.alias
+      : objectMetadata.nameSingular,
+    { workspaceId: internalContext.workspaceId },
+  );
+  if (deliveryCondition && authContext.type !== 'system')
+    queryBuilder.andWhere(deliveryCondition);
   const recordFilter = resolveRowLevelPermissionRecordFilter({
     internalContext,
     authContext,

@@ -161,6 +161,9 @@ import { AddMetaAdsConfigEntityFastInstanceCommand } from 'src/database/commands
 import { AddLeadAssignmentEntitiesFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1790000000001-add-lead-assignment-entities';
 import { AddMetaSheetLeadFormsFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1790000002002-add-meta-sheet-lead-forms';
 import { AddMetaLeadNotificationStatusFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1790000002003-add-meta-lead-notification-status';
+import { AddDeliveryWorkspaceFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1792822821202-add-delivery-workspace';
+import { AddDeliveryAgentsFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1792824583893-add-delivery-agents';
+import { AddDeliveryOperationsFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1792832831047-add-delivery-operations';
 
 export const INSTANCE_COMMANDS = [
   AddViewFieldGroupIdIndexOnViewFieldFastInstanceCommand,
@@ -324,4 +327,7 @@ export const INSTANCE_COMMANDS = [
   AddLeadAssignmentEntitiesFastInstanceCommand,
   AddMetaSheetLeadFormsFastInstanceCommand,
   AddMetaLeadNotificationStatusFastInstanceCommand,
+  AddDeliveryWorkspaceFastInstanceCommand,
+  AddDeliveryAgentsFastInstanceCommand,
+  AddDeliveryOperationsFastInstanceCommand,
 ];

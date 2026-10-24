@@ -2752,6 +2752,14 @@ export type Mutation = {
   cancelSwitchBillingInterval: BillingUpdate;
   cancelSwitchBillingPlan: BillingUpdate;
   cancelSwitchResourceCreditPrice: BillingUpdate;
+  changeDeliveryAgents: Scalars['JSON']['output'];
+  changeDeliveryBusiness: Scalars['JSON']['output'];
+  changeDeliveryClients: Scalars['JSON']['output'];
+  changeDeliveryCreative: Scalars['JSON']['output'];
+  changeDeliveryMedia: Scalars['JSON']['output'];
+  changeDeliveryMeta: Scalars['JSON']['output'];
+  changeDeliveryOperations: Scalars['JSON']['output'];
+  changeDeliveryWorkspace: Scalars['JSON']['output'];
   checkCustomDomainValidRecords?: Maybe<DomainValidRecords>;
   checkPublicDomainValidRecords?: Maybe<DomainValidRecords>;
   checkoutSession: BillingSession;
@@ -3054,6 +3062,46 @@ export type MutationAuthorizeAppArgs = {
   redirectUrl: Scalars['String']['input'];
   scope?: InputMaybe<Scalars['String']['input']>;
   state?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type MutationChangeDeliveryAgentsArgs = {
+  input: Scalars['JSON']['input'];
+};
+
+
+export type MutationChangeDeliveryBusinessArgs = {
+  input: Scalars['JSON']['input'];
+};
+
+
+export type MutationChangeDeliveryClientsArgs = {
+  input: Scalars['JSON']['input'];
+};
+
+
+export type MutationChangeDeliveryCreativeArgs = {
+  input: Scalars['JSON']['input'];
+};
+
+
+export type MutationChangeDeliveryMediaArgs = {
+  input: Scalars['JSON']['input'];
+};
+
+
+export type MutationChangeDeliveryMetaArgs = {
+  input: Scalars['JSON']['input'];
+};
+
+
+export type MutationChangeDeliveryOperationsArgs = {
+  input: Scalars['JSON']['input'];
+};
+
+
+export type MutationChangeDeliveryWorkspaceArgs = {
+  input: Scalars['JSON']['input'];
 };
 
 
@@ -4809,6 +4857,14 @@ export type Query = {
   currentUserApplicationAuthorizations: Array<ApplicationAuthorization>;
   currentUserSessions: Array<UserSession>;
   currentWorkspace: Workspace;
+  deliveryAgents: Scalars['JSON']['output'];
+  deliveryBusiness: Scalars['JSON']['output'];
+  deliveryClients: Scalars['JSON']['output'];
+  deliveryCreative: Scalars['JSON']['output'];
+  deliveryMediaModels: Scalars['JSON']['output'];
+  deliveryMeta: Scalars['JSON']['output'];
+  deliveryOperations: Scalars['JSON']['output'];
+  deliveryWorkspace: Scalars['JSON']['output'];
   enterpriseCheckoutSession?: Maybe<Scalars['String']['output']>;
   enterprisePortalSession?: Maybe<Scalars['String']['output']>;
   enterpriseSubscriptionStatus?: Maybe<EnterpriseSubscriptionStatusDto>;
@@ -5001,6 +5057,16 @@ export type QueryCheckWorkspaceSubdomainAvailabilityArgs = {
 
 export type QueryCommandMenuItemArgs = {
   id: Scalars['UUID']['input'];
+};
+
+
+export type QueryDeliveryCreativeArgs = {
+  taskId: Scalars['String']['input'];
+};
+
+
+export type QueryDeliveryMediaModelsArgs = {
+  taskId: Scalars['String']['input'];
 };
 
 

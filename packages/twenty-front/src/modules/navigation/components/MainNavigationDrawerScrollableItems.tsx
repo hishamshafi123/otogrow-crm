@@ -1,7 +1,7 @@
 import { useHasPermissionFlag } from '@/settings/roles/hooks/useHasPermissionFlag';
 import { PermissionFlagType } from '~/generated-metadata/graphql';
 import { NavigationDrawerItem } from '@/ui/navigation/navigation-drawer/components/NavigationDrawerItem';
-import { IconBrandMeta } from 'twenty-ui/icon';
+import { IconBrandMeta, IconLayoutDashboard } from 'twenty-ui/icon';
 import { t } from '@lingui/core/macro';
 import { NavigationDrawerOpenedSection } from '@/navigation-menu-item/display/sections/components/NavigationDrawerOpenedSection';
 import { NavigationDrawerWorkspaceSectionSkeletonLoader } from '@/object-metadata/components/NavigationDrawerWorkspaceSectionSkeletonLoader';
@@ -40,6 +40,11 @@ export const MainNavigationDrawerScrollableItems = () => {
   return (
     <StyledScrollableItemsContainer>
       <NavigationDrawerOpenedSection />
+      <NavigationDrawerItem
+        label={t`Otogrow workspace`}
+        Icon={IconLayoutDashboard}
+        to="/delivery"
+      />
       {canManageLeadForms && (
         <NavigationDrawerItem
           label={t`Meta lead forms`}
