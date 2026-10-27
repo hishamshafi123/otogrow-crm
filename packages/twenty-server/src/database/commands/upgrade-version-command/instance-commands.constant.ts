@@ -164,6 +164,28 @@ import { AddMetaLeadNotificationStatusFastInstanceCommand } from 'src/database/c
 import { AddDeliveryWorkspaceFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1792822821202-add-delivery-workspace';
 import { AddDeliveryAgentsFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1792824583893-add-delivery-agents';
 import { AddDeliveryOperationsFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1792832831047-add-delivery-operations';
+import { AddOtogrowRoleAccessFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1792916611500-add-otogrow-role-access';
+import { AddOtogrowActivityFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1792921997275-add-otogrow-activity';
+import { AddActivitySourceNamesFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1792923507475-add-activity-source-names';
+import { AddDeliveryReminderOutboxFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1792924760229-add-delivery-reminder-outbox';
+import { AddOtogrowAiBudgetFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1792926292956-add-otogrow-ai-budget';
+import { AddAiSpendHistoryIndexFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1792928528022-add-ai-spend-history-index';
+import { AddDeliveryCommitmentsFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1792929062917-add-delivery-commitments';
+import { AddDeliveryWorkflowsFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1792930786458-add-delivery-workflows';
+import { AddDeliveryBatchesFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1792937196864-add-delivery-batches';
+import { AddDeliveryMetaReportsFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1792942106514-add-delivery-meta-reports';
+import { AddDeliveryTeamChatFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1792969805124-add-delivery-team-chat';
+import { AddDeliveryKnowledgeFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1792999216929-add-delivery-knowledge';
+import { AddDeliveryProjectRevisionFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1793059035908-add-delivery-project-revision';
+import { AddDeliveryAvailabilityFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1793060080823-add-delivery-availability';
+import { AddDeliveryRevisionsFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1793065339880-add-delivery-revisions';
+import { AddDeliveryHandoffsFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1793083523639-add-delivery-handoffs';
+import { AddDeliveryKnowledgeCategoryFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1793086114105-add-delivery-knowledge-category';
+import { AddDeliveryFinanceFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1793098333552-add-delivery-finance';
+import { AddDeliveryReconciliationFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1793102132820-add-delivery-reconciliation';
+import { AddDeliveryAiFinanceFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1793133548966-add-delivery-ai-finance';
+import { AddDeliveryFinancePeriodFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1793136306094-add-delivery-finance-period';
+import { AddDeliveryFinanceForecastFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1793139353868-add-delivery-finance-forecast';
 
 export const INSTANCE_COMMANDS = [
   AddViewFieldGroupIdIndexOnViewFieldFastInstanceCommand,
@@ -330,4 +352,26 @@ export const INSTANCE_COMMANDS = [
   AddDeliveryWorkspaceFastInstanceCommand,
   AddDeliveryAgentsFastInstanceCommand,
   AddDeliveryOperationsFastInstanceCommand,
+  AddOtogrowRoleAccessFastInstanceCommand,
+  AddOtogrowActivityFastInstanceCommand,
+  AddActivitySourceNamesFastInstanceCommand,
+  AddDeliveryReminderOutboxFastInstanceCommand,
+  AddOtogrowAiBudgetFastInstanceCommand,
+  AddAiSpendHistoryIndexFastInstanceCommand,
+  AddDeliveryCommitmentsFastInstanceCommand,
+  AddDeliveryWorkflowsFastInstanceCommand,
+  AddDeliveryBatchesFastInstanceCommand,
+  AddDeliveryMetaReportsFastInstanceCommand,
+  AddDeliveryTeamChatFastInstanceCommand,
+  AddDeliveryKnowledgeFastInstanceCommand,
+  AddDeliveryProjectRevisionFastInstanceCommand,
+  AddDeliveryAvailabilityFastInstanceCommand,
+  AddDeliveryRevisionsFastInstanceCommand,
+  AddDeliveryHandoffsFastInstanceCommand,
+  AddDeliveryKnowledgeCategoryFastInstanceCommand,
+  AddDeliveryFinanceFastInstanceCommand,
+  AddDeliveryReconciliationFastInstanceCommand,
+  AddDeliveryAiFinanceFastInstanceCommand,
+  AddDeliveryFinancePeriodFastInstanceCommand,
+  AddDeliveryFinanceForecastFastInstanceCommand,
 ];

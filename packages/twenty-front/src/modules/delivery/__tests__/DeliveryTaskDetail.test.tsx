@@ -2,11 +2,21 @@ import { i18n } from '@lingui/core';
 import { I18nProvider } from '@lingui/react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+jest.mock('@/delivery/revisions/DeliveryRevisions', () => ({
+  DeliveryRevisions: () => null,
+}));
 import { DeliveryTaskDetail } from '@/delivery/DeliveryTaskDetail';
 import {
   type DeliveryTask,
   type DeliveryWorkspace,
 } from '@/delivery/delivery.types';
+
+jest.mock('@/delivery/workflows/useTaskWorkflow', () => ({
+  useTaskWorkflow: () => ({ readyToSubmit: true, data: {}, reset: jest.fn() }),
+}));
+jest.mock('@/delivery/workflows/DeliveryTaskWorkflow', () => ({
+  DeliveryTaskWorkflow: () => null,
+}));
 
 jest.mock('@/delivery/deliveryStyles', () => ({
   StyledDeliveryStack: 'div',
@@ -52,6 +62,7 @@ const workspace: DeliveryWorkspace = {
   tasks: [task],
   projects: [
     {
+      revision: 1,
       id: 'project',
       name: 'Brand launch',
       companyId: null,

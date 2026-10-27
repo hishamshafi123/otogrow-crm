@@ -1,3 +1,6 @@
+const {
+  OtogrowAccessService,
+} = require('../dist/modules/otogrow-access/otogrow-access.service');
 // Runs against the local development database; all fixture writes roll back.
 const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
@@ -33,7 +36,7 @@ async function main() {
   await runner.startTransaction();
   try {
     const [workspace] = await runner.query(
-      'SELECT id, "databaseSchema" FROM core.workspace WHERE "databaseSchema" IS NOT NULL LIMIT 1',
+      `SELECT id, "databaseSchema" FROM core.workspace WHERE "databaseSchema" IS NOT NULL AND "activationStatus"='ACTIVE' LIMIT 1`,
     );
     assert(/^[a-zA-Z0-9_]+$/.test(workspace.databaseSchema));
     const schema = `"${workspace.databaseSchema}"`;
@@ -45,9 +48,18 @@ async function main() {
       [editor, 'Delivery editor fixture'],
       [outsider, 'Delivery outsider fixture'],
     ]) {
+      const userId = randomUUID();
+      await runner.query('INSERT INTO core."user" (id,email) VALUES ($1,$2)', [
+        userId,
+        `${id}@example.invalid`,
+      ]);
+      await runner.query(
+        'INSERT INTO core."userWorkspace" (id,"userId","workspaceId") VALUES ($1,$2,$3)',
+        [id, userId, workspace.id],
+      );
       await runner.query(
         `INSERT INTO ${schema}."workspaceMember" (id, "nameFirstName", "nameLastName", "userId", "userEmail") VALUES ($1,$2,'',$3,$4)`,
-        [id, name, randomUUID(), `${id}@example.invalid`],
+        [id, name, userId, `${id}@example.invalid`],
       );
     }
     const scopedDataSource = {
@@ -56,10 +68,11 @@ async function main() {
       query: (...args) => runner.query(...args),
       transaction: (callback) => callback(runner.manager),
     };
-    const service = new DeliveryService(scopedDataSource, {
+    const access = new OtogrowAccessService(scopedDataSource, {
       userHasWorkspaceSettingPermission: async ({ userWorkspaceId }) =>
         userWorkspaceId === admin,
     });
+    const service = new DeliveryService(scopedDataSource, access);
     const command = (actor, input) =>
       service.command(workspace, actor, actor, input);
     await command(admin, {
@@ -68,12 +81,54 @@ async function main() {
       companyId: null,
       memberIds: [editor],
     });
-    const project = await runner.manager
+    let project = await runner.manager
       .getRepository(DeliveryProjectEntity)
       .findOneByOrFail({
         name: 'Rollback delivery verification',
         workspaceId: workspace.id,
       });
+    assert.equal(project.revision, 1);
+    const editProject = {
+      action: 'project',
+      id: project.id,
+      revision: project.revision,
+      name: project.name,
+      companyId: null,
+      memberIds: [editor],
+    };
+    const countProjectEvents = async () =>
+      (
+        await runner.query(
+          'SELECT count(*)::int AS count FROM core."otogrowActivityEvent" WHERE "workspaceId"=$1 AND "sourceId"=$2',
+          [workspace.id, project.id],
+        )
+      )[0].count;
+    const eventsBefore = await countProjectEvents();
+    await command(admin, { ...editProject, name: 'Newer project name' });
+    await assert.rejects(command(admin, { ...editProject, memberIds: [] }), {
+      status: 409,
+    });
+    const { revision: _revision, ...missingRevision } = editProject;
+    await assert.rejects(command(admin, missingRevision), { status: 400 });
+    await assert.rejects(command(editor, { ...editProject, revision: 2 }), {
+      status: 403,
+    });
+    await assert.rejects(command(admin, { ...editProject, id: randomUUID() }), {
+      status: 404,
+    });
+    await command(admin, { ...editProject, revision: 2 });
+    await assert.rejects(command(admin, editProject), { status: 409 });
+    project = await runner.manager
+      .getRepository(DeliveryProjectEntity)
+      .findOneByOrFail({ id: project.id });
+    assert.equal(project.revision, 3);
+    assert.equal(project.name, editProject.name);
+    assert.deepEqual(project.memberIds, [editor]);
+    assert.equal(
+      await countProjectEvents(),
+      eventsBefore + 2,
+      'Rejected project edits leave no success event',
+    );
     let snapshot = await command(admin, {
       action: 'create',
       projectId: project.id,
@@ -131,6 +186,53 @@ async function main() {
         feedback: '',
       }),
     );
+    await assert.rejects(
+      command(admin, {
+        action: 'member',
+        workspaceMemberId: editor,
+        access: 'ADMIN',
+        roleLabel: 'Legacy bypass attempt',
+      }),
+      (error) => error.getStatus?.() === 400,
+    );
+    assert(
+      !(await access.getAccess(workspace.id, editor)).capabilities.includes(
+        'workspace.admin',
+      ),
+    );
+    const roleDirectory = await access.directory(workspace.id, admin, admin);
+    const administratorRole = roleDirectory.roles.find((role) =>
+      role.capabilities.includes('workspace.admin'),
+    );
+    assert(administratorRole);
+    await access.assignRoles(workspace.id, admin, admin, {
+      memberId: editor,
+      roleIds: [administratorRole.id],
+      roleRevisions: [
+        { id: administratorRole.id, revision: administratorRole.revision },
+      ],
+      revision: 0,
+    });
+    assert(
+      (await access.getAccess(workspace.id, editor)).capabilities.includes(
+        'workspace.admin',
+      ),
+    );
+    await assert.rejects(
+      command(editor, {
+        action: 'review',
+        taskId,
+        revision: task.revision,
+        decision: 'APPROVED',
+        feedback: 'An additional admin role must not allow self-approval',
+      }),
+    );
+    await access.assignRoles(workspace.id, admin, admin, {
+      memberId: editor,
+      roleIds: [],
+      roleRevisions: [],
+      revision: 1,
+    });
     await assert.rejects(
       command(admin, {
         action: 'review',
@@ -279,6 +381,7 @@ async function main() {
     await command(admin, {
       action: 'project',
       id: project.id,
+      revision: project.revision,
       name: project.name,
       companyId: null,
       memberIds: [],

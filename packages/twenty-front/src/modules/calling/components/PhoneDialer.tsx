@@ -12,6 +12,7 @@ import { IncomingCallControls } from '@/calling/components/IncomingCallControls'
 import { RecentCallsList } from '@/calling/components/RecentCallsList';
 import {
   initializeCallingDevice,
+  setCallingAccess,
   runVoicePreflight,
   startOutgoingCall,
 } from '@/calling/services/twilio-device-manager';
@@ -21,7 +22,7 @@ import { dialerErrorState } from '@/calling/states/dialerErrorState';
 import { dialerNumberState } from '@/calling/states/dialerNumberState';
 import { isDialerOpenState } from '@/calling/states/isDialerOpenState';
 import { preflightReportState } from '@/calling/states/preflightReportState';
-import { useIsLogged } from '@/auth/hooks/useIsLogged';
+import { useOtogrowAccess } from '@/otogrow-access/useOtogrowAccess';
 import { useAtomState } from '@/ui/utilities/state/jotai/hooks/useAtomState';
 import { useAtomStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomStateValue';
 
@@ -152,7 +153,7 @@ const toE164 = (rawNumber: string): string => {
 
 export const PhoneDialer = () => {
   const { t } = useLingui();
-  const isLogged = useIsLogged();
+  const { canUsePhone, scopeKey } = useOtogrowAccess();
   const [isDialerOpen, setIsDialerOpen] = useAtomState(isDialerOpenState);
   const [dialerNumber, setDialerNumber] = useAtomState(dialerNumberState);
   const callStatus = useAtomStateValue(callStatusState);
@@ -163,12 +164,12 @@ export const PhoneDialer = () => {
   // Registering the Twilio device is what makes inbound PSTN calls ring
   // this browser; it must happen on mount, not on the first outbound call.
   useEffect(() => {
-    if (isLogged) {
-      initializeCallingDevice();
-    }
-  }, [isLogged]);
+    setCallingAccess(canUsePhone ? scopeKey : null);
+    if (canUsePhone) void initializeCallingDevice();
+    return () => setCallingAccess(null);
+  }, [canUsePhone, scopeKey]);
 
-  if (!isLogged) {
+  if (!canUsePhone) {
     return null;
   }
 

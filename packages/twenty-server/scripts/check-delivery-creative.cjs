@@ -1,3 +1,9 @@
+const {
+  makeBudgetFixture,
+} = require('./helpers/otogrow-ai-budget-fixture.cjs');
+const {
+  OtogrowAccessService,
+} = require('../dist/modules/otogrow-access/otogrow-access.service');
 // Default mode rolls back synthetic data; --browser-fixture creates temporary UI records for the companion cleanup script.
 const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
@@ -8,18 +14,6 @@ const {
 const {
   DeliveryService,
 } = require('../dist/modules/delivery/delivery.service');
-const {
-  DeliveryAgentService,
-} = require('../dist/modules/delivery/agents/delivery-agent.service');
-const {
-  DeliveryAgentEntity,
-} = require('../dist/modules/delivery/entities/delivery-agent.entity');
-const {
-  DeliveryAgentRunEntity,
-} = require('../dist/modules/delivery/entities/delivery-agent-run.entity');
-const {
-  DeliveryTaskEntity,
-} = require('../dist/modules/delivery/entities/delivery-task.entity');
 
 async function main() {
   const { mkdtempSync, readFileSync, rmSync } = require('node:fs');
@@ -69,7 +63,7 @@ async function main() {
     const [workspace] = await runner.query(
       process.argv.includes('--browser-fixture')
         ? `SELECT w.* FROM core.workspace w JOIN core."userWorkspace" uw ON uw."workspaceId"=w.id JOIN core."user" u ON u.id=uw."userId" WHERE u.email='tim@apple.dev' LIMIT 1`
-        : 'SELECT * FROM core.workspace WHERE "databaseSchema" IS NOT NULL LIMIT 1',
+        : `SELECT * FROM core.workspace WHERE "databaseSchema" IS NOT NULL AND "activationStatus"='ACTIVE' LIMIT 1`,
     );
     assert(/^[a-zA-Z0-9_]+$/.test(workspace.databaseSchema));
     const schema = `"${workspace.databaseSchema}"`;
@@ -91,16 +85,28 @@ async function main() {
         [memberId, userId, `${userId}@example.invalid`],
       );
     }
+    let failAfterTransaction = false;
     const scoped = {
       manager: runner.manager,
       getRepository: (entity) => runner.manager.getRepository(entity),
       query: (...args) => runner.query(...args),
-      transaction: (callback) => callback(runner.manager),
+      transaction: (callback) =>
+        runner.manager.transaction(async (manager) => {
+          const result = await callback(manager);
+          if (failAfterTransaction) {
+            failAfterTransaction = false;
+            throw new Error(
+              'Synthetic failure after creative and activity writes',
+            );
+          }
+          return result;
+        }),
     };
-    const delivery = new DeliveryService(scoped, {
+    const access = new OtogrowAccessService(scoped, {
       userHasWorkspaceSettingPermission: async ({ userWorkspaceId }) =>
         userWorkspaceId === admin,
     });
+    const delivery = new DeliveryService(scoped, access);
     const mutateTask = (actor, input) =>
       delivery.command(workspace, actor, actor, input);
     let state = await mutateTask(admin, {
@@ -129,6 +135,25 @@ async function main() {
       },
     });
     const task = state.tasks.find((item) => item.projectId === project.id);
+    const confidential = `PRIVATE-CREATIVE-${randomUUID()}`;
+    const activity = () =>
+      runner.query(
+        'SELECT * FROM core."otogrowActivityEvent" WHERE "workspaceId"=$1 AND "taskId"=$2 ORDER BY "recordedAt",id',
+        [workspace.id, task.id],
+      );
+    const checkedOperation = async (operation) => {
+      const before = await activity();
+      try {
+        return await operation();
+      } catch (error) {
+        assert.deepEqual(
+          await activity(),
+          before,
+          'Denied creative changes must not record successful activity',
+        );
+        throw error;
+      }
+    };
     const {
       DeliveryCreativeService,
     } = require('../dist/modules/delivery/creative/delivery-creative.service');
@@ -153,14 +178,36 @@ async function main() {
     const controller = new DeliveryCreativeFilesController(creative, storage);
     const read = () => creative.read(workspace, editor, editor, task.id);
     const change = async (actor, input) =>
-      creative.command(workspace, actor, actor, {
-        taskId: task.id,
-        revision: (await read()).revision,
-        ...input,
-      });
+      checkedOperation(async () =>
+        creative.command(workspace, actor, actor, {
+          taskId: task.id,
+          revision: (await read()).revision,
+          ...input,
+        }),
+      );
     await assert.rejects(creative.read(workspace, outsider, outsider, task.id));
     await change(editor, { action: 'initialize' });
     let current = await read();
+    const beforeReads = await activity();
+    await read();
+    assert.deepEqual(
+      await activity(),
+      beforeReads,
+      'Creative reads and export preparation must not claim completed work',
+    );
+    failAfterTransaction = true;
+    await assert.rejects(
+      change(admin, {
+        action: 'brief',
+        brief: {
+          ...current.document.brief,
+          concept: 'Discarded',
+          productFacts: confidential,
+        },
+      }),
+      /Synthetic failure/,
+    );
+    assert.deepEqual(await read(), current);
     await assert.rejects(change(editor, { action: 'approveBrief' }));
     await change(admin, {
       action: 'brief',
@@ -168,6 +215,7 @@ async function main() {
         ...current.document.brief,
         concept: '20% offer product demo',
         productFacts: '20% off; blue cotton shirt',
+        mandatoryClaims: confidential,
       },
     });
     await change(admin, { action: 'approveBrief' });
@@ -175,7 +223,7 @@ async function main() {
       action: 'reference',
       fields: {
         title: 'Reference',
-        url: 'https://example.com/ref',
+        url: `https://example.com/${confidential}`,
         assetId: null,
         summary: 'Synthetic',
         angle: 'Offer',
@@ -205,7 +253,7 @@ async function main() {
       subject: 'Product',
       product: 'Shirt',
       location: 'Studio',
-      notes: '',
+      notes: confidential,
       referenceId: reference.id,
     };
     await change(editor, { action: 'shot', fields });
@@ -228,8 +276,8 @@ async function main() {
         { mode: 0o600 },
       );
       await runner.commitTransaction();
-      console.log(
-        'Temporary synthetic browser fixture created. Cleanup identifiers saved in /tmp/otogrow-phase3-browser.json.',
+      process.stdout.write(
+        'Temporary synthetic browser fixture created. Cleanup identifiers saved in /tmp/otogrow-phase3-browser.json.\n',
       );
       return;
     }
@@ -345,6 +393,9 @@ async function main() {
       ctaIds: [ctaId],
     });
     assert.equal((await read()).document.variants.length, 1);
+    const variantId = (await read()).document.variants[0].id;
+    await change(editor, { action: 'selectVariants', ids: [] });
+    await change(editor, { action: 'selectVariants', ids: [variantId] });
     const finalId = await add('FINAL');
     await assert.rejects(
       change(editor, {
@@ -379,11 +430,14 @@ async function main() {
       decision: 'APPROVED',
       feedback: 'Verified fixture',
     });
+    await assert.rejects(change(admin, {action:'reopen', notes:'Ambiguous legacy amount', revisionCharge:10}));
     await change(admin, {
       action: 'reopen',
       notes: 'New client revision',
       revisionCharge: 0,
     });
+    const [creativeRevision] = await runner.query('SELECT source, reason, "proposedCharge" FROM core."deliveryRevision" WHERE "taskId"=$1 ORDER BY round DESC LIMIT 1',[task.id]);
+    assert.equal(creativeRevision.source,'CREATIVE_REOPEN');assert.equal(creativeRevision.reason,'New client revision');assert.equal(creativeRevision.proposedCharge,'0');
     await change(editor, {
       action: 'shot',
       id: shot.id,
@@ -441,6 +495,23 @@ async function main() {
       (await read()).document.assets.find((asset) => asset.id === failedId)
         .storageState,
       'FAILED',
+    );
+    const failedUploadEvents = (await activity()).filter((event) =>
+      event.changes.some(
+        (change) => change.field === 'assetId' && change.after === failedId,
+      ),
+    );
+    assert.deepEqual(failedUploadEvents.map((event) => event.action).sort(), [
+      'CREATIVE_UPLOAD_FAILED',
+      'CREATIVE_UPLOAD_STARTED',
+    ]);
+    assert(
+      failedUploadEvents.some(
+        (event) =>
+          event.outcome === 'FAILED' &&
+          event.actorType === 'SYSTEM' &&
+          event.actorId === null,
+      ),
     );
     let providerCalls = 0;
     let enteredProvider;
@@ -514,6 +585,10 @@ async function main() {
         { modelId: 'google/gemini-3.1-flash-image' },
       ],
     };
+    const budget = await makeBudgetFixture(scoped, access, workspace, [
+      { modelId: 'google/gemini-3.1-flash-image', kind: 'IMAGE' },
+      { modelId: 'google/gemini-3.5-flash-lite', kind: 'INSPECTION' },
+    ]);
     const media = new DeliveryMediaService(
       scoped,
       creative,
@@ -523,13 +598,16 @@ async function main() {
       storage,
       { add: async () => undefined },
       new (require('../dist/modules/delivery/creative/delivery-assembly.adapter').DeliveryAssemblyAdapter)(),
+      budget,
     );
     const mediaChange = async (actor, input) =>
-      media.command(workspace, actor, actor, {
-        taskId: task.id,
-        revision: (await read()).revision,
-        ...input,
-      });
+      checkedOperation(async () =>
+        media.command(workspace, actor, actor, {
+          taskId: task.id,
+          revision: (await read()).revision,
+          ...input,
+        }),
+      );
     const configuration = {
       action: 'configure',
       enabled: true,
@@ -558,6 +636,35 @@ async function main() {
     await media.execute(workspace.id, task.id, run.id);
     assert.equal(providerCalls, 1);
     assert.equal((await read()).document.mediaRuns[0].status, 'SUCCEEDED');
+    const runEvents = (runId) =>
+      activity().then((events) =>
+        events.filter((event) =>
+          event.changes.some(
+            (change) => change.field === 'mediaRunId' && change.after === runId,
+          ),
+        ),
+      );
+    const completedEvents = await runEvents(run.id);
+    assert.deepEqual(completedEvents.map((event) => event.action).sort(), [
+      'MEDIA_QUEUED',
+      'MEDIA_RUNNING',
+      'MEDIA_SUCCEEDED',
+    ]);
+    assert.equal(
+      completedEvents.find((event) => event.action === 'MEDIA_QUEUED')
+        .actorType,
+      'HUMAN',
+    );
+    assert.equal(
+      completedEvents.find((event) => event.action === 'MEDIA_SUCCEEDED')
+        .actorType,
+      'AGENT',
+    );
+    assert.equal(
+      completedEvents.find((event) => event.action === 'MEDIA_SUCCEEDED')
+        .actorId,
+      editor,
+    );
     current = await read();
     const generated = current.document.assets.find(
       (asset) => asset.id === current.document.mediaRuns[0].assetId,
@@ -594,6 +701,26 @@ async function main() {
     await media.execute(workspace.id, task.id, renderRun.id);
     const rendered = (await read()).document.mediaRuns.at(-1);
     assert.equal(rendered.status, 'SUCCEEDED');
+    assert.equal(
+      (
+        await runner.query(
+          'SELECT id FROM core."otogrowAiSpend" WHERE "sourceRunId"=$1',
+          [renderRun.id],
+        )
+      ).length,
+      0,
+      'Local FFmpeg must not reserve paid AI money',
+    );
+    const renderEvents = await runEvents(renderRun.id);
+    assert.equal(
+      renderEvents.find((event) => event.action === 'MEDIA_SUCCEEDED')
+        .actorType,
+      'SYSTEM',
+    );
+    assert.equal(
+      renderEvents.find((event) => event.action === 'MEDIA_SUCCEEDED').actorId,
+      null,
+    );
     const renderedAsset = (await read()).document.assets.find(
       (item) => item.id === rendered.assetId,
     );
@@ -628,6 +755,18 @@ async function main() {
     await media.execute(workspace.id, task.id, inspectionRun.id);
     const inspected = (await read()).document.mediaRuns.at(-1);
     assert.equal(inspected.status, 'SUCCEEDED');
+    const [inspectionSpend] = await runner.query(
+      'SELECT state,"actualMicroUsd" FROM core."otogrowAiSpend" WHERE "sourceRunId"=$1',
+      [inspectionRun.id],
+    );
+    assert.equal(inspectionSpend.state, 'SETTLED');
+    assert.equal(inspectionSpend.actualMicroUsd, '20');
+    assert.equal(
+      (await runEvents(inspectionRun.id)).filter(
+        (event) => event.action === 'MEDIA_SUCCEEDED',
+      ).length,
+      1,
+    );
     assert.equal(inspected.inspection.findings[0].assetId, inspectionAssetId);
     assert.equal(
       (await read()).document.assets.find(
@@ -663,15 +802,83 @@ async function main() {
         changeDuringRun === 'cancel' ? 'CANCELLED' : 'FAILED',
       );
       assert.equal(completed.assetId, null);
+      const interruptedEvents = await runEvents(latestRun.id);
+      assert(
+        !interruptedEvents.some((event) => event.action === 'MEDIA_SUCCEEDED'),
+      );
+      assert.equal(
+        interruptedEvents.filter(
+          (event) =>
+            event.action ===
+            (changeDuringRun === 'cancel' ? 'MEDIA_CANCELLED' : 'MEDIA_FAILED'),
+        ).length,
+        1,
+      );
       modelAllowed = true;
       if (changeDuringRun === 'brief')
         await change(admin, { action: 'approveBrief' });
     }
     await mediaChange(admin, { ...configuration, dailyRunLimit: 1 });
     await assert.rejects(mediaChange(editor, generation()), /limit/);
+    const events = await activity();
+    for (const action of [
+      'CREATIVE_INITIALIZED',
+      'CREATIVE_BRIEF_UPDATED',
+      'CREATIVE_BRIEF_APPROVED',
+      'CREATIVE_REFERENCE_ADDED',
+      'CREATIVE_REFERENCES_REVIEWED',
+      'CREATIVE_SHOT_CREATED',
+      'CREATIVE_SHOT_UPDATED',
+      'CREATIVE_ASSET_ESCALATED',
+      'CREATIVE_ASSET_REVIEWED',
+      'CREATIVE_ASSET_SELECTED',
+      'CREATIVE_ASSEMBLY_UPDATED',
+      'CREATIVE_VARIANTS_CREATED',
+      'CREATIVE_VARIANTS_SELECTED',
+      'CREATIVE_REOPENED',
+      'CREATIVE_UPLOAD_STARTED',
+      'CREATIVE_UPLOAD_COMPLETED',
+      'CREATIVE_UPLOAD_FAILED',
+      'MEDIA_CONFIGURED',
+    ])
+      assert(
+        events.some((event) => event.action === action),
+        `Missing ${action}`,
+      );
+    const finalReview = events.filter(
+      (event) =>
+        event.action === 'TASK_REVIEWED' && event.outcome === 'APPROVED',
+    );
+    assert.equal(finalReview.length, 1);
+    assert.equal(finalReview[0].actorId, admin);
+    assert.equal(finalReview[0].subjectMemberId, editor);
+    assert(
+      events.some(
+        (event) =>
+          event.action === 'CREATIVE_ASSET_REVIEWED' &&
+          event.actorId === admin &&
+          event.outcome === 'APPROVED',
+      ),
+    );
+    const serializedActivity = JSON.stringify(events);
+    for (const value of [
+      confidential,
+      'A blue cotton shirt',
+      'Slow camera move',
+      'FIXTURE_ONLY',
+      'synthetic-provider-id',
+      'Fixture region only',
+      'Upload fixture failure',
+      '20% off; blue cotton shirt',
+    ])
+      assert(
+        !serializedActivity.includes(value),
+        'Activity must not retain private creative contents, prompts or provider details',
+      );
     await mutateTask(admin, {
       action: 'project',
       id: project.id,
+      revision: project.revision,
       name: project.name,
       companyId: null,
       memberIds: [],
@@ -680,8 +887,8 @@ async function main() {
     await assert.rejects(
       controller.download(workspace, editor, editor, task.id, image.id, {}),
     );
-    console.log(
-      'PASS: scoped creative workflow, references, briefs, shot lineage, upload validation/cleanup, escalation, final approval, revisions, variants, generation idempotency/cancellation/stale inputs/model revocation/limits, and revoked downloads. All synthetic records rolled back; no provider calls.',
+    process.stdout.write(
+      'PASS: scoped creative workflow and durable milestones; atomic denied/failed writes, upload success/failure, named review/variant actions, idempotent media lifecycle and actor attribution, secret exclusion and independent final approval. All synthetic records rolled back; no provider calls.\n',
     );
   } finally {
     if (runner.isTransactionActive) await runner.rollbackTransaction();
@@ -690,6 +897,6 @@ async function main() {
   }
 }
 main().catch((error) => {
-  console.error(error);
+  process.stderr.write(`${error.stack ?? error}\n`);
   process.exitCode = 1;
 });

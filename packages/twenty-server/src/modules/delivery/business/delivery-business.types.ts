@@ -14,10 +14,8 @@ const currency = z.enum([
   'AUD',
   'CAD',
 ]);
-const url = z
-  .url()
-  .max(2000)
-  .refine((value) => ['http:', 'https:'].includes(new URL(value).protocol));
+export { currency as deliveryCurrencySchema, money as deliveryMoneySchema };
+const url = z.url({ protocol: /^https?$/ }).max(2000);
 const base = {
   id: identifier.optional(),
   revision: z.number().int().nonnegative(),
@@ -33,6 +31,18 @@ export const businessRecordSchema = z.discriminatedUnion('kind', [
       sourceUrl: url.nullable(),
       ownerId: identifier,
       private: z.boolean(),
+      roleGrants: z
+        .array(
+          z
+            .object({
+              roleId: identifier,
+              read: z.boolean(),
+              send: z.boolean(),
+            })
+            .strict(),
+        )
+        .max(100)
+        .optional(),
       grants: z
         .array(
           z

@@ -4,7 +4,10 @@ import {
   canDraftConversation,
   financialSummary,
 } from 'src/modules/delivery/business/delivery-business.policy';
-import { type BusinessRecord } from 'src/modules/delivery/business/delivery-business.types';
+import {
+  businessCommandSchema,
+  type BusinessRecord,
+} from 'src/modules/delivery/business/delivery-business.types';
 
 const actor = { memberId: 'employee', isAdmin: false, isManager: false };
 const manager = { memberId: 'manager', isAdmin: true, isManager: true };
@@ -59,6 +62,37 @@ const finance = (
     notes: '',
     ...extra,
   }) as BusinessRecord;
+
+describe('business evidence validation', () => {
+  const transition = {
+    action: 'transition',
+    id: 'e090d6e5-41b8-4fbc-94aa-f762277cd137',
+    revision: 1,
+    status: 'PAID',
+    note: 'Reviewed receipt evidence.',
+  };
+
+  it.each(['not-a-url', 'javascript:alert(1)', 'ftp://example.com/receipt'])(
+    'rejects unsupported evidence %s without a raw URL error',
+    (evidence) => {
+      expect(() =>
+        businessCommandSchema.safeParse({ ...transition, evidence }),
+      ).not.toThrow();
+      expect(
+        businessCommandSchema.safeParse({ ...transition, evidence }).success,
+      ).toBe(false);
+    },
+  );
+
+  it.each(['http://example.com/receipt', 'https://example.com/receipt', null])(
+    'preserves supported evidence %s',
+    (evidence) => {
+      expect(
+        businessCommandSchema.parse({ ...transition, evidence }),
+      ).toMatchObject({ evidence });
+    },
+  );
+});
 
 describe('business permissions and transitions', () => {
   it('does not turn project membership into conversation access', () => {

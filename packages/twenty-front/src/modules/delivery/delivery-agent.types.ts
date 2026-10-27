@@ -10,6 +10,7 @@ export type DeliveryAgentConfiguration = {
   modelId: string | null;
   projectIds: string[];
   roles: ('ADMIN' | 'MANAGER' | 'MEMBER')[];
+  roleIds?: string[] | null;
   dailyRunLimit: number;
   maxOutputTokens: number;
   humanConfirmation: true;
@@ -58,6 +59,8 @@ export type DeliveryAgentRun = {
   updatedAt: string;
 };
 export type DeliveryAgentsSnapshot = {
+  actor: { workspaceId: string; memberId: string; userWorkspaceId: string };
+  runnableAgentIds: string[];
   agents: DeliveryAgent[];
   runs: DeliveryAgentRun[];
   models: { id: string; provider: string; price: number | null }[];

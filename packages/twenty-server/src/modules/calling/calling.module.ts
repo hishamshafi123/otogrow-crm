@@ -12,6 +12,8 @@ import { CallRecordingController } from 'src/modules/calling/controllers/call-re
 import { TwilioVoiceWebhookController } from 'src/modules/calling/controllers/twilio-voice-webhook.controller';
 import { CallLogService } from 'src/modules/calling/services/call-log.service';
 import { CallTimelineService } from 'src/modules/calling/services/call-timeline.service';
+import { CallAccessService } from 'src/modules/calling/services/call-access.service';
+import { OtogrowAccessModule } from 'src/modules/otogrow-access/otogrow-access.module';
 import { ContactCreationManagerModule } from 'src/modules/contact-creation-manager/contact-creation-manager.module';
 import { TimelineActivityModule } from 'src/modules/timeline/timeline-activity.module';
 import { TimelineActivityWorkspaceEntity } from 'src/modules/timeline/standard-objects/timeline-activity.workspace-entity';
@@ -23,6 +25,7 @@ import { TimelineActivityWorkspaceEntity } from 'src/modules/timeline/standard-o
       TimelineActivityWorkspaceEntity,
     ]),
     TwilioConfigModule,
+    OtogrowAccessModule,
     ContactCreationManagerModule,
     TimelineActivityModule,
     ThrottlerModule,
@@ -31,7 +34,7 @@ import { TimelineActivityWorkspaceEntity } from 'src/modules/timeline/standard-o
     WorkspaceCacheStorageModule,
   ],
   controllers: [TwilioVoiceWebhookController, CallRecordingController],
-  providers: [CallLogService, CallTimelineService],
+  providers: [CallLogService, CallTimelineService, CallAccessService],
   exports: [CallLogService],
 })
 export class CallingModule {}

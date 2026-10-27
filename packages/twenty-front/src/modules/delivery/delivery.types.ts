@@ -1,4 +1,6 @@
+import { type AppliedWorkflow } from '@/delivery/workflows/workflow.types';
 import { type CreativeDocument } from '@/delivery/delivery-creative.types';
+import { type TaskPlan } from '@/delivery/capacity/capacity.types';
 export type DeliveryState =
   | 'PLANNED'
   | 'IN_PROGRESS'
@@ -17,8 +19,23 @@ export type DeliverySubmission = {
   feedback?: string;
   reviewedBy?: string;
   reviewedAt?: string;
+  workflow?: AppliedWorkflow;
+  workflowReview?: { checkedIds: string[] };
 };
 export type DeliveryTask = {
+  delivery?: {
+    timezone: string;
+    status:
+      | 'NOT_DELIVERED'
+      | 'WAITING'
+      | 'FULFILLED'
+      | 'REDOING'
+      | 'NEEDS_RECONFIRMATION';
+    cycle: number;
+    deliveredAt: string | null;
+    nextCheckAt: string | null;
+    deliveredSubmissionVersion: number | null;
+  };
   id: string;
   title: string;
   assigneeId: string;
@@ -26,7 +43,9 @@ export type DeliveryTask = {
   projectId: string;
   revision: number;
   details: {
+    plan?: TaskPlan;
     assignmentAt?: string;
+    workflow?: AppliedWorkflow;
     creative?: CreativeDocument;
     draftCopy?: string;
     brief: string;
@@ -50,6 +69,7 @@ export type DeliveryTask = {
 };
 export type DeliveryProject = {
   id: string;
+  revision: number;
   name: string;
   companyId: string | null;
   memberIds: string[];

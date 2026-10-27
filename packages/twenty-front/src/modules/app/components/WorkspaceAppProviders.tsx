@@ -10,6 +10,7 @@ import { PageChangeEffect } from '@/app/effect-components/PageChangeEffect';
 import { AuthProvider } from '@/auth/components/AuthProvider';
 import { SignOutOnOtherTabSignOutEffect } from '@/auth/effect-components/SignOutOnOtherTabSignOutEffect';
 import { PhoneDialer } from '@/calling/components/PhoneDialer';
+import { OtogrowAccessLoaderEffect } from '@/otogrow-access/OtogrowAccessLoaderEffect';
 import { CaptchaProvider } from '@/captcha/components/CaptchaProvider';
 import { RequestFreshCaptchaTokenEffect } from '@/captcha/components/RequestFreshCaptchaTokenEffect';
 import { CommandMenuConfirmationModalManager } from '@/command-menu-item/confirmation-modal/components/CommandMenuConfirmationModalManager';
@@ -74,6 +75,7 @@ export const WorkspaceAppProviders = () => {
                             <GlobalFilePreviewModal />
                             <CommandMenuConfirmationModalManager />
                             <CommandRunner />
+                            <OtogrowAccessLoaderEffect />
                             <PhoneDialer />
                           </StrictMode>
                         </DialogManager>

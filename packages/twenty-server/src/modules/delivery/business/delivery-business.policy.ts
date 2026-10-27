@@ -1,13 +1,24 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { type BusinessRecord } from 'src/modules/delivery/business/delivery-business.types';
 
-type BusinessActor = { memberId: string; isAdmin: boolean; isManager: boolean };
+type BusinessActor = {
+  memberId: string;
+  isAdmin: boolean;
+  isManager: boolean;
+  capabilities?: string[];
+  roleIds?: string[];
+};
+export const canManageFinance = (actor: BusinessActor) =>
+  actor.isAdmin || actor.capabilities?.includes('finance.manage') === true;
+export const canReadFinance = (actor: BusinessActor) =>
+  canManageFinance(actor) ||
+  actor.capabilities?.includes('finance.read') === true;
 export const canReadBusinessRecord = (
   record: BusinessRecord,
   actor: BusinessActor,
   projectIds: Set<string>,
 ) => {
-  if (record.kind === 'FINANCE') return actor.isAdmin;
+  if (record.kind === 'FINANCE') return canReadFinance(actor);
   if (record.kind === 'CONVERSATION')
     return record.private
       ? record.ownerId === actor.memberId
@@ -15,6 +26,9 @@ export const canReadBusinessRecord = (
           record.ownerId === actor.memberId ||
           record.grants.some(
             (grant) => grant.memberId === actor.memberId && grant.read,
+          ) ||
+          (record.roleGrants ?? []).some(
+            (grant) => actor.roleIds?.includes(grant.roleId) && grant.read,
           );
   if (actor.isManager) return true;
   if (!record.projectId || !projectIds.has(record.projectId)) return false;
@@ -32,6 +46,10 @@ export const canDraftConversation = (
     record.ownerId === actor.memberId ||
     record.grants.some(
       (grant) => grant.memberId === actor.memberId && grant.read && grant.send,
+    ) ||
+    (record.roleGrants ?? []).some(
+      (grant) =>
+        actor.roleIds?.includes(grant.roleId) && grant.read && grant.send,
     ));
 
 export const assertBusinessTransition = (
@@ -45,19 +63,20 @@ export const assertBusinessTransition = (
       'This record does not support that transition.',
     );
   if (status === 'VOID') {
-    if (!actor.isAdmin) throw new ForbiddenException();
+    if (record.kind === 'FINANCE' ? !canManageFinance(actor) : !actor.isAdmin)
+      throw new ForbiddenException();
     return;
   }
   if (record.kind === 'FINANCE') {
     if (
-      !actor.isAdmin ||
+      !canManageFinance(actor) ||
       status !== 'PAID' ||
       record.category !== 'RECEIVABLE' ||
       record.status === 'PAID' ||
       !evidence
     )
       throw new BadRequestException(
-        'An administrator must confirm an unpaid receivable with payment evidence.',
+        'Finance editing permission and payment evidence are required to confirm an unpaid receivable.',
       );
     return;
   }
@@ -133,6 +152,7 @@ export const assertBusinessTransition = (
 export const financialSummary = (
   records: BusinessRecord[],
   now = new Date(),
+  settledReceivables: ReadonlyMap<string, bigint> = new Map(),
 ) => {
   const finance = records.filter(
     (record): record is Extract<BusinessRecord, { kind: 'FINANCE' }> =>
@@ -203,7 +223,16 @@ export const financialSummary = (
           (record) =>
             record.category === 'RECEIVABLE' && record.status !== 'PAID',
         )
-        .reduce((total, record) => total + record.amount, 0),
+        .reduce(
+          (total, record) =>
+            total +
+            Math.max(
+              0,
+              record.amount -
+                Number(settledReceivables.get(record.id) ?? BigInt(0)) / 10000,
+            ),
+          0,
+        ),
       overdue: rows
         .filter(
           (record) =>
@@ -212,7 +241,16 @@ export const financialSummary = (
             record.dueDate &&
             record.dueDate < date,
         )
-        .reduce((total, record) => total + record.amount, 0),
+        .reduce(
+          (total, record) =>
+            total +
+            Math.max(
+              0,
+              record.amount -
+                Number(settledReceivables.get(record.id) ?? BigInt(0)) / 10000,
+            ),
+          0,
+        ),
       projects: projectIds.map((projectId) => {
         const project = settled.filter(
           (record) => record.projectId === projectId && record.date > start,

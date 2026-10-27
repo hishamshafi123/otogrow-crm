@@ -17,7 +17,7 @@ export const PhonesFieldDisplay = () => {
   const { fieldValue, fieldDefinition } = usePhonesFieldDisplay();
   const { copyToClipboard } = useCopyToClipboard();
   const { isFocused } = useFieldFocus();
-  const { openDialer } = useOpenDialer();
+  const { openDialer, canUsePhone } = useOpenDialer();
   const { recordId } = useContext(FieldContext);
   const { objectNameSingular } = useRecordIndexContextOrThrow();
 
@@ -48,7 +48,7 @@ export const PhonesFieldDisplay = () => {
       value={fieldValue}
       isFocused={isFocused}
       onPhoneNumberClick={handleClick}
-      onCallNumberClick={handleCallClick}
+      onCallNumberClick={canUsePhone ? handleCallClick : undefined}
     />
   );
 };

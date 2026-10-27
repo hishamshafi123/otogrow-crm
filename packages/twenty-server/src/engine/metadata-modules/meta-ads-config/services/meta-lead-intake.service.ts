@@ -4,7 +4,7 @@ import { isNonEmptyString } from '@sniptt/guards';
 import { type CountryCode } from 'libphonenumber-js';
 import { FieldActorSource } from 'twenty-shared/types';
 import { isDefined } from 'twenty-shared/utils';
-import { type DeepPartial } from 'typeorm';
+import { type QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
 import { v4 } from 'uuid';
 
 import { MetaAdsConfigEntity } from 'src/engine/metadata-modules/meta-ads-config/entities/meta-ads-config.entity';
@@ -181,7 +181,8 @@ export class MetaLeadIntakeService {
 
         if (person && previous) {
           const before = this.mapFieldData(previous.answers);
-          const partialEntity: DeepPartial<PersonWorkspaceEntity> = {};
+          const partialEntity: QueryDeepPartialEntity<PersonWorkspaceEntity> =
+            {};
 
           // Preserve CRM edits while applying changes to fields still owned by the sheet.
           if (
@@ -432,7 +433,7 @@ export class MetaLeadIntakeService {
     mappedValues: MappedLeadValues,
     companyId: string | null,
   ): Promise<void> {
-    const partialEntity: DeepPartial<PersonWorkspaceEntity> = {};
+    const partialEntity: QueryDeepPartialEntity<PersonWorkspaceEntity> = {};
 
     if (isDefined(person.deletedAt)) {
       partialEntity.deletedAt = null;

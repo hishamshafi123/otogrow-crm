@@ -11,7 +11,7 @@ const mockOpenDialer = jest.fn();
 const mockUpdate = jest.fn().mockResolvedValue({});
 const mockRefetch = jest.fn();
 jest.mock('@/calling/hooks/useOpenDialer', () => ({
-  useOpenDialer: () => ({ openDialer: mockOpenDialer }),
+  useOpenDialer: () => ({ openDialer: mockOpenDialer, canUsePhone: true }),
 }));
 jest.mock('@/object-record/hooks/useFindOneRecord', () => ({
   useFindOneRecord: () => ({

@@ -1,8 +1,9 @@
+import { workflowPinSchema } from 'src/modules/delivery/workflows/delivery-workflows.types';
 import { type MetaReporting } from 'src/modules/delivery/advertising/delivery-meta.types';
 import { type DeliveryBusiness } from 'src/modules/delivery/business/delivery-business.types';
 import { type DeliveryClients } from 'src/modules/delivery/clients/delivery-clients.types';
 import { z } from 'zod';
-import { deliveryCommandSchema } from 'src/modules/delivery/delivery-validation';
+import { deliveryTaskFieldsSchema } from 'src/modules/delivery/delivery-validation';
 
 const identifier = z.uuid();
 const text = z.string().trim().min(1).max(2000);
@@ -11,7 +12,8 @@ export const recurrenceSchema = z
   .object({
     id: identifier.optional(),
     projectId: identifier,
-    fields: deliveryCommandSchema.options[2].shape.fields,
+    workflow: workflowPinSchema.nullish(),
+    fields: deliveryTaskFieldsSchema,
     frequency: z.enum(['DAILY', 'WEEKLY', 'MONTHLY']),
     weekdays: z.array(z.number().int().min(0).max(6)).min(1).max(7),
     monthDay: z.number().int().min(1).max(31),
@@ -46,6 +48,7 @@ export type DeliveryNotice = {
   cancelled: boolean;
   sendState:
     | 'PENDING'
+    | 'QUEUED'
     | 'SENDING'
     | 'SENT'
     | 'UNCONFIGURED'
@@ -56,6 +59,7 @@ export type DeliveryNotice = {
   error: string | null;
 };
 export type Fulfilment = {
+  deliveredSubmissionVersion?: number;
   taskId: string;
   status: 'WAITING' | 'FULFILLED' | 'REDOING';
   deliveredAt: string;
@@ -148,6 +152,7 @@ export const operationsCommandSchema = z.discriminatedUnion('action', [
     })
     .strict(),
   z.object({ action: z.literal('acknowledge'), id: identifier }).strict(),
+  z.object({ action: z.literal('noticeSeen'), id: identifier }).strict(),
   z.object({ action: z.literal('seen'), ...task }).strict(),
   z
     .object({

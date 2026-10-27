@@ -5,13 +5,23 @@ export const metaConfigurationSchema = z
     accountId: z.string().regex(/^\d{5,30}$/),
     token: z.string().trim().min(20).max(4096).optional(),
     revision: z.number().int().nonnegative(),
+    engagementId: z.uuid().nullable().optional(),
+    scheduleTimezone: z.literal('Asia/Qatar').nullable().optional(),
     projectId: z.uuid().nullable(),
     managerId: z.uuid().nullable(),
     marketerId: z.uuid().nullable(),
     time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
     enabled: z.boolean(),
+    catchUpDays: z.number().int().min(1).max(90).optional(),
+    refreshDays: z.number().int().min(0).max(30).optional(),
+    dailyImportLimit: z.number().int().min(1).max(100).optional(),
   })
-  .strict();
+  .strict()
+  .refine(
+    (configuration) =>
+      (configuration.refreshDays ?? 7) <= (configuration.catchUpDays ?? 14),
+    { message: 'Refresh days cannot exceed catch-up days.' },
+  );
 export type MetaInsightRow = {
   date_start: string;
   date_stop: string;
@@ -43,8 +53,10 @@ export type MetaConnection = Omit<
   error: string | null;
   retryAt: string | null;
   lease: { id: string; until: string } | null;
+  checks?: { date: string; reportId: string; checkedAt: string }[];
 };
 export type MetaReport = {
+  engagementId?: string | null;
   id: string;
   accountId: string;
   projectId: string | null;
@@ -66,6 +78,12 @@ export type MetaReporting = {
   connections: MetaConnection[];
   reports: MetaReport[];
   workerSeenAt: string | null;
+  attempts?: {
+    accountId: string;
+    date: string;
+    count: number;
+    retryAt?: string;
+  }[];
 };
 export const newMetaReporting = (): MetaReporting => ({
   connections: [],
@@ -73,6 +91,13 @@ export const newMetaReporting = (): MetaReporting => ({
   workerSeenAt: null,
 });
 export const metaCommandSchema = z.discriminatedUnion('action', [
+  z
+    .object({
+      action: z.literal('archive'),
+      id: z.uuid(),
+      archived: z.boolean(),
+    })
+    .strict(),
   z
     .object({
       action: z.literal('connect'),
@@ -83,6 +108,7 @@ export const metaCommandSchema = z.discriminatedUnion('action', [
     .object({
       action: z.literal('sync'),
       accountId: z.string().regex(/^\d{5,30}$/),
+      date: z.iso.date().optional(),
     })
     .strict(),
   z
@@ -95,6 +121,14 @@ export const metaCommandSchema = z.discriminatedUnion('action', [
   z
     .object({
       action: z.literal('review'),
+      expectedRouting: z
+        .object({
+          projectId: z.uuid().nullable(),
+          managerId: z.uuid().nullable(),
+          marketerId: z.uuid().nullable(),
+        })
+        .strict()
+        .optional(),
       id: z.uuid(),
       status: z.enum(['APPROVED', 'CHANGES_REQUESTED']),
       note: z.string().trim().min(1).max(2000),

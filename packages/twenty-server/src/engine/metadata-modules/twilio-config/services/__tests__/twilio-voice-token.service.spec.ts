@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 
 import { type TwilioConfigEntity } from 'src/engine/metadata-modules/twilio-config/entities/twilio-config.entity';
 import { TwilioVoiceTokenService } from 'src/engine/metadata-modules/twilio-config/services/twilio-voice-token.service';
@@ -10,17 +10,30 @@ const decodeJwtPayload = (token: string): Record<string, unknown> =>
   JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString());
 
 describe('TwilioVoiceTokenService', () => {
+  const access = { requireCapability: jest.fn() };
+  beforeEach(() => {
+    access.requireCapability.mockReset().mockResolvedValue({
+      workspaceId: WORKSPACE_ID,
+      memberId: WORKSPACE_MEMBER_ID,
+      userWorkspaceId: 'user-workspace-id',
+      capabilities: ['phone.use'],
+    });
+  });
   const buildService = (config: Partial<TwilioConfigEntity> | null) => {
     const twilioConfigService = {
       findByWorkspaceId: jest.fn().mockResolvedValue(config),
       decryptApiKeySecret: jest.fn().mockReturnValue('api-key-secret'),
     };
 
-    return new TwilioVoiceTokenService(twilioConfigService as never);
+    return new TwilioVoiceTokenService(
+      twilioConfigService as never,
+      access as never,
+    );
   };
 
   it('should mint a JWT with a voice grant scoped to the TwiML app and member identity', async () => {
     const service = buildService({
+      isActive: true,
       accountSid: 'ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
       apiKeySid: 'SKxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
       apiKeySecret: 'enc:v2:xxx' as never,
@@ -54,6 +67,71 @@ describe('TwilioVoiceTokenService', () => {
     );
     expect(payload.grants.voice.incoming.allow).toBe(true);
     expect(payload.exp - payload.iat).toBe(3600);
+    expect(access.requireCapability).toHaveBeenCalledWith(
+      WORKSPACE_ID,
+      WORKSPACE_MEMBER_ID,
+      'phone.use',
+    );
+  });
+
+  it.each([undefined, 'outsider', 'inactive-member', 'marketing-member'])(
+    'denies token minting at the service boundary for %s before reading credentials',
+    async (workspaceMemberId) => {
+      access.requireCapability.mockRejectedValue(
+        new ForbiddenException('Phone access denied'),
+      );
+      const configuration = {
+        findByWorkspaceId: jest.fn(),
+        decryptApiKeySecret: jest.fn(),
+      };
+      const service = new TwilioVoiceTokenService(
+        configuration as never,
+        access as never,
+      );
+      await expect(
+        service.generateVoiceToken({
+          workspaceId: WORKSPACE_ID,
+          workspaceMemberId,
+        }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(configuration.findByWorkspaceId).not.toHaveBeenCalled();
+      expect(configuration.decryptApiKeySecret).not.toHaveBeenCalled();
+    },
+  );
+
+  it('does not mint another token after capability revocation', async () => {
+    const service = buildService({
+      isActive: true,
+      accountSid: 'ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+      apiKeySid: 'SKxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+      twimlAppSid: 'APxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+    });
+    await service.generateVoiceToken({
+      workspaceId: WORKSPACE_ID,
+      workspaceMemberId: WORKSPACE_MEMBER_ID,
+    });
+    access.requireCapability.mockRejectedValueOnce(new ForbiddenException());
+    await expect(
+      service.generateVoiceToken({
+        workspaceId: WORKSPACE_ID,
+        workspaceMemberId: WORKSPACE_MEMBER_ID,
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('does not mint a token for disabled Twilio even when the member may use the phone', async () => {
+    const service = buildService({
+      isActive: false,
+      accountSid: 'ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+      apiKeySid: 'SKxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+      twimlAppSid: 'APxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+    });
+    await expect(
+      service.generateVoiceToken({
+        workspaceId: WORKSPACE_ID,
+        workspaceMemberId: WORKSPACE_MEMBER_ID,
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('should throw when calling is not provisioned', async () => {

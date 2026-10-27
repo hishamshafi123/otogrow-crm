@@ -11,6 +11,7 @@ import { TwilioClientService } from 'src/engine/metadata-modules/twilio-config/s
 import { TwilioVoiceTokenService } from 'src/engine/metadata-modules/twilio-config/services/twilio-voice-token.service';
 import { TwilioConfigResolver } from 'src/engine/metadata-modules/twilio-config/twilio-config.resolver';
 import { TwilioConfigService } from 'src/engine/metadata-modules/twilio-config/twilio-config.service';
+import { OtogrowAccessModule } from 'src/modules/otogrow-access/otogrow-access.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { TwilioConfigService } from 'src/engine/metadata-modules/twilio-config/t
     SecretEncryptionModule,
     TwentyConfigModule,
     PermissionsModule,
+    OtogrowAccessModule,
   ],
   providers: [
     TwilioConfigService,

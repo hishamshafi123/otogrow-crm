@@ -1,3 +1,4 @@
+import { DeliveryReminderJob } from 'src/modules/delivery/operations/delivery-reminder.job';
 import { DeliveryMediaJob } from 'src/modules/delivery/creative/delivery-media.job';
 import { Module } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
@@ -117,6 +118,7 @@ import { WorkflowModule } from 'src/modules/workflow/workflow.module';
   ],
   providers: [
     DeliveryAgentJob,
+    DeliveryReminderJob,
     DeliveryMediaJob,
     BillingReminderCronJob,
     CleanSuspendedWorkspacesJob,

@@ -1,4 +1,6 @@
+import { type DeliveryAppliedWorkflow } from 'src/modules/delivery/workflows/delivery-workflows.types';
 import { type CreativeDocument } from 'src/modules/delivery/creative/delivery-creative.types';
+import { type DeliveryTaskPlan } from 'src/modules/delivery/capacity/delivery-capacity.types';
 export const DELIVERY_STATES = [
   'PLANNED',
   'IN_PROGRESS',
@@ -10,6 +12,8 @@ export const DELIVERY_STATES = [
 export type DeliveryState = (typeof DELIVERY_STATES)[number];
 export type DeliveryChecklistItem = { id: string; text: string; done: boolean };
 export type DeliverySubmission = {
+  workflow?: DeliveryAppliedWorkflow;
+  workflowReview?: { checkedIds: string[] };
   version: number;
   creativeVersion?: number;
   finalAssetId?: string;
@@ -30,6 +34,8 @@ export type DeliveryEvent = {
   at: string;
 };
 export type DeliveryDetails = {
+  plan?: DeliveryTaskPlan;
+  workflow?: DeliveryAppliedWorkflow;
   assignmentAt?: string;
   creative?: CreativeDocument;
   draftCopy?: string;

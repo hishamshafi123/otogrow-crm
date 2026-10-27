@@ -1,6 +1,10 @@
+import { useState } from 'react';
+import { Request } from 'cross-fetch';
+import { createMemoryRouter, Link, RouterProvider } from 'react-router-dom';
+import { DeliveryDraftGuardProvider } from '@/delivery/drafts/DeliveryDraftGuard';
 import { i18n } from '@lingui/core';
 import { I18nProvider } from '@lingui/react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { DeliveryOperations } from '@/delivery/DeliveryOperations';
 import {
@@ -47,14 +51,31 @@ const task: DeliveryTask = {
     checklist: [],
     evidence: [],
     events: [],
-    submissions: [],
+    submissions: [
+      {
+        version: 1,
+        description: 'Approved report',
+        evidence: [],
+        submittedBy: 'editor',
+        submittedAt: '2026-10-23T00:00:00Z',
+        decision: 'APPROVED',
+        reviewedBy: 'manager',
+        reviewedAt: '2026-10-23T01:00:00Z',
+      },
+    ],
   },
 };
 const workspace: DeliveryWorkspace = {
   actor: { memberId: 'manager', isAdmin: true, isManager: true },
   tasks: [task],
   projects: [
-    { id: 'project', name: 'Brand', companyId: null, memberIds: ['editor'] },
+    {
+      revision: 1,
+      id: 'project',
+      name: 'Brand',
+      companyId: null,
+      memberIds: ['editor'],
+    },
   ],
   members: [
     { id: 'manager', name: 'Amna', access: 'ADMIN', roleLabel: '' },
@@ -62,6 +83,23 @@ const workspace: DeliveryWorkspace = {
   ],
   companies: [],
 };
+const message = (
+  id: string,
+  recipientId = 'editor',
+): OperationsSnapshot['notices'][number] => ({
+  id,
+  taskId: task.id,
+  recipientId,
+  senderId: 'manager',
+  kind: 'MESSAGE',
+  text: `Message ${id}`,
+  createdAt: '2026-10-24T00:00:00Z',
+  remindAt: '2026-10-24T00:05:00Z',
+  seenAt: null,
+  acknowledgedAt: null,
+  sendState: 'PENDING',
+  error: null,
+});
 const setup = (value = workspace, selectedTask?: DeliveryTask) => {
   i18n.loadAndActivate({ locale: 'en', messages: {} });
   render(
@@ -93,6 +131,55 @@ beforeEach(() => {
     .mockResolvedValue({ data: { changeDeliveryOperations: mockData } });
 });
 describe('delivery follow-through', () => {
+  it('leaves messages unread when opening a task and marks only the selected message read', async () => {
+    mockData.notices = [message('first'), message('second')];
+    const user = setup(
+      {
+        ...workspace,
+        actor: { memberId: 'editor', isAdmin: false, isManager: false },
+      },
+      task,
+    );
+    expect(screen.getByText('Message first')).toBeInTheDocument();
+    expect(screen.getByText('Message second')).toBeInTheDocument();
+    expect(mockMutate).not.toHaveBeenCalled();
+    const firstMessage = screen.getByText('Message first').closest('section');
+    expect(firstMessage).not.toBeNull();
+    await user.click(
+      within(firstMessage!).getByRole('button', { name: 'Mark as read' }),
+    );
+    await waitFor(() => expect(mockMutate).toHaveBeenCalledTimes(1));
+    expect(mockMutate).toHaveBeenCalledWith({
+      variables: { input: { action: 'noticeSeen', id: 'first' } },
+    });
+  });
+  it('keeps marking read and acknowledgement restricted to the recipient', async () => {
+    mockData.notices = [message('employee'), message('manager', 'manager')];
+    const user = setup(workspace, task);
+    const employeeMessage = screen
+      .getByText('Message employee')
+      .closest('section');
+    const managerMessage = screen
+      .getByText('Message manager')
+      .closest('section');
+    expect(employeeMessage).not.toBeNull();
+    expect(managerMessage).not.toBeNull();
+    expect(
+      within(employeeMessage!).queryByRole('button', { name: 'Mark as read' }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(employeeMessage!).queryByRole('button', { name: 'Acknowledge' }),
+    ).not.toBeInTheDocument();
+    await user.click(
+      within(managerMessage!).getByRole('button', { name: 'Acknowledge' }),
+    );
+    await waitFor(() =>
+      expect(mockMutate).toHaveBeenCalledWith({
+        variables: { input: { action: 'acknowledge', id: 'manager' } },
+      }),
+    );
+    expect(mockMutate).toHaveBeenCalledTimes(1);
+  });
   it('keeps recurrence administration and founder settings unavailable to employees', () => {
     setup({
       ...workspace,
@@ -140,6 +227,7 @@ describe('delivery follow-through', () => {
       {
         taskId: 'task',
         status: 'WAITING',
+        deliveredSubmissionVersion: 1,
         deliveredAt: '2026-10-24T00:00:00Z',
         nextCheckAt: '2026-10-24T12:00:00Z',
         cycle: 2,
@@ -180,4 +268,171 @@ describe('delivery follow-through', () => {
       }),
     );
   });
+});
+
+const GuardedOperations = ({
+  selectedTask,
+}: {
+  selectedTask?: DeliveryTask;
+}) => {
+  const [, refresh] = useState(0);
+  return (
+    <>
+      <Link to="/other">Other view</Link>
+      <button onClick={() => refresh((value) => value + 1)}>
+        Refresh test data
+      </button>
+      <DeliveryOperations
+        workspace={workspace}
+        task={selectedTask}
+        onChanged={mockRefetch}
+      />
+    </>
+  );
+};
+const setupGuardedOperations = (selectedTask?: DeliveryTask) => {
+  i18n.loadAndActivate({ locale: 'en', messages: {} });
+  Object.assign(globalThis, { Request });
+  HTMLDialogElement.prototype.showModal = function () {
+    this.setAttribute('open', '');
+  };
+  HTMLDialogElement.prototype.close = function () {
+    this.removeAttribute('open');
+  };
+  const router = createMemoryRouter(
+    [
+      {
+        path: '/delivery',
+        element: (
+          <DeliveryDraftGuardProvider>
+            <GuardedOperations selectedTask={selectedTask} />
+          </DeliveryDraftGuardProvider>
+        ),
+      },
+      { path: '/other', element: <p>Other view opened</p> },
+    ],
+    { initialEntries: ['/delivery'] },
+  );
+  render(
+    <I18nProvider i18n={i18n}>
+      <RouterProvider router={router} />
+    </I18nProvider>,
+  );
+  return userEvent.setup();
+};
+
+it('preserves failed internal messages but clears a successful message even when the subsequent refresh fails', async () => {
+  const user = setupGuardedOperations(task);
+  await user.type(
+    screen.getByLabelText('Message'),
+    'Please check the finished work',
+  );
+  await user.click(screen.getByRole('link', { name: 'Other view' }));
+  await user.click(screen.getByRole('button', { name: 'Keep editing' }));
+  mockMutate.mockRejectedValueOnce(new Error('Message not saved'));
+  await user.click(
+    screen.getByRole('button', { name: 'Send internal message' }),
+  );
+  expect(screen.getByLabelText('Message')).toHaveValue(
+    'Please check the finished work',
+  );
+  mockRefetch.mockRejectedValueOnce(new Error('Refresh unavailable'));
+  await user.click(
+    screen.getByRole('button', { name: 'Send internal message' }),
+  );
+  expect(screen.getByRole('alert')).toHaveTextContent('operation was saved');
+  expect(screen.getByLabelText('Message')).toHaveValue('');
+  expect(mockMutate).toHaveBeenCalledTimes(2);
+  await user.click(screen.getByRole('link', { name: 'Other view' }));
+  expect(screen.getByText('Other view opened')).toBeInTheDocument();
+});
+
+it('keeps settings through a polling conflict until an explicit reload', async () => {
+  const user = setupGuardedOperations();
+  await user.clear(screen.getByLabelText('Workspace timezone (IANA)'));
+  await user.type(
+    screen.getByLabelText('Workspace timezone (IANA)'),
+    'Asia/Qatar',
+  );
+  mockData = { ...mockData, timezone: 'Asia/Dubai' };
+  await user.click(screen.getByRole('button', { name: 'Refresh test data' }));
+  expect(screen.getByLabelText('Workspace timezone (IANA)')).toHaveValue(
+    'Asia/Qatar',
+  );
+  expect(
+    screen.getByRole('button', { name: 'Save follow-through settings' }),
+  ).toBeDisabled();
+  await user.click(
+    screen.getByRole('button', { name: 'Reload latest version' }),
+  );
+  await user.click(screen.getByRole('button', { name: 'Keep editing' }));
+  expect(screen.getByLabelText('Workspace timezone (IANA)')).toHaveValue(
+    'Asia/Qatar',
+  );
+  await user.click(
+    screen.getByRole('button', { name: 'Reload latest version' }),
+  );
+  await user.click(
+    screen.getByRole('button', { name: 'Discard and continue' }),
+  );
+  expect(screen.getByLabelText('Workspace timezone (IANA)')).toHaveValue(
+    'Asia/Dubai',
+  );
+});
+
+it('guards replacing a recurring draft and ignores scheduler counters while detecting template edits', async () => {
+  mockData.templates = [
+    {
+      id: 'template',
+      projectId: 'project',
+      fields: {
+        ...task.details,
+        title: task.title,
+        assigneeId: 'editor',
+        dueAt: null,
+      },
+      frequency: 'WEEKLY',
+      weekdays: [1],
+      monthDay: 1,
+      time: '09:00',
+      startDate: '2026-10-25',
+      endDate: null,
+      paused: false,
+      dueHours: 24,
+      skipped: 0,
+      error: null,
+      lastDate: null,
+      lastTaskId: null,
+    },
+  ];
+  const user = setupGuardedOperations();
+  await user.type(
+    screen.getByLabelText('Task title'),
+    'Unfinished new schedule',
+  );
+  await user.click(screen.getByRole('button', { name: 'Edit template' }));
+  await user.click(screen.getByRole('button', { name: 'Keep editing' }));
+  expect(screen.getByLabelText('Task title')).toHaveValue(
+    'Unfinished new schedule',
+  );
+  await user.click(screen.getByRole('button', { name: 'Edit template' }));
+  await user.click(
+    screen.getByRole('button', { name: 'Discard and continue' }),
+  );
+  await user.type(screen.getByLabelText('Task title'), ' updated');
+  mockData.templates = [
+    { ...mockData.templates[0], skipped: 2, lastDate: '2026-10-26' },
+  ];
+  await user.click(screen.getByRole('button', { name: 'Refresh test data' }));
+  expect(
+    screen.getByRole('button', { name: 'Save recurring template' }),
+  ).toBeEnabled();
+  mockData.templates = [{ ...mockData.templates[0], time: '10:00' }];
+  await user.click(screen.getByRole('button', { name: 'Refresh test data' }));
+  expect(
+    screen.getByRole('button', { name: 'Save recurring template' }),
+  ).toBeDisabled();
+  expect(screen.getByLabelText('Task title')).toHaveValue(
+    'Monthly SEO report updated',
+  );
 });

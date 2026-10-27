@@ -1,3 +1,6 @@
+import { syncDeliveryCommitment } from 'src/modules/delivery/commitments/record-delivery-commitment';
+import { DeliveryCommitmentsService } from 'src/modules/delivery/commitments/delivery-commitments.service';
+import { readDeliveryOperations } from 'src/modules/delivery/read-delivery-snapshot';
 import { newDeliveryBusiness } from 'src/modules/delivery/business/delivery-business.types';
 import { clientShareContent } from 'src/modules/delivery/clients/delivery-clients.policy';
 import {
@@ -28,6 +31,9 @@ import {
   type ClientEngagement,
   type ClientBrandAsset,
 } from 'src/modules/delivery/clients/delivery-clients.types';
+import { recordOtogrowActivity } from 'src/modules/otogrow-activity/record-otogrow-activity';
+import { type OtogrowActivityInput } from 'src/modules/otogrow-activity/otogrow-activity.types';
+import { hasPerformanceMarketingService } from 'src/modules/delivery/advertising/delivery-meta-client-routing';
 
 const hashToken = (token: string) =>
   createHash('sha256').update(token).digest('hex');
@@ -38,7 +44,61 @@ export class DeliveryClientsService {
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly delivery: DeliveryService,
     private readonly creative: DeliveryCreativeService,
+    private readonly commitments: DeliveryCommitmentsService,
   ) {}
+
+  private recordActivity(
+    manager: EntityManager,
+    workspaceId: string,
+    actorId: string | null,
+    engagement: ClientEngagement,
+    event: Pick<OtogrowActivityInput, 'action' | 'summary'> &
+      Partial<
+        Pick<
+          OtogrowActivityInput,
+          | 'sourceType'
+          | 'sourceId'
+          | 'taskId'
+          | 'subjectMemberId'
+          | 'changes'
+          | 'outcome'
+        >
+      >,
+  ) {
+    return recordOtogrowActivity(manager, {
+      workspaceId,
+      actorId,
+      actorType: actorId ? 'HUMAN' : 'CLIENT',
+      category: 'CLIENT',
+      sourceType: 'client-engagement',
+      sourceId: engagement.id,
+      projectId: engagement.projectId,
+      outcome: 'RECORDED',
+      ...event,
+    });
+  }
+
+  private read<TResult>(
+    workspaceId: string,
+    operation: (
+      clients: DeliveryClients,
+      operations: DeliveryOperations,
+      manager: EntityManager,
+    ) => Promise<TResult>,
+    transactionManager?: EntityManager,
+  ) {
+    return readDeliveryOperations(
+      this.dataSource,
+      workspaceId,
+      (operations, manager) =>
+        operation(
+          operations.clients ?? newDeliveryClients(),
+          operations,
+          manager,
+        ),
+      transactionManager,
+    );
+  }
 
   private async transact<TResult>(
     workspaceId: string,
@@ -47,8 +107,14 @@ export class DeliveryClientsService {
       operations: DeliveryOperations,
       manager: EntityManager,
     ) => Promise<TResult>,
+    transactionManager?: EntityManager,
   ) {
-    return this.dataSource.transaction(async (manager) => {
+    if (
+      transactionManager &&
+      !transactionManager.queryRunner?.isTransactionActive
+    )
+      throw new Error('Client changes require an active transaction.');
+    const apply = async (manager: EntityManager) => {
       await manager.query(
         'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
         [`delivery:${workspaceId}`],
@@ -69,7 +135,10 @@ export class DeliveryClientsService {
         );
       await repository.save(record);
       return result;
-    });
+    };
+    return transactionManager
+      ? apply(transactionManager)
+      : this.dataSource.transaction(apply);
   }
 
   private async manager(
@@ -133,8 +202,9 @@ export class DeliveryClientsService {
     workspace: WorkspaceEntity,
     memberId: string,
     userWorkspaceId: string,
+    transactionManager?: EntityManager,
   ) {
-    return this.transact(
+    return this.read(
       workspace.id,
       async (clients, _operations, manager) => {
         await this.manager(workspace, memberId, userWorkspaceId, manager);
@@ -145,6 +215,7 @@ export class DeliveryClientsService {
           ),
         };
       },
+      transactionManager,
     );
   }
 
@@ -153,6 +224,7 @@ export class DeliveryClientsService {
     memberId: string,
     userWorkspaceId: string,
     input: unknown,
+    transactionManager?: EntityManager,
   ) {
     const parsed = clientsCommandSchema.safeParse(input);
     if (!parsed.success)
@@ -185,6 +257,13 @@ export class DeliveryClientsService {
             fields.fields.length
           )
             throw new BadRequestException('Form fields must be unique.');
+          if (
+            fields.advertising &&
+            !hasPerformanceMarketingService(fields.services)
+          )
+            throw new BadRequestException(
+              'Select the Performance marketing service before configuring advertising responsibilities and client budgets.',
+            );
           if (fields.advertising)
             await this.advertisingManager(workspace, fields, manager);
           const existing = clients.engagements.find(
@@ -211,6 +290,60 @@ export class DeliveryClientsService {
             submissions: existing?.submissions ?? [],
             assets: existing?.assets ?? [],
           };
+          await this.recordActivity(
+            manager,
+            workspace.id,
+            memberId,
+            engagement,
+            {
+              action: existing
+                ? 'CLIENT_ENGAGEMENT_UPDATED'
+                : 'CLIENT_ENGAGEMENT_CREATED',
+              summary: existing
+                ? 'Updated a client engagement.'
+                : 'Created a client engagement.',
+              subjectMemberId: engagement.advertising?.marketerId,
+              changes: [
+                {
+                  field: 'revision',
+                  before: existing ? String(existing.revision) : null,
+                  after: String(engagement.revision),
+                },
+                {
+                  field: 'billing',
+                  before: existing?.billing ?? null,
+                  after: engagement.billing,
+                },
+                {
+                  field: 'serviceCount',
+                  before: existing ? String(existing.services.length) : null,
+                  after: String(engagement.services.length),
+                },
+                {
+                  field: 'formFieldCount',
+                  before: existing ? String(existing.fields.length) : null,
+                  after: String(engagement.fields.length),
+                },
+                {
+                  field: 'advertisingEnabled',
+                  before: existing
+                    ? String(Boolean(existing.advertising))
+                    : null,
+                  after: String(Boolean(engagement.advertising)),
+                },
+                {
+                  field: 'assigneeId',
+                  before: existing?.advertising?.marketerId ?? null,
+                  after: engagement.advertising?.marketerId ?? null,
+                },
+                {
+                  field: 'reviewerId',
+                  before: existing?.advertising?.managerId ?? null,
+                  after: engagement.advertising?.managerId ?? null,
+                },
+              ].filter((change) => change.before !== change.after),
+            },
+          );
           if (existing) Object.assign(existing, engagement);
           else clients.engagements.push(engagement);
           targetId = engagement.id;
@@ -223,9 +356,48 @@ export class DeliveryClientsService {
               ? clients.links.find((link) => link.id === command.id)
               : clients.shares.find((share) => share.id === command.id);
           if (!item) throw new NotFoundException();
+          const engagement = clients.engagements.find(
+            (candidate) => candidate.id === item.engagementId,
+          );
+          if (!engagement) throw new NotFoundException();
+          if (
+            ('hash' in item && item.revokedAt) ||
+            ('withdrawnAt' in item && item.withdrawnAt)
+          )
+            return null;
           if ('hash' in item) item.revokedAt = now;
           else item.withdrawnAt = now;
           targetId = item.id;
+          await this.recordActivity(
+            manager,
+            workspace.id,
+            memberId,
+            engagement,
+            {
+              action:
+                'hash' in item
+                  ? 'CLIENT_PORTAL_REVOKED'
+                  : 'CLIENT_SHARE_WITHDRAWN',
+              summary:
+                'hash' in item
+                  ? 'Revoked client portal access.'
+                  : 'Withdrew a shared version from the client portal.',
+              ...('taskId' in item
+                ? {
+                    sourceType: 'client-share',
+                    sourceId: item.id,
+                    taskId: item.taskId,
+                  }
+                : {}),
+              changes: [
+                {
+                  field: 'state',
+                  before: 'ACTIVE',
+                  after: 'hash' in item ? 'REVOKED' : 'WITHDRAWN',
+                },
+              ],
+            },
+          );
         } else {
           const engagement = clients.engagements.find(
             (item) => item.id === command.engagementId,
@@ -233,6 +405,9 @@ export class DeliveryClientsService {
           if (!engagement) throw new NotFoundException();
           targetId = engagement.id;
           if (command.action === 'link') {
+            const activeLinkCount = clients.links.filter(
+              (item) => item.engagementId === engagement.id && !item.revokedAt,
+            ).length;
             for (const link of clients.links.filter(
               (item) => item.engagementId === engagement.id && !item.revokedAt,
             ))
@@ -249,14 +424,55 @@ export class DeliveryClientsService {
               revokedAt: null,
               createdBy: memberId,
             });
+            await this.recordActivity(
+              manager,
+              workspace.id,
+              memberId,
+              engagement,
+              {
+                action: activeLinkCount
+                  ? 'CLIENT_PORTAL_ROTATED'
+                  : 'CLIENT_PORTAL_CREATED',
+                summary: activeLinkCount
+                  ? 'Rotated client portal access and revoked previous links.'
+                  : 'Created expiring client portal access.',
+                changes: [
+                  {
+                    field: 'linkCount',
+                    before: String(activeLinkCount),
+                    after: '1',
+                  },
+                ],
+              },
+            );
           } else if (command.action === 'accept') {
             const submission = engagement.submissions.find(
               (item) => item.id === command.submissionId,
             );
             if (!submission) throw new NotFoundException();
+            if (submission.acceptedBy === memberId) return null;
+            const previousReviewerId = submission.acceptedBy;
             submission.acceptedBy = memberId;
+            await this.recordActivity(
+              manager,
+              workspace.id,
+              memberId,
+              engagement,
+              {
+                action: 'CLIENT_ONBOARDING_ACCEPTED',
+                summary: 'Accepted a client onboarding submission.',
+                outcome: 'ACCEPTED',
+                changes: [
+                  {
+                    field: 'reviewerId',
+                    before: previousReviewerId,
+                    after: memberId,
+                  },
+                ],
+              },
+            );
           } else {
-            const { task } = await this.creative.scope(
+            const { task, assigneeId } = await this.creative.scope(
               manager,
               workspace,
               memberId,
@@ -287,8 +503,9 @@ export class DeliveryClientsService {
               `SELECT title FROM ${this.delivery.schema(workspace)}.task WHERE id=$1`,
               [task.taskId],
             );
+            const shareId = randomUUID();
             clients.shares.push({
-              id: randomUUID(),
+              id: shareId,
               engagementId: engagement.id,
               taskId: task.taskId,
               kind: command.kind,
@@ -299,6 +516,30 @@ export class DeliveryClientsService {
               withdrawnAt: null,
               reviews: [],
             });
+            await this.recordActivity(
+              manager,
+              workspace.id,
+              memberId,
+              engagement,
+              {
+                action: 'CLIENT_SHARE_CREATED',
+                summary:
+                  'Shared an approved work version with the client portal.',
+                sourceType: 'client-share',
+                sourceId: shareId,
+                taskId: task.taskId,
+                subjectMemberId: assigneeId,
+                changes: [
+                  { field: 'shareKind', before: null, after: command.kind },
+                  {
+                    field: 'shareVersion',
+                    before: null,
+                    after: String(version),
+                  },
+                  { field: 'state', before: null, after: 'ACTIVE' },
+                ],
+              },
+            );
           }
         }
         clients.audit.push({
@@ -309,9 +550,15 @@ export class DeliveryClientsService {
         });
         return result;
       },
+      transactionManager,
     );
     return {
-      ...(await this.snapshot(workspace, memberId, userWorkspaceId)),
+      ...(await this.snapshot(
+        workspace,
+        memberId,
+        userWorkspaceId,
+        transactionManager,
+      )),
       token,
       accessCode: token ? accessCode : null,
     };
@@ -319,6 +566,7 @@ export class DeliveryClientsService {
 
   private async client<TResult>(
     credential: string,
+    mode: 'read' | 'write',
     operation: (
       engagement: ClientEngagement,
       clients: DeliveryClients,
@@ -333,7 +581,11 @@ export class DeliveryClientsService {
     const workspaceId = token.split('.')[0];
     if (!/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(workspaceId))
       throw new NotFoundException();
-    return this.transact(workspaceId, async (clients, operations, manager) => {
+    const apply = async (
+      clients: DeliveryClients,
+      operations: DeliveryOperations,
+      manager: EntityManager,
+    ) => {
       const link = clients.links.find(
         (item) =>
           item.hash === hashToken(token) &&
@@ -363,65 +615,89 @@ export class DeliveryClientsService {
       if (!projects || !company.length)
         throw new NotFoundException('Client portal unavailable.');
       return operation(engagement, clients, operations, manager, workspace);
-    });
+    };
+    return mode === 'read'
+      ? this.read(workspaceId, apply)
+      : this.transact(workspaceId, apply);
   }
 
   async portal(token: string) {
-    return this.client(token, async (engagement, clients, operations) => ({
-      engagement: {
-        name: engagement.name,
-        services: engagement.services,
-        billing: engagement.billing,
-        scope: engagement.scope,
-        allowance: engagement.allowance,
-        contact: engagement.contact,
-        revision: engagement.revision,
-        fields: engagement.fields,
-      },
-      advertising: engagement.advertising
-        ? {
-            currency: engagement.advertising.currency,
-            channel: engagement.advertising.channel,
-            period: engagement.advertising.period,
-            requests: (operations.business?.records ?? [])
-              .filter(
-                (record) =>
-                  record.kind === 'BUDGET' &&
-                  record.clientEngagementId === engagement.id,
-              )
-              .map((record) => ({
-                id: record.id,
-                amount: record.kind === 'BUDGET' ? record.amount : 0,
-                currency: record.kind === 'BUDGET' ? record.currency : '',
-                channel: record.kind === 'BUDGET' ? record.channel : '',
-                period: record.kind === 'BUDGET' ? record.period : '',
-                status: record.status,
-                createdAt: record.createdAt,
-              })),
-          }
-        : null,
-      assets: engagement.assets ?? [],
-      submissions: engagement.submissions.map(({ acceptedBy, ...item }) => ({
-        ...item,
-        accepted: Boolean(acceptedBy),
-      })),
-      shares: clients.shares
-        .filter(
-          (item) => item.engagementId === engagement.id && !item.withdrawnAt,
-        )
-        .map(
-          ({ id, version, kind, title, content, links, assetId, reviews }) => ({
-            id,
-            version,
-            kind,
-            title,
-            content,
-            links,
-            hasAsset: Boolean(assetId),
-            reviews,
-          }),
+    return this.client(
+      token,
+      'read',
+      async (engagement, clients, operations, manager, workspace) => ({
+        commitments: await this.commitments.portalSummary(
+          workspace,
+          engagement,
+          operations,
+          manager,
         ),
-    }));
+        engagement: {
+          name: engagement.name,
+          services: engagement.services,
+          billing: engagement.billing,
+          scope: engagement.scope,
+          allowance: engagement.allowance,
+          contact: engagement.contact,
+          revision: engagement.revision,
+          fields: engagement.fields,
+        },
+        advertising:
+          engagement.advertising &&
+          hasPerformanceMarketingService(engagement.services)
+            ? {
+                currency: engagement.advertising.currency,
+                channel: engagement.advertising.channel,
+                period: engagement.advertising.period,
+                requests: (operations.business?.records ?? [])
+                  .filter(
+                    (record) =>
+                      record.kind === 'BUDGET' &&
+                      record.clientEngagementId === engagement.id,
+                  )
+                  .map((record) => ({
+                    id: record.id,
+                    amount: record.kind === 'BUDGET' ? record.amount : 0,
+                    currency: record.kind === 'BUDGET' ? record.currency : '',
+                    channel: record.kind === 'BUDGET' ? record.channel : '',
+                    period: record.kind === 'BUDGET' ? record.period : '',
+                    status: record.status,
+                    createdAt: record.createdAt,
+                  })),
+              }
+            : null,
+        assets: engagement.assets ?? [],
+        submissions: engagement.submissions.map(({ acceptedBy, ...item }) => ({
+          ...item,
+          accepted: Boolean(acceptedBy),
+        })),
+        shares: clients.shares
+          .filter(
+            (item) => item.engagementId === engagement.id && !item.withdrawnAt,
+          )
+          .map(
+            ({
+              id,
+              version,
+              kind,
+              title,
+              content,
+              links,
+              assetId,
+              reviews,
+            }) => ({
+              id,
+              version,
+              kind,
+              title,
+              content,
+              links,
+              hasAsset: Boolean(assetId),
+              reviews,
+            }),
+          ),
+      }),
+    );
   }
 
   async respond(token: string, input: unknown) {
@@ -430,10 +706,15 @@ export class DeliveryClientsService {
     const command = parsed.data;
     await this.client(
       token,
+      'write',
       async (engagement, clients, operations, manager, workspace) => {
         const now = new Date().toISOString();
         if (command.action === 'budget') {
-          if (!engagement.advertising) throw new ForbiddenException();
+          if (
+            !engagement.advertising ||
+            !hasPerformanceMarketingService(engagement.services)
+          )
+            throw new ForbiddenException();
           operations.business ??= newDeliveryBusiness();
           if (
             operations.business.records.some(
@@ -479,13 +760,15 @@ export class DeliveryClientsService {
               },
             },
             manager,
+            { actorType: 'CLIENT', actorId: null },
           );
           if (typeof taskId !== 'string')
             throw new BadRequestException(
               'Could not create budget review task.',
             );
+          const budgetId = randomUUID();
           operations.business.records.push({
-            id: randomUUID(),
+            id: budgetId,
             revision: 1,
             kind: 'BUDGET',
             projectId: engagement.projectId,
@@ -527,6 +810,24 @@ export class DeliveryClientsService {
             attemptedAt: null,
             error: null,
           });
+          await this.recordActivity(manager, workspace.id, null, engagement, {
+            action: 'CLIENT_BUDGET_REQUESTED',
+            summary:
+              'The client requested an advertising budget change for review.',
+            sourceType: 'budget',
+            sourceId: budgetId,
+            taskId,
+            subjectMemberId: configuration.marketerId,
+            changes: [
+              { field: 'state', before: null, after: 'REVIEW' },
+              {
+                field: 'assigneeId',
+                before: null,
+                after: configuration.marketerId,
+              },
+              { field: 'reviewerId', before: null, after: reviewer.id },
+            ],
+          });
         } else if (command.action === 'onboard') {
           if (
             engagement.submissions.some((item) => item.id === command.requestId)
@@ -555,6 +856,22 @@ export class DeliveryClientsService {
             })),
             acceptedBy: null,
           });
+          await this.recordActivity(manager, workspace.id, null, engagement, {
+            action: 'CLIENT_ONBOARDING_SUBMITTED',
+            summary: 'The client submitted an onboarding form.',
+            changes: [
+              {
+                field: 'revision',
+                before: null,
+                after: String(engagement.revision),
+              },
+              {
+                field: 'submissionCount',
+                before: String(engagement.submissions.length - 1),
+                after: String(engagement.submissions.length),
+              },
+            ],
+          });
         } else {
           const share = clients.shares.find(
             (item) =>
@@ -571,14 +888,28 @@ export class DeliveryClientsService {
             decision: command.decision,
             comment: command.comment,
           });
+          const task = await manager
+            .getRepository(DeliveryTaskEntity)
+            .findOneBy({
+              workspaceId: workspace.id,
+              taskId: share.taskId,
+              projectId: engagement.projectId,
+            });
+          const nativeTasks: { assigneeId: string | null }[] = task
+            ? await manager.query(
+                `SELECT "assigneeId" FROM ${this.delivery.schema(workspace)}.task WHERE id=$1`,
+                [task.taskId],
+              )
+            : [];
+          const changes: OtogrowActivityInput['changes'] = [
+            { field: 'shareKind', before: null, after: share.kind },
+            {
+              field: 'shareVersion',
+              before: null,
+              after: String(share.version),
+            },
+          ];
           if (command.decision === 'CHANGES_REQUESTED') {
-            const task = await manager
-              .getRepository(DeliveryTaskEntity)
-              .findOneBy({
-                workspaceId: workspace.id,
-                taskId: share.taskId,
-                projectId: engagement.projectId,
-              });
             if (!task) throw new NotFoundException();
             task.details.events.push({
               id: randomUUID(),
@@ -592,6 +923,11 @@ export class DeliveryClientsService {
               (item) => item.taskId === task.taskId,
             );
             if (fulfilment) {
+              changes.push({
+                field: 'fulfilmentStatus',
+                before: fulfilment.status,
+                after: 'WAITING',
+              });
               fulfilment.status = 'WAITING';
               fulfilment.nextCheckAt = now;
               fulfilment.history.push({
@@ -601,8 +937,21 @@ export class DeliveryClientsService {
                 note: command.comment,
               });
             }
+            changes.push({
+              field: 'taskRevision',
+              before: String(task.revision),
+              after: String(task.revision + 1),
+            });
             task.revision += 1;
             await manager.getRepository(DeliveryTaskEntity).save(task);
+            await syncDeliveryCommitment(
+              manager,
+              workspace.id,
+              task.taskId,
+              task.details,
+              fulfilment,
+              { actorId: null, actorType: 'CLIENT' },
+            );
             operations.notices.push({
               id: randomUUID(),
               taskId: task.taskId,
@@ -620,6 +969,22 @@ export class DeliveryClientsService {
               error: null,
             });
           }
+          await this.recordActivity(manager, workspace.id, null, engagement, {
+            action: 'CLIENT_SHARE_REVIEWED',
+            summary:
+              command.decision === 'COMMENT'
+                ? 'The client commented on a shared version.'
+                : command.decision === 'APPROVED'
+                  ? 'The client approved a shared version.'
+                  : 'The client requested changes to a shared version.',
+            sourceType: 'client-share',
+            sourceId: share.id,
+            taskId: share.taskId,
+            subjectMemberId: nativeTasks[0]?.assigneeId,
+            outcome:
+              command.decision === 'COMMENT' ? 'RECORDED' : command.decision,
+            changes,
+          });
         }
         clients.audit.push({
           at: now,
@@ -639,7 +1004,8 @@ export class DeliveryClientsService {
   ) {
     await this.client(
       token,
-      async (engagement, _clients, _operations, _manager, workspace) => {
+      'write',
+      async (engagement, _clients, _operations, manager, workspace) => {
         engagement.assets ??= [];
         if (
           engagement.assets.length >= 30 ||
@@ -654,6 +1020,17 @@ export class DeliveryClientsService {
           `${workspace.id}/delivery-client/${engagement.id}/${asset.id}`,
         );
         engagement.assets.push(asset);
+        await this.recordActivity(manager, workspace.id, null, engagement, {
+          action: 'CLIENT_BRAND_ASSET_UPLOADED',
+          summary: 'The client uploaded a brand asset.',
+          changes: [
+            {
+              field: 'assetCount',
+              before: String(engagement.assets.length - 1),
+              after: String(engagement.assets.length),
+            },
+          ],
+        });
       },
     );
   }
@@ -661,6 +1038,7 @@ export class DeliveryClientsService {
   async brandAsset(token: string, assetId: string) {
     return this.client(
       token,
+      'read',
       async (engagement, _clients, _operations, _manager, workspace) => {
         const asset = engagement.assets?.find((item) => item.id === assetId);
         if (!asset) throw new NotFoundException();
@@ -679,26 +1057,24 @@ export class DeliveryClientsService {
     engagementId: string,
     assetId: string,
   ) {
-    return this.transact(
-      workspace.id,
-      async (clients, _operations, manager) => {
-        await this.manager(workspace, memberId, userWorkspaceId, manager);
-        const engagement = clients.engagements.find(
-          (item) => item.id === engagementId,
-        );
-        const asset = engagement?.assets?.find((item) => item.id === assetId);
-        if (!asset || !engagement) throw new NotFoundException();
-        return {
-          asset,
-          path: `${workspace.id}/delivery-client/${engagement.id}/${asset.id}`,
-        };
-      },
-    );
+    return this.read(workspace.id, async (clients, _operations, manager) => {
+      await this.manager(workspace, memberId, userWorkspaceId, manager);
+      const engagement = clients.engagements.find(
+        (item) => item.id === engagementId,
+      );
+      const asset = engagement?.assets?.find((item) => item.id === assetId);
+      if (!asset || !engagement) throw new NotFoundException();
+      return {
+        asset,
+        path: `${workspace.id}/delivery-client/${engagement.id}/${asset.id}`,
+      };
+    });
   }
 
   async asset(token: string, shareId: string) {
     return this.client(
       token,
+      'read',
       async (engagement, clients, _operations, manager, workspace) => {
         const share = clients.shares.find(
           (item) =>

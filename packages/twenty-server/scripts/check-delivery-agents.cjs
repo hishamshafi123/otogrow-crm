@@ -1,3 +1,10 @@
+const report = (message) => process.stdout.write(`${message}\n`);
+const {
+  makeBudgetFixture,
+} = require('./helpers/otogrow-ai-budget-fixture.cjs');
+const {
+  OtogrowAccessService,
+} = require('../dist/modules/otogrow-access/otogrow-access.service');
 // Live mode is opt-in; database records are rolled back in either mode.
 const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
@@ -20,6 +27,9 @@ const {
 const {
   DeliveryTaskEntity,
 } = require('../dist/modules/delivery/entities/delivery-task.entity');
+const {
+  OtogrowActivityEventEntity,
+} = require('../dist/modules/otogrow-activity/entities/otogrow-activity-event.entity');
 
 async function main() {
   const live = process.argv.includes('--live');
@@ -36,7 +46,7 @@ async function main() {
   await runner.startTransaction();
   try {
     const [workspace] = await runner.query(
-      'SELECT * FROM core.workspace WHERE "databaseSchema" IS NOT NULL LIMIT 1',
+      `SELECT * FROM core.workspace WHERE "databaseSchema" IS NOT NULL AND "activationStatus"='ACTIVE' LIMIT 1`,
     );
     assert(/^[a-zA-Z0-9_]+$/.test(workspace.databaseSchema));
     const schema = `"${workspace.databaseSchema}"`;
@@ -62,12 +72,13 @@ async function main() {
       manager: runner.manager,
       getRepository: (entity) => runner.manager.getRepository(entity),
       query: (...args) => runner.query(...args),
-      transaction: (callback) => callback(runner.manager),
+      transaction: (callback) => runner.manager.transaction(callback),
     };
-    const delivery = new DeliveryService(scoped, {
+    const access = new OtogrowAccessService(scoped, {
       userHasWorkspaceSettingPermission: async ({ userWorkspaceId }) =>
         userWorkspaceId === admin,
     });
+    const delivery = new DeliveryService(scoped, access);
     const mutateTask = (actor, input) =>
       delivery.command(workspace, actor, actor, input);
     let state = await mutateTask(admin, {
@@ -98,6 +109,7 @@ async function main() {
     const task = state.tasks.find((item) => item.projectId === project.id);
     let providerCalls = 0;
     let behavior = 'success';
+    let modelHook = null;
     let releaseProvider;
     let enteredProvider;
     const fixtureModel = new MockLanguageModelV3({
@@ -106,6 +118,7 @@ async function main() {
           'Check for missing requirements',
         );
         providerCalls++;
+        if (modelHook) await modelHook();
         if (behavior === 'failure')
           throw new Error(
             'Fixture provider failed (secret must not be echoed)',
@@ -132,20 +145,24 @@ async function main() {
           content: [
             {
               type: 'text',
-              text: JSON.stringify({
-                summary: 'FIXTURE: Copy contradicts the approved discount.',
-                findings: [
-                  {
-                    severity: 'error',
-                    evidence: 'FIXTURE: Brief says 20%; copy says 50%.',
-                    correction: 'Use 20% off.',
-                  },
-                ],
-                suggestedBrief: isBrief
-                  ? 'Offer is 20% off. Add approved CTA and audience.'
-                  : null,
-                suggestedCopy: 'Get 20% off today.',
-              }),
+              text:
+                behavior === 'invalid-output'
+                  ? '{invalid JSON'
+                  : JSON.stringify({
+                      summary:
+                        'FIXTURE: Copy contradicts the approved discount.',
+                      findings: [
+                        {
+                          severity: 'error',
+                          evidence: 'FIXTURE: Brief says 20%; copy says 50%.',
+                          correction: 'Use 20% off.',
+                        },
+                      ],
+                      suggestedBrief: isBrief
+                        ? 'Offer is 20% off. Add approved CTA and audience.'
+                        : null,
+                      suggestedCopy: 'Get 20% off today.',
+                    }),
             },
           ],
           finishReason: { unified: 'stop', raw: 'stop' },
@@ -173,7 +190,7 @@ async function main() {
               try {
                 return await doGenerate();
               } catch (error) {
-                console.log(
+                report(
                   JSON.stringify({
                     providerError: String(error.message)
                       .split(process.env.DELIVERY_TEST_GEMINI_KEY)
@@ -195,12 +212,22 @@ async function main() {
       },
       getAdminFilteredModels: () => [{ modelId, model }],
     };
+    const budget = await makeBudgetFixture(scoped, access, workspace, [
+      { modelId, kind: 'TEXT' },
+    ]);
     let enqueues = 0;
-    const service = new DeliveryAgentService(scoped, delivery, registry, {
-      add: async () => {
-        enqueues++;
+    const service = new DeliveryAgentService(
+      scoped,
+      delivery,
+      registry,
+      {
+        add: async () => {
+          enqueues++;
+        },
       },
-    });
+      budget,
+      access,
+    );
     const command = (actor, input) =>
       service.command(workspace, actor, actor, input);
     const configuration = {
@@ -233,6 +260,7 @@ async function main() {
     const preview = await command(editor, previewInput);
     assert.equal(preview.context.brief, task.details.brief);
     const makeStart = () => ({
+      pricingRevision: 1,
       type: 'start',
       taskId: task.id,
       agentId,
@@ -269,7 +297,7 @@ async function main() {
         const result = await runner.manager
           .getRepository(DeliveryAgentRunEntity)
           .findOneByOrFail({ id: started.runId });
-        console.log(
+        report(
           JSON.stringify({
             kind,
             modelId,
@@ -308,12 +336,19 @@ async function main() {
         );
         task.revision = updated.revision;
       }
-      console.log(
+      report(
         'PASS: selected live Gemini checks, persisted structured findings, human edit acceptance and unchanged delivery approval. Synthetic data rolled back.',
       );
       return;
     }
     const firstInput = makeStart();
+    const withoutPricing = { ...firstInput };
+    delete withoutPricing.pricingRevision;
+    await assert.rejects(command(editor, withoutPricing), /Preview/);
+    await assert.rejects(
+      command(editor, { ...firstInput, pricingRevision: 999 }),
+      /pricing changed/,
+    );
     const first = await command(editor, firstInput);
     assert.equal((await command(editor, firstInput)).runId, first.runId);
     await service.execute(first.runId);
@@ -327,7 +362,7 @@ async function main() {
       .getRepository(DeliveryAgentRunEntity)
       .findOneByOrFail({ id: first.runId });
     assert.equal(persisted.status, 'WAITING_REVIEW');
-    assert.equal(persisted.usage.cost, null);
+    assert.equal(persisted.usage.cost, 0.00014);
     assert.equal(persisted.usage.inputTokens, 100);
     assert.equal(
       persisted.configuration.instructions,
@@ -397,6 +432,27 @@ async function main() {
       .findOneByOrFail({ id: failed.runId });
     assert.equal(persisted.status, 'FAILED');
     assert(!persisted.error.includes('secret'));
+    behavior = 'invalid-output';
+    const invalidOutput = await command(editor, makeStart());
+    await service.execute(invalidOutput.runId);
+    assert.equal(
+      (
+        await runner.manager
+          .getRepository(DeliveryAgentRunEntity)
+          .findOneByOrFail({ id: invalidOutput.runId })
+      ).status,
+      'FAILED',
+    );
+    const [invalidOutputSpend] = await runner.query(
+      'SELECT state,"actualMicroUsd" FROM core."otogrowAiSpend" WHERE "sourceRunId"=$1',
+      [invalidOutput.runId],
+    );
+    assert.equal(
+      invalidOutputSpend.state,
+      'SETTLED',
+      'Invalid structured output still has known provider usage',
+    );
+    assert.equal(invalidOutputSpend.actualMicroUsd, '140');
     behavior = 'success';
     const cancelled = await command(editor, makeStart());
     await command(editor, { type: 'cancel', runId: cancelled.runId });
@@ -455,6 +511,7 @@ async function main() {
     await mutateTask(admin, {
       action: 'project',
       id: project.id,
+      revision: project.revision,
       name: project.name,
       companyId: null,
       memberIds: [],
@@ -471,10 +528,48 @@ async function main() {
     await mutateTask(admin, {
       action: 'project',
       id: project.id,
+      revision: project.revision + 1,
       name: project.name,
       companyId: null,
       memberIds: [editor],
     });
+    const beforeDispatchRace = providerCalls;
+    const dispatchRace = await command(editor, makeStart());
+    const originalDispatch = budget.dispatch.bind(budget);
+    try {
+      budget.dispatch = async (source, identity, authorize) => {
+        await mutateTask(admin, {
+          action: 'project',
+          id: project.id,
+          revision: project.revision + 2,
+          name: project.name,
+          companyId: null,
+          memberIds: [],
+        });
+        return originalDispatch(source, identity, authorize);
+      };
+      await service.execute(dispatchRace.runId);
+    } finally {
+      budget.dispatch = originalDispatch;
+      await mutateTask(admin, {
+        action: 'project',
+        id: project.id,
+        revision: project.revision + 3,
+        name: project.name,
+        companyId: null,
+        memberIds: [editor],
+      });
+    }
+    assert.equal(
+      providerCalls,
+      beforeDispatchRace,
+      'Revocation at paid dispatch must prevent provider work',
+    );
+    const [blockedSpend] = await runner.query(
+      'SELECT state FROM core."otogrowAiSpend" WHERE "sourceRunId"=$1',
+      [dispatchRace.runId],
+    );
+    assert.equal(blockedSpend.state, 'RELEASED');
     modelAllowed = false;
     await assert.rejects(command(editor, makeStart()), /Disabled model/);
     modelAllowed = true;
@@ -541,11 +636,18 @@ async function main() {
     const queue = new Queue(queueName, { connection: redis });
     const events = new QueueEvents(queueName, { connection: redis });
     let actualJob;
-    const queuedService = new DeliveryAgentService(scoped, delivery, registry, {
-      add: async (name, data) => {
-        actualJob = await queue.add(name, data);
+    const queuedService = new DeliveryAgentService(
+      scoped,
+      delivery,
+      registry,
+      {
+        add: async (name, data) => {
+          actualJob = await queue.add(name, data);
+        },
       },
-    });
+      budget,
+      access,
+    );
     const handler = new DeliveryAgentJob(queuedService);
     const worker = new Worker(queueName, (job) => handler.handle(job.data), {
       connection: redis,
@@ -630,9 +732,443 @@ async function main() {
       ).details.brief,
       briefResult.result.suggestedBrief,
     );
+    const configurationEvents = await runner.query(
+      `SELECT * FROM core."otogrowActivityEvent" WHERE "workspaceId"=$1 AND "sourceType"='agent' AND "sourceId"=$2`,
+      [workspace.id, agentId],
+    );
+    assert.deepEqual(configurationEvents.map((event) => event.action).sort(), [
+      'AGENT_CREATED',
+      'AGENT_UPDATED',
+      'AGENT_UPDATED',
+    ]);
+    assert(
+      configurationEvents.every(
+        (event) => event.actorId === admin && event.actorType === 'HUMAN',
+      ),
+    );
+    assert(
+      configurationEvents.some((event) =>
+        event.changes.some(
+          (change) =>
+            change.field === 'enabled' &&
+            change.before === 'true' &&
+            change.after === 'false',
+        ),
+      ),
+    );
+    assert(
+      configurationEvents.some((event) =>
+        event.changes.some(
+          (change) =>
+            change.field === 'dailyRunLimit' &&
+            change.before === '30' &&
+            change.after === '1',
+        ),
+      ),
+    );
+    assert(
+      !JSON.stringify(configurationEvents).includes(configuration.instructions),
+    );
+    await assert.rejects(
+      command(admin, { type: 'save', id: agentId, version: 1, configuration }),
+      /Agent changed/,
+    );
+    assert.equal(
+      (
+        await runner.query(
+          `SELECT id FROM core."otogrowActivityEvent" WHERE "workspaceId"=$1 AND "sourceType"='agent' AND "sourceId"=$2`,
+          [workspace.id, agentId],
+        )
+      ).length,
+      configurationEvents.length,
+    );
+    const runEvents = (runId) =>
+      runner.query(
+        `SELECT * FROM core."otogrowActivityEvent" WHERE "workspaceId"=$1 AND "sourceType"='agent-run' AND "sourceId"=$2`,
+        [workspace.id, runId],
+      );
+    const assertActions = async (runId, expected) => {
+      const rows = await runEvents(runId);
+      assert.deepEqual(
+        rows.map((event) => event.action).sort(),
+        [...expected].sort(),
+      );
+      for (const event of rows) {
+        assert.equal(event.category, 'AGENT');
+        assert.equal(event.taskId, task.id);
+        assert.equal(event.projectId, project.id);
+        assert.equal(event.projectName, project.name);
+        assert(
+          event.subjectName,
+          'Initiating member identity must be retained',
+        );
+      }
+      return rows;
+    };
+    const successActions = [
+      'AGENT_RUN_QUEUED',
+      'AGENT_RUN_STARTED',
+      'AGENT_RUN_COMPLETED',
+    ];
+    const firstEvents = await assertActions(first.runId, [
+      ...successActions,
+      'AGENT_RESULT_ACCEPTED',
+    ]);
+    for (const event of firstEvents) {
+      assert.equal(event.actorId, editor);
+      assert.equal(event.subjectMemberId, editor);
+      assert.equal(event.taskName, task.title);
+      assert.equal(event.agentName, configuration.name);
+      assert.equal(
+        event.actorType,
+        ['AGENT_RUN_STARTED', 'AGENT_RUN_COMPLETED'].includes(event.action)
+          ? 'AGENT'
+          : 'HUMAN',
+      );
+    }
+    const completion = firstEvents.find(
+      (event) => event.action === 'AGENT_RUN_COMPLETED',
+    );
+    assert.equal(completion.outcome, 'SUCCEEDED');
+    assert(
+      completion.changes.some(
+        (change) =>
+          change.field === 'runStatus' && change.after === 'WAITING_REVIEW',
+      ),
+    );
+    assert(
+      completion.changes.some(
+        (change) => change.field === 'inputTokens' && change.after === '100',
+      ),
+    );
+    assert(
+      firstEvents
+        .find((event) => event.action === 'AGENT_RESULT_ACCEPTED')
+        .changes.some(
+          (change) =>
+            change.field === 'appliedField' && change.after === 'copy',
+        ),
+    );
+    await assertActions(rejected.runId, [
+      ...successActions,
+      'AGENT_RESULT_REJECTED',
+    ]);
+    for (const run of [failed, stale, revoke, changedDuringRun, timedOut]) {
+      const rows = await assertActions(run.runId, [
+        'AGENT_RUN_QUEUED',
+        'AGENT_RUN_STARTED',
+        'AGENT_RUN_FAILED',
+      ]);
+      assert.equal(
+        rows.find((event) => event.action === 'AGENT_RUN_FAILED').actorType,
+        'AGENT',
+      );
+    }
+    await assertActions(cancelled.runId, [
+      'AGENT_RUN_QUEUED',
+      'AGENT_RUN_CANCELLED',
+    ]);
+    await assertActions(inFlight.runId, [
+      'AGENT_RUN_QUEUED',
+      'AGENT_RUN_STARTED',
+      'AGENT_RUN_CANCELLED',
+    ]);
+    const interruptedEvents = await assertActions(interrupted.runId, [
+      'AGENT_RUN_QUEUED',
+      'AGENT_RUN_INTERRUPTED',
+    ]);
+    const interruption = interruptedEvents.find(
+      (event) => event.action === 'AGENT_RUN_INTERRUPTED',
+    );
+    assert.equal(interruption.actorType, 'SYSTEM');
+    assert.equal(interruption.actorId, null);
+    await assertActions(unqueued.runId, [
+      'AGENT_RUN_QUEUED',
+      'AGENT_RUN_CANCELLED',
+    ]);
+    const briefEvents = await assertActions(briefRun.runId, [
+      ...successActions,
+      'AGENT_RESULT_ACCEPTED',
+    ]);
+    assert(
+      briefEvents
+        .find((event) => event.action === 'AGENT_RESULT_ACCEPTED')
+        .changes.some(
+          (change) =>
+            change.field === 'appliedField' && change.after === 'brief',
+        ),
+    );
+    for (const event of briefEvents) {
+      assert.equal(
+        event.actorId,
+        admin,
+        'Preserve the manager who initiated or accepted the run',
+      );
+      assert.equal(
+        event.subjectMemberId,
+        editor,
+        'Attribute the affected assignment to its editor',
+      );
+      assert.equal(
+        event.actorType,
+        ['AGENT_RUN_STARTED', 'AGENT_RUN_COMPLETED'].includes(event.action)
+          ? 'AGENT'
+          : 'HUMAN',
+      );
+    }
+    const activityPayload = JSON.stringify(
+      await runner.query(
+        'SELECT * FROM core."otogrowActivityEvent" WHERE "workspaceId"=$1 AND "projectId"=$2',
+        [workspace.id, project.id],
+      ),
+    );
+    for (const privateText of [
+      configuration.instructions,
+      inputs.copy,
+      'Offer is 20% off.',
+      'FIXTURE: Copy contradicts',
+      'secret must not be echoed',
+      'Need audience and CTA',
+    ]) {
+      assert(
+        !activityPayload.includes(privateText),
+        'Activity must exclude instructions, task content, results and errors',
+      );
+    }
+    const taskBeforeFailedAcceptance = await runner.manager
+      .getRepository(DeliveryTaskEntity)
+      .findOneByOrFail({ id: storedTask.id });
+    const atomicResult = await command(admin, {
+      ...makeStart(),
+      agentId: briefAgent.saved,
+      agentVersion: 1,
+      taskRevision: taskBeforeFailedAcceptance.revision,
+      inputs: { copy: '', requirements: 'Atomic fixture' },
+    });
+    await service.execute(atomicResult.runId);
+    // A failed activity write must roll configuration, acceptance and queue changes back.
+    const requestId = randomUUID();
+    const enqueueCount = enqueues;
+    const originalGetRepository = runner.manager.getRepository.bind(
+      runner.manager,
+    );
+    try {
+      runner.manager.getRepository = (entity) => {
+        const repository = originalGetRepository(entity);
+        return entity === OtogrowActivityEventEntity
+          ? new Proxy(repository, {
+              get: (target, property) =>
+                property === 'insert'
+                  ? async () => {
+                      throw new Error('Fixture activity write failure');
+                    }
+                  : Reflect.get(target, property),
+            })
+          : repository;
+      };
+      await assert.rejects(
+        command(admin, {
+          type: 'decide',
+          runId: atomicResult.runId,
+          action: 'ACCEPT',
+          field: 'brief',
+        }),
+        /Fixture activity write failure/,
+      );
+      const taskAfterFailedAcceptance = await originalGetRepository(
+        DeliveryTaskEntity,
+      ).findOneByOrFail({ id: storedTask.id });
+      assert.equal(
+        taskAfterFailedAcceptance.revision,
+        taskBeforeFailedAcceptance.revision,
+      );
+      assert.equal(
+        taskAfterFailedAcceptance.details.brief,
+        taskBeforeFailedAcceptance.details.brief,
+      );
+      assert.equal(
+        (
+          await originalGetRepository(DeliveryAgentRunEntity).findOneByOrFail({
+            id: atomicResult.runId,
+          })
+        ).status,
+        'WAITING_REVIEW',
+      );
+      await assertActions(atomicResult.runId, successActions);
+      await assert.rejects(
+        command(admin, {
+          type: 'save',
+          id: agentId,
+          version: 3,
+          configuration,
+        }),
+        /Fixture activity write failure/,
+      );
+      assert.equal(
+        (
+          await originalGetRepository(DeliveryAgentEntity).findOneByOrFail({
+            id: agentId,
+          })
+        ).version,
+        3,
+      );
+      await assert.rejects(
+        command(admin, {
+          ...makeStart(),
+          agentId: briefAgent.saved,
+          agentVersion: 1,
+          requestId,
+          taskRevision: (
+            await originalGetRepository(DeliveryTaskEntity).findOneByOrFail({
+              id: storedTask.id,
+            })
+          ).revision,
+          inputs: { copy: '', requirements: '' },
+        }),
+        /Fixture activity write failure/,
+      );
+    } finally {
+      runner.manager.getRepository = originalGetRepository;
+    }
+    assert.equal(
+      await runner.manager
+        .getRepository(DeliveryAgentRunEntity)
+        .countBy({ workspaceId: workspace.id, requestId }),
+      0,
+    );
+    assert.equal(enqueues, enqueueCount);
+    const ledger = async (run) =>
+      (
+        await runner.query(
+          'SELECT * FROM core."otogrowAiSpend" WHERE "sourceRunId"=$1',
+          [run.runId],
+        )
+      )[0];
+    assert.equal((await ledger(first)).state, 'SETTLED');
+    assert.equal((await ledger(first)).actualMicroUsd, '140');
+    assert.equal((await ledger(failed)).state, 'UNCERTAIN');
+    assert.equal((await ledger(cancelled)).state, 'RELEASED');
+    assert.equal((await ledger(inFlight)).state, 'SETTLED');
+    assert.equal(
+      (await ledger(changedDuringRun)).state,
+      'SETTLED',
+      'Discarded paid output must still be charged',
+    );
+    assert.equal((await ledger(stale)).state, 'RELEASED');
+    assert.equal((await ledger(revoke)).state, 'RELEASED');
+    // Named roles narrow run rights without widening project access or administrator run rights.
+    const makeRole = async (name) => (await access.saveRole(workspace.id, admin, admin, {
+      name, description: '', capabilities: [],
+    })).roles.find((role) => role.name === name);
+    const productionRole = await makeRole('Agent production fixture');
+    const seoRole = await makeRole('Agent SEO fixture');
+    const assign = async (memberId, roleIds) => {
+      const directory = await access.directory(workspace.id, admin, admin);
+      return access.assignRoles(workspace.id, admin, admin, {
+        memberId, roleIds,
+        revision: directory.members.find((member) => member.memberId === memberId).revision,
+        roleRevisions: directory.roles.filter((role) => roleIds.includes(role.id)).map(({ id, revision }) => ({ id, revision })),
+      });
+    };
+    const namedConfiguration = { ...configuration, name: 'Named role assistant fixture', roleIds: [productionRole.id], dailyRunLimit: 50 };
+    await assert.rejects(command(admin, { type: 'save', configuration: {...namedConfiguration, roleIds: [randomUUID()]}}), /unique roles/);
+    await assert.rejects(command(admin, { type: 'save', configuration: {...namedConfiguration, roleIds: [productionRole.id, productionRole.id]}}), /unique roles/);
+    await assert.rejects(command(admin, { type: 'save', configuration: {...namedConfiguration, roleIds: []}}));
+    const namedAgent = await command(admin, { type: 'save', configuration: namedConfiguration });
+    const namedPreview = { ...previewInput, agentId: namedAgent.saved };
+    await assert.rejects(command(admin, namedPreview), /role and project/);
+    await assign(editor, [seoRole.id]);
+    await assert.rejects(command(editor, namedPreview), /role and project/);
+    await assign(editor, [seoRole.id, productionRole.id]);
+    assert((await command(editor, namedPreview)).context);
+    await assign(outsider, [productionRole.id]);
+    await assert.rejects(command(outsider, namedPreview), /unavailable/);
+    const adminCatalog = await service.snapshot(workspace, admin, admin);
+    assert(adminCatalog.agents.some((agent) => agent.id === namedAgent.saved));
+    assert(!adminCatalog.runnableAgentIds.includes(namedAgent.saved));
+    const editorCatalog = await service.snapshot(workspace, editor, editor);
+    assert(editorCatalog.runnableAgentIds.includes(namedAgent.saved));
+    assert.deepEqual(editorCatalog.actor, { workspaceId: workspace.id, memberId: editor, userWorkspaceId: editor });
+    const currentNamedAgent = () => runner.manager.getRepository(DeliveryAgentEntity).findOneByOrFail({ id: namedAgent.saved });
+    const startNamed = async () => command(editor, { ...makeStart(), agentId: namedAgent.saved,
+      agentVersion: (await currentNamedAgent()).version,
+      taskRevision: (await runner.manager.getRepository(DeliveryTaskEntity).findOneByOrFail({ id: storedTask.id })).revision,
+    });
+    const queuedRevocation = await startNamed();
+    await assign(editor, [seoRole.id]);
+    const callsBeforeQueuedRevocation = providerCalls;
+    await service.execute(queuedRevocation.runId);
+    assert.equal(providerCalls, callsBeforeQueuedRevocation);
+    assert.equal((await ledger(queuedRevocation)).state, 'RELEASED');
+    const revokedCatalog = await service.snapshot(workspace, editor, editor);
+    assert(!revokedCatalog.agents.some((agent) => agent.id === namedAgent.saved));
+    assert(revokedCatalog.runs.some((run) => run.id === queuedRevocation.runId), 'Keep permitted task history for accountability');
+    await assign(editor, [productionRole.id]);
+    const dispatchRevocation = await startNamed();
+    const namedRoleDispatch = budget.dispatch.bind(budget);
+    budget.dispatch = async (...args) => { await assign(editor, []); return namedRoleDispatch(...args); };
+    try { await service.execute(dispatchRevocation.runId); } finally { budget.dispatch = namedRoleDispatch; }
+    assert.equal(providerCalls, callsBeforeQueuedRevocation);
+    assert.equal((await ledger(dispatchRevocation)).state, 'RELEASED');
+    await assign(editor, [productionRole.id]);
+    behavior = 'success';
+    const completionRevocation = await startNamed();
+    modelHook = () => assign(editor, []);
+    await service.execute(completionRevocation.runId);
+    modelHook = null;
+    const completionRun = await runner.manager.getRepository(DeliveryAgentRunEntity).findOneByOrFail({ id: completionRevocation.runId });
+    assert.equal(completionRun.status, 'FAILED');
+    assert.equal(completionRun.result, null);
+    assert.equal((await ledger(completionRevocation)).state, 'SETTLED');
+    await assign(editor, [productionRole.id]);
+    const reviewRevocation = await startNamed();
+    await service.execute(reviewRevocation.runId);
+    await assign(editor, []);
+    await assert.rejects(command(editor, { type: 'decide', runId: reviewRevocation.runId, action: 'ACCEPT', field: 'copy' }), /role and project/);
+    await assert.rejects(command(admin, { type: 'decide', runId: reviewRevocation.runId, action: 'ACCEPT', field: null }), /role and project/);
+    await command(admin, { type: 'decide', runId: reviewRevocation.runId, action: 'REJECT', field: null });
+    await command(admin, { type: 'save', id: namedAgent.saved, version: 1, configuration: { ...configuration, name: namedConfiguration.name } });
+    assert.deepEqual((await currentNamedAgent()).configuration.roleIds, [productionRole.id], 'Older saves preserve named role boundaries');
+    const namedEvents = await runner.query(`SELECT changes FROM core."otogrowActivityEvent" WHERE "sourceType"='agent' AND "sourceId"=$1`, [namedAgent.saved]);
+    assert(namedEvents.some((event) => event.changes.some((change) => change.field === 'agentRoles' && change.after === productionRole.name)));
+    await command(admin, { type: 'save', id: namedAgent.saved, version: 2, configuration: { ...namedConfiguration, roleIds: null } });
+    assert((await command(editor, namedPreview)).context, 'Explicit legacy mode remains supported');
+    const { DeliveryKnowledgeService } = require('../dist/modules/delivery/knowledge/delivery-knowledge.service');
+    const knowledge = new DeliveryKnowledgeService(scoped, delivery);
+    const meeting = { id: randomUUID(), projectId: project.id, revision: 0, title: 'Meeting fixture', meetingDate: '2026-10-26', sourceUrl: 'https://fathom.video/share/synthetic', transcript: 'Raw private meeting evidence', knowledge: 'Approved brand decision: focus on booked calls.' };
+    await knowledge.save(workspace, admin, admin, meeting);
+    await knowledge.publish(workspace, admin, admin, { projectId: project.id, id: meeting.id, revision: 1, publish: true });
+    const meetingPreview = await command(editor, namedPreview);
+    assert.equal(meetingPreview.context.brandKnowledge.sources[0].sourceId, meeting.id);
+    assert(!JSON.stringify(meetingPreview.context).includes(meeting.transcript));
+    const startWithKnowledge = async () => {
+      const fresh = await command(editor, namedPreview);
+      return command(editor, { ...makeStart(), agentId: namedAgent.saved, taskRevision: fresh.taskRevision, agentVersion: fresh.agentVersion, knowledgeFingerprint: fresh.context.brandKnowledge.fingerprint });
+    };
+    const queuedKnowledge = await startWithKnowledge();
+    await knowledge.save(workspace, admin, admin, { ...meeting, revision: 2, knowledge: 'Approved new decision: webinar registration.' });
+    await knowledge.publish(workspace, admin, admin, { projectId: project.id, id: meeting.id, revision: 3, publish: true });
+    await assert.rejects(command(editor, { ...makeStart(), agentId: namedAgent.saved, taskRevision: meetingPreview.taskRevision, agentVersion: meetingPreview.agentVersion, knowledgeFingerprint: meetingPreview.context.brandKnowledge.fingerprint }), /knowledge changed after preview/);
+    const beforeKnowledgeCalls = providerCalls;
+    await service.execute(queuedKnowledge.runId);
+    assert.equal(providerCalls, beforeKnowledgeCalls);
+    assert.equal((await ledger(queuedKnowledge)).state, 'RELEASED');
+    const reviewKnowledge = await startWithKnowledge();
+    await service.execute(reviewKnowledge.runId);
+    await knowledge.publish(workspace, admin, admin, { projectId: project.id, id: meeting.id, revision: 4, publish: false });
+    await assert.rejects(command(editor, { type: 'decide', runId: reviewKnowledge.runId, action: 'ACCEPT', field: 'copy' }), /brand knowledge changed/);
+    await command(editor, { type: 'decide', runId: reviewKnowledge.runId, action: 'REJECT', field: null });
+    await knowledge.publish(workspace, admin, admin, { projectId: project.id, id: meeting.id, revision: 5, publish: true });
+    const inFlightKnowledge = await startWithKnowledge();
+    modelHook = () => knowledge.publish(workspace, admin, admin, { projectId: project.id, id: meeting.id, revision: 6, publish: false });
+    try { await service.execute(inFlightKnowledge.runId); } finally { modelHook = null; }
+    const discardedKnowledge = await runner.manager.getRepository(DeliveryAgentRunEntity).findOneByOrFail({ id: inFlightKnowledge.runId });
+    assert.equal(discardedKnowledge.status, 'FAILED');
+    assert.equal(discardedKnowledge.result, null);
+    assert.equal((await ledger(inFlightKnowledge)).state, 'SETTLED');
     assert(enqueues > 0);
-    console.log(
-      'PASS: fixture SDK execution, persisted review, scoped permissions, revoked access/model, idempotency, accept/reject, failure, queued/in-flight cancellation, stale revision, daily limits, aborted timeouts, outbox recovery and real Redis queue processing. All fixtures rolled back.',
+    report(
+      'PASS: meeting context inclusion and raw-note exclusion, preview/queued/in-flight/acceptance freshness; named-role unions, project/admin boundaries, queued/dispatch/completion/acceptance revocation, legacy preservation, role activity; fixture SDK execution, persisted review, scoped permissions, revoked access/model, idempotency, accept/reject, failure, queued/in-flight cancellation, stale revision, daily limits, aborted timeouts, outbox recovery, real Redis queue processing, safe transactional activity, initiator/agent/system attribution and rollback on activity-write failure. All fixtures rolled back.',
     );
   } finally {
     await runner.rollbackTransaction();
@@ -641,7 +1177,7 @@ async function main() {
   }
 }
 main().catch((error) => {
-  console.error(
+  report(
     process.argv.includes('--live')
       ? 'Live check failed; inspect the sanitized run output above.'
       : error,

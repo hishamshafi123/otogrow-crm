@@ -1,7 +1,11 @@
+import { useDeliveryDraft } from '@/delivery/drafts/useDeliveryDraft';
+import { DeliveryDraftConflict } from '@/delivery/drafts/DeliveryDraftConflict';
+import { DeliveryGuardedForm } from '@/delivery/drafts/DeliveryGuardedForm';
 import { useState } from 'react';
 import { gql } from '@apollo/client';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { Trans, useLingui } from '@lingui/react/macro';
+import { isDefined } from 'twenty-shared/utils';
 import {
   type DeliveryTask,
   type DeliveryWorkspace,
@@ -40,19 +44,39 @@ export const DeliveryMedia = ({
   }>(GET_MODELS, {
     variables: { taskId: task.id },
     fetchPolicy: 'network-only',
+    notifyOnNetworkStatusChange: true,
   });
   const [mutate, mutation] = useMutation(CHANGE_MEDIA);
   const [error, setError] = useState('');
-  const [shotId, setShotId] = useState('');
-  const [modelId, setModelId] = useState('');
-  const [referenceIds, setReferenceIds] = useState<string[]>([]);
-  const [confirmed, setConfirmed] = useState(false);
+  const [changing, setChanging] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const busy = changing || mutation.loading;
+  const initialInputs = {
+    shotId: '',
+    modelId: '',
+    referenceIds: [] as string[],
+    confirmed: false,
+  };
+  const draft = useDeliveryDraft({
+    initialValues: initialInputs,
+    revision: task.revision,
+    busy,
+  });
+  const { shotId, modelId, referenceIds, confirmed } = draft.values;
   const [requestId, setRequestId] = useState(() => crypto.randomUUID());
+  const [hasVerifiedModelSnapshot, setHasVerifiedModelSnapshot] =
+    useState(false);
   const document = task.details.creative;
   if (!document) return null;
   const settings = document.mediaSettings;
+  const modelsVerified =
+    !query.loading && !query.error && isDefined(query.data);
+  if (modelsVerified && !hasVerifiedModelSnapshot)
+    setHasVerifiedModelSnapshot(true);
   const models = query.data?.deliveryMediaModels ?? [];
-  const model = models.find((item) => item.id === modelId);
+  const model = modelsVerified
+    ? models.find((item) => item.id === modelId)
+    : undefined;
   const shot = document.shots.find((item) => item.id === shotId);
   const role = workspace.actor.isAdmin
     ? 'ADMIN'
@@ -60,28 +84,55 @@ export const DeliveryMedia = ({
       ? 'MANAGER'
       : 'MEMBER';
   const enabled = settings?.enabled === true && settings.roles.includes(role);
-  const reset = () => {
-    setConfirmed(false);
+  const update = (values: typeof initialInputs) => {
+    draft.update({ ...values, confirmed: false });
     setRequestId(crypto.randomUUID());
   };
-  const change = async (fields: Record<string, unknown>) => {
+  const refresh = async () => {
+    if (refreshing) return;
+    setRefreshing(true);
     setError('');
+    const results = await Promise.allSettled([
+      Promise.resolve().then(() => query.refetch()),
+      Promise.resolve().then(onChanged),
+    ]);
+    if (results.some((result) => result.status === 'rejected'))
+      setError(
+        t`Media status could not be fully refreshed. Your draft is kept. Retry before relying on updated models or run status.`,
+      );
+    setRefreshing(false);
+  };
+  const change = async (
+    fields: Record<string, unknown>,
+    revision = task.revision,
+  ) => {
+    if (fields.action !== 'cancel' && !modelsVerified) return false;
+    setError('');
+    setChanging(true);
     try {
       await mutate({
         variables: {
-          input: { ...fields, taskId: task.id, revision: task.revision },
+          input: { ...fields, taskId: task.id, revision },
         },
       });
-      await onChanged();
-      return true;
     } catch (failure) {
       setError(
         failure instanceof Error
           ? failure.message
           : t`Unable to update generation.`,
       );
+      setChanging(false);
       return false;
     }
+    try {
+      await onChanged();
+    } catch {
+      setError(
+        t`Saved, but this page could not refresh. Refresh before making another change.`,
+      );
+    }
+    setChanging(false);
+    return true;
   };
   const statuses: Record<string, string> = {
     QUEUED: t`Queued`,
@@ -94,43 +145,77 @@ export const DeliveryMedia = ({
     <StyledDeliveryStack>
       <StyledDeliveryRow>
         <h4>
-          <Trans>Generate a shot</Trans>
+          <Trans>Media tools</Trans>
         </h4>
-        <StyledDeliveryButton onClick={() => void onChanged()}>
-          <Trans>Refresh run status</Trans>
+        <StyledDeliveryButton
+          disabled={refreshing || query.loading}
+          onClick={() => void refresh()}
+        >
+          {refreshing ? t`Refreshing media status…` : t`Refresh media status`}
         </StyledDeliveryButton>
       </StyledDeliveryRow>
-      {(error || query.error) && (
-        <p role="alert">{error || query.error?.message}</p>
-      )}
-      {!models.length && (
+      {error && <p role="alert">{error}</p>}
+      <p>
+        <Trans>
+          Google is the only supported media provider. Selected still images can
+          be inspected with an allowed model; motion and audio require human
+          review. Image and video generation are unavailable until billing for
+          these model outputs is supported. You can upload assets created in
+          your existing tools.
+        </Trans>
+      </p>
+      {query.error ? (
+        <div>
+          <p role="alert">
+            <Trans>
+              Media model access could not be checked. Your draft is kept. Retry
+              before changing generation settings or starting a request.
+            </Trans>
+          </p>
+          <StyledDeliveryButton
+            disabled={query.loading}
+            onClick={() => void query.refetch().catch(() => undefined)}
+          >
+            <Trans>Retry media model check</Trans>
+          </StyledDeliveryButton>
+        </div>
+      ) : !modelsVerified ? (
+        <p role="status">
+          <Trans>Checking media model access…</Trans>
+        </p>
+      ) : !models.length ? (
         <p>
           <Trans>
-            No supported media models are connected. Upload assets made in your
-            existing tools, or configure an approved Google provider and media
-            model in server settings. The earlier testing key was not saved.
+            No supported Google media models are configured. Upload assets made
+            in your existing tools, or ask an administrator to configure a
+            supported still-image inspection model.
           </Trans>
         </p>
-      )}
-      {workspace.actor.isAdmin && (
+      ) : null}
+      {workspace.actor.isAdmin && hasVerifiedModelSnapshot && (
         <details>
           <summary>{t`Generation access for this production`}</summary>
-          <form
-            key={settings?.version ?? 0}
-            onSubmit={(event) => {
-              event.preventDefault();
-              const data = new FormData(event.currentTarget);
-              void change({
-                action: 'configure',
-                enabled: data.get('enabled') === 'on',
-                modelIds: data.getAll('modelIds'),
-                roles: data.getAll('roles'),
-                dailyRunLimit: Number(data.get('dailyRunLimit')),
-                allowUnknownCost: data.get('allowUnknownCost') === 'on',
-              });
-            }}
+          <DeliveryGuardedForm
+            revision={task.revision}
+            busy={busy}
+            disabled={!modelsVerified}
+            onSave={(data, revision) =>
+              change(
+                {
+                  action: 'configure',
+                  enabled: data.get('enabled') === 'on',
+                  modelIds: data.getAll('modelIds'),
+                  roles: data.getAll('roles'),
+                  dailyRunLimit: Number(data.get('dailyRunLimit')),
+                },
+                revision,
+              )
+            }
           >
-            <fieldset disabled={mutation.loading}>
+            <fieldset
+              hidden={!modelsVerified}
+              disabled={busy || !modelsVerified}
+            >
               <StyledDeliveryStack>
                 <label>
                   <input
@@ -181,14 +266,12 @@ export const DeliveryMedia = ({
                     defaultValue={settings?.dailyRunLimit ?? 3}
                   />
                 </label>
-                <label>
-                  <input
-                    type="checkbox"
-                    name="allowUnknownCost"
-                    defaultChecked={settings?.allowUnknownCost ?? false}
-                  />
-                  {t`Allow bounded runs when monetary pricing is unknown`}
-                </label>
+                <p>
+                  <Trans>
+                    Paid requests require supported pricing and an available AI
+                    budget. Unknown pricing cannot be bypassed here.
+                  </Trans>
+                </p>
                 <small>
                   <Trans>
                     One output per request. Failed and cancelled requests count
@@ -201,156 +284,193 @@ export const DeliveryMedia = ({
                 </StyledDeliveryButton>
               </StyledDeliveryStack>
             </fieldset>
-          </form>
+          </DeliveryGuardedForm>
         </details>
       )}
       <StyledDeliveryCard>
-        <StyledDeliveryStack>
-          <StyledDeliveryGrid>
-            <label>
-              <Trans>Shot</Trans>
-              <select
-                value={shotId}
-                onChange={(event) => {
-                  setShotId(event.target.value);
-                  reset();
-                }}
-              >
-                <option value="">{t`Select shot`}</option>
-                {document.shots.map((item) => (
-                  <option value={item.id} key={item.id}>
-                    {item.title}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <Trans>Model</Trans>
-              <select
-                value={modelId}
-                onChange={(event) => {
-                  setModelId(event.target.value);
-                  reset();
-                }}
-              >
-                <option value="">{t`Select model`}</option>
-                {models
-                  .filter((item) => settings?.modelIds.includes(item.id))
-                  .map((item) => (
-                    <option value={item.id} key={item.id}>
-                      {item.id}
-                    </option>
-                  ))}
-              </select>
-            </label>
-            {(model?.kind === 'IMAGE' || model?.kind === 'INSPECTION') && (
+        {draft.stale && (
+          <DeliveryDraftConflict onReload={draft.reload} busy={busy} />
+        )}
+        <fieldset
+          hidden={!modelsVerified}
+          disabled={busy || draft.stale || !modelsVerified}
+        >
+          <StyledDeliveryStack>
+            <StyledDeliveryGrid>
               <label>
-                <Trans>Reference images — up to three, under 6 MB each</Trans>
+                <Trans>Shot</Trans>
                 <select
-                  multiple
-                  value={referenceIds}
+                  value={shotId}
                   onChange={(event) => {
-                    setReferenceIds(
-                      Array.from(event.target.selectedOptions).map(
-                        (option) => option.value,
-                      ),
-                    );
-                    reset();
+                    update({ ...draft.values, shotId: event.target.value });
                   }}
                 >
-                  {document.assets
-                    .filter(
-                      (asset) =>
-                        asset.storageState === 'READY' &&
-                        asset.mimeType.startsWith('image/') &&
-                        asset.size <= 6000000 &&
-                        (model?.kind === 'INSPECTION' ||
-                          asset.reviews.at(-1)?.decision === 'APPROVED'),
-                    )
-                    .map((asset) => (
-                      <option key={asset.id} value={asset.id}>
-                        {asset.name}
+                  <option value="">{t`Select shot`}</option>
+                  {document.shots.map((item) => (
+                    <option value={item.id} key={item.id}>
+                      {item.title}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <Trans>Model</Trans>
+                <select
+                  value={modelId}
+                  onChange={(event) => {
+                    update({
+                      ...draft.values,
+                      modelId: event.target.value,
+                      referenceIds: [],
+                    });
+                  }}
+                >
+                  <option value="">{t`Select model`}</option>
+                  {models
+                    .filter((item) => settings?.modelIds.includes(item.id))
+                    .map((item) => (
+                      <option value={item.id} key={item.id}>
+                        {item.id}
                       </option>
                     ))}
                 </select>
               </label>
-            )}
-          </StyledDeliveryGrid>
-          {shot && model && (
-            <>
-              <p>
-                <Trans>
-                  This request sends the shot prompt, current approved brief and
-                  selected references to the chosen provider.
-                </Trans>
-              </p>
-              <pre style={{ whiteSpace: 'pre-wrap' }}>
-                {model.kind === 'IMAGE'
-                  ? shot.imagePrompt
-                  : model.kind === 'INSPECTION'
-                    ? t`Inspect selected still images against the approved brief. Cite visible issues and coverage limits.`
-                    : shot.animationPrompt}
-              </pre>
-              <details>
-                <summary>{t`Review brief sent to provider`}</summary>
-                <pre style={{ whiteSpace: 'pre-wrap' }}>
-                  {JSON.stringify(document.brief, null, 2)}
-                </pre>
-              </details>
-              {model.kind === 'CLIP' && (
-                <small>
-                  <Trans>
-                    Video uses the shot’s selected approved image. Duration is a
-                    prompt target, not a guaranteed output length.
-                  </Trans>
-                </small>
+              {(model?.kind === 'IMAGE' || model?.kind === 'INSPECTION') && (
+                <label>
+                  <Trans>Reference images — up to three, under 6 MB each</Trans>
+                  <select
+                    multiple
+                    value={referenceIds}
+                    onChange={(event) => {
+                      update({
+                        ...draft.values,
+                        referenceIds: Array.from(
+                          event.target.selectedOptions,
+                          (option) => option.value,
+                        ),
+                      });
+                    }}
+                  >
+                    {document.assets
+                      .filter(
+                        (asset) =>
+                          asset.storageState === 'READY' &&
+                          asset.mimeType.startsWith('image/') &&
+                          asset.size <= 6000000 &&
+                          (model?.kind === 'INSPECTION' ||
+                            asset.reviews.at(-1)?.decision === 'APPROVED'),
+                      )
+                      .map((asset) => (
+                        <option key={asset.id} value={asset.id}>
+                          {asset.name}
+                        </option>
+                      ))}
+                  </select>
+                </label>
               )}
-              <p>
-                <Trans>
-                  Estimated monetary cost: unknown. One output. Cancellation may
-                  still incur provider charges.
-                </Trans>
-              </p>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={confirmed}
-                  onChange={(event) => setConfirmed(event.target.checked)}
-                />
-                {t`I reviewed these inputs and authorize this generation request`}
-              </label>
-            </>
-          )}
-          <StyledDeliveryButton
-            disabled={
-              !enabled ||
-              !settings?.allowUnknownCost ||
-              !confirmed ||
-              !shot ||
-              !model ||
-              mutation.loading ||
-              ['APPROVED', 'IN_REVIEW'].includes(task.details.state)
-            }
-            onClick={async () => {
-              if (
-                await change({
-                  action: 'generate',
-                  shotId,
-                  modelId,
-                  kind: model?.kind,
-                  referenceAssetIds: referenceIds,
-                  confirm: true,
-                  requestId,
-                })
-              )
-                reset();
-            }}
-          >
-            {model?.kind === 'INSPECTION'
-              ? t`Review selected images`
-              : t`Generate one candidate`}
-          </StyledDeliveryButton>
-        </StyledDeliveryStack>
+            </StyledDeliveryGrid>
+            {shot && model && (
+              <>
+                <p>
+                  <Trans>
+                    This request sends the shot prompt, current approved brief
+                    and selected references to the chosen provider.
+                  </Trans>
+                </p>
+                <pre style={{ whiteSpace: 'pre-wrap' }}>
+                  {model.kind === 'IMAGE'
+                    ? shot.imagePrompt
+                    : model.kind === 'INSPECTION'
+                      ? t`Inspect selected still images against the approved brief. Cite visible issues and coverage limits.`
+                      : shot.animationPrompt}
+                </pre>
+                <details>
+                  <summary>{t`Review brief sent to provider`}</summary>
+                  <pre style={{ whiteSpace: 'pre-wrap' }}>
+                    {JSON.stringify(document.brief, null, 2)}
+                  </pre>
+                </details>
+                {model.kind === 'CLIP' && (
+                  <small>
+                    <Trans>
+                      Video uses the shot’s selected approved image. Duration is
+                      a prompt target, not a guaranteed output length.
+                    </Trans>
+                  </small>
+                )}
+                <p>
+                  <Trans>
+                    Paid requests are checked against configured pricing and AI
+                    budgets before they start. Cancellation may still incur
+                    provider charges.
+                  </Trans>
+                </p>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={confirmed}
+                    onChange={(event) =>
+                      draft.update({
+                        ...draft.values,
+                        confirmed: event.target.checked,
+                      })
+                    }
+                  />
+                  {t`I reviewed these inputs and authorize this generation request`}
+                </label>
+              </>
+            )}
+            <StyledDeliveryButton
+              disabled={
+                !modelsVerified ||
+                !enabled ||
+                model?.kind === 'IMAGE' ||
+                model?.kind === 'CLIP' ||
+                !confirmed ||
+                !shot ||
+                !model ||
+                busy ||
+                ['APPROVED', 'IN_REVIEW'].includes(task.details.state)
+              }
+              onClick={async () => {
+                if (
+                  !modelsVerified ||
+                  busy ||
+                  draft.stale ||
+                  !confirmed ||
+                  !model ||
+                  !shot ||
+                  model.kind === 'IMAGE' ||
+                  model.kind === 'CLIP'
+                )
+                  return;
+                if (
+                  await change(
+                    {
+                      action: 'generate',
+                      shotId,
+                      modelId,
+                      kind: model?.kind,
+                      referenceAssetIds: referenceIds,
+                      confirm: true,
+                      requestId,
+                    },
+                    draft.revision,
+                  )
+                ) {
+                  draft.markSaved(initialInputs);
+                  setRequestId(crypto.randomUUID());
+                }
+              }}
+            >
+              {model?.kind === 'INSPECTION'
+                ? t`Inspect selected images`
+                : model?.kind === 'IMAGE' || model?.kind === 'CLIP'
+                  ? t`Generation unavailable`
+                  : t`Select a model to continue`}
+            </StyledDeliveryButton>
+          </StyledDeliveryStack>
+        </fieldset>
       </StyledDeliveryCard>
       {(document.mediaRuns ?? [])
         .slice()
@@ -395,7 +515,7 @@ export const DeliveryMedia = ({
               )}
               {['QUEUED', 'RUNNING'].includes(run.status) && (
                 <StyledDeliveryButton
-                  disabled={mutation.loading}
+                  disabled={busy}
                   onClick={() =>
                     void change({ action: 'cancel', runId: run.id })
                   }

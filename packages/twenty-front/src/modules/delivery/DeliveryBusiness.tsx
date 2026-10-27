@@ -1,6 +1,26 @@
+import { DeliveryReceivableBalance } from '@/delivery/finance/DeliveryReceivableBalance';
+import { financePaymentDestination } from '@/delivery/finance/finance-payment-destination';
+import { useReconciliationLabels } from '@/delivery/finance/useReconciliationLabels';
+import { DeliveryReadiness } from '@/delivery/readiness/DeliveryReadiness';
+import { DeliveryRevisionCosts } from '@/delivery/revisions/DeliveryRevisionCosts';
+import {
+  ConversationPermissions,
+  type ConversationPermissionsValue,
+} from '@/delivery/inbox/ConversationPermissions';
+import { GET_OTOGROW_ROLE_DIRECTORY } from '@/otogrow-access/otogrow-access.graphql';
+import { type OtogrowRoleDirectory } from '@/otogrow-access/otogrow-access.types';
+import { useWorkflowAccess } from '@/delivery/workflows/useWorkflowAccess';
+import { DeliveryGuardedForm } from '@/delivery/drafts/DeliveryGuardedForm';
+import { useDeliveryDraft } from '@/delivery/drafts/useDeliveryDraft';
+import { useDeliveryNativeDraft } from '@/delivery/drafts/useDeliveryNativeDraft';
+import { DeliveryDraftConflict } from '@/delivery/drafts/DeliveryDraftConflict';
+import { DeliveryInboxForm } from '@/delivery/DeliveryInboxForm';
+import { useDeliveryDraftGuard } from '@/delivery/drafts/DeliveryDraftGuard';
 import { DeliveryMeta } from '@/delivery/DeliveryMeta';
 import { type DeliveryAgentsSnapshot } from '@/delivery/delivery-agent.types';
 import { useState, type FormEvent } from 'react';
+import { Link } from 'react-router-dom';
+import { styled } from '@linaria/react';
 import { gql } from '@apollo/client';
 import { useMutation, useQuery } from '@apollo/client/react';
 import { Trans, useLingui } from '@lingui/react/macro';
@@ -10,6 +30,7 @@ import {
   type BusinessKind,
   type BusinessRecord,
   type BusinessSnapshot,
+  type FinanceReceivableBalance,
 } from '@/delivery/delivery-business.types';
 import {
   StyledDeliveryStack,
@@ -20,6 +41,15 @@ import {
   StyledDeliveryBadge,
 } from '@/delivery/deliveryStyles';
 
+const StyledBusinessBoundary = styled.fieldset`
+  border: 0;
+  margin: 0;
+  min-width: 0;
+  padding: 0;
+  &[hidden] {
+    display: none;
+  }
+`;
 const GET_BUSINESS = gql`
   query DeliveryBusiness {
     deliveryBusiness
@@ -53,17 +83,35 @@ type DeliveryBusinessProps = {
   onChanged: () => Promise<unknown>;
   onOpenTask: (id: string) => void;
 };
-export const DeliveryBusiness = ({
+export const DeliveryBusiness = (props: DeliveryBusinessProps) => {
+  const permission = useWorkflowAccess();
+  return (
+    <BusinessWorkspace
+      key={permission.scope}
+      workspace={props.workspace}
+      view={props.view}
+      onChanged={props.onChanged}
+      onOpenTask={props.onOpenTask}
+      permission={permission}
+    />
+  );
+};
+const BusinessWorkspace = ({
   workspace,
   view,
   onChanged,
   onOpenTask,
-}: DeliveryBusinessProps) => {
+  permission,
+}: DeliveryBusinessProps & {
+  permission: ReturnType<typeof useWorkflowAccess>;
+}) => {
   const { t } = useLingui();
   const query = useQuery<{ deliveryBusiness: BusinessSnapshot }>(GET_BUSINESS, {
-    fetchPolicy: 'network-only',
+    fetchPolicy: 'no-cache',
+    skip: !permission.ready,
     pollInterval: 30000,
   });
+  const { requestAction } = useDeliveryDraftGuard();
   const [mutate, mutation] = useMutation(CHANGE_BUSINESS);
   const [error, setError] = useState('');
   const [editing, setEditing] = useState<{
@@ -71,16 +119,23 @@ export const DeliveryBusiness = ({
     record?: BusinessRecord;
   } | null>(null);
   const [selected, setSelected] = useState('');
-  const data = query.data?.deliveryBusiness;
-  const connectionLabels: Record<string, string> = {
-    EMAIL: t`Email`,
-    SLACK: t`Slack`,
-    WHATSAPP: t`WhatsApp`,
-    META_SHOPIFY: t`Meta and Shopify`,
-    META: t`Meta reporting`,
-    SHOPIFY: t`Shopify`,
-    SOCIAL_PUBLISHING: t`Social publishing`,
-  };
+  const candidate = query.data?.deliveryBusiness;
+  const available = !query.error && permission.matches(candidate);
+  const [lastVerifiedData, setLastVerifiedData] = useState<BusinessSnapshot>();
+  if (available && candidate !== lastVerifiedData)
+    setLastVerifiedData(candidate);
+  const data = available ? candidate : lastVerifiedData;
+  const canReadFinance =
+    permission.canReadFinance && data?.financeAccess.read === true;
+  const canManageFinance =
+    permission.canManageFinance && data?.financeAccess.manage === true;
+  const financeProjects = data?.financeProjects ?? [];
+  const receivableBalances = new Map(
+    (data?.financeReceivableBalances ?? []).map((balance) => [
+      balance.id,
+      balance,
+    ]),
+  );
   const labels: Record<string, string> = {
     CONVERSATION: t`Conversation`,
     AD_REPORT: t`Advertising report`,
@@ -91,7 +146,7 @@ export const DeliveryBusiness = ({
     RELEASE: t`Release`,
     DRAFT: t`Draft`,
     POSTED: t`Recorded`,
-    OPEN: t`Awaiting payment`,
+    OPEN: t`Open`,
     REVIEW: t`Awaiting review`,
     APPROVED: t`Approved`,
     CHANGES_REQUESTED: t`Changes requested`,
@@ -102,13 +157,26 @@ export const DeliveryBusiness = ({
     PAID: t`Payment confirmed`,
     VOID: t`Voided`,
   };
+  const statusLabel = (record: BusinessRecord) => {
+    if (
+      record.kind === 'FINANCE' &&
+      record.category === 'RECEIVABLE' &&
+      record.status !== 'VOID'
+    ) {
+      const balance = receivableBalances.get(record.id);
+      if (!balance || balance.sourceWarnings.length)
+        return t`Payment status needs review`;
+      if (balance.outstandingMicros === '0') return t`Fully paid`;
+      if (balance.settledMicros !== '0') return t`Partially paid`;
+      if (record.status === 'OPEN') return t`Awaiting payment`;
+    }
+    return labels[record.status] ?? record.status;
+  };
   const run = async (input: Record<string, unknown>) => {
+    if (!available) return false;
     setError('');
     try {
       await mutate({ variables: { input } });
-      await query.refetch();
-      await onChanged();
-      return true;
     } catch (failure) {
       setError(
         failure instanceof Error
@@ -117,6 +185,15 @@ export const DeliveryBusiness = ({
       );
       return false;
     }
+    try {
+      await query.refetch();
+      await onChanged();
+    } catch {
+      setError(
+        t`Saved, but this page could not refresh. Refresh the page before making another change.`,
+      );
+    }
+    return true;
   };
   const records = (data?.records ?? []).filter((record) =>
     VIEW_KINDS[view]?.includes(record.kind),
@@ -124,17 +201,9 @@ export const DeliveryBusiness = ({
   const item = records.find((record) => record.id === selected);
   const canDraft =
     item?.kind === 'CONVERSATION' &&
-    (!item.private || item.ownerId === workspace.actor.memberId) &&
-    (workspace.actor.isAdmin ||
-      item.ownerId === workspace.actor.memberId ||
-      (Array.isArray(item.grants) &&
-        item.grants.some(
-          (grant: { memberId: string; read: boolean; send: boolean }) =>
-            grant.memberId === workspace.actor.memberId &&
-            grant.read &&
-            grant.send,
-        )));
+    data?.conversationAccess?.[item.id]?.draft === true;
   const exportFinance = () => {
+    if (!available || !canReadFinance) return;
     const headings = [
       'id',
       'category',
@@ -169,454 +238,551 @@ export const DeliveryBusiness = ({
     anchor.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
-  if (query.loading && !data)
+  if (available && view === 'finance' && !canReadFinance)
     return (
       <StyledDeliveryCard>
-        <Trans>Loading business workspace…</Trans>
+        <p>{t`Your roles do not grant finance access. Ask an administrator if you need it.`}</p>
       </StyledDeliveryCard>
     );
-  if (query.error && !data) return <p role="alert">{query.error.message}</p>;
   return (
-    <StyledDeliveryStack>
-      <StyledDeliveryCard>
-        <StyledDeliveryStack>
-          <StyledDeliveryRow>
-            <h2>
-              {view === 'inbox'
-                ? t`Client conversations`
-                : view === 'ads'
-                  ? t`Advertising decisions`
-                  : view === 'finance'
-                    ? t`Cash and client economics`
-                    : view === 'content'
-                      ? t`Your content engine`
-                      : view === 'competitors'
-                        ? t`Competitor research`
-                        : view === 'development'
-                          ? t`Build and release`
-                          : t`Founder overview`}
-            </h2>
-            <StyledDeliveryRow>
-              {VIEW_KINDS[view]
-                ?.filter(
-                  (kind) =>
-                    !['FINANCE', 'CONVERSATION'].includes(kind) ||
-                    workspace.actor.isAdmin,
-                )
-                .map((kind) => (
-                  <StyledDeliveryButton
-                    key={kind}
-                    onClick={() => setEditing({ kind })}
-                  >
-                    {t`New`} {labels[kind]}
-                  </StyledDeliveryButton>
-                ))}
-              {view === 'finance' && workspace.actor.isAdmin && (
-                <StyledDeliveryButton onClick={exportFinance}>
-                  <Trans>Export CSV</Trans>
-                </StyledDeliveryButton>
-              )}
-            </StyledDeliveryRow>
-          </StyledDeliveryRow>
-          {['inbox', 'content', 'competitors'].includes(view) && (
-            <p>
-              <Trans>
-                Connections are not configured. Records and drafts stay inside
-                the OS. No messages, ad changes or social posts are sent from
-                these controls.
-              </Trans>
-            </p>
+    <>
+      {!available && (
+        <StyledDeliveryCard>
+          <p role={query.error || permission.error ? 'alert' : 'status'}>
+            {query.error || permission.error
+              ? t`Could not verify your current access and records. Your unsaved edits are kept while you retry.`
+              : t`Loading your permitted records…`}
+          </p>
+          {(query.error || permission.error) && (
+            <StyledDeliveryButton
+              onClick={() => {
+                void permission.refetch();
+                void query.refetch();
+              }}
+            >{t`Try again`}</StyledDeliveryButton>
           )}
-          {view === 'inbox' && (
+        </StyledDeliveryCard>
+      )}
+      <StyledBusinessBoundary hidden={!available} disabled={!available}>
+        <StyledDeliveryStack>
+          <StyledDeliveryCard>
+            <StyledDeliveryStack>
+              <StyledDeliveryRow>
+                <h2>
+                  {view === 'inbox'
+                    ? t`Client conversations`
+                    : view === 'ads'
+                      ? t`Advertising decisions`
+                      : view === 'finance'
+                        ? t`Cash records and collections`
+                        : view === 'content'
+                          ? t`Your content engine`
+                          : view === 'competitors'
+                            ? t`Competitor research`
+                            : view === 'development'
+                              ? t`Build and release`
+                              : t`Founder overview`}
+                </h2>
+                <StyledDeliveryRow>
+                  {VIEW_KINDS[view]
+                    ?.filter((kind) =>
+                      kind === 'FINANCE'
+                        ? canManageFinance
+                        : kind !== 'CONVERSATION' || workspace.actor.isAdmin,
+                    )
+                    .map((kind) => (
+                      <StyledDeliveryButton
+                        key={kind}
+                        disabled={editing !== null}
+                        onClick={() =>
+                          requestAction(() => setEditing({ kind }))
+                        }
+                      >
+                        {t`New`} {labels[kind]}
+                      </StyledDeliveryButton>
+                    ))}
+                  {view === 'finance' && canReadFinance && (
+                    <StyledDeliveryButton onClick={exportFinance}>
+                      <Trans>Export CSV</Trans>
+                    </StyledDeliveryButton>
+                  )}
+                </StyledDeliveryRow>
+              </StyledDeliveryRow>
+              {['inbox', 'content', 'competitors'].includes(view) && (
+                <p>
+                  <Trans>
+                    This is a manual workflow. Records and drafts stay inside
+                    the OS. Live synchronization, automatic research and sending
+                    or publishing are not implemented here.
+                  </Trans>
+                </p>
+              )}
+              {view === 'inbox' && (
+                <p>
+                  <Trans>
+                    Record selected client conversations and prepare replies.
+                    Grants apply to this conversation only; project membership
+                    does not grant inbox access. Imported notes are labeled
+                    separately from provider-synced messages.
+                  </Trans>
+                </p>
+              )}
+              {view === 'ads' && (
+                <p>
+                  <Trans>
+                    Record source evidence, review recommendations, then assign
+                    follow-up. Marketers apply budget changes in the ad
+                    platform; a separate manager verifies them.
+                  </Trans>
+                </p>
+              )}
+              {view === 'finance' && !canManageFinance && (
+                <p>{t`You have view-only finance access. You can inspect reports and export entries.`}</p>
+              )}
+              {view === 'finance' && (
+                <p>
+                  <Trans>
+                    Cash basis, separated by currency. Record opening cash,
+                    receipts, expenses and allocated salary costs. Receivables
+                    are excluded from cash until payment is confirmed.
+                    Advertising-platform spend stays separate from agency
+                    expenses.
+                  </Trans>
+                </p>
+              )}
+            </StyledDeliveryStack>
+          </StyledDeliveryCard>
+          {view === 'finance' && canReadFinance && (
+            <DeliveryRevisionCosts workspace={workspace} />
+          )}
+          {(error || query.error) && (
+            <p role="alert">{error || query.error?.message}</p>
+          )}
+          {view === 'development' && (
             <p>
               <Trans>
-                Record selected client conversations and prepare replies. Grants
-                apply to this conversation only; project membership does not
-                grant inbox access. Imported notes are labeled separately from
-                provider-synced messages.
+                Task boards, release checklists and evidence links are
+                available. Repository, issue, CI, Jira and deployment
+                synchronization are not implemented. Record external release
+                evidence here for review.
               </Trans>
             </p>
           )}
           {view === 'ads' && (
-            <p>
-              <Trans>
-                Record source evidence, review recommendations, then assign
-                follow-up. Marketers apply budget changes in the ad platform; a
-                separate manager verifies them.
-              </Trans>
-            </p>
+            <DeliveryMeta
+              workspace={workspace}
+              onChanged={onChanged}
+              onOpenTask={onOpenTask}
+            />
           )}
-          {view === 'finance' && (
-            <p>
-              <Trans>
-                Cash basis, separated by currency. Record opening cash,
-                receipts, expenses and allocated salary costs. Receivables are
-                excluded from cash until payment is confirmed.
-                Advertising-platform spend stays separate from agency expenses.
-              </Trans>
-            </p>
-          )}
-        </StyledDeliveryStack>
-      </StyledDeliveryCard>
-      {(error || query.error) && (
-        <p role="alert">{error || query.error?.message}</p>
-      )}
-      {view === 'ads' && (
-        <DeliveryMeta
-          workspace={workspace}
-          onChanged={onChanged}
-          onOpenTask={onOpenTask}
-        />
-      )}
-      {view === 'finance' &&
-        data?.finance.map((summary) => (
-          <StyledDeliveryCard key={summary.currency}>
-            <StyledDeliveryStack>
-              <h3>{summary.currency}</h3>
+          {view === 'finance' &&
+            data?.finance.map((summary) => (
+              <StyledDeliveryCard key={summary.currency}>
+                <StyledDeliveryStack>
+                  <h3>{summary.currency}</h3>
+                  <StyledDeliveryGrid>
+                    {[
+                      [t`Cash`, summary.cash],
+                      [t`Receivables`, summary.receivables],
+                      [t`Overdue`, summary.overdue],
+                      [t`Receipts · last 30 days`, summary.income30],
+                      [t`Costs · last 30 days`, summary.expense30],
+                      [t`Net cash burn · last 30 days`, summary.netBurn],
+                    ].map(([label, amount]) => (
+                      <div key={String(label)}>
+                        <small>{label}</small>
+                        <h2>{formatMoney(Number(amount), summary.currency)}</h2>
+                      </div>
+                    ))}
+                  </StyledDeliveryGrid>
+                  <p>
+                    <Trans>Runway</Trans>:{' '}
+                    {summary.runwayMonths === null
+                      ? t`No net cash burn in this period`
+                      : t`${summary.runwayMonths.toFixed(1)} months`}
+                  </p>
+                  <p>
+                    <Trans>Receipts growth</Trans>:{' '}
+                    {summary.revenueGrowth === null
+                      ? '—'
+                      : `${(summary.revenueGrowth * 100).toFixed(1)}%`}{' '}
+                    · <Trans>Spending growth</Trans>:{' '}
+                    {summary.spendingGrowth === null
+                      ? '—'
+                      : `${(summary.spendingGrowth * 100).toFixed(1)}%`}
+                  </p>
+                  {summary.projects.map((project) => (
+                    <div key={project.projectId ?? 'shared'}>
+                      <strong>
+                        {(view === 'finance'
+                          ? financeProjects
+                          : workspace.projects
+                        ).find(
+                          (candidate) => candidate.id === project.projectId,
+                        )?.name ?? t`Shared / unallocated`}
+                      </strong>
+                      <p>
+                        {t`Cash contribution`}:{' '}
+                        {formatMoney(
+                          project.cashContribution,
+                          summary.currency,
+                        )}{' '}
+                        · {t`Cash contribution margin`}:{' '}
+                        {project.margin === null
+                          ? '—'
+                          : `${(project.margin * 100).toFixed(1)}%`}
+                      </p>
+                    </div>
+                  ))}
+                </StyledDeliveryStack>
+              </StyledDeliveryCard>
+            ))}
+          {view === 'health' && (
+            <>
               <StyledDeliveryGrid>
                 {[
-                  [t`Cash`, summary.cash],
-                  [t`Receivables`, summary.receivables],
-                  [t`Overdue`, summary.overdue],
-                  [t`Receipts · last 30 days`, summary.income30],
-                  [t`Costs · last 30 days`, summary.expense30],
-                  [t`Net cash burn · last 30 days`, summary.netBurn],
-                ].map(([label, amount]) => (
-                  <div key={String(label)}>
+                  [
+                    t`Late work`,
+                    workspace.tasks.filter(
+                      (task) =>
+                        task.dueAt !== null &&
+                        Date.parse(task.dueAt) < Date.now() &&
+                        task.details.state !== 'APPROVED',
+                    ).length,
+                  ],
+                  [
+                    t`Blocked work`,
+                    workspace.tasks.filter(
+                      (task) => task.details.state === 'BLOCKED',
+                    ).length,
+                  ],
+                  [
+                    t`Work awaiting review`,
+                    workspace.tasks.filter(
+                      (task) => task.details.state === 'IN_REVIEW',
+                    ).length,
+                  ],
+                  [
+                    t`Business reviews`,
+                    data?.records.filter((record) => record.status === 'REVIEW')
+                      .length ?? 0,
+                  ],
+                ].map(([label, count]) => (
+                  <StyledDeliveryCard key={String(label)}>
                     <small>{label}</small>
-                    <h2>{formatMoney(Number(amount), summary.currency)}</h2>
-                  </div>
+                    <h2>{count}</h2>
+                  </StyledDeliveryCard>
                 ))}
               </StyledDeliveryGrid>
-              <p>
-                <Trans>Runway</Trans>:{' '}
-                {summary.runwayMonths === null
-                  ? t`No net cash burn in this period`
-                  : t`${summary.runwayMonths.toFixed(1)} months`}
-              </p>
-              <p>
-                <Trans>Receipts growth</Trans>:{' '}
-                {summary.revenueGrowth === null
-                  ? '—'
-                  : `${(summary.revenueGrowth * 100).toFixed(1)}%`}{' '}
-                · <Trans>Spending growth</Trans>:{' '}
-                {summary.spendingGrowth === null
-                  ? '—'
-                  : `${(summary.spendingGrowth * 100).toFixed(1)}%`}
-              </p>
-              {summary.projects.map((project) => (
-                <div key={project.projectId ?? 'shared'}>
-                  <strong>
-                    {workspace.projects.find(
-                      (candidate) => candidate.id === project.projectId,
-                    )?.name ?? t`Shared / unallocated`}
-                  </strong>
-                  <p>
-                    {t`Cash contribution`}:{' '}
-                    {formatMoney(project.cashContribution, summary.currency)} ·{' '}
-                    {t`Margin`}:{' '}
-                    {project.margin === null
-                      ? '—'
-                      : `${(project.margin * 100).toFixed(1)}%`}
-                  </p>
-                </div>
-              ))}
-            </StyledDeliveryStack>
-          </StyledDeliveryCard>
-        ))}
-      {view === 'health' && (
-        <>
+              <DeliveryReadiness />
+            </>
+          )}
+          {editing &&
+            (editing.kind !== 'FINANCE' || !available || canManageFinance) && (
+              <BusinessForm
+                key={
+                  editing.record
+                    ? `${editing.record.id}:${editing.record.revision}`
+                    : editing.kind
+                }
+                workspace={workspace}
+                financeProjects={financeProjects}
+                kind={editing.kind}
+                initial={editing.record}
+                busy={mutation.loading}
+                onCancel={() => requestAction(() => setEditing(null))}
+                latestRevision={
+                  editing.record
+                    ? (data?.records.find(
+                        (item) => item.id === editing.record?.id,
+                      )?.revision ?? -1)
+                    : 0
+                }
+                onReload={() =>
+                  requestAction(() => {
+                    const latest = data?.records.find(
+                      (item) => item.id === editing.record?.id,
+                    );
+                    if (latest)
+                      setEditing({ kind: latest.kind, record: latest });
+                    else
+                      setError(
+                        t`This record is no longer available. Your draft is still here.`,
+                      );
+                  })
+                }
+                onSave={async (record) => {
+                  const saved = await run({ action: 'save', record });
+                  if (saved) setEditing(null);
+                  return saved;
+                }}
+              />
+            )}
           <StyledDeliveryGrid>
-            {[
-              [
-                t`Late work`,
-                workspace.tasks.filter(
-                  (task) =>
-                    task.dueAt &&
-                    Date.parse(task.dueAt) < Date.now() &&
-                    task.details.state !== 'APPROVED',
-                ).length,
-              ],
-              [
-                t`Blocked work`,
-                workspace.tasks.filter(
-                  (task) => task.details.state === 'BLOCKED',
-                ).length,
-              ],
-              [
-                t`Work awaiting review`,
-                workspace.tasks.filter(
-                  (task) => task.details.state === 'IN_REVIEW',
-                ).length,
-              ],
-              [
-                t`Business reviews`,
-                data?.records.filter((record) => record.status === 'REVIEW')
-                  .length ?? 0,
-              ],
-            ].map(([label, count]) => (
-              <StyledDeliveryCard key={String(label)}>
-                <small>{label}</small>
-                <h2>{count}</h2>
+            {records.map((record) => (
+              <StyledDeliveryCard key={record.id}>
+                <StyledDeliveryStack>
+                  <StyledDeliveryRow>
+                    <strong>{record.title}</strong>
+                    <StyledDeliveryBadge>
+                      {statusLabel(record)}
+                    </StyledDeliveryBadge>
+                  </StyledDeliveryRow>
+                  <small>
+                    {labels[record.kind]} ·{' '}
+                    {(view === 'finance'
+                      ? financeProjects
+                      : workspace.projects
+                    ).find((project) => project.id === record.projectId)
+                      ?.name ?? t`Company-wide`}
+                  </small>
+                  {record.kind === 'AD_REPORT' && (
+                    <>
+                      <p>
+                        {formatMoney(
+                          Number(record.spend),
+                          String(record.currency),
+                        )}{' '}
+                        · {t`Ad-attributed revenue`}:{' '}
+                        {formatMoney(
+                          Number(record.attributedRevenue),
+                          String(record.currency),
+                        )}
+                      </p>
+                      <p>
+                        {t`Shopify observed revenue`}:{' '}
+                        {record.shopifyRevenue === null
+                          ? t`Not supplied`
+                          : formatMoney(
+                              Number(record.shopifyRevenue),
+                              String(record.currency),
+                            )}
+                      </p>
+                      <AdvertisingMetrics
+                        insight={data?.advertising?.find(
+                          (insight) => insight.id === record.id,
+                        )}
+                        currency={String(record.currency)}
+                      />
+                      <p>{String(record.recommendation)}</p>
+                    </>
+                  )}
+                  {['FINANCE', 'BUDGET'].includes(record.kind) && (
+                    <h3>
+                      {formatMoney(
+                        Number(record.amount),
+                        String(record.currency),
+                      )}
+                    </h3>
+                  )}
+                  {record.kind === 'FINANCE' &&
+                    record.category === 'RECEIVABLE' &&
+                    record.status !== 'VOID' && (
+                      <DeliveryReceivableBalance
+                        balance={receivableBalances.get(record.id)}
+                        currency={String(record.currency)}
+                      />
+                    )}
+                  {record.kind === 'CONTENT' && <p>{String(record.copy)}</p>}
+                  {record.kind === 'COMPETITOR' && (
+                    <>
+                      <p>{String(record.observation)}</p>
+                      <small>
+                        <Trans>Interpretation</Trans>:{' '}
+                        {String(record.interpretation)}
+                      </small>
+                    </>
+                  )}
+                  {record.kind === 'CONVERSATION' && (
+                    <small>
+                      {record.private
+                        ? t`Private to owner`
+                        : t`Explicit staff access`}{' '}
+                      ·{' '}
+                      {data?.inbox.filter(
+                        (entry) =>
+                          entry.conversationId === record.id &&
+                          entry.createdAt > (data.seen[record.id] ?? ''),
+                      ).length ?? 0}{' '}
+                      {t`unread entries`}
+                    </small>
+                  )}
+                  <StyledDeliveryButton
+                    onClick={() => requestAction(() => setSelected(record.id))}
+                  >
+                    <Trans>Open details</Trans>
+                  </StyledDeliveryButton>
+                </StyledDeliveryStack>
               </StyledDeliveryCard>
             ))}
           </StyledDeliveryGrid>
-          <StyledDeliveryCard>
-            <StyledDeliveryStack>
-              <h3>
-                <Trans>Connection readiness</Trans>
-              </h3>
-              {data?.connections.map((connection) => (
-                <StyledDeliveryRow key={connection.channel}>
-                  <strong>
-                    {connectionLabels[connection.channel] ?? connection.channel}
-                  </strong>
-                  <span>
-                    {connection.status === 'CONNECTED'
-                      ? t`Connected`
-                      : connection.status === 'GROUP_SUPPORT_UNVERIFIED'
-                        ? t`Existing group support needs verification`
-                        : t`Account setup needed`}
-                  </span>
-                </StyledDeliveryRow>
-              ))}
-              <p>
-                <Trans>
-                  Production deployment, backup restoration and live provider
-                  acceptance remain required before rollout.
-                </Trans>
-              </p>
-            </StyledDeliveryStack>
-          </StyledDeliveryCard>
-        </>
-      )}
-      {editing && (
-        <BusinessForm
-          key={editing.record?.id ?? editing.kind}
-          workspace={workspace}
-          kind={editing.kind}
-          initial={editing.record}
-          busy={mutation.loading}
-          onCancel={() => setEditing(null)}
-          onSave={async (record) => {
-            if (await run({ action: 'save', record })) setEditing(null);
-          }}
-        />
-      )}
-      <StyledDeliveryGrid>
-        {records.map((record) => (
-          <StyledDeliveryCard key={record.id}>
-            <StyledDeliveryStack>
-              <StyledDeliveryRow>
-                <strong>{record.title}</strong>
-                <StyledDeliveryBadge>
-                  {labels[record.status] ?? record.status}
-                </StyledDeliveryBadge>
-              </StyledDeliveryRow>
-              <small>
-                {labels[record.kind]} ·{' '}
-                {workspace.projects.find(
-                  (project) => project.id === record.projectId,
-                )?.name ?? t`Company-wide`}
-              </small>
-              {record.kind === 'AD_REPORT' && (
-                <>
-                  <p>
-                    {formatMoney(Number(record.spend), String(record.currency))}{' '}
-                    · {t`Ad-attributed revenue`}:{' '}
-                    {formatMoney(
-                      Number(record.attributedRevenue),
-                      String(record.currency),
-                    )}
-                  </p>
-                  <p>
-                    {t`Shopify observed revenue`}:{' '}
-                    {record.shopifyRevenue === null
-                      ? t`Not supplied`
-                      : formatMoney(
-                          Number(record.shopifyRevenue),
-                          String(record.currency),
-                        )}
-                  </p>
-                  <AdvertisingMetrics
-                    insight={data?.advertising?.find(
-                      (insight) => insight.id === record.id,
-                    )}
-                    currency={String(record.currency)}
-                  />
-                  <p>{String(record.recommendation)}</p>
-                </>
-              )}
-              {['FINANCE', 'BUDGET'].includes(record.kind) && (
-                <h3>
-                  {formatMoney(Number(record.amount), String(record.currency))}
-                </h3>
-              )}
-              {record.kind === 'CONTENT' && <p>{String(record.copy)}</p>}
-              {record.kind === 'COMPETITOR' && (
-                <>
-                  <p>{String(record.observation)}</p>
-                  <small>
-                    <Trans>Interpretation</Trans>:{' '}
-                    {String(record.interpretation)}
-                  </small>
-                </>
-              )}
-              {record.kind === 'CONVERSATION' && (
-                <small>
-                  {record.private
-                    ? t`Private to owner`
-                    : t`Explicit staff access`}{' '}
-                  ·{' '}
-                  {data?.inbox.filter(
-                    (entry) =>
-                      entry.conversationId === record.id &&
-                      entry.createdAt > (data.seen[record.id] ?? ''),
-                  ).length ?? 0}{' '}
-                  {t`unread entries`}
-                </small>
-              )}
-              <StyledDeliveryButton onClick={() => setSelected(record.id)}>
-                <Trans>Open details</Trans>
-              </StyledDeliveryButton>
-            </StyledDeliveryStack>
-          </StyledDeliveryCard>
-        ))}
-      </StyledDeliveryGrid>
-      {view !== 'health' && !records.length && (
-        <p>
-          <Trans>
-            No records yet. Add the first item to start this workflow.
-          </Trans>
-        </p>
-      )}
-      {item && (
-        <StyledDeliveryCard>
-          <StyledDeliveryStack>
-            <StyledDeliveryRow>
-              <h2>{item.title}</h2>
-              <StyledDeliveryButton onClick={() => setSelected('')}>
-                <Trans>Close details</Trans>
-              </StyledDeliveryButton>
-            </StyledDeliveryRow>
+          {view !== 'health' && !records.length && (
             <p>
-              {labels[item.status]} · {t`Version`} {item.revision}
+              {view === 'ads' ? (
+                <Trans>No manual reports or budget requests yet.</Trans>
+              ) : view === 'finance' ? (
+                <Trans>
+                  No financial entries yet. Add an opening balance, receipt,
+                  expense or receivable.
+                </Trans>
+              ) : (
+                <Trans>
+                  No records yet. Add the first item to start this workflow.
+                </Trans>
+              )}
             </p>
-            {item.kind === 'CONVERSATION' ? (
-              <>
-                <StyledDeliveryButton
-                  disabled={mutation.loading}
-                  onClick={() => void run({ action: 'seen', id: item.id })}
-                >
-                  <Trans>Mark seen</Trans>
-                </StyledDeliveryButton>
-                {data?.inbox
-                  .filter((entry) => entry.conversationId === item.id)
-                  .map((entry) => (
-                    <div key={entry.id}>
-                      <small>
-                        {entry.kind === 'DRAFT'
-                          ? t`Unsent draft`
-                          : t`Manually recorded inbound note`}{' '}
-                        · {new Date(entry.createdAt).toLocaleString()}
-                      </small>
-                      <p
-                        style={{
-                          whiteSpace: 'pre-wrap',
-                          overflowWrap: 'anywhere',
-                        }}
-                      >
-                        {entry.text}
-                      </p>
-                      {entry.sourceIds.length > 0 && (
-                        <small>
-                          <Trans>AI source notes</Trans>:{' '}
-                          {entry.sourceIds
-                            .map(
-                              (id) =>
-                                data.inbox
-                                  .find((source) => source.id === id)
-                                  ?.text.slice(0, 80) ?? t`Source unavailable`,
-                            )
-                            .join(' · ')}
-                        </small>
-                      )}
-                    </div>
-                  ))}
-                {canDraft ? (
-                  <>
-                    {' '}
-                    <InboxAgentForm
-                      record={item}
-                      sources={(data?.inbox ?? []).filter(
-                        (entry) =>
-                          entry.conversationId === item.id &&
-                          entry.kind === 'INBOUND_NOTE',
-                      )}
-                      busy={mutation.loading}
-                      run={run}
+          )}
+          {item && (
+            <StyledDeliveryCard>
+              <StyledDeliveryStack>
+                <StyledDeliveryRow>
+                  <h2>{item.title}</h2>
+                  <StyledDeliveryButton
+                    onClick={() => requestAction(() => setSelected(''))}
+                  >
+                    <Trans>Close details</Trans>
+                  </StyledDeliveryButton>
+                </StyledDeliveryRow>
+                <p>
+                  {statusLabel(item)} · {t`Version`} {item.revision}
+                </p>
+                {item.kind === 'FINANCE' &&
+                  item.category === 'RECEIVABLE' &&
+                  item.status !== 'VOID' && (
+                    <DeliveryReceivableBalance
+                      balance={receivableBalances.get(item.id)}
+                      currency={String(item.currency)}
                     />
-                    <InboxForm
-                      key={`${item.id}:${item.revision}`}
-                      initialText={
-                        (data?.inbox ?? [])
-                          .filter(
+                  )}
+                {item.kind === 'CONVERSATION' ? (
+                  <>
+                    <StyledDeliveryButton
+                      disabled={mutation.loading}
+                      onClick={() => void run({ action: 'seen', id: item.id })}
+                    >
+                      <Trans>Mark seen</Trans>
+                    </StyledDeliveryButton>
+                    {data?.inbox
+                      .filter((entry) => entry.conversationId === item.id)
+                      .map((entry) => (
+                        <div key={entry.id}>
+                          <small>
+                            {entry.kind === 'DRAFT'
+                              ? t`Unsent draft`
+                              : t`Manually recorded inbound note`}{' '}
+                            · {new Date(entry.createdAt).toLocaleString()}
+                          </small>
+                          <p
+                            style={{
+                              whiteSpace: 'pre-wrap',
+                              overflowWrap: 'anywhere',
+                            }}
+                          >
+                            {entry.text}
+                          </p>
+                          {entry.sourceIds.length > 0 && (
+                            <small>
+                              <Trans>AI source notes</Trans>:{' '}
+                              {entry.sourceIds
+                                .map(
+                                  (id) =>
+                                    data.inbox
+                                      .find((source) => source.id === id)
+                                      ?.text.slice(0, 80) ??
+                                    t`Source unavailable`,
+                                )
+                                .join(' · ')}
+                            </small>
+                          )}
+                        </div>
+                      ))}
+                    {canDraft ? (
+                      <>
+                        {' '}
+                        <InboxAgentForm
+                          key={`agent-${item.id}`}
+                          record={item}
+                          sources={(data?.inbox ?? []).filter(
                             (entry) =>
                               entry.conversationId === item.id &&
-                              entry.kind === 'DRAFT',
-                          )
-                          .slice(-1)[0]?.text ?? ''
-                      }
-                      record={item}
-                      admin={workspace.actor.isAdmin}
-                      busy={mutation.loading}
-                      run={run}
-                    />
+                              entry.kind === 'INBOUND_NOTE',
+                          )}
+                          busy={mutation.loading}
+                          run={run}
+                        />
+                        <DeliveryInboxForm
+                          key={item.id}
+                          initialText={
+                            (data?.inbox ?? [])
+                              .filter(
+                                (entry) =>
+                                  entry.conversationId === item.id &&
+                                  entry.kind === 'DRAFT',
+                              )
+                              .slice(-1)[0]?.text ?? ''
+                          }
+                          record={item}
+                          admin={workspace.actor.isAdmin}
+                          busy={mutation.loading}
+                          run={run}
+                        />
+                      </>
+                    ) : (
+                      <p>
+                        <Trans>
+                          You have view-only access to this conversation.
+                        </Trans>
+                      </p>
+                    )}
                   </>
                 ) : (
-                  <p>
-                    <Trans>
-                      You have view-only access to this conversation.
-                    </Trans>
-                  </p>
+                  <RecordActions
+                    key={item.id}
+                    record={item}
+                    receivableBalance={receivableBalances.get(item.id)}
+                    canManageFinance={canManageFinance}
+                    workspace={workspace}
+                    busy={mutation.loading}
+                    run={run}
+                  />
                 )}
-              </>
-            ) : (
-              <RecordActions
-                record={item}
-                workspace={workspace}
-                busy={mutation.loading}
-                run={run}
-              />
-            )}
-            {(item.kind === 'CONVERSATION'
-              ? workspace.actor.isAdmin
-              : item.kind !== 'FINANCE' &&
-                ['DRAFT', 'CHANGES_REQUESTED'].includes(item.status)) && (
-              <StyledDeliveryButton
-                onClick={() => setEditing({ kind: item.kind, record: item })}
-              >
-                <Trans>Edit</Trans>
-              </StyledDeliveryButton>
-            )}
-            {item.taskId && (
-              <StyledDeliveryButton onClick={() => onOpenTask(item.taskId!)}>
-                <Trans>Open assigned task</Trans>
-              </StyledDeliveryButton>
-            )}
-            <details>
-              <summary>{t`Audit history`}</summary>
-              {item.history.map((event, index) => (
-                <p key={index}>
-                  {new Date(event.at).toLocaleString()} ·{' '}
-                  {labels[event.action] ?? event.action} · {event.note}
-                </p>
-              ))}
-            </details>
-          </StyledDeliveryStack>
-        </StyledDeliveryCard>
-      )}
-    </StyledDeliveryStack>
+                {(item.kind === 'CONVERSATION'
+                  ? workspace.actor.isAdmin
+                  : item.kind !== 'FINANCE' &&
+                    ['DRAFT', 'CHANGES_REQUESTED'].includes(item.status)) && (
+                  <StyledDeliveryButton
+                    disabled={editing !== null}
+                    onClick={() =>
+                      requestAction(() =>
+                        setEditing({ kind: item.kind, record: item }),
+                      )
+                    }
+                  >
+                    <Trans>Edit</Trans>
+                  </StyledDeliveryButton>
+                )}
+                {item.taskId && (
+                  <StyledDeliveryButton
+                    onClick={() => onOpenTask(item.taskId!)}
+                  >
+                    <Trans>Open assigned task</Trans>
+                  </StyledDeliveryButton>
+                )}
+                <details>
+                  <summary>{t`Audit history`}</summary>
+                  {item.history.map((event, index) => (
+                    <p key={index}>
+                      {new Date(event.at).toLocaleString()} ·{' '}
+                      {labels[event.action] ?? event.action} · {event.note}
+                    </p>
+                  ))}
+                </details>
+              </StyledDeliveryStack>
+            </StyledDeliveryCard>
+          )}
+        </StyledDeliveryStack>
+      </StyledBusinessBoundary>
+    </>
   );
 };
 
@@ -638,163 +804,166 @@ const InboxAgentForm = ({
   run: Runner;
 }) => {
   const { t } = useLingui();
+  const access = useWorkflowAccess();
   const query = useQuery<{ deliveryAgents: DeliveryAgentsSnapshot }>(
     GET_REPLY_AGENTS,
-    { fetchPolicy: 'network-only' },
+    {
+      fetchPolicy: 'no-cache',
+      skip: !access.ready,
+      pollInterval: 30000,
+    },
   );
-  const [sourceIds, setSourceIds] = useState<string[]>([]);
-  return (
-    <form
-      onSubmit={(event) => {
-        event.preventDefault();
-        const form = new FormData(event.currentTarget);
-        void run({
-          action: 'aiDraft',
-          id: record.id,
-          revision: record.revision,
-          agentId: form.get('agentId'),
-          sourceIds,
-        });
-      }}
-    >
-      <StyledDeliveryStack>
-        <h3>
-          <Trans>Prepare a reply with AI</Trans>
-        </h3>
-        <p>
-          <Trans>
-            Only the selected conversation notes are sent to the configured
-            model. Review and edit the draft before using it. Nothing is sent to
-            the client.
-          </Trans>
-        </p>
-        <label>
-          <Trans>Copy agent</Trans>
-          <select name="agentId" required>
-            <option value="">{t`Choose an enabled agent`}</option>
-            {query.data?.deliveryAgents.agents
-              .filter(
-                (agent) =>
-                  agent.configuration.kind === 'COPY' &&
-                  agent.configuration.enabled &&
-                  agent.configuration.projectIds.includes(
-                    record.projectId ?? '',
-                  ),
-              )
-              .map((agent) => (
-                <option key={agent.id} value={agent.id}>
-                  {agent.configuration.name}
-                </option>
-              ))}
-          </select>
-        </label>
-        {sources.map((source) => (
-          <label key={source.id}>
-            <input
-              type="checkbox"
-              checked={sourceIds.includes(source.id)}
-              onChange={(event) =>
-                setSourceIds(
-                  event.target.checked
-                    ? [...sourceIds, source.id]
-                    : sourceIds.filter((id) => id !== source.id),
-                )
-              }
-            />
-            {source.text.slice(0, 200)}
-          </label>
-        ))}
-        <StyledDeliveryButton
-          disabled={busy || !sourceIds.length || sourceIds.length > 20}
-        >
-          <Trans>Generate unsent reply draft</Trans>
-        </StyledDeliveryButton>
-        {query.error && <p role="alert">{query.error.message}</p>}
-      </StyledDeliveryStack>
-    </form>
-  );
-};
-const InboxForm = ({
-  record,
-  admin,
-  busy,
-  run,
-  initialText,
-}: {
-  initialText: string;
-  record: BusinessRecord;
-  admin: boolean;
-  busy: boolean;
-  run: Runner;
-}) => {
-  const { t } = useLingui();
+  const agentData = query.data?.deliveryAgents;
+  const agentsReady = !query.error && access.matches(agentData?.actor);
+  const availableAgents = agentsReady
+    ? (agentData?.agents.filter((agent) =>
+        agentData.runnableAgentIds.includes(agent.id),
+      ) ?? [])
+    : [];
+  const draft = useDeliveryDraft({
+    initialValues: { sourceIds: [] as string[], agentId: '' },
+    revision: record.revision,
+    busy,
+  });
   return (
     <form
       onSubmit={async (event) => {
         event.preventDefault();
-        const form = event.currentTarget;
-        const data = new FormData(form);
         if (
-          await run({
-            action: 'inboxEntry',
-            id: record.id,
-            revision: record.revision,
-            entryKind: data.get('kind'),
-            text: data.get('text'),
-            sourceUrl: data.get('sourceUrl') || null,
-          })
+          !agentsReady ||
+          !availableAgents.some((agent) => agent.id === draft.values.agentId) ||
+          draft.saving ||
+          draft.stale ||
+          !draft.values.agentId ||
+          !draft.values.sourceIds.length ||
+          draft.values.sourceIds.length > 20
         )
-          form.reset();
+          return;
+        draft.setSaving(true);
+        try {
+          if (
+            await run({
+              action: 'aiDraft',
+              id: record.id,
+              revision: draft.revision,
+              ...draft.values,
+            })
+          )
+            draft.markSaved();
+        } finally {
+          draft.setSaving(false);
+        }
       }}
     >
-      <StyledDeliveryStack>
-        <label>
-          <Trans>Entry type</Trans>
-          <select name="kind">
-            <option value="DRAFT">{t`Reply draft — not sent`}</option>
-            {admin && (
-              <option value="INBOUND_NOTE">{t`Record an inbound note manually`}</option>
-            )}
-          </select>
-        </label>
-        <label>
-          <Trans>Message</Trans>
-          <textarea
-            required
-            name="text"
-            maxLength={12000}
-            defaultValue={initialText}
-          />
-        </label>
-        <label>
-          <Trans>Source link (optional)</Trans>
-          <input type="url" name="sourceUrl" />
-        </label>
-        <StyledDeliveryButton disabled={busy}>
-          <Trans>Save inside OS</Trans>
-        </StyledDeliveryButton>
-      </StyledDeliveryStack>
+      {draft.stale && (
+        <DeliveryDraftConflict onReload={draft.reload} busy={draft.saving} />
+      )}
+      {!agentsReady && (
+        <p role="status">
+          <Trans>
+            Assistant access could not be verified. Refresh before preparing a
+            reply.
+          </Trans>
+        </p>
+      )}
+      <fieldset disabled={draft.saving || draft.stale || !agentsReady}>
+        <StyledDeliveryStack>
+          <h3>
+            <Trans>Prepare a reply with AI</Trans>
+          </h3>
+          <p>
+            <Trans>
+              Only the selected conversation notes are sent to the configured
+              model. Review and edit the draft before using it. Nothing is sent
+              to the client.
+            </Trans>
+          </p>
+          <label>
+            <Trans>Copy agent</Trans>
+            <select
+              name="agentId"
+              required
+              value={draft.values.agentId}
+              onChange={(event) =>
+                draft.update({ ...draft.values, agentId: event.target.value })
+              }
+            >
+              <option value="">{t`Choose an enabled agent`}</option>
+              {availableAgents
+                .filter(
+                  (agent) =>
+                    agent.configuration.kind === 'COPY' &&
+                    agent.configuration.enabled &&
+                    agent.configuration.projectIds.includes(
+                      record.projectId ?? '',
+                    ),
+                )
+                .map((agent) => (
+                  <option key={agent.id} value={agent.id}>
+                    {agent.configuration.name}
+                  </option>
+                ))}
+            </select>
+          </label>
+          {sources.map((source) => (
+            <label key={source.id}>
+              <input
+                type="checkbox"
+                checked={draft.values.sourceIds.includes(source.id)}
+                onChange={(event) =>
+                  draft.update({
+                    ...draft.values,
+                    sourceIds: event.target.checked
+                      ? [...draft.values.sourceIds, source.id]
+                      : draft.values.sourceIds.filter((id) => id !== source.id),
+                  })
+                }
+              />
+              {source.text.slice(0, 200)}
+            </label>
+          ))}
+          <StyledDeliveryButton
+            type="submit"
+            disabled={
+              !draft.values.agentId ||
+              !draft.values.sourceIds.length ||
+              draft.values.sourceIds.length > 20
+            }
+          >
+            <Trans>Generate unsent reply draft</Trans>
+          </StyledDeliveryButton>
+          {query.error && <p role="alert">{query.error.message}</p>}
+        </StyledDeliveryStack>
+      </fieldset>
     </form>
   );
 };
 const RecordActions = ({
   record,
+  receivableBalance,
+  canManageFinance,
   workspace,
   busy,
   run,
 }: {
   record: BusinessRecord;
+  receivableBalance: FinanceReceivableBalance | undefined;
+  canManageFinance: boolean;
   workspace: DeliveryWorkspace;
   busy: boolean;
   run: Runner;
 }) => {
   const { t } = useLingui();
+  const isReceivable =
+    record.kind === 'FINANCE' && record.category === 'RECEIVABLE';
+  const receivableCanVoid =
+    !isReceivable ||
+    (receivableBalance?.settledMicros === '0' &&
+      receivableBalance.sourceWarnings.length === 0 &&
+      record.status !== 'PAID');
   const states = (
     record.kind === 'FINANCE'
-      ? [
-          ['PAID', t`Confirm payment`],
-          ['VOID', t`Void entry`],
-        ]
+      ? [['VOID', t`Void entry`]]
       : [
           ['REVIEW', t`Submit for review`],
           ['APPROVED', t`Approve`],
@@ -812,12 +981,11 @@ const RecordActions = ({
         ]
   ).filter(([status]) => {
     const actor = workspace.actor;
-    if (status === 'VOID') return actor.isAdmin && record.status !== 'VOID';
-    if (status === 'PAID')
+    if (status === 'VOID')
       return (
-        actor.isAdmin &&
-        record.category === 'RECEIVABLE' &&
-        !['PAID', 'VOID'].includes(record.status)
+        (record.kind === 'FINANCE' ? canManageFinance : actor.isAdmin) &&
+        record.status !== 'VOID' &&
+        receivableCanVoid
       );
     if (status === 'REVIEW')
       return (
@@ -858,136 +1026,202 @@ const RecordActions = ({
   });
   return (
     <>
-      {states.length > 0 && (
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            const data = new FormData(event.currentTarget);
-            void run({
-              action: 'transition',
-              id: record.id,
-              revision: record.revision,
-              status: data.get('status'),
-              note: data.get('note'),
-              evidence: data.get('evidence') || null,
-            });
-          }}
+      {isReceivable && (
+        <Link
+          to={financePaymentDestination({
+            receivableId: record.id,
+            currency: String(record.currency),
+          })}
         >
-          <StyledDeliveryStack>
-            <label>
-              <Trans>Next action</Trans>
-              <select name="status">
-                {states.map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
+          <Trans>Review invoice payments</Trans>
+        </Link>
+      )}
+      {record.kind === 'FINANCE' &&
+        ['INCOME', 'EXPENSE', 'SALARY'].includes(String(record.category)) && (
+          <Link
+            to={financePaymentDestination({
+              cashId: record.id,
+              currency: String(record.currency),
+            })}
+          >
+            <Trans>Review payment and matching</Trans>
+          </Link>
+        )}
+      {isReceivable &&
+        canManageFinance &&
+        record.status !== 'VOID' &&
+        !receivableCanVoid && (
+          <p role="status">
+            {receivableBalance && receivableBalance.settledMicros !== '0' ? (
+              <Trans>
+                Review its applied payments before voiding this receivable.
+                Reverse the invoice link or void its linked payment receipt
+                first.
+              </Trans>
+            ) : (
+              <Trans>
+                Review this receivable’s payment status before voiding it.
+                Refresh and resolve any payment source warnings first.
+              </Trans>
+            )}
+          </p>
+        )}
+      <DeliveryGuardedForm
+        revision={record.revision}
+        busy={busy}
+        visible={states.length > 0}
+        onSave={(data, revision) =>
+          run({
+            action: 'transition',
+            id: record.id,
+            revision,
+            status: data.get('status'),
+            note: data.get('note'),
+            evidence: String(data.get('evidence') ?? '') || null,
+          })
+        }
+      >
+        <StyledDeliveryStack>
+          <label>
+            <Trans>Next action</Trans>
+            <select name="status">
+              {states.map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <Trans>Reason / review notes</Trans>
+            <textarea required name="note" maxLength={240} />
+          </label>
+          <label>
+            <Trans>Evidence link</Trans>
+            <input type="url" name="evidence" />
+          </label>
+          <StyledDeliveryButton disabled={busy}>
+            <Trans>Record decision</Trans>
+          </StyledDeliveryButton>
+        </StyledDeliveryStack>
+      </DeliveryGuardedForm>
+      <DeliveryGuardedForm
+        revision={record.revision}
+        busy={busy}
+        visible={
+          workspace.actor.isManager &&
+          !record.taskId &&
+          record.kind !== 'FINANCE' &&
+          (record.kind !== 'AD_REPORT' || record.status === 'APPROVED')
+        }
+        onSave={(data, revision) =>
+          run({
+            action: 'assign',
+            id: record.id,
+            revision,
+            assigneeId: data.get('assigneeId'),
+            reviewerId: data.get('reviewerId'),
+            dueDate: data.get('dueDate'),
+          })
+        }
+      >
+        <StyledDeliveryStack>
+          <h3>
+            <Trans>Assign follow-up</Trans>
+          </h3>
+          <label>
+            <Trans>Task owner</Trans>
+            <select name="assigneeId" required>
+              <option value="">{t`Choose a person`}</option>
+              {workspace.members
+                .filter((member) =>
+                  workspace.projects
+                    .find((project) => project.id === record.projectId)
+                    ?.memberIds.includes(member.id),
+                )
+                .map((member) => (
+                  <option key={member.id} value={member.id}>
+                    {member.name}
                   </option>
                 ))}
-              </select>
-            </label>
-            <label>
-              <Trans>Reason / review notes</Trans>
-              <textarea required name="note" maxLength={240} />
-            </label>
-            <label>
-              <Trans>Evidence link</Trans>
-              <input type="url" name="evidence" />
-            </label>
-            <StyledDeliveryButton disabled={busy}>
-              <Trans>Record decision</Trans>
-            </StyledDeliveryButton>
-          </StyledDeliveryStack>
-        </form>
-      )}
-      {workspace.actor.isManager &&
-        !record.taskId &&
-        record.kind !== 'FINANCE' &&
-        (record.kind !== 'AD_REPORT' || record.status === 'APPROVED') && (
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              const data = new FormData(event.currentTarget);
-              void run({
-                action: 'assign',
-                id: record.id,
-                revision: record.revision,
-                assigneeId: data.get('assigneeId'),
-                reviewerId: data.get('reviewerId'),
-                dueDate: data.get('dueDate'),
-              });
-            }}
-          >
-            <StyledDeliveryStack>
-              <h3>
-                <Trans>Assign follow-up</Trans>
-              </h3>
-              <label>
-                <Trans>Task owner</Trans>
-                <select name="assigneeId" required>
-                  <option value="">{t`Choose a person`}</option>
-                  {workspace.members
-                    .filter((member) =>
-                      workspace.projects
-                        .find((project) => project.id === record.projectId)
-                        ?.memberIds.includes(member.id),
-                    )
-                    .map((member) => (
-                      <option key={member.id} value={member.id}>
-                        {member.name}
-                      </option>
-                    ))}
-                </select>
-              </label>
-              <label>
-                <Trans>Reviewer</Trans>
-                <select required name="reviewerId">
-                  <option value="">{t`Choose a manager`}</option>
-                  {workspace.members
-                    .filter((member) => member.access !== 'MEMBER')
-                    .map((member) => (
-                      <option key={member.id} value={member.id}>
-                        {member.name}
-                      </option>
-                    ))}
-                </select>
-              </label>
-              <label>
-                <Trans>Due date</Trans>
-                <input type="date" required name="dueDate" />
-              </label>
-              <StyledDeliveryButton disabled={busy}>
-                <Trans>Create follow-up task</Trans>
-              </StyledDeliveryButton>
-            </StyledDeliveryStack>
-          </form>
-        )}
+            </select>
+          </label>
+          <label>
+            <Trans>Reviewer</Trans>
+            <select required name="reviewerId">
+              <option value="">{t`Choose a manager`}</option>
+              {workspace.members
+                .filter((member) => member.access !== 'MEMBER')
+                .map((member) => (
+                  <option key={member.id} value={member.id}>
+                    {member.name}
+                  </option>
+                ))}
+            </select>
+          </label>
+          <label>
+            <Trans>Due date</Trans>
+            <input type="date" required name="dueDate" />
+          </label>
+          <StyledDeliveryButton disabled={busy}>
+            <Trans>Create follow-up task</Trans>
+          </StyledDeliveryButton>
+        </StyledDeliveryStack>
+      </DeliveryGuardedForm>
     </>
   );
 };
 
 type BusinessFormProps = {
   workspace: DeliveryWorkspace;
+  financeProjects: BusinessSnapshot['financeProjects'];
   kind: BusinessKind;
   initial?: BusinessRecord;
   busy: boolean;
   onCancel: () => void;
-  onSave: (record: Record<string, unknown>) => Promise<void>;
+  onSave: (record: Record<string, unknown>) => Promise<boolean>;
+  latestRevision: number;
+  onReload: () => void;
 };
 const BusinessForm = ({
   workspace,
+  financeProjects,
   kind,
   initial,
   busy,
   onCancel,
   onSave,
+  latestRevision,
+  onReload,
 }: BusinessFormProps) => {
   const { t } = useLingui();
-  const [grants, setGrants] = useState(
-    (initial?.grants ?? []) as {
-      memberId: string;
-      read: boolean;
-      send: boolean;
-    }[],
-  );
+  const reconciliationLabels = useReconciliationLabels();
+  const financeCategoryLabels: Record<string, string> = {
+    ...reconciliationLabels.categories,
+    OPENING_BALANCE: t`Opening cash balance`,
+    RECEIVABLE: t`Receivable / expected payment`,
+  };
+  const access = useWorkflowAccess();
+  const directoryQuery = useQuery<{
+    otogrowRoleDirectory: OtogrowRoleDirectory;
+  }>(GET_OTOGROW_ROLE_DIRECTORY, {
+    skip: kind !== 'CONVERSATION' || !access.ready,
+    fetchPolicy: 'no-cache',
+    pollInterval: 30000,
+    variables: { identity: access.scope },
+  });
+  const directory = directoryQuery.data?.otogrowRoleDirectory;
+  const conversationReady =
+    kind !== 'CONVERSATION' ||
+    (!directoryQuery.error && access.matches(directory?.actor));
+  const [conversationPermissions, setConversationPermissions] =
+    useState<ConversationPermissionsValue>({
+      ownerId: String(initial?.ownerId ?? ''),
+      private: initial ? Boolean(initial.private) : true,
+      grants: (initial?.grants ?? []) as ConversationPermissionsValue['grants'],
+      roleGrants: (initial?.roleGrants ??
+        []) as ConversationPermissionsValue['roleGrants'],
+    });
   const [checks, setChecks] = useState(
     (initial?.checks ??
       [
@@ -1001,6 +1235,12 @@ const BusinessForm = ({
       done: boolean;
     }[],
   );
+  const [saving, setSaving] = useState(false);
+  const draft = useDeliveryNativeDraft({
+    extraValues: { conversationPermissions, checks },
+    busy: busy || saving,
+  });
+  const stale = Boolean(initial && initial.revision !== latestRevision);
   const inputs: {
     key: string;
     label: string;
@@ -1199,14 +1439,15 @@ const BusinessForm = ({
                       type: 'textarea',
                     },
                   ];
-  const submit = (event: FormEvent<HTMLFormElement>) => {
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (busy || saving || stale || !draft.dirty || !conversationReady) return;
     const data = new FormData(event.currentTarget);
     const record: Record<string, unknown> = {
       kind,
       ...(initial ? { id: initial.id } : {}),
       revision: initial?.revision ?? 0,
-      projectId: data.get('projectId') || null,
+      projectId: String(data.get('projectId') ?? '') || null,
       title: data.get('title'),
     };
     for (const field of inputs) {
@@ -1224,263 +1465,245 @@ const BusinessForm = ({
     }
     if (['AD_REPORT', 'BUDGET', 'FINANCE'].includes(kind))
       record.currency = data.get('currency');
-    if (['CONTENT', 'RELEASE', 'CONVERSATION'].includes(kind))
+    if (['CONTENT', 'RELEASE'].includes(kind))
       record.ownerId = data.get('ownerId');
     if (['AD_REPORT', 'BUDGET'].includes(kind))
       record.marketerId = data.get('ownerId');
     if (kind === 'CONVERSATION') {
-      record.private = data.get('private') === 'on';
-      record.grants = grants;
+      Object.assign(record, conversationPermissions);
     }
     if (kind === 'RELEASE') record.checks = checks;
-    void onSave(record);
+    setSaving(true);
+    try {
+      await onSave(record);
+    } finally {
+      setSaving(false);
+    }
   };
   return (
     <StyledDeliveryCard>
-      <form onSubmit={submit}>
-        <StyledDeliveryStack>
-          <h3>{initial ? t`Edit record` : t`New record`}</h3>
-          <label>
-            <Trans>Title</Trans>
-            <input
-              required
-              name="title"
-              maxLength={240}
-              defaultValue={initial?.title}
-            />
-          </label>
-          <label>
-            <Trans>Project</Trans>
-            <select
-              name="projectId"
-              required={kind !== 'FINANCE'}
-              defaultValue={initial?.projectId ?? ''}
-            >
-              <option value="">
-                {kind === 'FINANCE'
-                  ? t`Company-wide / unallocated`
-                  : t`Choose a project`}
-              </option>
-              {workspace.projects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          {[
-            'CONTENT',
-            'RELEASE',
-            'CONVERSATION',
-            'AD_REPORT',
-            'BUDGET',
-          ].includes(kind) && (
+      <form ref={draft.formRef} onChange={draft.onChange} onSubmit={submit}>
+        {stale && (
+          <DeliveryDraftConflict onReload={onReload} busy={busy || saving} />
+        )}
+        <fieldset disabled={busy || saving}>
+          <StyledDeliveryStack>
+            <h3>{initial ? t`Edit record` : t`New record`}</h3>
             <label>
-              <Trans>Responsible person</Trans>
-              <select
+              <Trans>Title</Trans>
+              <input
                 required
-                name="ownerId"
-                defaultValue={String(
-                  initial?.ownerId ?? initial?.marketerId ?? '',
-                )}
+                name="title"
+                maxLength={240}
+                defaultValue={initial?.title}
+              />
+            </label>
+            <label>
+              <Trans>Project</Trans>
+              <select
+                name="projectId"
+                required={kind !== 'FINANCE'}
+                defaultValue={initial?.projectId ?? ''}
               >
-                <option value="">{t`Choose a person`}</option>
-                {workspace.members.map((member) => (
-                  <option key={member.id} value={member.id}>
-                    {member.name}
+                <option value="">
+                  {kind === 'FINANCE'
+                    ? t`Company-wide / unallocated`
+                    : t`Choose a project`}
+                </option>
+                {(kind === 'FINANCE'
+                  ? financeProjects
+                  : workspace.projects
+                ).map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.name}
                   </option>
                 ))}
               </select>
             </label>
-          )}
-          {['AD_REPORT', 'BUDGET', 'FINANCE'].includes(kind) && (
-            <label>
-              <Trans>Currency</Trans>
-              <select
-                name="currency"
-                defaultValue={String(initial?.currency ?? 'USD')}
-              >
-                {['USD', 'AED', 'EUR', 'GBP', 'INR', 'SGD', 'AUD', 'CAD'].map(
-                  (currency) => (
-                    <option key={currency}>{currency}</option>
-                  ),
-                )}
-              </select>
-            </label>
-          )}
-          <StyledDeliveryGrid>
-            {inputs.map((field) => (
-              <label key={field.key}>
-                {field.label}
-                {!field.optional && ' *'}
-                {field.options ? (
-                  <select
-                    name={field.key}
-                    defaultValue={String(
-                      initial?.[field.key] ?? field.options[0],
-                    )}
-                  >
-                    {field.options.map((value) => (
-                      <option key={value}>{value}</option>
-                    ))}
-                  </select>
-                ) : field.type === 'textarea' ? (
-                  <textarea
-                    name={field.key}
-                    required={!field.optional}
-                    maxLength={12000}
-                    defaultValue={String(initial?.[field.key] ?? '')}
-                  />
-                ) : (
-                  <input
-                    name={field.key}
-                    type={
-                      field.type === 'money' ? 'number' : (field.type ?? 'text')
-                    }
-                    min={
-                      ['money', 'number'].includes(field.type ?? '')
-                        ? 0
-                        : undefined
-                    }
-                    step={
-                      field.type === 'money'
-                        ? '0.01'
-                        : field.type === 'number'
-                          ? '1'
-                          : undefined
-                    }
-                    required={!field.optional}
-                    defaultValue={
-                      initial?.[field.key] == null
-                        ? ''
-                        : field.type === 'money'
-                          ? Number(initial[field.key]) / 100
-                          : String(initial[field.key])
-                    }
-                  />
-                )}
-              </label>
-            ))}
-          </StyledDeliveryGrid>
-          {kind === 'CONVERSATION' && (
-            <>
+            {['CONTENT', 'RELEASE', 'AD_REPORT', 'BUDGET'].includes(kind) && (
               <label>
-                <input
-                  type="checkbox"
-                  name="private"
-                  defaultChecked={initial ? Boolean(initial.private) : true}
-                />
-                <Trans>Private to the selected owner</Trans>
+                <Trans>Responsible person</Trans>
+                <select
+                  required
+                  name="ownerId"
+                  defaultValue={String(
+                    initial?.ownerId ?? initial?.marketerId ?? '',
+                  )}
+                >
+                  <option value="">{t`Choose a person`}</option>
+                  {workspace.members.map((member) => (
+                    <option key={member.id} value={member.id}>
+                      {member.name}
+                    </option>
+                  ))}
+                </select>
               </label>
-              <h3>
-                <Trans>Conversation permissions</Trans>
-              </h3>
-              {workspace.members.map((member) => {
-                const grant = grants.find(
-                  (item) => item.memberId === member.id,
-                );
-                return (
-                  <StyledDeliveryRow key={member.id}>
-                    <span>{member.name}</span>
-                    {(['read', 'send'] as const).map((permission) => (
-                      <label key={permission}>
-                        <input
-                          type="checkbox"
-                          checked={grant?.[permission] ?? false}
-                          onChange={(event) => {
-                            const next = {
-                              memberId: member.id,
-                              read: grant?.read ?? false,
-                              send: grant?.send ?? false,
-                              [permission]: event.target.checked,
-                            };
-                            if (permission === 'send' && next.send)
-                              next.read = true;
-                            if (permission === 'read' && !next.read)
-                              next.send = false;
-                            setGrants([
-                              ...grants.filter(
-                                (item) => item.memberId !== member.id,
-                              ),
-                              next,
-                            ]);
-                          }}
-                        />
-                        {permission === 'read'
-                          ? t`View`
-                          : t`Draft / send when connected`}
-                      </label>
-                    ))}
-                  </StyledDeliveryRow>
-                );
-              })}
-            </>
-          )}
-          {kind === 'RELEASE' && (
-            <>
-              <h3>
-                <Trans>Release checklist</Trans>
-              </h3>
-              {checks.map((check) => (
-                <StyledDeliveryRow key={check.id}>
-                  <label>
+            )}
+            {['AD_REPORT', 'BUDGET', 'FINANCE'].includes(kind) && (
+              <label>
+                <Trans>Currency</Trans>
+                <select
+                  name="currency"
+                  defaultValue={String(initial?.currency ?? 'USD')}
+                >
+                  {['USD', 'AED', 'EUR', 'GBP', 'INR', 'SGD', 'AUD', 'CAD'].map(
+                    (currency) => (
+                      <option key={currency}>{currency}</option>
+                    ),
+                  )}
+                </select>
+              </label>
+            )}
+            <StyledDeliveryGrid>
+              {inputs.map((field) => (
+                <label key={field.key}>
+                  {field.label}
+                  {!field.optional && ' *'}
+                  {field.options ? (
+                    <select
+                      name={field.key}
+                      defaultValue={String(
+                        initial?.[field.key] ?? field.options[0],
+                      )}
+                    >
+                      {field.options.map((value) => (
+                        <option key={value} value={value}>
+                          {kind === 'FINANCE' && field.key === 'category'
+                            ? financeCategoryLabels[value]
+                            : value}
+                        </option>
+                      ))}
+                    </select>
+                  ) : field.type === 'textarea' ? (
+                    <textarea
+                      name={field.key}
+                      required={!field.optional}
+                      maxLength={12000}
+                      defaultValue={String(initial?.[field.key] ?? '')}
+                    />
+                  ) : (
                     <input
-                      type="checkbox"
-                      checked={check.done}
-                      onChange={(event) =>
-                        setChecks(
-                          checks.map((item) =>
-                            item.id === check.id
-                              ? { ...item, done: event.target.checked }
-                              : item,
-                          ),
-                        )
+                      name={field.key}
+                      type={
+                        field.type === 'money'
+                          ? 'number'
+                          : (field.type ?? 'text')
+                      }
+                      min={
+                        ['money', 'number'].includes(field.type ?? '')
+                          ? 0
+                          : undefined
+                      }
+                      step={
+                        field.type === 'money'
+                          ? '0.01'
+                          : field.type === 'number'
+                            ? '1'
+                            : undefined
+                      }
+                      required={!field.optional}
+                      defaultValue={
+                        initial?.[field.key] == null
+                          ? ''
+                          : field.type === 'money'
+                            ? Number(initial[field.key]) / 100
+                            : String(initial[field.key])
                       }
                     />
-                    <input
-                      aria-label={t`Release check`}
-                      value={check.label}
-                      required
-                      maxLength={240}
-                      onChange={(event) =>
-                        setChecks(
-                          checks.map((item) =>
-                            item.id === check.id
-                              ? { ...item, label: event.target.value }
-                              : item,
-                          ),
-                        )
-                      }
-                    />
-                  </label>
-                </StyledDeliveryRow>
+                  )}
+                </label>
               ))}
+            </StyledDeliveryGrid>
+            {kind === 'CONVERSATION' &&
+              (conversationReady && directory ? (
+                <ConversationPermissions
+                  value={conversationPermissions}
+                  directory={directory}
+                  onChange={setConversationPermissions}
+                />
+              ) : (
+                <div>
+                  <p role={directoryQuery.error ? 'alert' : 'status'}>
+                    {directoryQuery.error
+                      ? t`Could not verify current roles. Your draft is kept; retry before saving access.`
+                      : t`Checking current roles and people…`}
+                  </p>
+                  <StyledDeliveryButton
+                    type="button"
+                    onClick={() => void directoryQuery.refetch()}
+                  >
+                    <Trans>Retry role access</Trans>
+                  </StyledDeliveryButton>
+                </div>
+              ))}
+            {kind === 'RELEASE' && (
+              <>
+                <h3>
+                  <Trans>Release checklist</Trans>
+                </h3>
+                {checks.map((check) => (
+                  <StyledDeliveryRow key={check.id}>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={check.done}
+                        onChange={(event) =>
+                          setChecks(
+                            checks.map((item) =>
+                              item.id === check.id
+                                ? { ...item, done: event.target.checked }
+                                : item,
+                            ),
+                          )
+                        }
+                      />
+                      <input
+                        aria-label={t`Release check`}
+                        value={check.label}
+                        required
+                        maxLength={240}
+                        onChange={(event) =>
+                          setChecks(
+                            checks.map((item) =>
+                              item.id === check.id
+                                ? { ...item, label: event.target.value }
+                                : item,
+                            ),
+                          )
+                        }
+                      />
+                    </label>
+                  </StyledDeliveryRow>
+                ))}
+                <StyledDeliveryButton
+                  type="button"
+                  onClick={() =>
+                    setChecks([
+                      ...checks,
+                      { id: crypto.randomUUID(), label: '', done: false },
+                    ])
+                  }
+                >
+                  <Trans>Add check</Trans>
+                </StyledDeliveryButton>
+              </>
+            )}
+            <StyledDeliveryRow>
               <StyledDeliveryButton
-                type="button"
-                onClick={() =>
-                  setChecks([
-                    ...checks,
-                    { id: crypto.randomUUID(), label: '', done: false },
-                  ])
+                disabled={
+                  busy || saving || stale || !draft.dirty || !conversationReady
                 }
+                type="submit"
+                data-primary="true"
               >
-                <Trans>Add check</Trans>
+                <Trans>Save record</Trans>
               </StyledDeliveryButton>
-            </>
-          )}
-          <StyledDeliveryRow>
-            <StyledDeliveryButton
-              disabled={busy}
-              type="submit"
-              data-primary="true"
-            >
-              <Trans>Save record</Trans>
-            </StyledDeliveryButton>
-            <StyledDeliveryButton type="button" onClick={onCancel}>
-              <Trans>Cancel</Trans>
-            </StyledDeliveryButton>
-          </StyledDeliveryRow>
-        </StyledDeliveryStack>
+              <StyledDeliveryButton type="button" onClick={onCancel}>
+                <Trans>Cancel</Trans>
+              </StyledDeliveryButton>
+            </StyledDeliveryRow>
+          </StyledDeliveryStack>
+        </fieldset>
       </form>
     </StyledDeliveryCard>
   );

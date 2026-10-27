@@ -14,10 +14,11 @@ import { AuthWorkspace } from 'src/engine/decorators/auth/auth-workspace.decorat
 import { AuthWorkspaceMemberId } from 'src/engine/decorators/auth/auth-workspace-member-id.decorator';
 import { AuthUserWorkspaceId } from 'src/engine/decorators/auth/auth-user-workspace-id.decorator';
 import { WorkspaceAuthGuard } from 'src/engine/guards/workspace-auth.guard';
+import { RequireAccessTokenGuard } from 'src/engine/guards/require-access-token.guard';
 import { DeliveryService } from 'src/modules/delivery/delivery.service';
 import { DeliveryAgentService } from 'src/modules/delivery/agents/delivery-agent.service';
 
-@UseGuards(WorkspaceAuthGuard, CustomPermissionGuard)
+@UseGuards(WorkspaceAuthGuard, RequireAccessTokenGuard, CustomPermissionGuard)
 @MetadataResolver()
 export class DeliveryResolver {
   constructor(
@@ -33,11 +34,26 @@ export class DeliveryResolver {
 
   @Query(() => GraphQLJSON)
   deliveryMeta(
+    @Args('input', { type: () => GraphQLJSON, nullable: true }) input: unknown,
     @AuthWorkspace() workspace: WorkspaceEntity,
     @AuthWorkspaceMemberId() memberId: string,
     @AuthUserWorkspaceId() userWorkspaceId: string,
   ) {
-    return this.meta.snapshot(workspace, memberId, userWorkspaceId);
+    return this.meta.snapshot(
+      workspace,
+      memberId,
+      userWorkspaceId,
+      input ?? {},
+    );
+  }
+  @Query(() => GraphQLJSON)
+  deliveryMetaReport(
+    @AuthWorkspace() workspace: WorkspaceEntity,
+    @AuthWorkspaceMemberId() memberId: string,
+    @AuthUserWorkspaceId() userWorkspaceId: string,
+    @Args('input', { type: () => GraphQLJSON }) input: unknown,
+  ) {
+    return this.meta.report(workspace, memberId, userWorkspaceId, input);
   }
   @Mutation(() => GraphQLJSON)
   changeDeliveryMeta(

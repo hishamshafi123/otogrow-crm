@@ -1,3 +1,5 @@
+import { syncStoredDeliveryCommitment } from 'src/modules/delivery/commitments/record-delivery-commitment';
+import { recordDeliveryRevision } from 'src/modules/delivery/revisions/record-delivery-revision';
 import { Cron } from '@nestjs/schedule';
 import { FileStorageDriverFactory } from 'src/engine/core-modules/file-storage/file-storage-driver.factory';
 import {
@@ -27,6 +29,90 @@ import {
   isCreativeAssetApproved,
   isCreativeAssetCurrent,
 } from 'src/modules/delivery/creative/delivery-creative.policy';
+import { recordOtogrowActivity } from 'src/modules/otogrow-activity/record-otogrow-activity';
+import { type OtogrowActivityInput } from 'src/modules/otogrow-activity/otogrow-activity.types';
+
+type CreativeActivity = Pick<OtogrowActivityInput, 'action' | 'summary'> &
+  Partial<
+    Pick<OtogrowActivityInput, 'outcome' | 'changes' | 'actorType' | 'actorId'>
+  >;
+
+const creativeStructure = (
+  document: CreativeDocument,
+  state: string,
+): Record<string, string | null> => ({
+  state,
+  creativeVersion: String(document.version),
+  productionVersion: String(document.productionVersion),
+  briefVersion: String(document.briefVersion),
+  approvedBriefVersion:
+    document.approvedBriefVersion === null
+      ? null
+      : String(document.approvedBriefVersion),
+  assemblyVersion: String(document.assemblyVersion),
+  referenceCount: String(document.references.length),
+  shotCount: String(document.shots.length),
+  assetCount: String(document.assets.length),
+  variantCount: String(document.variants.length),
+  selectedVariantCount: String(
+    document.variants.filter((variant) => variant.selected).length,
+  ),
+  reviewCount: String(
+    [...document.references, ...document.assets].reduce(
+      (count, item) => count + item.reviews.length,
+      0,
+    ),
+  ),
+  ...(document.mediaSettings
+    ? {
+        enabled: String(document.mediaSettings.enabled),
+        dailyRunLimit: String(document.mediaSettings.dailyRunLimit),
+        roleCount: String(document.mediaSettings.roles.length),
+        Roles: [...document.mediaSettings.roles].sort().join(', '),
+      }
+    : {}),
+});
+
+const CREATIVE_ACTIONS = {
+  initialize: ['CREATIVE_INITIALIZED', 'Started creative production.'],
+  brief: ['CREATIVE_BRIEF_UPDATED', 'Updated the creative brief.'],
+  approveBrief: [
+    'CREATIVE_BRIEF_APPROVED',
+    'Approved the current creative brief.',
+  ],
+  reference: [
+    'CREATIVE_REFERENCE_ADDED',
+    'Added a creative reference for review.',
+  ],
+  reviewReferences: [
+    'CREATIVE_REFERENCES_REVIEWED',
+    'Reviewed selected creative references.',
+  ],
+  reuseReference: [
+    'CREATIVE_REFERENCE_REUSED',
+    'Reused an approved project reference for new review.',
+  ],
+  shot: ['CREATIVE_SHOT_CREATED', 'Created a production shot.'],
+  order: ['CREATIVE_SHOTS_REORDERED', 'Changed the production shot order.'],
+  reviewAsset: [
+    'CREATIVE_ASSET_REVIEWED',
+    'Reviewed an intermediate creative asset.',
+  ],
+  selectAsset: [
+    'CREATIVE_ASSET_SELECTED',
+    'Selected an asset for the current production.',
+  ],
+  assembly: [
+    'CREATIVE_ASSEMBLY_UPDATED',
+    'Updated the creative assembly plan.',
+  ],
+  variants: ['CREATIVE_VARIANTS_CREATED', 'Planned hook and CTA variations.'],
+  selectVariants: [
+    'CREATIVE_VARIANTS_SELECTED',
+    'Selected creative variations.',
+  ],
+  reopen: ['CREATIVE_REOPENED', 'Reopened creative production for changes.'],
+} as const;
 
 @Injectable()
 export class DeliveryCreativeService {
@@ -107,6 +193,7 @@ export class DeliveryCreativeService {
     ) => Promise<void> | void,
     action: string,
     allowLocked = false,
+    activity?: (document: CreativeDocument) => CreativeActivity,
   ) {
     return this.dataSource.transaction(async (manager) => {
       await manager.query(
@@ -136,6 +223,13 @@ export class DeliveryCreativeService {
           'Creative work is locked for final review. Request a revision first.',
         );
       const document = scope.task.details.creative ?? newCreativeDocument();
+      const before = creativeStructure(document, scope.task.details.state);
+      const previousModels = JSON.stringify(
+        document.mediaSettings?.modelIds ?? [],
+      );
+      const previousRunStates = new Map(
+        document.mediaRuns?.map((run) => [run.id, run.status]),
+      );
       await apply(document, scope, manager);
       if (JSON.stringify(document).length > 2000000)
         throw new BadRequestException(
@@ -152,6 +246,78 @@ export class DeliveryCreativeService {
         at: new Date().toISOString(),
       });
       await manager.getRepository(DeliveryTaskEntity).save(scope.task);
+      await syncStoredDeliveryCommitment(manager, scope.task, {
+        actorId: memberId,
+        actorType: 'HUMAN',
+      });
+      const event =
+        activity?.(document) ??
+        (action === 'Media: configure'
+          ? {
+              action: 'MEDIA_CONFIGURED',
+              summary: 'Updated media generation controls.',
+            }
+          : null);
+      if (event) {
+        const after = creativeStructure(document, scope.task.details.state);
+        await recordOtogrowActivity(manager, {
+          workspaceId: workspace.id,
+          actorId: memberId,
+          subjectMemberId: scope.assigneeId,
+          category: 'CREATIVE',
+          sourceType: 'creative',
+          sourceId: taskId,
+          projectId: scope.task.projectId,
+          taskId,
+          outcome: 'RECORDED',
+          ...event,
+          changes: [
+            {
+              field: 'taskRevision',
+              before: String(revision),
+              after: String(scope.task.revision),
+            },
+            ...Object.entries(after)
+              .filter(([field, value]) => value !== before[field])
+              .map(([field, value]) => ({
+                field,
+                before: before[field] ?? null,
+                after: value,
+              })),
+            ...(event.changes ?? []),
+            ...(action === 'Media: configure' &&
+            previousModels !==
+              JSON.stringify(document.mediaSettings?.modelIds ?? [])
+              ? [{ field: 'modelChanged', before: 'false', after: 'true' }]
+              : []),
+          ],
+        });
+      }
+      for (const run of document.mediaRuns ?? []) {
+        const previousStatus = previousRunStates.get(run.id) ?? null;
+        if (previousStatus === run.status) continue;
+        const requested = run.status === 'QUEUED' || run.status === 'CANCELLED';
+        const system = !requested && run.kind === 'ASSEMBLY';
+        await recordOtogrowActivity(manager, {
+          workspaceId: workspace.id,
+          actorId: system ? null : memberId,
+          actorType: requested ? 'HUMAN' : system ? 'SYSTEM' : 'AGENT',
+          subjectMemberId: scope.assigneeId,
+          category: 'CREATIVE',
+          sourceType: 'creative',
+          sourceId: taskId,
+          projectId: scope.task.projectId,
+          taskId,
+          action: `MEDIA_${run.status}`,
+          summary: `Creative media ${run.status.toLowerCase()}.`,
+          outcome: run.status,
+          changes: [
+            { field: 'mediaRunId', before: null, after: run.id },
+            { field: 'mediaKind', before: null, after: run.kind },
+            { field: 'runStatus', before: previousStatus, after: run.status },
+          ],
+        });
+      }
       return { document, revision: scope.task.revision };
     });
   }
@@ -477,8 +643,14 @@ export class DeliveryCreativeService {
               throw new BadRequestException(
                 'This task is already open for production.',
               );
+            await recordDeliveryRevision(
+              manager,
+              scope.task,
+              memberId,
+              'CREATIVE_REOPEN',
+              command.notes,
+            );
             scope.task.details.state = 'CHANGES_REQUESTED';
-            document.revisionCharge = command.revisionCharge;
             scope.task.details.events.push({
               id: v4(),
               actorId: memberId,
@@ -500,6 +672,65 @@ export class DeliveryCreativeService {
       },
       command.action,
       command.action === 'reopen',
+      (document) => {
+        let [action, summary]: [string, string] = [
+          ...CREATIVE_ACTIONS[command.action],
+        ];
+        if (command.action === 'shot' && command.id) {
+          action = 'CREATIVE_SHOT_UPDATED';
+          summary =
+            'Updated a production shot and invalidated dependent selections.';
+        }
+        if (
+          command.action === 'reviewAsset' &&
+          command.decision === 'ESCALATED'
+        ) {
+          action = 'CREATIVE_ASSET_ESCALATED';
+          summary = 'Escalated an intermediate asset for manager review.';
+        }
+        const reviewed =
+          command.action === 'reviewAsset' ||
+          command.action === 'reviewReferences';
+        const selectedAsset =
+          'assetId' in command
+            ? document.assets.find((asset) => asset.id === command.assetId)
+            : null;
+        return {
+          action,
+          summary,
+          outcome:
+            command.action === 'approveBrief'
+              ? 'APPROVED'
+              : command.action === 'reopen'
+                ? 'CHANGES_REQUESTED'
+                : reviewed && command.decision !== 'ESCALATED'
+                  ? command.decision
+                  : 'RECORDED',
+          changes: [
+            ...(selectedAsset
+              ? [
+                  { field: 'assetId', before: null, after: selectedAsset.id },
+                  {
+                    field: 'assetKind',
+                    before: null,
+                    after: selectedAsset.kind,
+                  },
+                ]
+              : []),
+            ...(command.action === 'shot'
+              ? [
+                  {
+                    field: 'shotId',
+                    before: null,
+                    after:
+                      command.id ??
+                      document.shots[document.shots.length - 1].id,
+                  },
+                ]
+              : []),
+          ],
+        };
+      },
     );
   }
 
@@ -529,6 +760,25 @@ export class DeliveryCreativeService {
       asset.storageState = 'FAILED';
       task.revision++;
       await manager.getRepository(DeliveryTaskEntity).save(task);
+      await recordOtogrowActivity(manager, {
+        workspaceId,
+        actorId: null,
+        actorType: 'SYSTEM',
+        subjectMemberId: asset.uploadedBy,
+        category: 'CREATIVE',
+        sourceType: 'creative',
+        sourceId: taskId,
+        projectId: task.projectId,
+        taskId,
+        action: 'CREATIVE_UPLOAD_FAILED',
+        outcome: 'FAILED',
+        summary: 'Cleaned up an unsuccessful or abandoned creative upload.',
+        changes: [
+          { field: 'assetId', before: null, after: asset.id },
+          { field: 'assetKind', before: null, after: asset.kind },
+          { field: 'state', before: 'PENDING', after: 'FAILED' },
+        ],
+      });
     });
   }
 
@@ -631,6 +881,21 @@ export class DeliveryCreativeService {
         });
       },
       'Reserved creative upload',
+      false,
+      () => ({
+        action: 'CREATIVE_UPLOAD_STARTED',
+        summary: lifecycle
+          ? 'Reserved a generated creative asset.'
+          : 'Started a creative asset upload.',
+        actorType: lifecycle ? 'SYSTEM' : 'HUMAN',
+        actorId: lifecycle ? null : memberId,
+        outcome: 'RUNNING',
+        changes: [
+          { field: 'assetId', before: null, after: metadata.id },
+          { field: 'assetKind', before: null, after: metadata.kind },
+          { field: 'state', before: null, after: 'PENDING' },
+        ],
+      }),
     );
     try {
       await writeFile();
@@ -649,6 +914,21 @@ export class DeliveryCreativeService {
           lifecycle?.complete(document);
         },
         'Completed creative upload',
+        false,
+        () => ({
+          action: 'CREATIVE_UPLOAD_COMPLETED',
+          summary: lifecycle
+            ? 'Saved a generated asset for human review.'
+            : 'Completed a creative asset upload.',
+          actorType: lifecycle ? 'SYSTEM' : 'HUMAN',
+          actorId: lifecycle ? null : memberId,
+          outcome: 'SUCCEEDED',
+          changes: [
+            { field: 'assetId', before: null, after: metadata.id },
+            { field: 'assetKind', before: null, after: metadata.kind },
+            { field: 'state', before: 'PENDING', after: 'READY' },
+          ],
+        }),
       );
     } catch (error) {
       await this.discardPending(workspace.id, taskId, metadata.id);

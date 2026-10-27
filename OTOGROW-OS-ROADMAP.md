@@ -4,17 +4,23 @@ Build a simpler workspace for Otogrow's martech agency, prioritizing delivery, t
 
 ## Current authorization and workflow
 
+Latest instruction (2026-10-25): list and track all 42 critique findings, include the new role/activity requirements, complete the improvements and make the system easier to use. Planning, implementation and verification are now authorized. `OTOGROW-OS-IMPROVEMENTS.md` is the authoritative 46-item redesign tracker (dynamic roles expand item 39; person-level activity, AI analysis, phone restrictions and team chat add 43–46). Work in verified batches and distinguish partial work, local completion and production acceptance.
+
+Additional quality rule (2026-10-25): every item requires the improvement tracker's **Mandatory business, workflow and design review**. Evaluate its impact on the company, the complete workflow, UI/UX, design structure and related systems; question the proposed solution; compare design ideas; choose the best practical implementation; and record the decision, design rationale, tradeoffs and functional/design acceptance evidence before completion. Design quality is a first-class requirement, including actual screen and interaction inspection for UI changes. Apply the same review to earlier completed items before dependent work or rollout. This strengthens implementation quality without reinstating phase-approval pauses.
+
 The user superseded the earlier approval gates with: “continue all the rest of the phases without my approval”. Plan, implement and verify phases 5–10 sequentially without asking for phase approval. Record progress and unfinished work honestly. Continue independent work when a provider connection is unavailable. Account credentials, unconfigured services, deployment destinations and actual external sends still require the necessary concrete details; this instruction does not invent credentials or increase the existing spending cap.
 
 The older per-phase approval wording below is historical and no longer blocks implementation.
 
 ## Current position
 
+- Latest verified improvements (2026-10-28): IMP-16 daily capacity, IMP-19 revision causes/effort/cost and IMP-20 accepted-deal handoff, plus project-edit and finance outage recovery under IMP-10. The authoritative improvement tracker has 17 Local complete, 13 Partial, 1 In progress and 15 Queued items (29 unfinished). IMP-42 readiness is locally complete; IMP-21 monthly plans, exact recognition/allocation, partial payments/reconciliation, recorded AI-cost imports/late corrections, monthly result locking and history passed local acceptance. Reviewed cash forecasting is implemented with local code/service checks passed; populated desktop/mobile acceptance and accountant mappings remain. Desktop/mobile, permission, migration rollback and concurrency acceptance passed locally; no production rollout is implied.
+- Active work: approved redesign follow-up. All 42 findings plus activity history and AI analysis are tracked in `OTOGROW-OS-IMPROVEMENTS.md`. First batch addresses navigation, setup clarity, reminder correctness and readiness labels. Existing histories do not yet constitute the requested unified per-person audit experience.
 - Current work: phases 5–10 authorized for autonomous continuation; local workflow foundations implemented and being verified, integration/automation work remains. Phase 4 is implemented and locally verified. Phase 3 is implemented and locally verified with live image/video acceptance.
 - Phase 1: implemented locally and verified with the repository-wide typecheck limitations recorded in its plan.
 - Approval evidence for Phase 1: user replied "continue" immediately after the Phase 1 approval request.
 - Completed local OS implementation phases: 1, 2, 3 and 4. Production rollout is not complete.
-- Next action: continue unfinished reporting, finance, content and integration work across phases 5–10 under the standing authorization.
+- Next action: execute the improvement tracker in dependency order while preserving the unfinished phase 5–10 scope below. Update the tracker with evidence before declaring an improvement complete.
 - Phase 2 implementation approval: "approve". The user subsequently supplied a Gemini key "for your testing", authorizing bounded live checks. These completed with synthetic data and rollback; the key was not permanently configured.
 - Current implementation checkpoint: client-portal advertising budgets and ad-report calculations (2026-10-25).
 - Requirements source: user discovery conversation, consolidated in `OTOGROW-OS-REQUIREMENTS.md`.
@@ -102,3 +108,44 @@ The local OS now has a working encrypted Meta connection and account/ad performa
 Automatic reports are OFF pending real staff/project assignment: the local workspace currently has one demo member and no projects. Production hosting is not configured. Meta is now connected locally; Shopify and other providers are not. Phase 6 remains in progress for remaining attribution/reporting automation and production acceptance. See Phase 6 for verification and explicit limits, including yesterday-only scheduled imports and no historical/rolling backfill yet.
 
 Final reporting verification: 15 backend tests and 6 frontend tests passed; rollback checks also exercised report notice isolation/acknowledgement and the existing recurring-work/notification suite. Server build, metadata generation and changed-file lint passed. Direct typechecks have no delivery-module errors; the previously documented unrelated front-component AppPath and Meta lead-intake DeepPartial failures remain. The persisted live token's versioned encryption prefix and the local scheduler heartbeat were checked without exposing the secret. The local app retains the new connection and real empty daily report; schedules remain off awaiting staff/project setup.
+
+### 2026-10-25 — approved critique improvements
+
+The 45-item `OTOGROW-OS-IMPROVEMENTS.md` tracker records all original 42 findings plus activity history, AI analysis and phone restrictions. First checkpoint: 2 locally complete (navigation consolidation and hidden-notice reminder correctness), 7 partially improved and 36 queued. Navigation/task URLs, setup entry points, mobile filters, Meta prerequisites and truthful readiness were implemented and checked. The original phase 5–10 work remains unfinished. Next priority is multiple-role capability enforcement, including phone use, followed by unified activity history. See the improvement tracker for criteria, evidence and limitations; phone restrictions are not implemented yet.
+
+
+### 2026-10-25 — multiple business roles and phone access
+
+The critique tracker now records the locally verified permission slice: multiple editable business roles, combined-access previews, active membership checks, transactional permission audit events and capability-based phone enforcement. Native CRM record permissions and independent final approval remain in force. Team UI, typed role endpoints and the local four-table migration are implemented; backend/frontend, rollback database, concurrent transaction and desktop/mobile checks passed. No paid calls or external sends were used.
+
+This is partial IMP-39/40/43 and local completion of IMP-45, not completion of granular authorization, the all-work activity viewer or AI analysis. The authoritative totals and limitations are in `OTOGROW-OS-IMPROVEMENTS.md`: 3 local complete, 10 partial, 32 queued. No production deployment or GitHub push was made for the critique work.
+
+### 2026-10-25 — delivery usability and production-AI controls
+
+The authoritative critique tracker now records prioritized My tasks, shared draft protection, transactional person-level OS activity, durable once-only reminder dispatch, read-only snapshots and exact production-AI spending controls with charge reconciliation/history. Local migration, permission/concurrency and focused UI checks passed; browser acceptance is ongoing for the newest forms. No new funding, paid AI requests, live messages, ad changes or deployment occurred. Native CRM AI remains outside the production budget, and unsupported media billing is blocked explicitly.
+
+The active implementation is structured client commitments: retainer periods and one-time packages, separate unique-video/variation counts, explicit task allocation and version-bound actual fulfilment. User approval is not required between batches. See `OTOGROW-OS-IMPROVEMENTS.md` for current totals, decisions, acceptance evidence and remaining items; earlier checkpoint totals above are historical.
+
+
+## 2026-10-26 — meeting knowledge checkpoint
+
+The user's meeting requirement is tracked under IMP-18/23 in `OTOGROW-OS-IMPROVEMENTS.md`. Local capture supports dated recording references, pasted transcripts/notes, manager-published immutable versions and approved context for existing task assistants. Updated/withdrawn knowledge invalidates stale runs and suggestion acceptance. Links do not auto-import transcripts; automatic Fathom import, video transcription, AI extraction, broader agent actions and the full brand asset library remain unfinished. Current critique tracker: 12 Local complete, 13 Partial and 21 Queued (46 total); phases 5–10 and production acceptance are not declared complete.
+
+### 2026-10-27 — capacity and revision economics
+
+Verified local daily availability and production/revision/generation-wait/reviewer capacity, versioned project conflict recovery, and durable revision rounds with causes, effort and protected cost/charge reporting. Additive project-version, availability and revision migrations were applied only locally. Exact browser fixtures were removed; no paid requests, external messages, ad changes or deployment. Full decisions and acceptance evidence are in IMP-10/16/19. Gmail is the confirmed email provider; live inbox authorization and the manager/marketer for 06:00 Qatar Meta reports remain setup prerequisites. Continue independent engineering without approval pauses.
+
+2026-10-27 handoff checkpoint: IMP-20 is locally complete after native CRM/browser, changed-source, duplicate, atomicity, permission and desktop/mobile acceptance. Exact synthetic records were cleaned; no live messages, payments or client links were created. See the authoritative improvement tracker for remaining work and detailed evidence.
+
+## 2026-10-27 — reusable library and reporting direction
+
+Brand knowledge now includes versioned facts, claims, visual rules, references, reusable prompts and meeting notes, with reader-scoped search and manager-published task-assistant context. Desktop/mobile and permission/version regressions passed. Import/transcription/media ingestion remain unfinished under IMP-18. The user clarified that daily performance reports follow each client's selected services and assigned PM/marketer plus founder, rather than fixed global staff names. This is now the active IMP-28 implementation; Gmail is confirmed and no global-name input is required.
+
+## 2026-10-27 — readiness acceptance and finance continuation
+
+IMP-42 is locally complete after typed status contracts, current-access checks, stale/mixed-account evidence, provider/media-copy audit, draft/recovery tests and desktop/mobile acceptance. Client service removal also revokes advertising budget entitlement; schedule-timezone clearing is tested. Disposable browser fixtures are removed. Current authoritative tracker: 17 Local complete, 13 Partial, 1 In progress, 15 Queued (29 unfinished). IMP-21 monthly management finance is active; no global staff names are required for reports, no paid calls or external sends were made, and production acceptance remains outstanding.
+
+
+### 2026-10-27 — monthly management finance accepted, payment matching active
+
+Finance now has Cash records, Monthly results and Monthly cost plans. The normalized recognition journey passed exact-money, current-source review, posting/voiding, permissions, rollback/concurrency and desktop/390px acceptance. Combined frontend checks passed 155 cases; direct frontend/server types and scoped lint passed. Disposable fixtures were removed and the prior finance baseline is unchanged. IMP-21 remains In progress: partial payment and source-linked matching is now delegated across backend, forms and independent database testing while root handles integration and browser acceptance. No automatic recognition, money movement, paid model calls or production rollout is implied.

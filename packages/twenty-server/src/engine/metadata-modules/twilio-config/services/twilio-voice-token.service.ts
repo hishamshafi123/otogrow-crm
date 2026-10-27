@@ -4,25 +4,35 @@ import { isDefined } from 'twenty-shared/utils';
 import { jwt } from 'twilio';
 
 import { TwilioConfigService } from 'src/engine/metadata-modules/twilio-config/twilio-config.service';
+import { OtogrowAccessService } from 'src/modules/otogrow-access/otogrow-access.service';
 
 const VOICE_TOKEN_TTL_SECONDS = 3600;
 
 @Injectable()
 export class TwilioVoiceTokenService {
-  constructor(private readonly twilioConfigService: TwilioConfigService) {}
+  constructor(
+    private readonly twilioConfigService: TwilioConfigService,
+    private readonly otogrowAccessService: OtogrowAccessService,
+  ) {}
 
   async generateVoiceToken({
     workspaceId,
     workspaceMemberId,
   }: {
     workspaceId: string;
-    workspaceMemberId: string;
+    workspaceMemberId: string | undefined;
   }): Promise<string> {
+    const access = await this.otogrowAccessService.requireCapability(
+      workspaceId,
+      workspaceMemberId,
+      'phone.use',
+    );
     const config =
       await this.twilioConfigService.findByWorkspaceId(workspaceId);
 
     if (
       !isDefined(config) ||
+      !config.isActive ||
       !isDefined(config.apiKeySid) ||
       !isDefined(config.twimlAppSid)
     ) {
@@ -39,7 +49,7 @@ export class TwilioVoiceTokenService {
       config.accountSid,
       config.apiKeySid,
       apiKeySecret,
-      { identity: workspaceMemberId, ttl: VOICE_TOKEN_TTL_SECONDS },
+      { identity: access.memberId, ttl: VOICE_TOKEN_TTL_SECONDS },
     );
 
     accessToken.addGrant(

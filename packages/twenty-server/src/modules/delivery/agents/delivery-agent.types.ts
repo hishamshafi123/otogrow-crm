@@ -1,3 +1,4 @@
+import { type DeliveryKnowledgeContext } from 'src/modules/delivery/knowledge/delivery-knowledge-context';
 import { z } from 'zod';
 
 export const deliveryAgentConfigurationSchema = z
@@ -16,6 +17,7 @@ export const deliveryAgentConfigurationSchema = z
       .array(z.enum(['ADMIN', 'MANAGER', 'MEMBER']))
       .min(1)
       .max(3),
+    roleIds: z.array(z.string().uuid()).min(1).max(100).nullable().optional(),
     dailyRunLimit: z.number().int().min(1).max(200),
     maxOutputTokens: z.number().int().min(256).max(4096),
     humanConfirmation: z.literal(true),
@@ -64,6 +66,7 @@ export type DeliveryAgentStatus =
   | 'FAILED'
   | 'CANCELLED';
 export type DeliveryAgentContext = {
+  brandKnowledge?: DeliveryKnowledgeContext;
   title: string;
   brief: string;
   service: string;

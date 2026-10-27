@@ -1518,6 +1518,1704 @@ export type DeletedWorkspaceMember = {
   userWorkspaceId?: Maybe<Scalars['UUID']['output']>;
 };
 
+export type DeliveryAppliedWorkflow = {
+  __typename?: 'DeliveryAppliedWorkflow';
+  appliedAt: Scalars['String']['output'];
+  appliedByName: Scalars['String']['output'];
+  checkedIds: Array<Scalars['String']['output']>;
+  definition: DeliveryWorkflowDefinition;
+  evidence: Array<DeliveryWorkflowAnswer>;
+  revision: Scalars['Int']['output'];
+  templateId: Scalars['ID']['output'];
+  version: Scalars['Int']['output'];
+};
+
+export type DeliveryAvailability = {
+  __typename?: 'DeliveryAvailability';
+  date: Scalars['String']['output'];
+  memberId: Scalars['ID']['output'];
+  minutes?: Maybe<Scalars['Int']['output']>;
+  revision: Scalars['Int']['output'];
+};
+
+export type DeliveryAvailabilityInput = {
+  date: Scalars['String']['input'];
+  memberId: Scalars['ID']['input'];
+  minutes?: InputMaybe<Scalars['Int']['input']>;
+  revision: Scalars['Int']['input'];
+};
+
+export type DeliveryBatch = {
+  __typename?: 'DeliveryBatch';
+  closed: Scalars['Boolean']['output'];
+  endDate?: Maybe<Scalars['String']['output']>;
+  id: Scalars['ID']['output'];
+  label: Scalars['String']['output'];
+  periodId?: Maybe<Scalars['ID']['output']>;
+  revision: Scalars['Int']['output'];
+  startDate?: Maybe<Scalars['String']['output']>;
+  timezone: Scalars['String']['output'];
+};
+
+export type DeliveryBatchCount = {
+  __typename?: 'DeliveryBatchCount';
+  approved: Scalars['Int']['output'];
+  fulfilled: Scalars['Int']['output'];
+  key: Scalars['String']['output'];
+  total: Scalars['Int']['output'];
+};
+
+export type DeliveryBatchEvent = {
+  __typename?: 'DeliveryBatchEvent';
+  action: Scalars['String']['output'];
+  actorName: Scalars['String']['output'];
+  changes: Array<DeliveryCommitmentChange>;
+  id: Scalars['ID']['output'];
+  occurredAt: Scalars['String']['output'];
+  reason: Scalars['String']['output'];
+  taskId?: Maybe<Scalars['ID']['output']>;
+  taskName?: Maybe<Scalars['String']['output']>;
+};
+
+export type DeliveryBatchItemInput = {
+  active: Scalars['Boolean']['input'];
+  batchId: Scalars['ID']['input'];
+  concept: Scalars['String']['input'];
+  projectId: Scalars['ID']['input'];
+  reason: Scalars['String']['input'];
+  revision: Scalars['Int']['input'];
+  taskId: Scalars['ID']['input'];
+  taskRevision?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type DeliveryBatchPeriodOption = {
+  __typename?: 'DeliveryBatchPeriodOption';
+  id: Scalars['ID']['output'];
+  label: Scalars['String']['output'];
+};
+
+export type DeliveryBatchSaveInput = {
+  endDate?: InputMaybe<Scalars['String']['input']>;
+  id: Scalars['ID']['input'];
+  label: Scalars['String']['input'];
+  periodId?: InputMaybe<Scalars['ID']['input']>;
+  projectId: Scalars['ID']['input'];
+  reason: Scalars['String']['input'];
+  revision: Scalars['Int']['input'];
+  startDate?: InputMaybe<Scalars['String']['input']>;
+  timezone: Scalars['String']['input'];
+};
+
+export type DeliveryBatchStateInput = {
+  batchId: Scalars['ID']['input'];
+  closed: Scalars['Boolean']['input'];
+  projectId: Scalars['ID']['input'];
+  reason: Scalars['String']['input'];
+  revision: Scalars['Int']['input'];
+};
+
+export type DeliveryBatchTask = {
+  __typename?: 'DeliveryBatchTask';
+  approved: Scalars['Boolean']['output'];
+  assigneeName?: Maybe<Scalars['String']['output']>;
+  available: Scalars['Boolean']['output'];
+  concept: Scalars['String']['output'];
+  fulfilled: Scalars['Boolean']['output'];
+  reviewerName?: Maybe<Scalars['String']['output']>;
+  state?: Maybe<Scalars['String']['output']>;
+  submissionVersion?: Maybe<Scalars['Int']['output']>;
+  taskId: Scalars['ID']['output'];
+  taskRevision?: Maybe<Scalars['Int']['output']>;
+  title: Scalars['String']['output'];
+  unit: Scalars['String']['output'];
+};
+
+export type DeliveryBatchTaskOption = {
+  __typename?: 'DeliveryBatchTaskOption';
+  taskId: Scalars['ID']['output'];
+  taskRevision: Scalars['Int']['output'];
+  title: Scalars['String']['output'];
+};
+
+export type DeliveryBatches = {
+  __typename?: 'DeliveryBatches';
+  batches: Array<DeliveryBatch>;
+  canManage: Scalars['Boolean']['output'];
+  counts: Array<DeliveryBatchCount>;
+  history: Array<DeliveryBatchEvent>;
+  memberId: Scalars['ID']['output'];
+  moreTaskOptions: Scalars['Boolean']['output'];
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  nextHistoryCursor?: Maybe<Scalars['String']['output']>;
+  nextTaskCursor?: Maybe<Scalars['String']['output']>;
+  periods: Array<DeliveryBatchPeriodOption>;
+  projectId: Scalars['ID']['output'];
+  selected?: Maybe<DeliveryBatch>;
+  taskOptions: Array<DeliveryBatchTaskOption>;
+  tasks: Array<DeliveryBatchTask>;
+  userWorkspaceId: Scalars['ID']['output'];
+  workspaceId: Scalars['ID']['output'];
+};
+
+export type DeliveryBatchesInput = {
+  batchId?: InputMaybe<Scalars['ID']['input']>;
+  cursor?: InputMaybe<Scalars['String']['input']>;
+  historyCursor?: InputMaybe<Scalars['String']['input']>;
+  includeClosed?: InputMaybe<Scalars['Boolean']['input']>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  projectId: Scalars['ID']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+  taskCursor?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type DeliveryCapacity = {
+  __typename?: 'DeliveryCapacity';
+  availability: Array<DeliveryAvailability>;
+  memberId: Scalars['ID']['output'];
+  startDate: Scalars['String']['output'];
+  userWorkspaceId: Scalars['ID']['output'];
+  workspaceId: Scalars['ID']['output'];
+};
+
+export type DeliveryCapacityInput = {
+  startDate: Scalars['String']['input'];
+};
+
+export type DeliveryChatInput = {
+  before?: InputMaybe<Scalars['String']['input']>;
+  peerId?: InputMaybe<Scalars['ID']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type DeliveryChatMessage = {
+  __typename?: 'DeliveryChatMessage';
+  createdAt: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  position: Scalars['String']['output'];
+  recipientId: Scalars['ID']['output'];
+  reminderState: Scalars['String']['output'];
+  senderId: Scalars['ID']['output'];
+  senderName: Scalars['String']['output'];
+  text: Scalars['String']['output'];
+  viewedAt?: Maybe<Scalars['String']['output']>;
+};
+
+export type DeliveryChatPerson = {
+  __typename?: 'DeliveryChatPerson';
+  active: Scalars['Boolean']['output'];
+  id: Scalars['ID']['output'];
+  lastMessageAt?: Maybe<Scalars['String']['output']>;
+  name: Scalars['String']['output'];
+  unread: Scalars['Int']['output'];
+};
+
+export type DeliveryChatSendInput = {
+  recipientId: Scalars['ID']['input'];
+  requestId: Scalars['ID']['input'];
+  text: Scalars['String']['input'];
+};
+
+export type DeliveryChatSnapshot = {
+  __typename?: 'DeliveryChatSnapshot';
+  before?: Maybe<Scalars['String']['output']>;
+  memberId: Scalars['ID']['output'];
+  messages: Array<DeliveryChatMessage>;
+  olderCursor?: Maybe<Scalars['String']['output']>;
+  peer?: Maybe<DeliveryChatPerson>;
+  people: Array<DeliveryChatPerson>;
+  peopleTotal: Scalars['Int']['output'];
+  telegramReady: Scalars['Boolean']['output'];
+  userWorkspaceId: Scalars['ID']['output'];
+  workspaceId: Scalars['ID']['output'];
+};
+
+export type DeliveryChatViewedInput = {
+  messageIds: Array<Scalars['ID']['input']>;
+};
+
+export type DeliveryCommitmentAllocation = {
+  __typename?: 'DeliveryCommitmentAllocation';
+  creditReason?: Maybe<Scalars['String']['output']>;
+  credited: Scalars['Boolean']['output'];
+  creditedCycle?: Maybe<Scalars['Int']['output']>;
+  creditedSubmissionVersion?: Maybe<Scalars['Int']['output']>;
+  fulfilledAt?: Maybe<Scalars['String']['output']>;
+  lineId: Scalars['ID']['output'];
+  parentTaskId?: Maybe<Scalars['ID']['output']>;
+  periodId: Scalars['ID']['output'];
+  revision: Scalars['Int']['output'];
+  state: Scalars['String']['output'];
+  taskId: Scalars['ID']['output'];
+  taskName: Scalars['String']['output'];
+};
+
+export type DeliveryCommitmentChange = {
+  __typename?: 'DeliveryCommitmentChange';
+  after?: Maybe<Scalars['String']['output']>;
+  before?: Maybe<Scalars['String']['output']>;
+  field: Scalars['String']['output'];
+};
+
+export type DeliveryCommitmentEngagement = {
+  __typename?: 'DeliveryCommitmentEngagement';
+  billing: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  name: Scalars['String']['output'];
+  projectId: Scalars['ID']['output'];
+};
+
+export type DeliveryCommitmentEngagements = {
+  __typename?: 'DeliveryCommitmentEngagements';
+  engagements: Array<DeliveryCommitmentEngagement>;
+  memberId: Scalars['ID']['output'];
+  userWorkspaceId: Scalars['ID']['output'];
+  workspaceId: Scalars['ID']['output'];
+};
+
+export type DeliveryCommitmentEvent = {
+  __typename?: 'DeliveryCommitmentEvent';
+  action: Scalars['String']['output'];
+  actorName: Scalars['String']['output'];
+  actorType: Scalars['String']['output'];
+  changes: Array<DeliveryCommitmentChange>;
+  id: Scalars['ID']['output'];
+  occurredAt: Scalars['String']['output'];
+  reason?: Maybe<Scalars['String']['output']>;
+  taskId?: Maybe<Scalars['ID']['output']>;
+  taskName?: Maybe<Scalars['String']['output']>;
+};
+
+export type DeliveryCommitmentLine = {
+  __typename?: 'DeliveryCommitmentLine';
+  assignedQuantity: Scalars['Int']['output'];
+  fulfilledQuantity: Scalars['Int']['output'];
+  id: Scalars['ID']['output'];
+  label: Scalars['String']['output'];
+  overdeliveredQuantity: Scalars['Int']['output'];
+  periodId: Scalars['ID']['output'];
+  promisedQuantity: Scalars['Int']['output'];
+  remainingQuantity: Scalars['Int']['output'];
+  revision: Scalars['Int']['output'];
+  unit: Scalars['String']['output'];
+};
+
+export type DeliveryCommitmentLineSaveInput = {
+  engagementId: Scalars['ID']['input'];
+  id: Scalars['ID']['input'];
+  label: Scalars['String']['input'];
+  periodId: Scalars['ID']['input'];
+  periodRevision: Scalars['Int']['input'];
+  promisedQuantity: Scalars['Int']['input'];
+  reason: Scalars['String']['input'];
+  revision: Scalars['Int']['input'];
+  unit: Scalars['String']['input'];
+};
+
+export type DeliveryCommitmentPeriod = {
+  __typename?: 'DeliveryCommitmentPeriod';
+  billing: Scalars['String']['output'];
+  endDateExclusive?: Maybe<Scalars['String']['output']>;
+  id: Scalars['ID']['output'];
+  label: Scalars['String']['output'];
+  revision: Scalars['Int']['output'];
+  startDate: Scalars['String']['output'];
+  state: Scalars['String']['output'];
+  timezone: Scalars['String']['output'];
+};
+
+export type DeliveryCommitmentPeriodSaveInput = {
+  endDateExclusive?: InputMaybe<Scalars['String']['input']>;
+  engagementId: Scalars['ID']['input'];
+  id: Scalars['ID']['input'];
+  label: Scalars['String']['input'];
+  reason: Scalars['String']['input'];
+  revision: Scalars['Int']['input'];
+  startDate: Scalars['String']['input'];
+  timezone: Scalars['String']['input'];
+};
+
+export type DeliveryCommitmentPeriodStateInput = {
+  engagementId: Scalars['ID']['input'];
+  periodId: Scalars['ID']['input'];
+  reason: Scalars['String']['input'];
+  revision: Scalars['Int']['input'];
+  state: Scalars['String']['input'];
+};
+
+export type DeliveryCommitmentTaskAssignInput = {
+  engagementId: Scalars['ID']['input'];
+  lineId: Scalars['ID']['input'];
+  lineRevision: Scalars['Int']['input'];
+  parentTaskId?: InputMaybe<Scalars['ID']['input']>;
+  periodId: Scalars['ID']['input'];
+  periodRevision: Scalars['Int']['input'];
+  reason: Scalars['String']['input'];
+  revision: Scalars['Int']['input'];
+  taskId: Scalars['ID']['input'];
+  taskRevision: Scalars['Int']['input'];
+};
+
+export type DeliveryCommitmentTaskOption = {
+  __typename?: 'DeliveryCommitmentTaskOption';
+  allocatedLineId?: Maybe<Scalars['ID']['output']>;
+  allocatedPeriodId?: Maybe<Scalars['ID']['output']>;
+  allocatedUnit?: Maybe<Scalars['String']['output']>;
+  allocationRevision: Scalars['Int']['output'];
+  name: Scalars['String']['output'];
+  state: Scalars['String']['output'];
+  taskId: Scalars['ID']['output'];
+  taskRevision: Scalars['Int']['output'];
+};
+
+export type DeliveryCommitmentTaskRemoveInput = {
+  engagementId: Scalars['ID']['input'];
+  periodId: Scalars['ID']['input'];
+  reason: Scalars['String']['input'];
+  revision: Scalars['Int']['input'];
+  taskId: Scalars['ID']['input'];
+};
+
+export type DeliveryCommitments = {
+  __typename?: 'DeliveryCommitments';
+  allocations: Array<DeliveryCommitmentAllocation>;
+  canManage: Scalars['Boolean']['output'];
+  engagementId: Scalars['ID']['output'];
+  engagementName: Scalars['String']['output'];
+  history: Array<DeliveryCommitmentEvent>;
+  legacyAllowance?: Maybe<Scalars['String']['output']>;
+  lines: Array<DeliveryCommitmentLine>;
+  memberId: Scalars['ID']['output'];
+  moreTaskOptions: Scalars['Boolean']['output'];
+  nextAllocationCursor?: Maybe<Scalars['String']['output']>;
+  nextHistoryCursor?: Maybe<Scalars['String']['output']>;
+  periods: Array<DeliveryCommitmentPeriod>;
+  projectId: Scalars['ID']['output'];
+  selectedPeriodId?: Maybe<Scalars['ID']['output']>;
+  taskOptions: Array<DeliveryCommitmentTaskOption>;
+  userWorkspaceId: Scalars['ID']['output'];
+  workspaceId: Scalars['ID']['output'];
+};
+
+export type DeliveryCommitmentsInput = {
+  allocationCursor?: InputMaybe<Scalars['String']['input']>;
+  engagementId: Scalars['ID']['input'];
+  historyCursor?: InputMaybe<Scalars['String']['input']>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  periodId?: InputMaybe<Scalars['ID']['input']>;
+  taskSearch?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type DeliveryFinanceAiCostClaim = {
+  __typename?: 'DeliveryFinanceAiCostClaim';
+  currentEntry?: Maybe<DeliveryFinanceAiCostEntryReference>;
+  replacementEntry?: Maybe<DeliveryFinanceAiCostEntryReference>;
+  revision: Scalars['Int']['output'];
+};
+
+export type DeliveryFinanceAiCostEntryReference = {
+  __typename?: 'DeliveryFinanceAiCostEntryReference';
+  activeMatchCount: Scalars['Int']['output'];
+  amountMicros: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  matchedMicros: Scalars['String']['output'];
+  month: Scalars['String']['output'];
+  revision: Scalars['Int']['output'];
+  status: Scalars['String']['output'];
+};
+
+export type DeliveryFinanceAiCostEvidence = {
+  __typename?: 'DeliveryFinanceAiCostEvidence';
+  amountMicros: Scalars['String']['output'];
+  basis: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  recordedAt: Scalars['String']['output'];
+};
+
+export type DeliveryFinanceAiCostOrigin = {
+  __typename?: 'DeliveryFinanceAiCostOrigin';
+  amountMicros: Scalars['String']['output'];
+  basis: Scalars['String']['output'];
+  correctionReason?: Maybe<Scalars['String']['output']>;
+  currency: Scalars['String']['output'];
+  evidenceEventId: Scalars['ID']['output'];
+  modelId: Scalars['String']['output'];
+  projectId?: Maybe<Scalars['ID']['output']>;
+  projectName?: Maybe<Scalars['String']['output']>;
+  recordedAt: Scalars['String']['output'];
+  replacesEntryId?: Maybe<Scalars['ID']['output']>;
+  sourceKind: Scalars['String']['output'];
+  spendId: Scalars['ID']['output'];
+  spendRevision: Scalars['Int']['output'];
+};
+
+export type DeliveryFinanceAiCostPostInput = {
+  acknowledgeReplacement: Scalars['Boolean']['input'];
+  acknowledgeSourceWarnings: Scalars['Boolean']['input'];
+  expectedClaimRevision: Scalars['Int']['input'];
+  expectedSourceReviewToken: Scalars['String']['input'];
+  id: Scalars['ID']['input'];
+  revision: Scalars['Int']['input'];
+};
+
+export type DeliveryFinanceAiCostPrepareInput = {
+  acknowledgeNoDuplicateCost: Scalars['Boolean']['input'];
+  acknowledgeSourceWarnings: Scalars['Boolean']['input'];
+  allocations: Array<DeliveryFinanceAllocationInput>;
+  correctionReason?: InputMaybe<Scalars['String']['input']>;
+  evidenceEventId: Scalars['ID']['input'];
+  expectedClaimRevision: Scalars['Int']['input'];
+  expectedReplacedEntryRevision?: InputMaybe<Scalars['Int']['input']>;
+  expectedSourceReviewToken: Scalars['String']['input'];
+  id: Scalars['ID']['input'];
+  month: Scalars['String']['input'];
+  note: Scalars['String']['input'];
+  replacesEntryId?: InputMaybe<Scalars['ID']['input']>;
+  spendId: Scalars['ID']['input'];
+  title: Scalars['String']['input'];
+};
+
+export type DeliveryFinanceAiCostResult = {
+  __typename?: 'DeliveryFinanceAiCostResult';
+  entryId: Scalars['ID']['output'];
+  replayed: Scalars['Boolean']['output'];
+  status: Scalars['String']['output'];
+};
+
+export type DeliveryFinanceAiCostSource = {
+  __typename?: 'DeliveryFinanceAiCostSource';
+  claim: DeliveryFinanceAiCostClaim;
+  createdAt: Scalars['String']['output'];
+  currency: Scalars['String']['output'];
+  dispatchedAt?: Maybe<Scalars['String']['output']>;
+  eligible: Scalars['Boolean']['output'];
+  evidenceOptions: Array<DeliveryFinanceAiCostEvidence>;
+  id: Scalars['ID']['output'];
+  modelId: Scalars['String']['output'];
+  nextEvidenceId?: Maybe<Scalars['ID']['output']>;
+  projectId?: Maybe<Scalars['ID']['output']>;
+  projectName?: Maybe<Scalars['String']['output']>;
+  revision: Scalars['Int']['output'];
+  settledAmountMicros?: Maybe<Scalars['String']['output']>;
+  settledAt?: Maybe<Scalars['String']['output']>;
+  sourceKind: Scalars['String']['output'];
+  sourceReviewToken: Scalars['String']['output'];
+  sourceWarnings: Array<Scalars['String']['output']>;
+  state: Scalars['String']['output'];
+};
+
+export type DeliveryFinanceAiCostsInput = {
+  afterEvidenceId?: InputMaybe<Scalars['ID']['input']>;
+  afterSpendId?: InputMaybe<Scalars['ID']['input']>;
+  filter?: InputMaybe<Scalars['String']['input']>;
+  selectedSpendId?: InputMaybe<Scalars['ID']['input']>;
+};
+
+export type DeliveryFinanceAiCostsSnapshot = {
+  __typename?: 'DeliveryFinanceAiCostsSnapshot';
+  canManage: Scalars['Boolean']['output'];
+  canReadBudget: Scalars['Boolean']['output'];
+  filter: Scalars['String']['output'];
+  memberId: Scalars['ID']['output'];
+  nextSpendId?: Maybe<Scalars['ID']['output']>;
+  projects: Array<DeliveryFinanceProject>;
+  selectedSource?: Maybe<DeliveryFinanceAiCostSource>;
+  sources: Array<DeliveryFinanceAiCostSource>;
+  userWorkspaceId: Scalars['ID']['output'];
+  workspaceId: Scalars['ID']['output'];
+};
+
+export type DeliveryFinanceAllocation = {
+  __typename?: 'DeliveryFinanceAllocation';
+  amountMicros: Scalars['String']['output'];
+  projectId?: Maybe<Scalars['ID']['output']>;
+  projectName?: Maybe<Scalars['String']['output']>;
+};
+
+export type DeliveryFinanceAllocationInput = {
+  amountMicros: Scalars['String']['input'];
+  projectId?: InputMaybe<Scalars['ID']['input']>;
+};
+
+export type DeliveryFinanceCashMatchInput = {
+  acknowledgeUnassignedCash?: InputMaybe<Scalars['Boolean']['input']>;
+  amountMicros: Scalars['String']['input'];
+  cashId: Scalars['ID']['input'];
+  entryId: Scalars['ID']['input'];
+  expectedCashToken: Scalars['String']['input'];
+  expectedEntryToken: Scalars['String']['input'];
+  id: Scalars['ID']['input'];
+  projectId?: InputMaybe<Scalars['ID']['input']>;
+};
+
+export type DeliveryFinanceCashRelation = {
+  __typename?: 'DeliveryFinanceCashRelation';
+  amountMicros: Scalars['String']['output'];
+  canReverse: Scalars['Boolean']['output'];
+  cashId: Scalars['ID']['output'];
+  cashTitle: Scalars['String']['output'];
+  createdAt: Scalars['String']['output'];
+  createdBy: Scalars['ID']['output'];
+  createdByName: Scalars['String']['output'];
+  currency: Scalars['String']['output'];
+  entryId?: Maybe<Scalars['ID']['output']>;
+  id: Scalars['ID']['output'];
+  kind: Scalars['String']['output'];
+  legacy: Scalars['Boolean']['output'];
+  month?: Maybe<Scalars['String']['output']>;
+  projectId?: Maybe<Scalars['ID']['output']>;
+  projectName?: Maybe<Scalars['String']['output']>;
+  receivableId?: Maybe<Scalars['ID']['output']>;
+  reversalReason?: Maybe<Scalars['String']['output']>;
+  reversedAt?: Maybe<Scalars['String']['output']>;
+  reversedBy?: Maybe<Scalars['ID']['output']>;
+  reversedByName?: Maybe<Scalars['String']['output']>;
+  revision: Scalars['Int']['output'];
+  status: Scalars['String']['output'];
+  targetTitle: Scalars['String']['output'];
+};
+
+export type DeliveryFinanceCashSource = {
+  __typename?: 'DeliveryFinanceCashSource';
+  amountMicros: Scalars['String']['output'];
+  category: Scalars['String']['output'];
+  currency: Scalars['String']['output'];
+  date: Scalars['String']['output'];
+  dueDate?: Maybe<Scalars['String']['output']>;
+  evidenceUrl?: Maybe<Scalars['String']['output']>;
+  id: Scalars['ID']['output'];
+  matchedMicros: Scalars['String']['output'];
+  note: Scalars['String']['output'];
+  outstandingMicros: Scalars['String']['output'];
+  projectId?: Maybe<Scalars['ID']['output']>;
+  projectName?: Maybe<Scalars['String']['output']>;
+  remainingMatchMicros: Scalars['String']['output'];
+  remainingSettlementMicros: Scalars['String']['output'];
+  revision: Scalars['Int']['output'];
+  settledMicros: Scalars['String']['output'];
+  sourceReviewToken: Scalars['String']['output'];
+  sourceWarnings: Array<Scalars['String']['output']>;
+  status: Scalars['String']['output'];
+  title: Scalars['String']['output'];
+};
+
+export type DeliveryFinanceEntry = {
+  __typename?: 'DeliveryFinanceEntry';
+  allocations: Array<DeliveryFinanceAllocation>;
+  amountMicros: Scalars['String']['output'];
+  category: Scalars['String']['output'];
+  createdAt: Scalars['String']['output'];
+  createdBy: Scalars['ID']['output'];
+  currency: Scalars['String']['output'];
+  dueDate?: Maybe<Scalars['String']['output']>;
+  evidenceUrl?: Maybe<Scalars['String']['output']>;
+  id: Scalars['ID']['output'];
+  kind: Scalars['String']['output'];
+  lockedMonths: Array<Scalars['String']['output']>;
+  month: Scalars['String']['output'];
+  note: Scalars['String']['output'];
+  postedAt?: Maybe<Scalars['String']['output']>;
+  remainingAllocationMicros: Scalars['String']['output'];
+  revision: Scalars['Int']['output'];
+  sourceAiSpend?: Maybe<DeliveryFinanceAiCostOrigin>;
+  sourcePlan?: Maybe<DeliveryFinancePlanSource>;
+  sourceReviewToken?: Maybe<Scalars['String']['output']>;
+  sourceType: Scalars['String']['output'];
+  sourceWarnings: Array<Scalars['String']['output']>;
+  status: Scalars['String']['output'];
+  title: Scalars['String']['output'];
+  updatedAt: Scalars['String']['output'];
+  voidReason?: Maybe<Scalars['String']['output']>;
+  voidedAt?: Maybe<Scalars['String']['output']>;
+};
+
+export type DeliveryFinanceEntryInput = {
+  allocations: Array<DeliveryFinanceAllocationInput>;
+  amountMicros: Scalars['String']['input'];
+  category: Scalars['String']['input'];
+  currency: Scalars['String']['input'];
+  evidenceUrl?: InputMaybe<Scalars['String']['input']>;
+  id: Scalars['ID']['input'];
+  kind: Scalars['String']['input'];
+  month: Scalars['String']['input'];
+  note: Scalars['String']['input'];
+  revision: Scalars['Int']['input'];
+  title: Scalars['String']['input'];
+};
+
+export type DeliveryFinanceEvent = {
+  __typename?: 'DeliveryFinanceEvent';
+  action: Scalars['String']['output'];
+  actorId: Scalars['ID']['output'];
+  actorName: Scalars['String']['output'];
+  afterAmountMicros?: Maybe<Scalars['String']['output']>;
+  afterStatus?: Maybe<Scalars['String']['output']>;
+  beforeAmountMicros?: Maybe<Scalars['String']['output']>;
+  beforeStatus?: Maybe<Scalars['String']['output']>;
+  createdAt: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  reason: Scalars['String']['output'];
+  revision: Scalars['Int']['output'];
+};
+
+export type DeliveryFinanceForecastAnchor = {
+  __typename?: 'DeliveryFinanceForecastAnchor';
+  amountMicros: Scalars['String']['output'];
+  changedAt: Scalars['String']['output'];
+  changedBy: Scalars['ID']['output'];
+  changedByName: Scalars['String']['output'];
+  closingDate: Scalars['String']['output'];
+  currency: Scalars['String']['output'];
+  evidenceUrl?: Maybe<Scalars['String']['output']>;
+  id: Scalars['ID']['output'];
+  note: Scalars['String']['output'];
+  revision: Scalars['Int']['output'];
+  timezone: Scalars['String']['output'];
+};
+
+export type DeliveryFinanceForecastAnchorInput = {
+  acknowledgeCoverage: Scalars['Boolean']['input'];
+  amountMicros: Scalars['String']['input'];
+  closingDate: Scalars['String']['input'];
+  currency: Scalars['String']['input'];
+  evidenceUrl?: InputMaybe<Scalars['String']['input']>;
+  id: Scalars['ID']['input'];
+  note: Scalars['String']['input'];
+  reason: Scalars['String']['input'];
+  revision: Scalars['Int']['input'];
+  timezone: Scalars['String']['input'];
+};
+
+export type DeliveryFinanceForecastAnchorResult = {
+  __typename?: 'DeliveryFinanceForecastAnchorResult';
+  anchor: DeliveryFinanceForecastAnchor;
+  replayed: Scalars['Boolean']['output'];
+};
+
+export type DeliveryFinanceForecastDay = {
+  __typename?: 'DeliveryFinanceForecastDay';
+  closingMicros: Scalars['String']['output'];
+  date: Scalars['String']['output'];
+  inflowMicros: Scalars['String']['output'];
+  itemIds: Array<Scalars['ID']['output']>;
+  outflowMicros: Scalars['String']['output'];
+};
+
+export type DeliveryFinanceForecastEvent = {
+  __typename?: 'DeliveryFinanceForecastEvent';
+  action: Scalars['String']['output'];
+  actorId: Scalars['ID']['output'];
+  actorName: Scalars['String']['output'];
+  afterStatus?: Maybe<Scalars['String']['output']>;
+  amountMicros?: Maybe<Scalars['String']['output']>;
+  beforeStatus?: Maybe<Scalars['String']['output']>;
+  cashDate?: Maybe<Scalars['String']['output']>;
+  cashId?: Maybe<Scalars['ID']['output']>;
+  createdAt: Scalars['String']['output'];
+  currency?: Maybe<Scalars['String']['output']>;
+  date?: Maybe<Scalars['String']['output']>;
+  evidenceUrl?: Maybe<Scalars['String']['output']>;
+  id: Scalars['ID']['output'];
+  itemId?: Maybe<Scalars['ID']['output']>;
+  note?: Maybe<Scalars['String']['output']>;
+  originSourceId?: Maybe<Scalars['ID']['output']>;
+  originSourceType?: Maybe<Scalars['String']['output']>;
+  ownerName?: Maybe<Scalars['String']['output']>;
+  planMonth?: Maybe<Scalars['String']['output']>;
+  reason: Scalars['String']['output'];
+  reversedAt?: Maybe<Scalars['String']['output']>;
+  revision: Scalars['Int']['output'];
+  sourceAmountMicros?: Maybe<Scalars['String']['output']>;
+  sourceId: Scalars['ID']['output'];
+  sourceRevision?: Maybe<Scalars['Int']['output']>;
+  sourceType: Scalars['String']['output'];
+  timezone?: Maybe<Scalars['String']['output']>;
+  title?: Maybe<Scalars['String']['output']>;
+};
+
+export type DeliveryFinanceForecastException = {
+  __typename?: 'DeliveryFinanceForecastException';
+  amountMicros?: Maybe<Scalars['String']['output']>;
+  code: Scalars['String']['output'];
+  date?: Maybe<Scalars['String']['output']>;
+  itemId?: Maybe<Scalars['ID']['output']>;
+  key: Scalars['String']['output'];
+  sourceId?: Maybe<Scalars['ID']['output']>;
+  sourceType?: Maybe<Scalars['String']['output']>;
+  title?: Maybe<Scalars['String']['output']>;
+};
+
+export type DeliveryFinanceForecastHistory = {
+  __typename?: 'DeliveryFinanceForecastHistory';
+  events: Array<DeliveryFinanceForecastEvent>;
+  memberId: Scalars['ID']['output'];
+  nextBeforeId?: Maybe<Scalars['ID']['output']>;
+  userWorkspaceId: Scalars['ID']['output'];
+  workspaceId: Scalars['ID']['output'];
+};
+
+export type DeliveryFinanceForecastHistoryInput = {
+  beforeId?: InputMaybe<Scalars['ID']['input']>;
+  sourceId: Scalars['ID']['input'];
+  sourceType: Scalars['String']['input'];
+};
+
+export type DeliveryFinanceForecastInput = {
+  afterExceptionKey?: InputMaybe<Scalars['String']['input']>;
+  afterItemId?: InputMaybe<Scalars['ID']['input']>;
+  afterRealizationId?: InputMaybe<Scalars['ID']['input']>;
+  currency: Scalars['String']['input'];
+  horizonDays: Scalars['Int']['input'];
+  selectedItemId?: InputMaybe<Scalars['ID']['input']>;
+};
+
+export type DeliveryFinanceForecastItem = {
+  __typename?: 'DeliveryFinanceForecastItem';
+  amountMicros: Scalars['String']['output'];
+  appliedMicros: Scalars['String']['output'];
+  changedAt: Scalars['String']['output'];
+  changedByName: Scalars['String']['output'];
+  contractualDueDate?: Maybe<Scalars['String']['output']>;
+  currency: Scalars['String']['output'];
+  eligible: Scalars['Boolean']['output'];
+  expectedDate?: Maybe<Scalars['String']['output']>;
+  id: Scalars['ID']['output'];
+  kind: Scalars['String']['output'];
+  nextActionDate: Scalars['String']['output'];
+  note: Scalars['String']['output'];
+  ownerEligible: Scalars['Boolean']['output'];
+  ownerId: Scalars['ID']['output'];
+  ownerName: Scalars['String']['output'];
+  planMonth?: Maybe<Scalars['String']['output']>;
+  remainingMicros?: Maybe<Scalars['String']['output']>;
+  reviewToken: Scalars['String']['output'];
+  revision: Scalars['Int']['output'];
+  sourceId?: Maybe<Scalars['ID']['output']>;
+  sourceReviewToken?: Maybe<Scalars['String']['output']>;
+  sourceType: Scalars['String']['output'];
+  status: Scalars['String']['output'];
+  title: Scalars['String']['output'];
+  warnings: Array<Scalars['String']['output']>;
+};
+
+export type DeliveryFinanceForecastItemInput = {
+  acknowledgeSourceWarnings: Scalars['Boolean']['input'];
+  amountMicros: Scalars['String']['input'];
+  commandId: Scalars['ID']['input'];
+  currency: Scalars['String']['input'];
+  expectedDate?: InputMaybe<Scalars['String']['input']>;
+  expectedSourceReviewToken?: InputMaybe<Scalars['String']['input']>;
+  id: Scalars['ID']['input'];
+  nextActionDate: Scalars['String']['input'];
+  note: Scalars['String']['input'];
+  ownerId: Scalars['ID']['input'];
+  planMonth?: InputMaybe<Scalars['String']['input']>;
+  reason: Scalars['String']['input'];
+  revision: Scalars['Int']['input'];
+  sourceId?: InputMaybe<Scalars['ID']['input']>;
+  sourceType: Scalars['String']['input'];
+  status: Scalars['String']['input'];
+  title: Scalars['String']['input'];
+};
+
+export type DeliveryFinanceForecastItemResult = {
+  __typename?: 'DeliveryFinanceForecastItemResult';
+  item: DeliveryFinanceForecastItem;
+  replayed: Scalars['Boolean']['output'];
+};
+
+export type DeliveryFinanceForecastOwner = {
+  __typename?: 'DeliveryFinanceForecastOwner';
+  id: Scalars['ID']['output'];
+  name: Scalars['String']['output'];
+};
+
+export type DeliveryFinanceForecastRealization = {
+  __typename?: 'DeliveryFinanceForecastRealization';
+  amountMicros: Scalars['String']['output'];
+  cashId: Scalars['ID']['output'];
+  cashTitle: Scalars['String']['output'];
+  createdAt: Scalars['String']['output'];
+  createdByName: Scalars['String']['output'];
+  currency: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  itemId: Scalars['ID']['output'];
+  note: Scalars['String']['output'];
+  reversalReason?: Maybe<Scalars['String']['output']>;
+  reversedAt?: Maybe<Scalars['String']['output']>;
+  reversedByName?: Maybe<Scalars['String']['output']>;
+  revision: Scalars['Int']['output'];
+  status: Scalars['String']['output'];
+  targetTitle: Scalars['String']['output'];
+};
+
+export type DeliveryFinanceForecastRealizationResult = {
+  __typename?: 'DeliveryFinanceForecastRealizationResult';
+  realization: DeliveryFinanceForecastRealization;
+  replayed: Scalars['Boolean']['output'];
+};
+
+export type DeliveryFinanceForecastRealizeInput = {
+  amountMicros: Scalars['String']['input'];
+  cashId: Scalars['ID']['input'];
+  expectedCashReviewToken: Scalars['String']['input'];
+  expectedItemReviewToken: Scalars['String']['input'];
+  id: Scalars['ID']['input'];
+  itemId: Scalars['ID']['input'];
+  note: Scalars['String']['input'];
+};
+
+export type DeliveryFinanceForecastReverseInput = {
+  id: Scalars['ID']['input'];
+  reason: Scalars['String']['input'];
+  revision: Scalars['Int']['input'];
+};
+
+export type DeliveryFinanceForecastSnapshot = {
+  __typename?: 'DeliveryFinanceForecastSnapshot';
+  actualInflowMicros?: Maybe<Scalars['String']['output']>;
+  actualOutflowMicros?: Maybe<Scalars['String']['output']>;
+  anchor?: Maybe<DeliveryFinanceForecastAnchor>;
+  businessDate?: Maybe<Scalars['String']['output']>;
+  canManage: Scalars['Boolean']['output'];
+  currency: Scalars['String']['output'];
+  currentCashMicros?: Maybe<Scalars['String']['output']>;
+  endingCashMicros?: Maybe<Scalars['String']['output']>;
+  exceptionCount: Scalars['Int']['output'];
+  exceptions: Array<DeliveryFinanceForecastException>;
+  expectedInflowMicros?: Maybe<Scalars['String']['output']>;
+  expectedOutflowMicros?: Maybe<Scalars['String']['output']>;
+  firstNegativeDate?: Maybe<Scalars['String']['output']>;
+  horizonDays: Scalars['Int']['output'];
+  itemCount: Scalars['Int']['output'];
+  items: Array<DeliveryFinanceForecastItem>;
+  knownUnscheduledInflowMicros: Scalars['String']['output'];
+  knownUnscheduledOutflowMicros: Scalars['String']['output'];
+  memberId: Scalars['ID']['output'];
+  nextExceptionKey?: Maybe<Scalars['String']['output']>;
+  nextItemId?: Maybe<Scalars['ID']['output']>;
+  nextRealizationId?: Maybe<Scalars['ID']['output']>;
+  owners: Array<DeliveryFinanceForecastOwner>;
+  projectionComplete: Scalars['Boolean']['output'];
+  realizations: Array<DeliveryFinanceForecastRealization>;
+  selectedItem?: Maybe<DeliveryFinanceForecastItem>;
+  timeline: Array<DeliveryFinanceForecastDay>;
+  timezone?: Maybe<Scalars['String']['output']>;
+  unappliedActualOutflowMicros: Scalars['String']['output'];
+  unknownCollectionCount: Scalars['Int']['output'];
+  userWorkspaceId: Scalars['ID']['output'];
+  warnings: Array<Scalars['String']['output']>;
+  workspaceId: Scalars['ID']['output'];
+};
+
+export type DeliveryFinanceForecastSource = {
+  __typename?: 'DeliveryFinanceForecastSource';
+  amountMicros?: Maybe<Scalars['String']['output']>;
+  category: Scalars['String']['output'];
+  currency: Scalars['String']['output'];
+  date?: Maybe<Scalars['String']['output']>;
+  dueDate?: Maybe<Scalars['String']['output']>;
+  eligible: Scalars['Boolean']['output'];
+  id: Scalars['ID']['output'];
+  occurrenceItemId?: Maybe<Scalars['ID']['output']>;
+  planMonth?: Maybe<Scalars['String']['output']>;
+  projectId?: Maybe<Scalars['ID']['output']>;
+  projectName?: Maybe<Scalars['String']['output']>;
+  remainingMicros?: Maybe<Scalars['String']['output']>;
+  sourceReviewToken: Scalars['String']['output'];
+  sourceType: Scalars['String']['output'];
+  suggestedDate?: Maybe<Scalars['String']['output']>;
+  title: Scalars['String']['output'];
+  warnings: Array<Scalars['String']['output']>;
+};
+
+export type DeliveryFinanceForecastSources = {
+  __typename?: 'DeliveryFinanceForecastSources';
+  canManage: Scalars['Boolean']['output'];
+  currency: Scalars['String']['output'];
+  kind: Scalars['String']['output'];
+  memberId: Scalars['ID']['output'];
+  nextId?: Maybe<Scalars['ID']['output']>;
+  selectedSource?: Maybe<DeliveryFinanceForecastSource>;
+  sources: Array<DeliveryFinanceForecastSource>;
+  userWorkspaceId: Scalars['ID']['output'];
+  workspaceId: Scalars['ID']['output'];
+};
+
+export type DeliveryFinanceForecastSourcesInput = {
+  afterId?: InputMaybe<Scalars['ID']['input']>;
+  currency: Scalars['String']['input'];
+  kind: Scalars['String']['input'];
+  month?: InputMaybe<Scalars['String']['input']>;
+  selectedId?: InputMaybe<Scalars['ID']['input']>;
+};
+
+export type DeliveryFinanceHistory = {
+  __typename?: 'DeliveryFinanceHistory';
+  entryId: Scalars['ID']['output'];
+  events: Array<DeliveryFinanceEvent>;
+  memberId: Scalars['ID']['output'];
+  nextBeforeId?: Maybe<Scalars['ID']['output']>;
+  userWorkspaceId: Scalars['ID']['output'];
+  workspaceId: Scalars['ID']['output'];
+};
+
+export type DeliveryFinanceHistoryInput = {
+  beforeId?: InputMaybe<Scalars['ID']['input']>;
+  entryId: Scalars['ID']['input'];
+};
+
+export type DeliveryFinanceInput = {
+  afterEntryId?: InputMaybe<Scalars['ID']['input']>;
+  afterPlanId?: InputMaybe<Scalars['ID']['input']>;
+  currency?: InputMaybe<Scalars['String']['input']>;
+  month: Scalars['String']['input'];
+  selectedEntryId?: InputMaybe<Scalars['ID']['input']>;
+  selectedPlanId?: InputMaybe<Scalars['ID']['input']>;
+};
+
+export type DeliveryFinanceMatchableEntry = {
+  __typename?: 'DeliveryFinanceMatchableEntry';
+  allocations: Array<DeliveryFinanceMatchedAllocation>;
+  currency: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  kind: Scalars['String']['output'];
+  month: Scalars['String']['output'];
+  revision: Scalars['Int']['output'];
+  sourceReviewToken: Scalars['String']['output'];
+  status: Scalars['String']['output'];
+  title: Scalars['String']['output'];
+};
+
+export type DeliveryFinanceMatchedAllocation = {
+  __typename?: 'DeliveryFinanceMatchedAllocation';
+  amountMicros: Scalars['String']['output'];
+  matchedMicros: Scalars['String']['output'];
+  projectId?: Maybe<Scalars['ID']['output']>;
+  projectName?: Maybe<Scalars['String']['output']>;
+  remainingMatchMicros: Scalars['String']['output'];
+};
+
+export type DeliveryFinancePaymentInput = {
+  amountMicros: Scalars['String']['input'];
+  category: Scalars['String']['input'];
+  currency: Scalars['String']['input'];
+  date: Scalars['String']['input'];
+  evidenceUrl?: InputMaybe<Scalars['String']['input']>;
+  id: Scalars['ID']['input'];
+  note: Scalars['String']['input'];
+  projectId?: InputMaybe<Scalars['ID']['input']>;
+  title: Scalars['String']['input'];
+};
+
+export type DeliveryFinancePaymentsInput = {
+  afterCashId?: InputMaybe<Scalars['ID']['input']>;
+  afterEntryId?: InputMaybe<Scalars['ID']['input']>;
+  afterMatchId?: InputMaybe<Scalars['ID']['input']>;
+  afterReceivableId?: InputMaybe<Scalars['ID']['input']>;
+  afterSettlementId?: InputMaybe<Scalars['ID']['input']>;
+  currency?: InputMaybe<Scalars['String']['input']>;
+  selectedCashId?: InputMaybe<Scalars['ID']['input']>;
+  selectedEntryId?: InputMaybe<Scalars['ID']['input']>;
+  selectedReceivableId?: InputMaybe<Scalars['ID']['input']>;
+};
+
+export type DeliveryFinancePaymentsSnapshot = {
+  __typename?: 'DeliveryFinancePaymentsSnapshot';
+  canManage: Scalars['Boolean']['output'];
+  cash: Array<DeliveryFinanceCashSource>;
+  cashTotal: Scalars['Int']['output'];
+  currency?: Maybe<Scalars['String']['output']>;
+  entries: Array<DeliveryFinanceMatchableEntry>;
+  entryTotal: Scalars['Int']['output'];
+  matchTotal: Scalars['Int']['output'];
+  matches: Array<DeliveryFinanceCashRelation>;
+  memberId: Scalars['ID']['output'];
+  nextCashId?: Maybe<Scalars['ID']['output']>;
+  nextEntryId?: Maybe<Scalars['ID']['output']>;
+  nextMatchId?: Maybe<Scalars['ID']['output']>;
+  nextReceivableId?: Maybe<Scalars['ID']['output']>;
+  nextSettlementId?: Maybe<Scalars['ID']['output']>;
+  projects: Array<DeliveryFinanceProject>;
+  receivableTotal: Scalars['Int']['output'];
+  receivables: Array<DeliveryFinanceCashSource>;
+  rejectedCashCount: Scalars['Int']['output'];
+  selectedCash?: Maybe<DeliveryFinanceCashSource>;
+  selectedEntry?: Maybe<DeliveryFinanceMatchableEntry>;
+  selectedReceivable?: Maybe<DeliveryFinanceCashSource>;
+  settlementTotal: Scalars['Int']['output'];
+  settlements: Array<DeliveryFinanceCashRelation>;
+  userWorkspaceId: Scalars['ID']['output'];
+  workspaceId: Scalars['ID']['output'];
+};
+
+export type DeliveryFinancePeriod = {
+  __typename?: 'DeliveryFinancePeriod';
+  changedAt?: Maybe<Scalars['String']['output']>;
+  changedBy?: Maybe<Scalars['ID']['output']>;
+  changedByName?: Maybe<Scalars['String']['output']>;
+  id?: Maybe<Scalars['ID']['output']>;
+  month: Scalars['String']['output'];
+  reason?: Maybe<Scalars['String']['output']>;
+  revision: Scalars['Int']['output'];
+  status: Scalars['String']['output'];
+};
+
+export type DeliveryFinancePeriodBlocker = {
+  __typename?: 'DeliveryFinancePeriodBlocker';
+  entryId: Scalars['ID']['output'];
+  month: Scalars['String']['output'];
+  reason: Scalars['String']['output'];
+  sourceType: Scalars['String']['output'];
+  title: Scalars['String']['output'];
+};
+
+export type DeliveryFinancePeriodChangeInput = {
+  acknowledgeLimitations: Scalars['Boolean']['input'];
+  expectedPreviewToken: Scalars['String']['input'];
+  id: Scalars['ID']['input'];
+  month: Scalars['String']['input'];
+  reason: Scalars['String']['input'];
+  revision: Scalars['Int']['input'];
+  status: Scalars['String']['input'];
+};
+
+export type DeliveryFinancePeriodChangeResult = {
+  __typename?: 'DeliveryFinancePeriodChangeResult';
+  period: DeliveryFinancePeriod;
+  replayed: Scalars['Boolean']['output'];
+};
+
+export type DeliveryFinancePeriodCurrencySummary = {
+  __typename?: 'DeliveryFinancePeriodCurrencySummary';
+  costMicros: Scalars['String']['output'];
+  currency: Scalars['String']['output'];
+  draftCount: Scalars['Int']['output'];
+  postedCount: Scalars['Int']['output'];
+  projects: Array<DeliveryFinancePeriodProjectSummary>;
+  resultMicros: Scalars['String']['output'];
+  revenueMicros: Scalars['String']['output'];
+  voidCount: Scalars['Int']['output'];
+};
+
+export type DeliveryFinancePeriodEvent = {
+  __typename?: 'DeliveryFinancePeriodEvent';
+  action: Scalars['String']['output'];
+  actorId: Scalars['ID']['output'];
+  actorName: Scalars['String']['output'];
+  afterStatus: Scalars['String']['output'];
+  beforeStatus: Scalars['String']['output'];
+  createdAt: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  reason: Scalars['String']['output'];
+  recognitionHash: Scalars['String']['output'];
+  revision: Scalars['Int']['output'];
+  summaries: Array<DeliveryFinancePeriodCurrencySummary>;
+};
+
+export type DeliveryFinancePeriodHistory = {
+  __typename?: 'DeliveryFinancePeriodHistory';
+  events: Array<DeliveryFinancePeriodEvent>;
+  memberId: Scalars['ID']['output'];
+  month: Scalars['String']['output'];
+  nextBeforeId?: Maybe<Scalars['ID']['output']>;
+  userWorkspaceId: Scalars['ID']['output'];
+  workspaceId: Scalars['ID']['output'];
+};
+
+export type DeliveryFinancePeriodHistoryInput = {
+  beforeId?: InputMaybe<Scalars['ID']['input']>;
+  month: Scalars['String']['input'];
+};
+
+export type DeliveryFinancePeriodInput = {
+  afterBlockerId?: InputMaybe<Scalars['ID']['input']>;
+  month: Scalars['String']['input'];
+};
+
+export type DeliveryFinancePeriodProjectSummary = {
+  __typename?: 'DeliveryFinancePeriodProjectSummary';
+  costMicros: Scalars['String']['output'];
+  postedCount: Scalars['Int']['output'];
+  projectId?: Maybe<Scalars['ID']['output']>;
+  projectName?: Maybe<Scalars['String']['output']>;
+  resultMicros: Scalars['String']['output'];
+  revenueMicros: Scalars['String']['output'];
+};
+
+export type DeliveryFinancePeriodSnapshot = {
+  __typename?: 'DeliveryFinancePeriodSnapshot';
+  blockerCount: Scalars['Int']['output'];
+  blockers: Array<DeliveryFinancePeriodBlocker>;
+  canLock: Scalars['Boolean']['output'];
+  canManage: Scalars['Boolean']['output'];
+  canReopen: Scalars['Boolean']['output'];
+  limitations: Array<Scalars['String']['output']>;
+  memberId: Scalars['ID']['output'];
+  nextBlockerId?: Maybe<Scalars['ID']['output']>;
+  period: DeliveryFinancePeriod;
+  previewToken: Scalars['String']['output'];
+  recognitionHash: Scalars['String']['output'];
+  summaries: Array<DeliveryFinancePeriodCurrencySummary>;
+  userWorkspaceId: Scalars['ID']['output'];
+  workspaceId: Scalars['ID']['output'];
+};
+
+export type DeliveryFinancePerson = {
+  __typename?: 'DeliveryFinancePerson';
+  id: Scalars['ID']['output'];
+  name: Scalars['String']['output'];
+};
+
+export type DeliveryFinancePlan = {
+  __typename?: 'DeliveryFinancePlan';
+  active: Scalars['Boolean']['output'];
+  createdAt: Scalars['String']['output'];
+  currency: Scalars['String']['output'];
+  dueDay: Scalars['Int']['output'];
+  endMonth?: Maybe<Scalars['String']['output']>;
+  id: Scalars['ID']['output'];
+  memberActive?: Maybe<Scalars['Boolean']['output']>;
+  memberId?: Maybe<Scalars['ID']['output']>;
+  memberName?: Maybe<Scalars['String']['output']>;
+  monthlyAmountMicros: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  revision: Scalars['Int']['output'];
+  startMonth: Scalars['String']['output'];
+  type: Scalars['String']['output'];
+  updatedAt: Scalars['String']['output'];
+};
+
+export type DeliveryFinancePlanInput = {
+  active: Scalars['Boolean']['input'];
+  currency: Scalars['String']['input'];
+  dueDay: Scalars['Int']['input'];
+  endMonth?: InputMaybe<Scalars['String']['input']>;
+  id: Scalars['ID']['input'];
+  memberId?: InputMaybe<Scalars['ID']['input']>;
+  monthlyAmountMicros: Scalars['String']['input'];
+  name: Scalars['String']['input'];
+  revision: Scalars['Int']['input'];
+  startMonth: Scalars['String']['input'];
+  type: Scalars['String']['input'];
+};
+
+export type DeliveryFinancePlanSource = {
+  __typename?: 'DeliveryFinancePlanSource';
+  dueDay: Scalars['Int']['output'];
+  endMonth?: Maybe<Scalars['String']['output']>;
+  memberId?: Maybe<Scalars['ID']['output']>;
+  memberName?: Maybe<Scalars['String']['output']>;
+  monthlyAmountMicros: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  planId: Scalars['ID']['output'];
+  revision: Scalars['Int']['output'];
+  startMonth: Scalars['String']['output'];
+  type: Scalars['String']['output'];
+};
+
+export type DeliveryFinancePostInput = {
+  acknowledgeSourceWarnings?: InputMaybe<Scalars['Boolean']['input']>;
+  expectedSourceReviewToken?: InputMaybe<Scalars['String']['input']>;
+  id: Scalars['ID']['input'];
+  revision: Scalars['Int']['input'];
+};
+
+export type DeliveryFinancePreparation = {
+  __typename?: 'DeliveryFinancePreparation';
+  createdCount: Scalars['Int']['output'];
+  existingCount: Scalars['Int']['output'];
+  nextPlanId?: Maybe<Scalars['ID']['output']>;
+  skipped: Array<DeliveryFinancePrepareSkipped>;
+};
+
+export type DeliveryFinancePrepareInput = {
+  afterPlanId?: InputMaybe<Scalars['ID']['input']>;
+  currency?: InputMaybe<Scalars['String']['input']>;
+  month: Scalars['String']['input'];
+};
+
+export type DeliveryFinancePrepareSkipped = {
+  __typename?: 'DeliveryFinancePrepareSkipped';
+  planId: Scalars['ID']['output'];
+  reason: Scalars['String']['output'];
+};
+
+export type DeliveryFinanceProject = {
+  __typename?: 'DeliveryFinanceProject';
+  id: Scalars['ID']['output'];
+  name: Scalars['String']['output'];
+};
+
+export type DeliveryFinanceProjectResult = {
+  __typename?: 'DeliveryFinanceProjectResult';
+  costMicros: Scalars['String']['output'];
+  projectId?: Maybe<Scalars['ID']['output']>;
+  projectName?: Maybe<Scalars['String']['output']>;
+  resultMicros: Scalars['String']['output'];
+  revenueMicros: Scalars['String']['output'];
+};
+
+export type DeliveryFinanceReverseRelationInput = {
+  id: Scalars['ID']['input'];
+  kind: Scalars['String']['input'];
+  reason: Scalars['String']['input'];
+  revision: Scalars['Int']['input'];
+};
+
+export type DeliveryFinanceSettlementInput = {
+  acknowledgeUnassignedCash?: InputMaybe<Scalars['Boolean']['input']>;
+  amountMicros: Scalars['String']['input'];
+  cashId: Scalars['ID']['input'];
+  expectedCashToken: Scalars['String']['input'];
+  expectedReceivableToken: Scalars['String']['input'];
+  id: Scalars['ID']['input'];
+  receivableId: Scalars['ID']['input'];
+};
+
+export type DeliveryFinanceSnapshot = {
+  __typename?: 'DeliveryFinanceSnapshot';
+  canManage: Scalars['Boolean']['output'];
+  currency?: Maybe<Scalars['String']['output']>;
+  entries: Array<DeliveryFinanceEntry>;
+  entryTotal: Scalars['Int']['output'];
+  memberId: Scalars['ID']['output'];
+  members: Array<DeliveryFinancePerson>;
+  month: Scalars['String']['output'];
+  nextEntryId?: Maybe<Scalars['ID']['output']>;
+  nextPlanId?: Maybe<Scalars['ID']['output']>;
+  period: DeliveryFinancePeriod;
+  planTotal: Scalars['Int']['output'];
+  plans: Array<DeliveryFinancePlan>;
+  projects: Array<DeliveryFinanceProject>;
+  selectedEntry?: Maybe<DeliveryFinanceEntry>;
+  selectedPlan?: Maybe<DeliveryFinancePlan>;
+  summaries: Array<DeliveryFinanceSummary>;
+  userWorkspaceId: Scalars['ID']['output'];
+  workspaceId: Scalars['ID']['output'];
+};
+
+export type DeliveryFinanceSummary = {
+  __typename?: 'DeliveryFinanceSummary';
+  costMicros: Scalars['String']['output'];
+  currency: Scalars['String']['output'];
+  draftCount: Scalars['Int']['output'];
+  postedCount: Scalars['Int']['output'];
+  projects: Array<DeliveryFinanceProjectResult>;
+  resultMicros: Scalars['String']['output'];
+  revenueMicros: Scalars['String']['output'];
+  unassignedCostMicros: Scalars['String']['output'];
+  unassignedRevenueMicros: Scalars['String']['output'];
+  voidCount: Scalars['Int']['output'];
+};
+
+export type DeliveryFinanceVoidInput = {
+  id: Scalars['ID']['input'];
+  reason: Scalars['String']['input'];
+  revision: Scalars['Int']['input'];
+};
+
+export type DeliveryHandoff = {
+  __typename?: 'DeliveryHandoff';
+  createdAt: Scalars['String']['output'];
+  engagementId: Scalars['ID']['output'];
+  id: Scalars['ID']['output'];
+  managerId: Scalars['ID']['output'];
+  opportunityId: Scalars['ID']['output'];
+  projectId: Scalars['ID']['output'];
+  reviewerId: Scalars['ID']['output'];
+  setupTaskIds: Array<Scalars['ID']['output']>;
+};
+
+export type DeliveryHandoffCandidate = {
+  __typename?: 'DeliveryHandoffCandidate';
+  hasCompany: Scalars['Boolean']['output'];
+  id: Scalars['ID']['output'];
+  name: Scalars['String']['output'];
+  quotes: Array<DeliveryHandoffQuote>;
+};
+
+export type DeliveryHandoffCreateInput = {
+  billing: Scalars['String']['input'];
+  contact: Scalars['String']['input'];
+  fingerprint: Scalars['String']['input'];
+  managerId: Scalars['ID']['input'];
+  memberIds: Array<Scalars['ID']['input']>;
+  opportunityId: Scalars['ID']['input'];
+  projectName: Scalars['String']['input'];
+  quoteId: Scalars['ID']['input'];
+  reviewerId: Scalars['ID']['input'];
+  scheduledDate?: InputMaybe<Scalars['String']['input']>;
+  services: Array<Scalars['String']['input']>;
+};
+
+export type DeliveryHandoffDirectory = {
+  __typename?: 'DeliveryHandoffDirectory';
+  handoffs: Array<DeliveryHandoff>;
+  hasMore: Scalars['Boolean']['output'];
+  memberId: Scalars['ID']['output'];
+  opportunities: Array<DeliveryHandoffCandidate>;
+  search: Scalars['String']['output'];
+  userWorkspaceId: Scalars['ID']['output'];
+  workspaceId: Scalars['ID']['output'];
+};
+
+export type DeliveryHandoffPreview = {
+  __typename?: 'DeliveryHandoffPreview';
+  memberId: Scalars['ID']['output'];
+  source: DeliveryHandoffSource;
+  userWorkspaceId: Scalars['ID']['output'];
+  workspaceId: Scalars['ID']['output'];
+};
+
+export type DeliveryHandoffPreviewInput = {
+  opportunityId: Scalars['ID']['input'];
+  quoteId: Scalars['ID']['input'];
+};
+
+export type DeliveryHandoffQuote = {
+  __typename?: 'DeliveryHandoffQuote';
+  id: Scalars['ID']['output'];
+  name: Scalars['String']['output'];
+};
+
+export type DeliveryHandoffSource = {
+  __typename?: 'DeliveryHandoffSource';
+  companyId: Scalars['ID']['output'];
+  companyName: Scalars['String']['output'];
+  currency?: Maybe<Scalars['String']['output']>;
+  fingerprint: Scalars['String']['output'];
+  opportunityId: Scalars['ID']['output'];
+  opportunityName: Scalars['String']['output'];
+  quoteId: Scalars['ID']['output'];
+  quoteNumber: Scalars['String']['output'];
+  scope: Scalars['String']['output'];
+  totalAmountMicros?: Maybe<Scalars['String']['output']>;
+};
+
+export type DeliveryKnowledgeDetail = {
+  __typename?: 'DeliveryKnowledgeDetail';
+  canEdit: Scalars['Boolean']['output'];
+  category: Scalars['String']['output'];
+  createdBy: Scalars['ID']['output'];
+  currentVersion: Scalars['Int']['output'];
+  id: Scalars['ID']['output'];
+  knowledge: Scalars['String']['output'];
+  meetingDate: Scalars['String']['output'];
+  publishedAt?: Maybe<Scalars['String']['output']>;
+  publishedVersion?: Maybe<Scalars['Int']['output']>;
+  revision: Scalars['Int']['output'];
+  sourceUrl: Scalars['String']['output'];
+  title: Scalars['String']['output'];
+  transcript?: Maybe<Scalars['String']['output']>;
+  version: Scalars['Int']['output'];
+};
+
+export type DeliveryKnowledgeInput = {
+  after?: InputMaybe<Scalars['ID']['input']>;
+  category?: InputMaybe<Scalars['String']['input']>;
+  projectId: Scalars['ID']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+  sourceId?: InputMaybe<Scalars['ID']['input']>;
+  version?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type DeliveryKnowledgeItem = {
+  __typename?: 'DeliveryKnowledgeItem';
+  canEdit: Scalars['Boolean']['output'];
+  category: Scalars['String']['output'];
+  createdBy: Scalars['ID']['output'];
+  id: Scalars['ID']['output'];
+  meetingDate: Scalars['String']['output'];
+  publishedAt?: Maybe<Scalars['String']['output']>;
+  publishedVersion?: Maybe<Scalars['Int']['output']>;
+  revision: Scalars['Int']['output'];
+  title: Scalars['String']['output'];
+  version: Scalars['Int']['output'];
+};
+
+export type DeliveryKnowledgePublishInput = {
+  id: Scalars['ID']['input'];
+  projectId: Scalars['ID']['input'];
+  publish: Scalars['Boolean']['input'];
+  revision: Scalars['Int']['input'];
+};
+
+export type DeliveryKnowledgeSaveInput = {
+  category?: InputMaybe<Scalars['String']['input']>;
+  id: Scalars['ID']['input'];
+  knowledge: Scalars['String']['input'];
+  meetingDate: Scalars['String']['input'];
+  projectId: Scalars['ID']['input'];
+  revision: Scalars['Int']['input'];
+  sourceUrl: Scalars['String']['input'];
+  title: Scalars['String']['input'];
+  transcript: Scalars['String']['input'];
+};
+
+export type DeliveryKnowledgeSnapshot = {
+  __typename?: 'DeliveryKnowledgeSnapshot';
+  canPublish: Scalars['Boolean']['output'];
+  detail?: Maybe<DeliveryKnowledgeDetail>;
+  items: Array<DeliveryKnowledgeItem>;
+  memberId: Scalars['ID']['output'];
+  nextCursor?: Maybe<Scalars['ID']['output']>;
+  userWorkspaceId: Scalars['ID']['output'];
+  workspaceId: Scalars['ID']['output'];
+};
+
+export type DeliveryReadinessItem = {
+  __typename?: 'DeliveryReadinessItem';
+  accountName?: Maybe<Scalars['String']['output']>;
+  capability: Scalars['String']['output'];
+  destination: Scalars['String']['output'];
+  id: Scalars['String']['output'];
+  lastSuccessAt?: Maybe<Scalars['String']['output']>;
+  reason: Scalars['String']['output'];
+  status: Scalars['String']['output'];
+};
+
+export type DeliveryReadinessSnapshot = {
+  __typename?: 'DeliveryReadinessSnapshot';
+  items: Array<DeliveryReadinessItem>;
+  memberId: Scalars['ID']['output'];
+  observedAt: Scalars['String']['output'];
+  userWorkspaceId: Scalars['ID']['output'];
+  workspaceId: Scalars['ID']['output'];
+};
+
+export type DeliveryRevision = {
+  __typename?: 'DeliveryRevision';
+  cause: Scalars['String']['output'];
+  createdAt: Scalars['String']['output'];
+  currency?: Maybe<Scalars['String']['output']>;
+  effortMinutes?: Maybe<Scalars['Int']['output']>;
+  id: Scalars['ID']['output'];
+  internalCost?: Maybe<Scalars['Float']['output']>;
+  proposedCharge?: Maybe<Scalars['Float']['output']>;
+  reason: Scalars['String']['output'];
+  revision: Scalars['Int']['output'];
+  round: Scalars['Int']['output'];
+  source: Scalars['String']['output'];
+  submissionVersion?: Maybe<Scalars['Int']['output']>;
+};
+
+export type DeliveryRevisionCostGroup = {
+  __typename?: 'DeliveryRevisionCostGroup';
+  cause: Scalars['String']['output'];
+  currency?: Maybe<Scalars['String']['output']>;
+  missingCostCount: Scalars['Int']['output'];
+  missingEffortCount: Scalars['Int']['output'];
+  projectId: Scalars['ID']['output'];
+  projectName: Scalars['String']['output'];
+  proposedCharges: Scalars['Float']['output'];
+  recordedCost: Scalars['Float']['output'];
+  recordedEffortMinutes: Scalars['Float']['output'];
+  rounds: Scalars['Int']['output'];
+};
+
+export type DeliveryRevisionCosts = {
+  __typename?: 'DeliveryRevisionCosts';
+  endDate: Scalars['String']['output'];
+  groups: Array<DeliveryRevisionCostGroup>;
+  memberId: Scalars['ID']['output'];
+  projectId?: Maybe<Scalars['ID']['output']>;
+  startDate: Scalars['String']['output'];
+  userWorkspaceId: Scalars['ID']['output'];
+  workspaceId: Scalars['ID']['output'];
+};
+
+export type DeliveryRevisionCostsInput = {
+  endDate: Scalars['String']['input'];
+  projectId?: InputMaybe<Scalars['ID']['input']>;
+  startDate: Scalars['String']['input'];
+};
+
+export type DeliveryRevisionSaveInput = {
+  cause: Scalars['String']['input'];
+  currency?: InputMaybe<Scalars['String']['input']>;
+  effortMinutes?: InputMaybe<Scalars['Int']['input']>;
+  id: Scalars['ID']['input'];
+  internalCost?: InputMaybe<Scalars['Float']['input']>;
+  proposedCharge?: InputMaybe<Scalars['Float']['input']>;
+  revision: Scalars['Int']['input'];
+  taskId: Scalars['ID']['input'];
+};
+
+export type DeliveryRevisions = {
+  __typename?: 'DeliveryRevisions';
+  canManage: Scalars['Boolean']['output'];
+  canManageFinance: Scalars['Boolean']['output'];
+  canReadFinance: Scalars['Boolean']['output'];
+  memberId: Scalars['ID']['output'];
+  nextBeforeRound?: Maybe<Scalars['Int']['output']>;
+  rounds: Array<DeliveryRevision>;
+  taskId: Scalars['ID']['output'];
+  total: Scalars['Int']['output'];
+  userWorkspaceId: Scalars['ID']['output'];
+  workspaceId: Scalars['ID']['output'];
+};
+
+export type DeliveryRevisionsInput = {
+  beforeRound?: InputMaybe<Scalars['Int']['input']>;
+  taskId: Scalars['ID']['input'];
+};
+
+export type DeliveryTaskWorkflow = {
+  __typename?: 'DeliveryTaskWorkflow';
+  canEdit: Scalars['Boolean']['output'];
+  canManage: Scalars['Boolean']['output'];
+  locked: Scalars['Boolean']['output'];
+  memberId: Scalars['ID']['output'];
+  missingRequirements: Array<Scalars['String']['output']>;
+  nextHistoryCursor?: Maybe<Scalars['String']['output']>;
+  previousApplications: Array<DeliveryAppliedWorkflow>;
+  taskId: Scalars['ID']['output'];
+  taskRevision: Scalars['Int']['output'];
+  userWorkspaceId: Scalars['ID']['output'];
+  workflow?: Maybe<DeliveryAppliedWorkflow>;
+  workspaceId: Scalars['ID']['output'];
+};
+
+export type DeliveryTaskWorkflowInput = {
+  historyCursor?: InputMaybe<Scalars['String']['input']>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  taskId: Scalars['ID']['input'];
+};
+
+export type DeliveryWorkflowAnswer = {
+  __typename?: 'DeliveryWorkflowAnswer';
+  requirementId: Scalars['String']['output'];
+  value: Scalars['String']['output'];
+};
+
+export type DeliveryWorkflowAnswerInput = {
+  requirementId: Scalars['String']['input'];
+  value: Scalars['String']['input'];
+};
+
+export type DeliveryWorkflowApplyInput = {
+  reason: Scalars['String']['input'];
+  reopen: Scalars['Boolean']['input'];
+  taskId: Scalars['ID']['input'];
+  taskRevision: Scalars['Int']['input'];
+  templateId: Scalars['ID']['input'];
+  templateRevision: Scalars['Int']['input'];
+  version: Scalars['Int']['input'];
+};
+
+export type DeliveryWorkflowArchiveInput = {
+  archived: Scalars['Boolean']['input'];
+  id: Scalars['ID']['input'];
+  reason: Scalars['String']['input'];
+  revision: Scalars['Int']['input'];
+};
+
+export type DeliveryWorkflowCatalog = {
+  __typename?: 'DeliveryWorkflowCatalog';
+  memberId: Scalars['ID']['output'];
+  starters: Array<DeliveryWorkflowStarter>;
+  templates: Array<DeliveryWorkflowTemplate>;
+  userWorkspaceId: Scalars['ID']['output'];
+  versions: Array<DeliveryWorkflowVersion>;
+  workspaceId: Scalars['ID']['output'];
+};
+
+export type DeliveryWorkflowCatalogInput = {
+  includeArchived?: InputMaybe<Scalars['Boolean']['input']>;
+  templateId?: InputMaybe<Scalars['ID']['input']>;
+};
+
+export type DeliveryWorkflowCheck = {
+  __typename?: 'DeliveryWorkflowCheck';
+  id: Scalars['String']['output'];
+  label: Scalars['String']['output'];
+  required: Scalars['Boolean']['output'];
+};
+
+export type DeliveryWorkflowCheckInput = {
+  id: Scalars['String']['input'];
+  label: Scalars['String']['input'];
+  required: Scalars['Boolean']['input'];
+};
+
+export type DeliveryWorkflowDefinition = {
+  __typename?: 'DeliveryWorkflowDefinition';
+  checklist: Array<DeliveryWorkflowCheck>;
+  definitionOfDone: Scalars['String']['output'];
+  description: Scalars['String']['output'];
+  evidence: Array<DeliveryWorkflowEvidence>;
+  name: Scalars['String']['output'];
+  reviewChecks: Array<DeliveryWorkflowCheck>;
+  service: Scalars['String']['output'];
+};
+
+export type DeliveryWorkflowDefinitionInput = {
+  checklist: Array<DeliveryWorkflowCheckInput>;
+  definitionOfDone: Scalars['String']['input'];
+  description: Scalars['String']['input'];
+  evidence: Array<DeliveryWorkflowEvidenceInput>;
+  name: Scalars['String']['input'];
+  reviewChecks: Array<DeliveryWorkflowCheckInput>;
+  service: Scalars['String']['input'];
+};
+
+export type DeliveryWorkflowEvidence = {
+  __typename?: 'DeliveryWorkflowEvidence';
+  id: Scalars['String']['output'];
+  instructions: Scalars['String']['output'];
+  kind: Scalars['String']['output'];
+  label: Scalars['String']['output'];
+  required: Scalars['Boolean']['output'];
+};
+
+export type DeliveryWorkflowEvidenceInput = {
+  id: Scalars['String']['input'];
+  instructions: Scalars['String']['input'];
+  kind: Scalars['String']['input'];
+  label: Scalars['String']['input'];
+  required: Scalars['Boolean']['input'];
+};
+
+export type DeliveryWorkflowProgressInput = {
+  checkedIds: Array<Scalars['String']['input']>;
+  evidence: Array<DeliveryWorkflowAnswerInput>;
+  taskId: Scalars['ID']['input'];
+  taskRevision: Scalars['Int']['input'];
+  workflowRevision: Scalars['Int']['input'];
+};
+
+export type DeliveryWorkflowSaveInput = {
+  definition: DeliveryWorkflowDefinitionInput;
+  id: Scalars['ID']['input'];
+  reason: Scalars['String']['input'];
+  revision: Scalars['Int']['input'];
+};
+
+export type DeliveryWorkflowStarter = {
+  __typename?: 'DeliveryWorkflowStarter';
+  definition: DeliveryWorkflowDefinition;
+  key: Scalars['String']['output'];
+};
+
+export type DeliveryWorkflowTemplate = {
+  __typename?: 'DeliveryWorkflowTemplate';
+  archived: Scalars['Boolean']['output'];
+  current: DeliveryWorkflowVersion;
+  id: Scalars['ID']['output'];
+  revision: Scalars['Int']['output'];
+  stateReason: Scalars['String']['output'];
+};
+
+export type DeliveryWorkflowVersion = {
+  __typename?: 'DeliveryWorkflowVersion';
+  definition: DeliveryWorkflowDefinition;
+  publishedAt: Scalars['String']['output'];
+  publishedByName: Scalars['String']['output'];
+  reason: Scalars['String']['output'];
+  templateId: Scalars['ID']['output'];
+  version: Scalars['Int']['output'];
+};
+
 export type DestroyViewFieldGroupInput = {
   /** The id of the view field group to destroy. */
   id: Scalars['UUID']['input'];
@@ -2745,7 +4443,11 @@ export type Mutation = {
   activateWorkspace: Workspace;
   addQueryToEventStream: Scalars['Boolean']['output'];
   answerAgentChatQuestion: SendChatMessageResult;
+  applyDeliveryWorkflow: DeliveryTaskWorkflow;
   archiveChatThread: AgentChatThread;
+  archiveDeliveryWorkflow: DeliveryWorkflowCatalog;
+  assignDeliveryCommitmentTask: DeliveryCommitments;
+  assignOtogrowRoles: OtogrowRoleDirectory;
   assignRoleToAgent: Scalars['Boolean']['output'];
   assignRoleToApiKey: Scalars['Boolean']['output'];
   authorizeApp: AuthorizeApp;
@@ -2756,6 +4458,7 @@ export type Mutation = {
   changeDeliveryBusiness: Scalars['JSON']['output'];
   changeDeliveryClients: Scalars['JSON']['output'];
   changeDeliveryCreative: Scalars['JSON']['output'];
+  changeDeliveryFinancePeriod: DeliveryFinancePeriodChangeResult;
   changeDeliveryMedia: Scalars['JSON']['output'];
   changeDeliveryMeta: Scalars['JSON']['output'];
   changeDeliveryOperations: Scalars['JSON']['output'];
@@ -2774,6 +4477,7 @@ export type Mutation = {
   createCalendarEvent: CreateCalendarEventOutput;
   createChatThread: AgentChatThread;
   createCommandMenuItem: CommandMenuItem;
+  createDeliveryHandoff: DeliveryHandoff;
   createDevelopmentApplication: DevelopmentApplication;
   createEmailGroupChannel: CreateEmailGroupChannelOutput;
   createEmailingDomain: EmailingDomain;
@@ -2888,9 +4592,19 @@ export type Mutation = {
   /** @deprecated Use installApplication instead */
   installMarketplaceApp: Scalars['Boolean']['output'];
   markMetaSheetLeadsRead: Scalars['Boolean']['output'];
+  matchDeliveryFinanceCash: Scalars['String']['output'];
+  postDeliveryFinanceAiCost: DeliveryFinanceAiCostResult;
+  postDeliveryFinanceEntry: Scalars['String']['output'];
+  prepareDeliveryFinanceAiCost: DeliveryFinanceAiCostResult;
+  prepareDeliveryFinanceMonth: DeliveryFinancePreparation;
   provisionTwilioCalling: TwilioConfig;
+  publishDeliveryKnowledge: Scalars['Boolean']['output'];
+  realizeDeliveryFinanceForecastOutflow: DeliveryFinanceForecastRealizationResult;
+  reconcileOtogrowAiSpend: OtogrowAiBudgetSnapshot;
+  recordDeliveryFinancePayment: Scalars['String']['output'];
   refreshEnterpriseValidityToken: Scalars['Boolean']['output'];
   releaseEnterpriseServerBinding: EnterpriseLicenseInfoDto;
+  removeDeliveryCommitmentTask: DeliveryCommitments;
   removeQueryFromEventStream: Scalars['Boolean']['output'];
   removeRoleFromAgent: Scalars['Boolean']['output'];
   renameChatThread: AgentChatThread;
@@ -2903,6 +4617,8 @@ export type Mutation = {
   resetPageLayoutToDefault: PageLayout;
   resetPageLayoutWidgetToDefault: PageLayoutWidget;
   retryChatMessage: SendChatMessageResult;
+  reverseDeliveryFinanceForecastRealization: DeliveryFinanceForecastRealizationResult;
+  reverseDeliveryFinanceRelation: Scalars['String']['output'];
   revokeAllOtherUserSessions: Scalars['Int']['output'];
   revokeApiKey?: Maybe<ApiKey>;
   revokeApplicationAuthorization: Scalars['Boolean']['output'];
@@ -2910,17 +4626,37 @@ export type Mutation = {
   rotateApplicationRegistrationClientSecret: RotateClientSecret;
   runAgent: RunAgentResult;
   runEvaluationInput: AgentTurn;
+  saveDeliveryAvailability: DeliveryAvailability;
+  saveDeliveryBatch: DeliveryBatches;
+  saveDeliveryBatchItem: DeliveryBatches;
+  saveDeliveryCommitmentLine: DeliveryCommitments;
+  saveDeliveryCommitmentPeriod: DeliveryCommitments;
+  saveDeliveryFinanceEntry: Scalars['String']['output'];
+  saveDeliveryFinanceForecastAnchor: DeliveryFinanceForecastAnchorResult;
+  saveDeliveryFinanceForecastItem: DeliveryFinanceForecastItemResult;
+  saveDeliveryFinancePlan: Scalars['String']['output'];
+  saveDeliveryKnowledge: Scalars['String']['output'];
+  saveDeliveryRevision: Scalars['Boolean']['output'];
+  saveDeliveryWorkflow: DeliveryWorkflowCatalog;
+  saveDeliveryWorkflowProgress: DeliveryTaskWorkflow;
   saveImapSmtpCaldavAccount: ImapSmtpCaldavConnectionSuccess;
+  saveOtogrowAiBudget: OtogrowAiBudgetSnapshot;
+  saveOtogrowAiPrice: OtogrowAiBudgetSnapshot;
+  saveOtogrowRole: OtogrowRoleDirectory;
   sendChatMessage: SendChatMessageResult;
+  sendDeliveryChatMessage: Scalars['String']['output'];
   sendEmail: SendEmailOutput;
   sendEmailViaEmailingDomain: SendEmailViaDomainOutput;
   sendInvitations: SendInvitations;
   sendMessageCampaign: SendMessageCampaignOutputDto;
   sendMessageCampaignTest: SendEmailViaDomainOutput;
   setAppKeyValue: AppKeyValue;
+  setDeliveryBatchState: DeliveryBatches;
+  setDeliveryCommitmentPeriodState: DeliveryCommitments;
   setEnterpriseKey: EnterpriseLicenseInfoDto;
   setMetaLeadFormActive: MetaLeadForm;
   setResourceCreditSubscriptionPrice: BillingUpdate;
+  settleDeliveryFinanceReceivable: Scalars['String']['output'];
   signIn: AvailableWorkspacesAndAccessTokens;
   signOut: Scalars['Boolean']['output'];
   signUp: AvailableWorkspacesAndAccessTokens;
@@ -3012,6 +4748,8 @@ export type Mutation = {
   verifyEmailAndGetWorkspaceAgnosticToken: AvailableWorkspacesAndAccessTokens;
   verifyEmailingDomain: EmailingDomain;
   verifyTwoFactorAuthenticationMethodForAuthenticatedUser: VerifyTwoFactorAuthenticationMethod;
+  viewDeliveryChatMessages: Scalars['Boolean']['output'];
+  voidDeliveryFinanceEntry: Scalars['String']['output'];
 };
 
 
@@ -3039,8 +4777,28 @@ export type MutationAnswerAgentChatQuestionArgs = {
 };
 
 
+export type MutationApplyDeliveryWorkflowArgs = {
+  input: DeliveryWorkflowApplyInput;
+};
+
+
 export type MutationArchiveChatThreadArgs = {
   id: Scalars['UUID']['input'];
+};
+
+
+export type MutationArchiveDeliveryWorkflowArgs = {
+  input: DeliveryWorkflowArchiveInput;
+};
+
+
+export type MutationAssignDeliveryCommitmentTaskArgs = {
+  input: DeliveryCommitmentTaskAssignInput;
+};
+
+
+export type MutationAssignOtogrowRolesArgs = {
+  input: OtogrowRoleAssignmentInput;
 };
 
 
@@ -3082,6 +4840,11 @@ export type MutationChangeDeliveryClientsArgs = {
 
 export type MutationChangeDeliveryCreativeArgs = {
   input: Scalars['JSON']['input'];
+};
+
+
+export type MutationChangeDeliveryFinancePeriodArgs = {
+  input: DeliveryFinancePeriodChangeInput;
 };
 
 
@@ -3161,6 +4924,11 @@ export type MutationCreateCalendarEventArgs = {
 
 export type MutationCreateCommandMenuItemArgs = {
   input: CreateCommandMenuItemInput;
+};
+
+
+export type MutationCreateDeliveryHandoffArgs = {
+  input: DeliveryHandoffCreateInput;
 };
 
 
@@ -3700,6 +5468,56 @@ export type MutationMarkMetaSheetLeadsReadArgs = {
 };
 
 
+export type MutationMatchDeliveryFinanceCashArgs = {
+  input: DeliveryFinanceCashMatchInput;
+};
+
+
+export type MutationPostDeliveryFinanceAiCostArgs = {
+  input: DeliveryFinanceAiCostPostInput;
+};
+
+
+export type MutationPostDeliveryFinanceEntryArgs = {
+  input: DeliveryFinancePostInput;
+};
+
+
+export type MutationPrepareDeliveryFinanceAiCostArgs = {
+  input: DeliveryFinanceAiCostPrepareInput;
+};
+
+
+export type MutationPrepareDeliveryFinanceMonthArgs = {
+  input: DeliveryFinancePrepareInput;
+};
+
+
+export type MutationPublishDeliveryKnowledgeArgs = {
+  input: DeliveryKnowledgePublishInput;
+};
+
+
+export type MutationRealizeDeliveryFinanceForecastOutflowArgs = {
+  input: DeliveryFinanceForecastRealizeInput;
+};
+
+
+export type MutationReconcileOtogrowAiSpendArgs = {
+  input: OtogrowAiSpendReconcileInput;
+};
+
+
+export type MutationRecordDeliveryFinancePaymentArgs = {
+  input: DeliveryFinancePaymentInput;
+};
+
+
+export type MutationRemoveDeliveryCommitmentTaskArgs = {
+  input: DeliveryCommitmentTaskRemoveInput;
+};
+
+
 export type MutationRemoveQueryFromEventStreamArgs = {
   input: RemoveQueryFromEventStreamInput;
 };
@@ -3763,6 +5581,16 @@ export type MutationRetryChatMessageArgs = {
 };
 
 
+export type MutationReverseDeliveryFinanceForecastRealizationArgs = {
+  input: DeliveryFinanceForecastReverseInput;
+};
+
+
+export type MutationReverseDeliveryFinanceRelationArgs = {
+  input: DeliveryFinanceReverseRelationInput;
+};
+
+
 export type MutationRevokeApiKeyArgs = {
   input: RevokeApiKeyInput;
 };
@@ -3794,10 +5622,90 @@ export type MutationRunEvaluationInputArgs = {
 };
 
 
+export type MutationSaveDeliveryAvailabilityArgs = {
+  input: DeliveryAvailabilityInput;
+};
+
+
+export type MutationSaveDeliveryBatchArgs = {
+  input: DeliveryBatchSaveInput;
+};
+
+
+export type MutationSaveDeliveryBatchItemArgs = {
+  input: DeliveryBatchItemInput;
+};
+
+
+export type MutationSaveDeliveryCommitmentLineArgs = {
+  input: DeliveryCommitmentLineSaveInput;
+};
+
+
+export type MutationSaveDeliveryCommitmentPeriodArgs = {
+  input: DeliveryCommitmentPeriodSaveInput;
+};
+
+
+export type MutationSaveDeliveryFinanceEntryArgs = {
+  input: DeliveryFinanceEntryInput;
+};
+
+
+export type MutationSaveDeliveryFinanceForecastAnchorArgs = {
+  input: DeliveryFinanceForecastAnchorInput;
+};
+
+
+export type MutationSaveDeliveryFinanceForecastItemArgs = {
+  input: DeliveryFinanceForecastItemInput;
+};
+
+
+export type MutationSaveDeliveryFinancePlanArgs = {
+  input: DeliveryFinancePlanInput;
+};
+
+
+export type MutationSaveDeliveryKnowledgeArgs = {
+  input: DeliveryKnowledgeSaveInput;
+};
+
+
+export type MutationSaveDeliveryRevisionArgs = {
+  input: DeliveryRevisionSaveInput;
+};
+
+
+export type MutationSaveDeliveryWorkflowArgs = {
+  input: DeliveryWorkflowSaveInput;
+};
+
+
+export type MutationSaveDeliveryWorkflowProgressArgs = {
+  input: DeliveryWorkflowProgressInput;
+};
+
+
 export type MutationSaveImapSmtpCaldavAccountArgs = {
   connectionParameters: EmailAccountConnectionParameters;
   handle: Scalars['String']['input'];
   id?: InputMaybe<Scalars['UUID']['input']>;
+};
+
+
+export type MutationSaveOtogrowAiBudgetArgs = {
+  input: OtogrowAiBudgetSaveInput;
+};
+
+
+export type MutationSaveOtogrowAiPriceArgs = {
+  input: OtogrowAiPriceSaveInput;
+};
+
+
+export type MutationSaveOtogrowRoleArgs = {
+  input: OtogrowRoleInput;
 };
 
 
@@ -3808,6 +5716,11 @@ export type MutationSendChatMessageArgs = {
   modelId?: InputMaybe<Scalars['String']['input']>;
   text: Scalars['String']['input'];
   threadId: Scalars['UUID']['input'];
+};
+
+
+export type MutationSendDeliveryChatMessageArgs = {
+  input: DeliveryChatSendInput;
 };
 
 
@@ -3842,6 +5755,16 @@ export type MutationSetAppKeyValueArgs = {
 };
 
 
+export type MutationSetDeliveryBatchStateArgs = {
+  input: DeliveryBatchStateInput;
+};
+
+
+export type MutationSetDeliveryCommitmentPeriodStateArgs = {
+  input: DeliveryCommitmentPeriodStateInput;
+};
+
+
 export type MutationSetEnterpriseKeyArgs = {
   enterpriseKey: Scalars['String']['input'];
 };
@@ -3855,6 +5778,11 @@ export type MutationSetMetaLeadFormActiveArgs = {
 
 export type MutationSetResourceCreditSubscriptionPriceArgs = {
   priceId: Scalars['String']['input'];
+};
+
+
+export type MutationSettleDeliveryFinanceReceivableArgs = {
+  input: DeliveryFinanceSettlementInput;
 };
 
 
@@ -4324,6 +6252,16 @@ export type MutationVerifyTwoFactorAuthenticationMethodForAuthenticatedUserArgs 
   otp: Scalars['String']['input'];
 };
 
+
+export type MutationViewDeliveryChatMessagesArgs = {
+  input: DeliveryChatViewedInput;
+};
+
+
+export type MutationVoidDeliveryFinanceEntryArgs = {
+  input: DeliveryFinanceVoidInput;
+};
+
 export type NativeModelCapabilities = {
   __typename?: 'NativeModelCapabilities';
   twitterSearch?: Maybe<Scalars['Boolean']['output']>;
@@ -4561,6 +6499,330 @@ export enum OpenRecordIn {
   RECORD_PAGE = 'RECORD_PAGE',
   SIDE_PANEL = 'SIDE_PANEL'
 }
+
+export type OtogrowAccess = {
+  __typename?: 'OtogrowAccess';
+  capabilities: Array<Scalars['String']['output']>;
+  grants: Array<OtogrowAccessGrant>;
+  memberId: Scalars['ID']['output'];
+  nativeAdministrator: Scalars['Boolean']['output'];
+  roleIds: Array<Scalars['ID']['output']>;
+  userWorkspaceId: Scalars['ID']['output'];
+  workspaceId: Scalars['ID']['output'];
+};
+
+export type OtogrowAccessGrant = {
+  __typename?: 'OtogrowAccessGrant';
+  capability: Scalars['String']['output'];
+  sourceId: Scalars['String']['output'];
+  sourceName: Scalars['String']['output'];
+  sourceType: Scalars['String']['output'];
+};
+
+export type OtogrowActivityChange = {
+  __typename?: 'OtogrowActivityChange';
+  after?: Maybe<Scalars['String']['output']>;
+  before?: Maybe<Scalars['String']['output']>;
+  field: Scalars['String']['output'];
+};
+
+export type OtogrowActivityEvent = {
+  __typename?: 'OtogrowActivityEvent';
+  action: Scalars['String']['output'];
+  actorId?: Maybe<Scalars['ID']['output']>;
+  actorName: Scalars['String']['output'];
+  actorType: Scalars['String']['output'];
+  agentName?: Maybe<Scalars['String']['output']>;
+  category: Scalars['String']['output'];
+  changes: Array<OtogrowActivityChange>;
+  clientId?: Maybe<Scalars['ID']['output']>;
+  clientName?: Maybe<Scalars['String']['output']>;
+  id: Scalars['ID']['output'];
+  occurredAt: Scalars['String']['output'];
+  outcome: Scalars['String']['output'];
+  projectId?: Maybe<Scalars['ID']['output']>;
+  projectName?: Maybe<Scalars['String']['output']>;
+  sourceId: Scalars['ID']['output'];
+  sourceType: Scalars['String']['output'];
+  subjectMemberId?: Maybe<Scalars['ID']['output']>;
+  subjectName?: Maybe<Scalars['String']['output']>;
+  summary: Scalars['String']['output'];
+  taskId?: Maybe<Scalars['ID']['output']>;
+  taskName?: Maybe<Scalars['String']['output']>;
+};
+
+export type OtogrowActivityFeed = {
+  __typename?: 'OtogrowActivityFeed';
+  clients: Array<OtogrowActivityOption>;
+  coverageStartedAt?: Maybe<Scalars['String']['output']>;
+  events: Array<OtogrowActivityEvent>;
+  memberId: Scalars['ID']['output'];
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  people: Array<OtogrowActivityOption>;
+  projects: Array<OtogrowActivityOption>;
+  userWorkspaceId: Scalars['ID']['output'];
+  workspaceId: Scalars['ID']['output'];
+};
+
+export type OtogrowActivityInput = {
+  action?: InputMaybe<Scalars['String']['input']>;
+  category?: InputMaybe<Scalars['String']['input']>;
+  clientId?: InputMaybe<Scalars['ID']['input']>;
+  cursor?: InputMaybe<Scalars['String']['input']>;
+  from?: InputMaybe<Scalars['String']['input']>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  outcome?: InputMaybe<Scalars['String']['input']>;
+  personId?: InputMaybe<Scalars['ID']['input']>;
+  projectId?: InputMaybe<Scalars['ID']['input']>;
+  through?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type OtogrowActivityOption = {
+  __typename?: 'OtogrowActivityOption';
+  id: Scalars['ID']['output'];
+  name: Scalars['String']['output'];
+};
+
+export type OtogrowAiBudget = {
+  __typename?: 'OtogrowAiBudget';
+  capUsd: Scalars['String']['output'];
+  chargedUsd: Scalars['String']['output'];
+  enabled: Scalars['Boolean']['output'];
+  heldUsd: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  openingSpentUsd: Scalars['String']['output'];
+  remainingUsd: Scalars['String']['output'];
+  revision: Scalars['Int']['output'];
+  scope: Scalars['String']['output'];
+  scopeId: Scalars['ID']['output'];
+  scopeName: Scalars['String']['output'];
+};
+
+export type OtogrowAiBudgetOption = {
+  __typename?: 'OtogrowAiBudgetOption';
+  id: Scalars['ID']['output'];
+  name: Scalars['String']['output'];
+};
+
+export type OtogrowAiBudgetSaveInput = {
+  capUsd: Scalars['String']['input'];
+  confirmOpeningBalance: Scalars['Boolean']['input'];
+  enabled: Scalars['Boolean']['input'];
+  openingSpentUsd?: InputMaybe<Scalars['String']['input']>;
+  revision: Scalars['Int']['input'];
+  scope: Scalars['String']['input'];
+  scopeId: Scalars['ID']['input'];
+};
+
+export type OtogrowAiBudgetSnapshot = {
+  __typename?: 'OtogrowAiBudgetSnapshot';
+  budgets: Array<OtogrowAiBudget>;
+  chargedUsd: Scalars['String']['output'];
+  clients: Array<OtogrowAiBudgetOption>;
+  configured: Scalars['Boolean']['output'];
+  coverageStartedAt?: Maybe<Scalars['String']['output']>;
+  heldUsd: Scalars['String']['output'];
+  memberId: Scalars['ID']['output'];
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  priceProfiles: Array<OtogrowAiPriceProfile>;
+  recentSpend: Array<OtogrowAiSpend>;
+  tasks: Array<OtogrowAiBudgetOption>;
+  unresolvedCount: Scalars['Int']['output'];
+  userWorkspaceId: Scalars['ID']['output'];
+  workspaceId: Scalars['ID']['output'];
+};
+
+export type OtogrowAiBudgetSnapshotInput = {
+  cursor?: InputMaybe<Scalars['String']['input']>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  needsAttention?: InputMaybe<Scalars['Boolean']['input']>;
+};
+
+export type OtogrowAiFinancialState = {
+  __typename?: 'OtogrowAiFinancialState';
+  actualUsd?: Maybe<Scalars['String']['output']>;
+  reportedActualUsd?: Maybe<Scalars['String']['output']>;
+  reservedUsd?: Maybe<Scalars['String']['output']>;
+  revision?: Maybe<Scalars['Int']['output']>;
+  state?: Maybe<Scalars['String']['output']>;
+};
+
+export type OtogrowAiPriceProfile = {
+  __typename?: 'OtogrowAiPriceProfile';
+  enabled: Scalars['Boolean']['output'];
+  id: Scalars['ID']['output'];
+  kind: Scalars['String']['output'];
+  modelId: Scalars['String']['output'];
+  pricing: OtogrowAiPricing;
+  revision: Scalars['Int']['output'];
+  source: Scalars['String']['output'];
+  verifiedAt: Scalars['String']['output'];
+};
+
+export type OtogrowAiPriceSaveInput = {
+  enabled: Scalars['Boolean']['input'];
+  id?: InputMaybe<Scalars['ID']['input']>;
+  kind: Scalars['String']['input'];
+  modelId: Scalars['String']['input'];
+  pricing: OtogrowAiPricingInput;
+  revision: Scalars['Int']['input'];
+  source: Scalars['String']['input'];
+  verifiedAt: Scalars['String']['input'];
+};
+
+export type OtogrowAiPricing = {
+  __typename?: 'OtogrowAiPricing';
+  cacheReadUsdPerMillionTokens: Scalars['String']['output'];
+  cacheWriteUsdPerMillionTokens: Scalars['String']['output'];
+  inputUsdPerMillionTokens: Scalars['String']['output'];
+  longCacheReadUsdPerMillionTokens?: Maybe<Scalars['String']['output']>;
+  longCacheWriteUsdPerMillionTokens?: Maybe<Scalars['String']['output']>;
+  longContextThresholdTokens?: Maybe<Scalars['Int']['output']>;
+  longInputUsdPerMillionTokens?: Maybe<Scalars['String']['output']>;
+  longOutputUsdPerMillionTokens?: Maybe<Scalars['String']['output']>;
+  longReasoningUsdPerMillionTokens?: Maybe<Scalars['String']['output']>;
+  maxInputTokens: Scalars['Int']['output'];
+  maxOutputTokens: Scalars['Int']['output'];
+  maxReasoningTokens: Scalars['Int']['output'];
+  outputIncludesReasoning: Scalars['Boolean']['output'];
+  outputUsdPerMillionTokens: Scalars['String']['output'];
+  reasoningUsdPerMillionTokens: Scalars['String']['output'];
+};
+
+export type OtogrowAiPricingInput = {
+  cacheReadUsdPerMillionTokens: Scalars['String']['input'];
+  cacheWriteUsdPerMillionTokens: Scalars['String']['input'];
+  inputUsdPerMillionTokens: Scalars['String']['input'];
+  longCacheReadUsdPerMillionTokens?: InputMaybe<Scalars['String']['input']>;
+  longCacheWriteUsdPerMillionTokens?: InputMaybe<Scalars['String']['input']>;
+  longContextThresholdTokens?: InputMaybe<Scalars['Int']['input']>;
+  longInputUsdPerMillionTokens?: InputMaybe<Scalars['String']['input']>;
+  longOutputUsdPerMillionTokens?: InputMaybe<Scalars['String']['input']>;
+  longReasoningUsdPerMillionTokens?: InputMaybe<Scalars['String']['input']>;
+  maxInputTokens: Scalars['Int']['input'];
+  maxOutputTokens: Scalars['Int']['input'];
+  maxReasoningTokens: Scalars['Int']['input'];
+  outputIncludesReasoning: Scalars['Boolean']['input'];
+  outputUsdPerMillionTokens: Scalars['String']['input'];
+  reasoningUsdPerMillionTokens: Scalars['String']['input'];
+};
+
+export type OtogrowAiSpend = {
+  __typename?: 'OtogrowAiSpend';
+  actualUsd?: Maybe<Scalars['String']['output']>;
+  attentionReason?: Maybe<Scalars['String']['output']>;
+  boundSource: Scalars['String']['output'];
+  clientName?: Maybe<Scalars['String']['output']>;
+  createdAt: Scalars['String']['output'];
+  dispatchedAt?: Maybe<Scalars['String']['output']>;
+  heldUsd: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  kind: Scalars['String']['output'];
+  modelId: Scalars['String']['output'];
+  priceRevision: Scalars['Int']['output'];
+  priceSource: Scalars['String']['output'];
+  priceVerifiedAt: Scalars['String']['output'];
+  reportedActualUsd?: Maybe<Scalars['String']['output']>;
+  reservedUsd: Scalars['String']['output'];
+  revision: Scalars['Int']['output'];
+  settledAt?: Maybe<Scalars['String']['output']>;
+  sourceKind: Scalars['String']['output'];
+  sourceRunId: Scalars['ID']['output'];
+  state: Scalars['String']['output'];
+  taskName?: Maybe<Scalars['String']['output']>;
+};
+
+export type OtogrowAiSpendEvent = {
+  __typename?: 'OtogrowAiSpendEvent';
+  action: Scalars['String']['output'];
+  actorAttribution: Scalars['String']['output'];
+  actorId?: Maybe<Scalars['ID']['output']>;
+  actorName?: Maybe<Scalars['String']['output']>;
+  after: OtogrowAiFinancialState;
+  before: OtogrowAiFinancialState;
+  createdAt: Scalars['String']['output'];
+  evidenceReference?: Maybe<Scalars['String']['output']>;
+  id: Scalars['ID']['output'];
+  reason?: Maybe<Scalars['String']['output']>;
+};
+
+export type OtogrowAiSpendHistory = {
+  __typename?: 'OtogrowAiSpendHistory';
+  clientName?: Maybe<Scalars['String']['output']>;
+  events: Array<OtogrowAiSpendEvent>;
+  kind: Scalars['String']['output'];
+  memberId: Scalars['ID']['output'];
+  modelId: Scalars['String']['output'];
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  priceRevision: Scalars['Int']['output'];
+  priceSource: Scalars['String']['output'];
+  priceVerifiedAt: Scalars['String']['output'];
+  sourceKind: Scalars['String']['output'];
+  sourceRunId: Scalars['ID']['output'];
+  spendId: Scalars['ID']['output'];
+  taskName?: Maybe<Scalars['String']['output']>;
+  userWorkspaceId: Scalars['ID']['output'];
+  workspaceId: Scalars['ID']['output'];
+};
+
+export type OtogrowAiSpendHistoryInput = {
+  cursor?: InputMaybe<Scalars['String']['input']>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  spendId: Scalars['ID']['input'];
+};
+
+export type OtogrowAiSpendReconcileInput = {
+  actualUsd: Scalars['String']['input'];
+  evidenceReference: Scalars['String']['input'];
+  reason: Scalars['String']['input'];
+  revision: Scalars['Int']['input'];
+  spendId: Scalars['ID']['input'];
+};
+
+export type OtogrowRole = {
+  __typename?: 'OtogrowRole';
+  capabilities: Array<Scalars['String']['output']>;
+  description: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  name: Scalars['String']['output'];
+  revision: Scalars['Int']['output'];
+};
+
+export type OtogrowRoleAssignmentInput = {
+  memberId: Scalars['ID']['input'];
+  revision: Scalars['Int']['input'];
+  roleIds: Array<Scalars['ID']['input']>;
+  roleRevisions: Array<OtogrowRoleRevisionInput>;
+};
+
+export type OtogrowRoleDirectory = {
+  __typename?: 'OtogrowRoleDirectory';
+  actor: OtogrowAccess;
+  members: Array<OtogrowRoleMember>;
+  roles: Array<OtogrowRole>;
+};
+
+export type OtogrowRoleInput = {
+  capabilities: Array<Scalars['String']['input']>;
+  description: Scalars['String']['input'];
+  id?: InputMaybe<Scalars['ID']['input']>;
+  name: Scalars['String']['input'];
+  revision?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type OtogrowRoleMember = {
+  __typename?: 'OtogrowRoleMember';
+  access: OtogrowAccess;
+  memberId: Scalars['ID']['output'];
+  name: Scalars['String']['output'];
+  revision: Scalars['Int']['output'];
+  roleIds: Array<Scalars['ID']['output']>;
+};
+
+export type OtogrowRoleRevisionInput = {
+  id: Scalars['ID']['input'];
+  revision: Scalars['Int']['input'];
+};
 
 export type PageInfo = {
   __typename?: 'PageInfo';
@@ -4858,12 +7120,35 @@ export type Query = {
   currentUserSessions: Array<UserSession>;
   currentWorkspace: Workspace;
   deliveryAgents: Scalars['JSON']['output'];
+  deliveryBatches: DeliveryBatches;
   deliveryBusiness: Scalars['JSON']['output'];
+  deliveryCapacity: DeliveryCapacity;
+  deliveryChat: DeliveryChatSnapshot;
   deliveryClients: Scalars['JSON']['output'];
+  deliveryCommitmentEngagements: DeliveryCommitmentEngagements;
+  deliveryCommitments: DeliveryCommitments;
   deliveryCreative: Scalars['JSON']['output'];
+  deliveryFinance: DeliveryFinanceSnapshot;
+  deliveryFinanceAiCosts: DeliveryFinanceAiCostsSnapshot;
+  deliveryFinanceEntryHistory: DeliveryFinanceHistory;
+  deliveryFinanceForecast: DeliveryFinanceForecastSnapshot;
+  deliveryFinanceForecastHistory: DeliveryFinanceForecastHistory;
+  deliveryFinanceForecastSources: DeliveryFinanceForecastSources;
+  deliveryFinancePayments: DeliveryFinancePaymentsSnapshot;
+  deliveryFinancePeriod: DeliveryFinancePeriodSnapshot;
+  deliveryFinancePeriodHistory: DeliveryFinancePeriodHistory;
+  deliveryHandoffPreview: DeliveryHandoffPreview;
+  deliveryHandoffs: DeliveryHandoffDirectory;
+  deliveryKnowledge: DeliveryKnowledgeSnapshot;
   deliveryMediaModels: Scalars['JSON']['output'];
   deliveryMeta: Scalars['JSON']['output'];
+  deliveryMetaReport: Scalars['JSON']['output'];
   deliveryOperations: Scalars['JSON']['output'];
+  deliveryReadiness: DeliveryReadinessSnapshot;
+  deliveryRevisionCosts: DeliveryRevisionCosts;
+  deliveryRevisions: DeliveryRevisions;
+  deliveryTaskWorkflow: DeliveryTaskWorkflow;
+  deliveryWorkflowCatalog: DeliveryWorkflowCatalog;
   deliveryWorkspace: Scalars['JSON']['output'];
   enterpriseCheckoutSession?: Maybe<Scalars['String']['output']>;
   enterprisePortalSession?: Maybe<Scalars['String']['output']>;
@@ -4954,6 +7239,11 @@ export type Query = {
   object: Object;
   objectRecordCounts: Array<ObjectRecordCount>;
   objects: ObjectConnection;
+  otogrowAccess: OtogrowAccess;
+  otogrowActivity: OtogrowActivityFeed;
+  otogrowAiBudgetSnapshot: OtogrowAiBudgetSnapshot;
+  otogrowAiSpendHistory: OtogrowAiSpendHistory;
+  otogrowRoleDirectory: OtogrowRoleDirectory;
   pieChartData: PieChartData;
   previewMessageCampaignAudience: CampaignAudiencePreviewDto;
   publicMarketplaceAppDetail: MarketplaceAppDetail;
@@ -5060,13 +7350,123 @@ export type QueryCommandMenuItemArgs = {
 };
 
 
+export type QueryDeliveryBatchesArgs = {
+  input: DeliveryBatchesInput;
+};
+
+
+export type QueryDeliveryCapacityArgs = {
+  input: DeliveryCapacityInput;
+};
+
+
+export type QueryDeliveryChatArgs = {
+  input: DeliveryChatInput;
+};
+
+
+export type QueryDeliveryCommitmentsArgs = {
+  input: DeliveryCommitmentsInput;
+};
+
+
 export type QueryDeliveryCreativeArgs = {
   taskId: Scalars['String']['input'];
 };
 
 
+export type QueryDeliveryFinanceArgs = {
+  input: DeliveryFinanceInput;
+};
+
+
+export type QueryDeliveryFinanceAiCostsArgs = {
+  input: DeliveryFinanceAiCostsInput;
+};
+
+
+export type QueryDeliveryFinanceEntryHistoryArgs = {
+  input: DeliveryFinanceHistoryInput;
+};
+
+
+export type QueryDeliveryFinanceForecastArgs = {
+  input: DeliveryFinanceForecastInput;
+};
+
+
+export type QueryDeliveryFinanceForecastHistoryArgs = {
+  input: DeliveryFinanceForecastHistoryInput;
+};
+
+
+export type QueryDeliveryFinanceForecastSourcesArgs = {
+  input: DeliveryFinanceForecastSourcesInput;
+};
+
+
+export type QueryDeliveryFinancePaymentsArgs = {
+  input: DeliveryFinancePaymentsInput;
+};
+
+
+export type QueryDeliveryFinancePeriodArgs = {
+  input: DeliveryFinancePeriodInput;
+};
+
+
+export type QueryDeliveryFinancePeriodHistoryArgs = {
+  input: DeliveryFinancePeriodHistoryInput;
+};
+
+
+export type QueryDeliveryHandoffPreviewArgs = {
+  input: DeliveryHandoffPreviewInput;
+};
+
+
+export type QueryDeliveryHandoffsArgs = {
+  search?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryDeliveryKnowledgeArgs = {
+  input: DeliveryKnowledgeInput;
+};
+
+
 export type QueryDeliveryMediaModelsArgs = {
   taskId: Scalars['String']['input'];
+};
+
+
+export type QueryDeliveryMetaArgs = {
+  input?: InputMaybe<Scalars['JSON']['input']>;
+};
+
+
+export type QueryDeliveryMetaReportArgs = {
+  input: Scalars['JSON']['input'];
+};
+
+
+export type QueryDeliveryRevisionCostsArgs = {
+  input: DeliveryRevisionCostsInput;
+};
+
+
+export type QueryDeliveryRevisionsArgs = {
+  input: DeliveryRevisionsInput;
+};
+
+
+export type QueryDeliveryTaskWorkflowArgs = {
+  input: DeliveryTaskWorkflowInput;
+};
+
+
+export type QueryDeliveryWorkflowCatalogArgs = {
+  input: DeliveryWorkflowCatalogInput;
 };
 
 
@@ -5383,6 +7783,21 @@ export type QueryObjectArgs = {
 export type QueryObjectsArgs = {
   filter?: ObjectFilter;
   paging?: CursorPaging;
+};
+
+
+export type QueryOtogrowActivityArgs = {
+  input: OtogrowActivityInput;
+};
+
+
+export type QueryOtogrowAiBudgetSnapshotArgs = {
+  input: OtogrowAiBudgetSnapshotInput;
+};
+
+
+export type QueryOtogrowAiSpendHistoryArgs = {
+  input: OtogrowAiSpendHistoryInput;
 };
 
 
@@ -8034,6 +10449,446 @@ export type FindOnePageLayoutTypeQueryVariables = Exact<{
 
 export type FindOnePageLayoutTypeQuery = { __typename?: 'Query', getPageLayout?: { __typename?: 'PageLayout', id: string, type: PageLayoutType } | null };
 
+export type DeliveryBatchFieldsFragment = { __typename?: 'DeliveryBatches', workspaceId: string, memberId: string, userWorkspaceId: string, projectId: string, canManage: boolean, moreTaskOptions: boolean, nextCursor?: string | null, nextTaskCursor?: string | null, nextHistoryCursor?: string | null, batches: Array<{ __typename?: 'DeliveryBatch', id: string, label: string, periodId?: string | null, startDate?: string | null, endDate?: string | null, timezone: string, closed: boolean, revision: number }>, selected?: { __typename?: 'DeliveryBatch', id: string, label: string, periodId?: string | null, startDate?: string | null, endDate?: string | null, timezone: string, closed: boolean, revision: number } | null, tasks: Array<{ __typename?: 'DeliveryBatchTask', taskId: string, title: string, concept: string, available: boolean, state?: string | null, taskRevision?: number | null, assigneeName?: string | null, reviewerName?: string | null, submissionVersion?: number | null, unit: string, approved: boolean, fulfilled: boolean }>, counts: Array<{ __typename?: 'DeliveryBatchCount', key: string, total: number, approved: number, fulfilled: number }>, history: Array<{ __typename?: 'DeliveryBatchEvent', id: string, actorName: string, action: string, occurredAt: string, taskId?: string | null, taskName?: string | null, reason: string, changes: Array<{ __typename?: 'DeliveryCommitmentChange', field: string, before?: string | null, after?: string | null }> }>, taskOptions: Array<{ __typename?: 'DeliveryBatchTaskOption', taskId: string, title: string, taskRevision: number }>, periods: Array<{ __typename?: 'DeliveryBatchPeriodOption', id: string, label: string }> };
+
+export type DeliveryBatchesQueryVariables = Exact<{
+  input: DeliveryBatchesInput;
+}>;
+
+
+export type DeliveryBatchesQuery = { __typename?: 'Query', deliveryBatches: { __typename?: 'DeliveryBatches', workspaceId: string, memberId: string, userWorkspaceId: string, projectId: string, canManage: boolean, moreTaskOptions: boolean, nextCursor?: string | null, nextTaskCursor?: string | null, nextHistoryCursor?: string | null, batches: Array<{ __typename?: 'DeliveryBatch', id: string, label: string, periodId?: string | null, startDate?: string | null, endDate?: string | null, timezone: string, closed: boolean, revision: number }>, selected?: { __typename?: 'DeliveryBatch', id: string, label: string, periodId?: string | null, startDate?: string | null, endDate?: string | null, timezone: string, closed: boolean, revision: number } | null, tasks: Array<{ __typename?: 'DeliveryBatchTask', taskId: string, title: string, concept: string, available: boolean, state?: string | null, taskRevision?: number | null, assigneeName?: string | null, reviewerName?: string | null, submissionVersion?: number | null, unit: string, approved: boolean, fulfilled: boolean }>, counts: Array<{ __typename?: 'DeliveryBatchCount', key: string, total: number, approved: number, fulfilled: number }>, history: Array<{ __typename?: 'DeliveryBatchEvent', id: string, actorName: string, action: string, occurredAt: string, taskId?: string | null, taskName?: string | null, reason: string, changes: Array<{ __typename?: 'DeliveryCommitmentChange', field: string, before?: string | null, after?: string | null }> }>, taskOptions: Array<{ __typename?: 'DeliveryBatchTaskOption', taskId: string, title: string, taskRevision: number }>, periods: Array<{ __typename?: 'DeliveryBatchPeriodOption', id: string, label: string }> } };
+
+export type SaveDeliveryBatchMutationVariables = Exact<{
+  input: DeliveryBatchSaveInput;
+}>;
+
+
+export type SaveDeliveryBatchMutation = { __typename?: 'Mutation', saveDeliveryBatch: { __typename?: 'DeliveryBatches', workspaceId: string, memberId: string, userWorkspaceId: string, projectId: string, canManage: boolean, moreTaskOptions: boolean, nextCursor?: string | null, nextTaskCursor?: string | null, nextHistoryCursor?: string | null, batches: Array<{ __typename?: 'DeliveryBatch', id: string, label: string, periodId?: string | null, startDate?: string | null, endDate?: string | null, timezone: string, closed: boolean, revision: number }>, selected?: { __typename?: 'DeliveryBatch', id: string, label: string, periodId?: string | null, startDate?: string | null, endDate?: string | null, timezone: string, closed: boolean, revision: number } | null, tasks: Array<{ __typename?: 'DeliveryBatchTask', taskId: string, title: string, concept: string, available: boolean, state?: string | null, taskRevision?: number | null, assigneeName?: string | null, reviewerName?: string | null, submissionVersion?: number | null, unit: string, approved: boolean, fulfilled: boolean }>, counts: Array<{ __typename?: 'DeliveryBatchCount', key: string, total: number, approved: number, fulfilled: number }>, history: Array<{ __typename?: 'DeliveryBatchEvent', id: string, actorName: string, action: string, occurredAt: string, taskId?: string | null, taskName?: string | null, reason: string, changes: Array<{ __typename?: 'DeliveryCommitmentChange', field: string, before?: string | null, after?: string | null }> }>, taskOptions: Array<{ __typename?: 'DeliveryBatchTaskOption', taskId: string, title: string, taskRevision: number }>, periods: Array<{ __typename?: 'DeliveryBatchPeriodOption', id: string, label: string }> } };
+
+export type SetDeliveryBatchStateMutationVariables = Exact<{
+  input: DeliveryBatchStateInput;
+}>;
+
+
+export type SetDeliveryBatchStateMutation = { __typename?: 'Mutation', setDeliveryBatchState: { __typename?: 'DeliveryBatches', workspaceId: string, memberId: string, userWorkspaceId: string, projectId: string, canManage: boolean, moreTaskOptions: boolean, nextCursor?: string | null, nextTaskCursor?: string | null, nextHistoryCursor?: string | null, batches: Array<{ __typename?: 'DeliveryBatch', id: string, label: string, periodId?: string | null, startDate?: string | null, endDate?: string | null, timezone: string, closed: boolean, revision: number }>, selected?: { __typename?: 'DeliveryBatch', id: string, label: string, periodId?: string | null, startDate?: string | null, endDate?: string | null, timezone: string, closed: boolean, revision: number } | null, tasks: Array<{ __typename?: 'DeliveryBatchTask', taskId: string, title: string, concept: string, available: boolean, state?: string | null, taskRevision?: number | null, assigneeName?: string | null, reviewerName?: string | null, submissionVersion?: number | null, unit: string, approved: boolean, fulfilled: boolean }>, counts: Array<{ __typename?: 'DeliveryBatchCount', key: string, total: number, approved: number, fulfilled: number }>, history: Array<{ __typename?: 'DeliveryBatchEvent', id: string, actorName: string, action: string, occurredAt: string, taskId?: string | null, taskName?: string | null, reason: string, changes: Array<{ __typename?: 'DeliveryCommitmentChange', field: string, before?: string | null, after?: string | null }> }>, taskOptions: Array<{ __typename?: 'DeliveryBatchTaskOption', taskId: string, title: string, taskRevision: number }>, periods: Array<{ __typename?: 'DeliveryBatchPeriodOption', id: string, label: string }> } };
+
+export type SaveDeliveryBatchItemMutationVariables = Exact<{
+  input: DeliveryBatchItemInput;
+}>;
+
+
+export type SaveDeliveryBatchItemMutation = { __typename?: 'Mutation', saveDeliveryBatchItem: { __typename?: 'DeliveryBatches', workspaceId: string, memberId: string, userWorkspaceId: string, projectId: string, canManage: boolean, moreTaskOptions: boolean, nextCursor?: string | null, nextTaskCursor?: string | null, nextHistoryCursor?: string | null, batches: Array<{ __typename?: 'DeliveryBatch', id: string, label: string, periodId?: string | null, startDate?: string | null, endDate?: string | null, timezone: string, closed: boolean, revision: number }>, selected?: { __typename?: 'DeliveryBatch', id: string, label: string, periodId?: string | null, startDate?: string | null, endDate?: string | null, timezone: string, closed: boolean, revision: number } | null, tasks: Array<{ __typename?: 'DeliveryBatchTask', taskId: string, title: string, concept: string, available: boolean, state?: string | null, taskRevision?: number | null, assigneeName?: string | null, reviewerName?: string | null, submissionVersion?: number | null, unit: string, approved: boolean, fulfilled: boolean }>, counts: Array<{ __typename?: 'DeliveryBatchCount', key: string, total: number, approved: number, fulfilled: number }>, history: Array<{ __typename?: 'DeliveryBatchEvent', id: string, actorName: string, action: string, occurredAt: string, taskId?: string | null, taskName?: string | null, reason: string, changes: Array<{ __typename?: 'DeliveryCommitmentChange', field: string, before?: string | null, after?: string | null }> }>, taskOptions: Array<{ __typename?: 'DeliveryBatchTaskOption', taskId: string, title: string, taskRevision: number }>, periods: Array<{ __typename?: 'DeliveryBatchPeriodOption', id: string, label: string }> } };
+
+export type DeliveryCapacityQueryVariables = Exact<{
+  input: DeliveryCapacityInput;
+}>;
+
+
+export type DeliveryCapacityQuery = { __typename?: 'Query', deliveryCapacity: { __typename?: 'DeliveryCapacity', workspaceId: string, memberId: string, userWorkspaceId: string, startDate: string, availability: Array<{ __typename?: 'DeliveryAvailability', memberId: string, date: string, minutes?: number | null, revision: number }> } };
+
+export type SaveDeliveryAvailabilityMutationVariables = Exact<{
+  input: DeliveryAvailabilityInput;
+}>;
+
+
+export type SaveDeliveryAvailabilityMutation = { __typename?: 'Mutation', saveDeliveryAvailability: { __typename?: 'DeliveryAvailability', memberId: string, date: string, minutes?: number | null, revision: number } };
+
+export type DeliveryChatQueryVariables = Exact<{
+  input: DeliveryChatInput;
+}>;
+
+
+export type DeliveryChatQuery = { __typename?: 'Query', deliveryChat: { __typename?: 'DeliveryChatSnapshot', workspaceId: string, memberId: string, userWorkspaceId: string, before?: string | null, olderCursor?: string | null, telegramReady: boolean, peopleTotal: number, people: Array<{ __typename?: 'DeliveryChatPerson', id: string, name: string, active: boolean, unread: number, lastMessageAt?: string | null }>, peer?: { __typename?: 'DeliveryChatPerson', id: string, name: string, active: boolean, unread: number, lastMessageAt?: string | null } | null, messages: Array<{ __typename?: 'DeliveryChatMessage', id: string, position: string, senderId: string, recipientId: string, senderName: string, text: string, createdAt: string, viewedAt?: string | null, reminderState: string }> } };
+
+export type SendDeliveryChatMessageMutationVariables = Exact<{
+  input: DeliveryChatSendInput;
+}>;
+
+
+export type SendDeliveryChatMessageMutation = { __typename?: 'Mutation', sendDeliveryChatMessage: string };
+
+export type ViewDeliveryChatMessagesMutationVariables = Exact<{
+  input: DeliveryChatViewedInput;
+}>;
+
+
+export type ViewDeliveryChatMessagesMutation = { __typename?: 'Mutation', viewDeliveryChatMessages: boolean };
+
+export type DeliveryCommitmentFieldsFragment = { __typename?: 'DeliveryCommitments', workspaceId: string, memberId: string, userWorkspaceId: string, engagementId: string, engagementName: string, projectId: string, canManage: boolean, legacyAllowance?: string | null, selectedPeriodId?: string | null, moreTaskOptions: boolean, nextAllocationCursor?: string | null, nextHistoryCursor?: string | null, periods: Array<{ __typename?: 'DeliveryCommitmentPeriod', id: string, label: string, billing: string, startDate: string, endDateExclusive?: string | null, timezone: string, state: string, revision: number }>, lines: Array<{ __typename?: 'DeliveryCommitmentLine', id: string, periodId: string, label: string, unit: string, revision: number, promisedQuantity: number, assignedQuantity: number, fulfilledQuantity: number, remainingQuantity: number, overdeliveredQuantity: number }>, allocations: Array<{ __typename?: 'DeliveryCommitmentAllocation', taskId: string, taskName: string, periodId: string, lineId: string, parentTaskId?: string | null, revision: number, state: string, credited: boolean, creditReason?: string | null, fulfilledAt?: string | null, creditedCycle?: number | null, creditedSubmissionVersion?: number | null }>, taskOptions: Array<{ __typename?: 'DeliveryCommitmentTaskOption', taskId: string, name: string, taskRevision: number, state: string, allocationRevision: number, allocatedPeriodId?: string | null, allocatedLineId?: string | null, allocatedUnit?: string | null }>, history: Array<{ __typename?: 'DeliveryCommitmentEvent', id: string, action: string, actorName: string, actorType: string, occurredAt: string, taskId?: string | null, taskName?: string | null, reason?: string | null, changes: Array<{ __typename?: 'DeliveryCommitmentChange', field: string, before?: string | null, after?: string | null }> }> };
+
+export type DeliveryCommitmentsQueryVariables = Exact<{
+  input: DeliveryCommitmentsInput;
+}>;
+
+
+export type DeliveryCommitmentsQuery = { __typename?: 'Query', deliveryCommitments: { __typename?: 'DeliveryCommitments', workspaceId: string, memberId: string, userWorkspaceId: string, engagementId: string, engagementName: string, projectId: string, canManage: boolean, legacyAllowance?: string | null, selectedPeriodId?: string | null, moreTaskOptions: boolean, nextAllocationCursor?: string | null, nextHistoryCursor?: string | null, periods: Array<{ __typename?: 'DeliveryCommitmentPeriod', id: string, label: string, billing: string, startDate: string, endDateExclusive?: string | null, timezone: string, state: string, revision: number }>, lines: Array<{ __typename?: 'DeliveryCommitmentLine', id: string, periodId: string, label: string, unit: string, revision: number, promisedQuantity: number, assignedQuantity: number, fulfilledQuantity: number, remainingQuantity: number, overdeliveredQuantity: number }>, allocations: Array<{ __typename?: 'DeliveryCommitmentAllocation', taskId: string, taskName: string, periodId: string, lineId: string, parentTaskId?: string | null, revision: number, state: string, credited: boolean, creditReason?: string | null, fulfilledAt?: string | null, creditedCycle?: number | null, creditedSubmissionVersion?: number | null }>, taskOptions: Array<{ __typename?: 'DeliveryCommitmentTaskOption', taskId: string, name: string, taskRevision: number, state: string, allocationRevision: number, allocatedPeriodId?: string | null, allocatedLineId?: string | null, allocatedUnit?: string | null }>, history: Array<{ __typename?: 'DeliveryCommitmentEvent', id: string, action: string, actorName: string, actorType: string, occurredAt: string, taskId?: string | null, taskName?: string | null, reason?: string | null, changes: Array<{ __typename?: 'DeliveryCommitmentChange', field: string, before?: string | null, after?: string | null }> }> } };
+
+export type SaveDeliveryCommitmentPeriodMutationVariables = Exact<{
+  input: DeliveryCommitmentPeriodSaveInput;
+}>;
+
+
+export type SaveDeliveryCommitmentPeriodMutation = { __typename?: 'Mutation', saveDeliveryCommitmentPeriod: { __typename?: 'DeliveryCommitments', workspaceId: string, memberId: string, userWorkspaceId: string, engagementId: string, engagementName: string, projectId: string, canManage: boolean, legacyAllowance?: string | null, selectedPeriodId?: string | null, moreTaskOptions: boolean, nextAllocationCursor?: string | null, nextHistoryCursor?: string | null, periods: Array<{ __typename?: 'DeliveryCommitmentPeriod', id: string, label: string, billing: string, startDate: string, endDateExclusive?: string | null, timezone: string, state: string, revision: number }>, lines: Array<{ __typename?: 'DeliveryCommitmentLine', id: string, periodId: string, label: string, unit: string, revision: number, promisedQuantity: number, assignedQuantity: number, fulfilledQuantity: number, remainingQuantity: number, overdeliveredQuantity: number }>, allocations: Array<{ __typename?: 'DeliveryCommitmentAllocation', taskId: string, taskName: string, periodId: string, lineId: string, parentTaskId?: string | null, revision: number, state: string, credited: boolean, creditReason?: string | null, fulfilledAt?: string | null, creditedCycle?: number | null, creditedSubmissionVersion?: number | null }>, taskOptions: Array<{ __typename?: 'DeliveryCommitmentTaskOption', taskId: string, name: string, taskRevision: number, state: string, allocationRevision: number, allocatedPeriodId?: string | null, allocatedLineId?: string | null, allocatedUnit?: string | null }>, history: Array<{ __typename?: 'DeliveryCommitmentEvent', id: string, action: string, actorName: string, actorType: string, occurredAt: string, taskId?: string | null, taskName?: string | null, reason?: string | null, changes: Array<{ __typename?: 'DeliveryCommitmentChange', field: string, before?: string | null, after?: string | null }> }> } };
+
+export type SetDeliveryCommitmentPeriodStateMutationVariables = Exact<{
+  input: DeliveryCommitmentPeriodStateInput;
+}>;
+
+
+export type SetDeliveryCommitmentPeriodStateMutation = { __typename?: 'Mutation', setDeliveryCommitmentPeriodState: { __typename?: 'DeliveryCommitments', workspaceId: string, memberId: string, userWorkspaceId: string, engagementId: string, engagementName: string, projectId: string, canManage: boolean, legacyAllowance?: string | null, selectedPeriodId?: string | null, moreTaskOptions: boolean, nextAllocationCursor?: string | null, nextHistoryCursor?: string | null, periods: Array<{ __typename?: 'DeliveryCommitmentPeriod', id: string, label: string, billing: string, startDate: string, endDateExclusive?: string | null, timezone: string, state: string, revision: number }>, lines: Array<{ __typename?: 'DeliveryCommitmentLine', id: string, periodId: string, label: string, unit: string, revision: number, promisedQuantity: number, assignedQuantity: number, fulfilledQuantity: number, remainingQuantity: number, overdeliveredQuantity: number }>, allocations: Array<{ __typename?: 'DeliveryCommitmentAllocation', taskId: string, taskName: string, periodId: string, lineId: string, parentTaskId?: string | null, revision: number, state: string, credited: boolean, creditReason?: string | null, fulfilledAt?: string | null, creditedCycle?: number | null, creditedSubmissionVersion?: number | null }>, taskOptions: Array<{ __typename?: 'DeliveryCommitmentTaskOption', taskId: string, name: string, taskRevision: number, state: string, allocationRevision: number, allocatedPeriodId?: string | null, allocatedLineId?: string | null, allocatedUnit?: string | null }>, history: Array<{ __typename?: 'DeliveryCommitmentEvent', id: string, action: string, actorName: string, actorType: string, occurredAt: string, taskId?: string | null, taskName?: string | null, reason?: string | null, changes: Array<{ __typename?: 'DeliveryCommitmentChange', field: string, before?: string | null, after?: string | null }> }> } };
+
+export type SaveDeliveryCommitmentLineMutationVariables = Exact<{
+  input: DeliveryCommitmentLineSaveInput;
+}>;
+
+
+export type SaveDeliveryCommitmentLineMutation = { __typename?: 'Mutation', saveDeliveryCommitmentLine: { __typename?: 'DeliveryCommitments', workspaceId: string, memberId: string, userWorkspaceId: string, engagementId: string, engagementName: string, projectId: string, canManage: boolean, legacyAllowance?: string | null, selectedPeriodId?: string | null, moreTaskOptions: boolean, nextAllocationCursor?: string | null, nextHistoryCursor?: string | null, periods: Array<{ __typename?: 'DeliveryCommitmentPeriod', id: string, label: string, billing: string, startDate: string, endDateExclusive?: string | null, timezone: string, state: string, revision: number }>, lines: Array<{ __typename?: 'DeliveryCommitmentLine', id: string, periodId: string, label: string, unit: string, revision: number, promisedQuantity: number, assignedQuantity: number, fulfilledQuantity: number, remainingQuantity: number, overdeliveredQuantity: number }>, allocations: Array<{ __typename?: 'DeliveryCommitmentAllocation', taskId: string, taskName: string, periodId: string, lineId: string, parentTaskId?: string | null, revision: number, state: string, credited: boolean, creditReason?: string | null, fulfilledAt?: string | null, creditedCycle?: number | null, creditedSubmissionVersion?: number | null }>, taskOptions: Array<{ __typename?: 'DeliveryCommitmentTaskOption', taskId: string, name: string, taskRevision: number, state: string, allocationRevision: number, allocatedPeriodId?: string | null, allocatedLineId?: string | null, allocatedUnit?: string | null }>, history: Array<{ __typename?: 'DeliveryCommitmentEvent', id: string, action: string, actorName: string, actorType: string, occurredAt: string, taskId?: string | null, taskName?: string | null, reason?: string | null, changes: Array<{ __typename?: 'DeliveryCommitmentChange', field: string, before?: string | null, after?: string | null }> }> } };
+
+export type AssignDeliveryCommitmentTaskMutationVariables = Exact<{
+  input: DeliveryCommitmentTaskAssignInput;
+}>;
+
+
+export type AssignDeliveryCommitmentTaskMutation = { __typename?: 'Mutation', assignDeliveryCommitmentTask: { __typename?: 'DeliveryCommitments', workspaceId: string, memberId: string, userWorkspaceId: string, engagementId: string, engagementName: string, projectId: string, canManage: boolean, legacyAllowance?: string | null, selectedPeriodId?: string | null, moreTaskOptions: boolean, nextAllocationCursor?: string | null, nextHistoryCursor?: string | null, periods: Array<{ __typename?: 'DeliveryCommitmentPeriod', id: string, label: string, billing: string, startDate: string, endDateExclusive?: string | null, timezone: string, state: string, revision: number }>, lines: Array<{ __typename?: 'DeliveryCommitmentLine', id: string, periodId: string, label: string, unit: string, revision: number, promisedQuantity: number, assignedQuantity: number, fulfilledQuantity: number, remainingQuantity: number, overdeliveredQuantity: number }>, allocations: Array<{ __typename?: 'DeliveryCommitmentAllocation', taskId: string, taskName: string, periodId: string, lineId: string, parentTaskId?: string | null, revision: number, state: string, credited: boolean, creditReason?: string | null, fulfilledAt?: string | null, creditedCycle?: number | null, creditedSubmissionVersion?: number | null }>, taskOptions: Array<{ __typename?: 'DeliveryCommitmentTaskOption', taskId: string, name: string, taskRevision: number, state: string, allocationRevision: number, allocatedPeriodId?: string | null, allocatedLineId?: string | null, allocatedUnit?: string | null }>, history: Array<{ __typename?: 'DeliveryCommitmentEvent', id: string, action: string, actorName: string, actorType: string, occurredAt: string, taskId?: string | null, taskName?: string | null, reason?: string | null, changes: Array<{ __typename?: 'DeliveryCommitmentChange', field: string, before?: string | null, after?: string | null }> }> } };
+
+export type RemoveDeliveryCommitmentTaskMutationVariables = Exact<{
+  input: DeliveryCommitmentTaskRemoveInput;
+}>;
+
+
+export type RemoveDeliveryCommitmentTaskMutation = { __typename?: 'Mutation', removeDeliveryCommitmentTask: { __typename?: 'DeliveryCommitments', workspaceId: string, memberId: string, userWorkspaceId: string, engagementId: string, engagementName: string, projectId: string, canManage: boolean, legacyAllowance?: string | null, selectedPeriodId?: string | null, moreTaskOptions: boolean, nextAllocationCursor?: string | null, nextHistoryCursor?: string | null, periods: Array<{ __typename?: 'DeliveryCommitmentPeriod', id: string, label: string, billing: string, startDate: string, endDateExclusive?: string | null, timezone: string, state: string, revision: number }>, lines: Array<{ __typename?: 'DeliveryCommitmentLine', id: string, periodId: string, label: string, unit: string, revision: number, promisedQuantity: number, assignedQuantity: number, fulfilledQuantity: number, remainingQuantity: number, overdeliveredQuantity: number }>, allocations: Array<{ __typename?: 'DeliveryCommitmentAllocation', taskId: string, taskName: string, periodId: string, lineId: string, parentTaskId?: string | null, revision: number, state: string, credited: boolean, creditReason?: string | null, fulfilledAt?: string | null, creditedCycle?: number | null, creditedSubmissionVersion?: number | null }>, taskOptions: Array<{ __typename?: 'DeliveryCommitmentTaskOption', taskId: string, name: string, taskRevision: number, state: string, allocationRevision: number, allocatedPeriodId?: string | null, allocatedLineId?: string | null, allocatedUnit?: string | null }>, history: Array<{ __typename?: 'DeliveryCommitmentEvent', id: string, action: string, actorName: string, actorType: string, occurredAt: string, taskId?: string | null, taskName?: string | null, reason?: string | null, changes: Array<{ __typename?: 'DeliveryCommitmentChange', field: string, before?: string | null, after?: string | null }> }> } };
+
+export type DeliveryCommitmentEngagementsQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type DeliveryCommitmentEngagementsQuery = { __typename?: 'Query', deliveryCommitmentEngagements: { __typename?: 'DeliveryCommitmentEngagements', workspaceId: string, memberId: string, userWorkspaceId: string, engagements: Array<{ __typename?: 'DeliveryCommitmentEngagement', id: string, name: string, projectId: string, billing: string }> } };
+
+export type DeliveryFinanceAiCostsQueryVariables = Exact<{
+  input: DeliveryFinanceAiCostsInput;
+}>;
+
+
+export type DeliveryFinanceAiCostsQuery = { __typename?: 'Query', deliveryFinanceAiCosts: { __typename?: 'DeliveryFinanceAiCostsSnapshot', workspaceId: string, memberId: string, userWorkspaceId: string, canManage: boolean, canReadBudget: boolean, filter: string, nextSpendId?: string | null, projects: Array<{ __typename?: 'DeliveryFinanceProject', id: string, name: string }>, sources: Array<{ __typename?: 'DeliveryFinanceAiCostSource', id: string, revision: number, state: string, sourceKind: string, modelId: string, currency: string, settledAmountMicros?: string | null, createdAt: string, dispatchedAt?: string | null, settledAt?: string | null, projectId?: string | null, projectName?: string | null, eligible: boolean, sourceWarnings: Array<string>, sourceReviewToken: string, nextEvidenceId?: string | null, claim: { __typename?: 'DeliveryFinanceAiCostClaim', revision: number, currentEntry?: { __typename?: 'DeliveryFinanceAiCostEntryReference', id: string, revision: number, status: string, month: string, amountMicros: string, matchedMicros: string, activeMatchCount: number } | null, replacementEntry?: { __typename?: 'DeliveryFinanceAiCostEntryReference', id: string, revision: number, status: string, month: string, amountMicros: string, matchedMicros: string, activeMatchCount: number } | null }, evidenceOptions: Array<{ __typename?: 'DeliveryFinanceAiCostEvidence', id: string, basis: string, amountMicros: string, recordedAt: string }> }>, selectedSource?: { __typename?: 'DeliveryFinanceAiCostSource', id: string, revision: number, state: string, sourceKind: string, modelId: string, currency: string, settledAmountMicros?: string | null, createdAt: string, dispatchedAt?: string | null, settledAt?: string | null, projectId?: string | null, projectName?: string | null, eligible: boolean, sourceWarnings: Array<string>, sourceReviewToken: string, nextEvidenceId?: string | null, claim: { __typename?: 'DeliveryFinanceAiCostClaim', revision: number, currentEntry?: { __typename?: 'DeliveryFinanceAiCostEntryReference', id: string, revision: number, status: string, month: string, amountMicros: string, matchedMicros: string, activeMatchCount: number } | null, replacementEntry?: { __typename?: 'DeliveryFinanceAiCostEntryReference', id: string, revision: number, status: string, month: string, amountMicros: string, matchedMicros: string, activeMatchCount: number } | null }, evidenceOptions: Array<{ __typename?: 'DeliveryFinanceAiCostEvidence', id: string, basis: string, amountMicros: string, recordedAt: string }> } | null } };
+
+export type FinanceAiCostEntryReferenceFieldsFragment = { __typename?: 'DeliveryFinanceAiCostEntryReference', id: string, revision: number, status: string, month: string, amountMicros: string, matchedMicros: string, activeMatchCount: number };
+
+export type FinanceAiCostSourceFieldsFragment = { __typename?: 'DeliveryFinanceAiCostSource', id: string, revision: number, state: string, sourceKind: string, modelId: string, currency: string, settledAmountMicros?: string | null, createdAt: string, dispatchedAt?: string | null, settledAt?: string | null, projectId?: string | null, projectName?: string | null, eligible: boolean, sourceWarnings: Array<string>, sourceReviewToken: string, nextEvidenceId?: string | null, claim: { __typename?: 'DeliveryFinanceAiCostClaim', revision: number, currentEntry?: { __typename?: 'DeliveryFinanceAiCostEntryReference', id: string, revision: number, status: string, month: string, amountMicros: string, matchedMicros: string, activeMatchCount: number } | null, replacementEntry?: { __typename?: 'DeliveryFinanceAiCostEntryReference', id: string, revision: number, status: string, month: string, amountMicros: string, matchedMicros: string, activeMatchCount: number } | null }, evidenceOptions: Array<{ __typename?: 'DeliveryFinanceAiCostEvidence', id: string, basis: string, amountMicros: string, recordedAt: string }> };
+
+export type PrepareDeliveryFinanceAiCostMutationVariables = Exact<{
+  input: DeliveryFinanceAiCostPrepareInput;
+}>;
+
+
+export type PrepareDeliveryFinanceAiCostMutation = { __typename?: 'Mutation', prepareDeliveryFinanceAiCost: { __typename?: 'DeliveryFinanceAiCostResult', entryId: string, status: string, replayed: boolean } };
+
+export type PostDeliveryFinanceAiCostMutationVariables = Exact<{
+  input: DeliveryFinanceAiCostPostInput;
+}>;
+
+
+export type PostDeliveryFinanceAiCostMutation = { __typename?: 'Mutation', postDeliveryFinanceAiCost: { __typename?: 'DeliveryFinanceAiCostResult', entryId: string, status: string, replayed: boolean } };
+
+export type DeliveryFinanceForecastQueryVariables = Exact<{
+  input: DeliveryFinanceForecastInput;
+}>;
+
+
+export type DeliveryFinanceForecastQuery = { __typename?: 'Query', deliveryFinanceForecast: { __typename?: 'DeliveryFinanceForecastSnapshot', workspaceId: string, memberId: string, userWorkspaceId: string, canManage: boolean, currency: string, horizonDays: number, businessDate?: string | null, timezone?: string | null, actualInflowMicros?: string | null, actualOutflowMicros?: string | null, currentCashMicros?: string | null, expectedInflowMicros?: string | null, expectedOutflowMicros?: string | null, endingCashMicros?: string | null, firstNegativeDate?: string | null, knownUnscheduledInflowMicros: string, knownUnscheduledOutflowMicros: string, unknownCollectionCount: number, unappliedActualOutflowMicros: string, projectionComplete: boolean, warnings: Array<string>, itemCount: number, nextItemId?: string | null, nextRealizationId?: string | null, exceptionCount: number, nextExceptionKey?: string | null, anchor?: { __typename?: 'DeliveryFinanceForecastAnchor', id: string, revision: number, currency: string, amountMicros: string, closingDate: string, timezone: string, note: string, evidenceUrl?: string | null, changedBy: string, changedByName: string, changedAt: string } | null, owners: Array<{ __typename?: 'DeliveryFinanceForecastOwner', id: string, name: string }>, items: Array<{ __typename?: 'DeliveryFinanceForecastItem', id: string, revision: number, status: string, kind: string, sourceType: string, sourceId?: string | null, planMonth?: string | null, title: string, currency: string, amountMicros: string, remainingMicros?: string | null, appliedMicros: string, expectedDate?: string | null, contractualDueDate?: string | null, ownerId: string, ownerName: string, ownerEligible: boolean, nextActionDate: string, note: string, sourceReviewToken?: string | null, reviewToken: string, eligible: boolean, warnings: Array<string>, changedAt: string, changedByName: string }>, selectedItem?: { __typename?: 'DeliveryFinanceForecastItem', id: string, revision: number, status: string, kind: string, sourceType: string, sourceId?: string | null, planMonth?: string | null, title: string, currency: string, amountMicros: string, remainingMicros?: string | null, appliedMicros: string, expectedDate?: string | null, contractualDueDate?: string | null, ownerId: string, ownerName: string, ownerEligible: boolean, nextActionDate: string, note: string, sourceReviewToken?: string | null, reviewToken: string, eligible: boolean, warnings: Array<string>, changedAt: string, changedByName: string } | null, realizations: Array<{ __typename?: 'DeliveryFinanceForecastRealization', id: string, revision: number, itemId: string, cashId: string, cashTitle: string, targetTitle: string, currency: string, amountMicros: string, status: string, note: string, createdAt: string, createdByName: string, reversedAt?: string | null, reversedByName?: string | null, reversalReason?: string | null }>, exceptions: Array<{ __typename?: 'DeliveryFinanceForecastException', key: string, code: string, itemId?: string | null, sourceId?: string | null, sourceType?: string | null, title?: string | null, date?: string | null, amountMicros?: string | null }>, timeline: Array<{ __typename?: 'DeliveryFinanceForecastDay', date: string, inflowMicros: string, outflowMicros: string, closingMicros: string, itemIds: Array<string> }> } };
+
+export type FinanceForecastItemFieldsFragment = { __typename?: 'DeliveryFinanceForecastItem', id: string, revision: number, status: string, kind: string, sourceType: string, sourceId?: string | null, planMonth?: string | null, title: string, currency: string, amountMicros: string, remainingMicros?: string | null, appliedMicros: string, expectedDate?: string | null, contractualDueDate?: string | null, ownerId: string, ownerName: string, ownerEligible: boolean, nextActionDate: string, note: string, sourceReviewToken?: string | null, reviewToken: string, eligible: boolean, warnings: Array<string>, changedAt: string, changedByName: string };
+
+export type FinanceForecastRealizationFieldsFragment = { __typename?: 'DeliveryFinanceForecastRealization', id: string, revision: number, itemId: string, cashId: string, cashTitle: string, targetTitle: string, currency: string, amountMicros: string, status: string, note: string, createdAt: string, createdByName: string, reversedAt?: string | null, reversedByName?: string | null, reversalReason?: string | null };
+
+export type DeliveryFinanceForecastSourcesQueryVariables = Exact<{
+  input: DeliveryFinanceForecastSourcesInput;
+}>;
+
+
+export type DeliveryFinanceForecastSourcesQuery = { __typename?: 'Query', deliveryFinanceForecastSources: { __typename?: 'DeliveryFinanceForecastSources', workspaceId: string, memberId: string, userWorkspaceId: string, canManage: boolean, currency: string, kind: string, nextId?: string | null, sources: Array<{ __typename?: 'DeliveryFinanceForecastSource', id: string, sourceType: string, title: string, category: string, currency: string, date?: string | null, dueDate?: string | null, projectId?: string | null, projectName?: string | null, amountMicros?: string | null, remainingMicros?: string | null, planMonth?: string | null, suggestedDate?: string | null, occurrenceItemId?: string | null, sourceReviewToken: string, eligible: boolean, warnings: Array<string> }>, selectedSource?: { __typename?: 'DeliveryFinanceForecastSource', id: string, sourceType: string, title: string, category: string, currency: string, date?: string | null, dueDate?: string | null, projectId?: string | null, projectName?: string | null, amountMicros?: string | null, remainingMicros?: string | null, planMonth?: string | null, suggestedDate?: string | null, occurrenceItemId?: string | null, sourceReviewToken: string, eligible: boolean, warnings: Array<string> } | null } };
+
+export type FinanceForecastSourceFieldsFragment = { __typename?: 'DeliveryFinanceForecastSource', id: string, sourceType: string, title: string, category: string, currency: string, date?: string | null, dueDate?: string | null, projectId?: string | null, projectName?: string | null, amountMicros?: string | null, remainingMicros?: string | null, planMonth?: string | null, suggestedDate?: string | null, occurrenceItemId?: string | null, sourceReviewToken: string, eligible: boolean, warnings: Array<string> };
+
+export type DeliveryFinanceForecastHistoryQueryVariables = Exact<{
+  input: DeliveryFinanceForecastHistoryInput;
+}>;
+
+
+export type DeliveryFinanceForecastHistoryQuery = { __typename?: 'Query', deliveryFinanceForecastHistory: { __typename?: 'DeliveryFinanceForecastHistory', workspaceId: string, memberId: string, userWorkspaceId: string, nextBeforeId?: string | null, events: Array<{ __typename?: 'DeliveryFinanceForecastEvent', id: string, sourceType: string, sourceId: string, action: string, revision: number, actorName: string, actorId: string, createdAt: string, reason: string, beforeStatus?: string | null, afterStatus?: string | null, currency?: string | null, amountMicros?: string | null, date?: string | null, title?: string | null, ownerName?: string | null, note?: string | null, timezone?: string | null, evidenceUrl?: string | null, originSourceType?: string | null, originSourceId?: string | null, planMonth?: string | null, sourceRevision?: number | null, sourceAmountMicros?: string | null, cashId?: string | null, itemId?: string | null, cashDate?: string | null, reversedAt?: string | null }> } };
+
+export type SaveDeliveryFinanceForecastAnchorMutationVariables = Exact<{
+  input: DeliveryFinanceForecastAnchorInput;
+}>;
+
+
+export type SaveDeliveryFinanceForecastAnchorMutation = { __typename?: 'Mutation', saveDeliveryFinanceForecastAnchor: { __typename?: 'DeliveryFinanceForecastAnchorResult', replayed: boolean, anchor: { __typename?: 'DeliveryFinanceForecastAnchor', id: string, revision: number, currency: string, amountMicros: string, closingDate: string, timezone: string, note: string, evidenceUrl?: string | null, changedBy: string, changedByName: string, changedAt: string } } };
+
+export type SaveDeliveryFinanceForecastItemMutationVariables = Exact<{
+  input: DeliveryFinanceForecastItemInput;
+}>;
+
+
+export type SaveDeliveryFinanceForecastItemMutation = { __typename?: 'Mutation', saveDeliveryFinanceForecastItem: { __typename?: 'DeliveryFinanceForecastItemResult', replayed: boolean, item: { __typename?: 'DeliveryFinanceForecastItem', id: string, revision: number, status: string, kind: string, sourceType: string, sourceId?: string | null, planMonth?: string | null, title: string, currency: string, amountMicros: string, remainingMicros?: string | null, appliedMicros: string, expectedDate?: string | null, contractualDueDate?: string | null, ownerId: string, ownerName: string, ownerEligible: boolean, nextActionDate: string, note: string, sourceReviewToken?: string | null, reviewToken: string, eligible: boolean, warnings: Array<string>, changedAt: string, changedByName: string } } };
+
+export type RealizeDeliveryFinanceForecastOutflowMutationVariables = Exact<{
+  input: DeliveryFinanceForecastRealizeInput;
+}>;
+
+
+export type RealizeDeliveryFinanceForecastOutflowMutation = { __typename?: 'Mutation', realizeDeliveryFinanceForecastOutflow: { __typename?: 'DeliveryFinanceForecastRealizationResult', replayed: boolean, realization: { __typename?: 'DeliveryFinanceForecastRealization', id: string, revision: number, itemId: string, cashId: string, cashTitle: string, targetTitle: string, currency: string, amountMicros: string, status: string, note: string, createdAt: string, createdByName: string, reversedAt?: string | null, reversedByName?: string | null, reversalReason?: string | null } } };
+
+export type ReverseDeliveryFinanceForecastRealizationMutationVariables = Exact<{
+  input: DeliveryFinanceForecastReverseInput;
+}>;
+
+
+export type ReverseDeliveryFinanceForecastRealizationMutation = { __typename?: 'Mutation', reverseDeliveryFinanceForecastRealization: { __typename?: 'DeliveryFinanceForecastRealizationResult', replayed: boolean, realization: { __typename?: 'DeliveryFinanceForecastRealization', id: string, revision: number, itemId: string, cashId: string, cashTitle: string, targetTitle: string, currency: string, amountMicros: string, status: string, note: string, createdAt: string, createdByName: string, reversedAt?: string | null, reversedByName?: string | null, reversalReason?: string | null } } };
+
+export type DeliveryFinancePaymentsQueryVariables = Exact<{
+  input: DeliveryFinancePaymentsInput;
+}>;
+
+
+export type DeliveryFinancePaymentsQuery = { __typename?: 'Query', deliveryFinancePayments: { __typename?: 'DeliveryFinancePaymentsSnapshot', workspaceId: string, memberId: string, userWorkspaceId: string, canManage: boolean, currency?: string | null, rejectedCashCount: number, cashTotal: number, receivableTotal: number, entryTotal: number, nextCashId?: string | null, nextReceivableId?: string | null, nextEntryId?: string | null, settlementTotal: number, matchTotal: number, nextSettlementId?: string | null, nextMatchId?: string | null, projects: Array<{ __typename?: 'DeliveryFinanceProject', id: string, name: string }>, cash: Array<{ __typename?: 'DeliveryFinanceCashSource', id: string, revision: number, title: string, category: string, currency: string, amountMicros: string, date: string, dueDate?: string | null, projectId?: string | null, projectName?: string | null, status: string, evidenceUrl?: string | null, note: string, sourceReviewToken: string, sourceWarnings: Array<string>, settledMicros: string, remainingSettlementMicros: string, matchedMicros: string, remainingMatchMicros: string, outstandingMicros: string }>, receivables: Array<{ __typename?: 'DeliveryFinanceCashSource', id: string, revision: number, title: string, category: string, currency: string, amountMicros: string, date: string, dueDate?: string | null, projectId?: string | null, projectName?: string | null, status: string, evidenceUrl?: string | null, note: string, sourceReviewToken: string, sourceWarnings: Array<string>, settledMicros: string, remainingSettlementMicros: string, matchedMicros: string, remainingMatchMicros: string, outstandingMicros: string }>, entries: Array<{ __typename?: 'DeliveryFinanceMatchableEntry', id: string, revision: number, month: string, title: string, kind: string, currency: string, status: string, sourceReviewToken: string, allocations: Array<{ __typename?: 'DeliveryFinanceMatchedAllocation', projectId?: string | null, projectName?: string | null, amountMicros: string, matchedMicros: string, remainingMatchMicros: string }> }>, selectedCash?: { __typename?: 'DeliveryFinanceCashSource', id: string, revision: number, title: string, category: string, currency: string, amountMicros: string, date: string, dueDate?: string | null, projectId?: string | null, projectName?: string | null, status: string, evidenceUrl?: string | null, note: string, sourceReviewToken: string, sourceWarnings: Array<string>, settledMicros: string, remainingSettlementMicros: string, matchedMicros: string, remainingMatchMicros: string, outstandingMicros: string } | null, selectedReceivable?: { __typename?: 'DeliveryFinanceCashSource', id: string, revision: number, title: string, category: string, currency: string, amountMicros: string, date: string, dueDate?: string | null, projectId?: string | null, projectName?: string | null, status: string, evidenceUrl?: string | null, note: string, sourceReviewToken: string, sourceWarnings: Array<string>, settledMicros: string, remainingSettlementMicros: string, matchedMicros: string, remainingMatchMicros: string, outstandingMicros: string } | null, selectedEntry?: { __typename?: 'DeliveryFinanceMatchableEntry', id: string, revision: number, month: string, title: string, kind: string, currency: string, status: string, sourceReviewToken: string, allocations: Array<{ __typename?: 'DeliveryFinanceMatchedAllocation', projectId?: string | null, projectName?: string | null, amountMicros: string, matchedMicros: string, remainingMatchMicros: string }> } | null, settlements: Array<{ __typename?: 'DeliveryFinanceCashRelation', id: string, kind: string, revision: number, cashId: string, cashTitle: string, receivableId?: string | null, entryId?: string | null, targetTitle: string, month?: string | null, projectId?: string | null, projectName?: string | null, currency: string, amountMicros: string, status: string, legacy: boolean, canReverse: boolean, createdBy: string, createdByName: string, createdAt: string, reversedBy?: string | null, reversedByName?: string | null, reversedAt?: string | null, reversalReason?: string | null }>, matches: Array<{ __typename?: 'DeliveryFinanceCashRelation', id: string, kind: string, revision: number, cashId: string, cashTitle: string, receivableId?: string | null, entryId?: string | null, targetTitle: string, month?: string | null, projectId?: string | null, projectName?: string | null, currency: string, amountMicros: string, status: string, legacy: boolean, canReverse: boolean, createdBy: string, createdByName: string, createdAt: string, reversedBy?: string | null, reversedByName?: string | null, reversedAt?: string | null, reversalReason?: string | null }> } };
+
+export type FinanceCashSourceFieldsFragment = { __typename?: 'DeliveryFinanceCashSource', id: string, revision: number, title: string, category: string, currency: string, amountMicros: string, date: string, dueDate?: string | null, projectId?: string | null, projectName?: string | null, status: string, evidenceUrl?: string | null, note: string, sourceReviewToken: string, sourceWarnings: Array<string>, settledMicros: string, remainingSettlementMicros: string, matchedMicros: string, remainingMatchMicros: string, outstandingMicros: string };
+
+export type FinanceMatchableEntryFieldsFragment = { __typename?: 'DeliveryFinanceMatchableEntry', id: string, revision: number, month: string, title: string, kind: string, currency: string, status: string, sourceReviewToken: string, allocations: Array<{ __typename?: 'DeliveryFinanceMatchedAllocation', projectId?: string | null, projectName?: string | null, amountMicros: string, matchedMicros: string, remainingMatchMicros: string }> };
+
+export type FinanceCashRelationFieldsFragment = { __typename?: 'DeliveryFinanceCashRelation', id: string, kind: string, revision: number, cashId: string, cashTitle: string, receivableId?: string | null, entryId?: string | null, targetTitle: string, month?: string | null, projectId?: string | null, projectName?: string | null, currency: string, amountMicros: string, status: string, legacy: boolean, canReverse: boolean, createdBy: string, createdByName: string, createdAt: string, reversedBy?: string | null, reversedByName?: string | null, reversedAt?: string | null, reversalReason?: string | null };
+
+export type RecordDeliveryFinancePaymentMutationVariables = Exact<{
+  input: DeliveryFinancePaymentInput;
+}>;
+
+
+export type RecordDeliveryFinancePaymentMutation = { __typename?: 'Mutation', recordDeliveryFinancePayment: string };
+
+export type SettleDeliveryFinanceReceivableMutationVariables = Exact<{
+  input: DeliveryFinanceSettlementInput;
+}>;
+
+
+export type SettleDeliveryFinanceReceivableMutation = { __typename?: 'Mutation', settleDeliveryFinanceReceivable: string };
+
+export type MatchDeliveryFinanceCashMutationVariables = Exact<{
+  input: DeliveryFinanceCashMatchInput;
+}>;
+
+
+export type MatchDeliveryFinanceCashMutation = { __typename?: 'Mutation', matchDeliveryFinanceCash: string };
+
+export type ReverseDeliveryFinanceRelationMutationVariables = Exact<{
+  input: DeliveryFinanceReverseRelationInput;
+}>;
+
+
+export type ReverseDeliveryFinanceRelationMutation = { __typename?: 'Mutation', reverseDeliveryFinanceRelation: string };
+
+export type DeliveryFinancePeriodQueryVariables = Exact<{
+  input: DeliveryFinancePeriodInput;
+}>;
+
+
+export type DeliveryFinancePeriodQuery = { __typename?: 'Query', deliveryFinancePeriod: { __typename?: 'DeliveryFinancePeriodSnapshot', workspaceId: string, memberId: string, userWorkspaceId: string, canManage: boolean, recognitionHash: string, previewToken: string, blockerCount: number, nextBlockerId?: string | null, limitations: Array<string>, canLock: boolean, canReopen: boolean, period: { __typename?: 'DeliveryFinancePeriod', id?: string | null, month: string, status: string, revision: number, changedBy?: string | null, changedByName?: string | null, changedAt?: string | null, reason?: string | null }, summaries: Array<{ __typename?: 'DeliveryFinancePeriodCurrencySummary', currency: string, revenueMicros: string, costMicros: string, resultMicros: string, draftCount: number, postedCount: number, voidCount: number, projects: Array<{ __typename?: 'DeliveryFinancePeriodProjectSummary', projectId?: string | null, projectName?: string | null, revenueMicros: string, costMicros: string, resultMicros: string, postedCount: number }> }>, blockers: Array<{ __typename?: 'DeliveryFinancePeriodBlocker', entryId: string, month: string, title: string, sourceType: string, reason: string }> } };
+
+export type FinancePeriodFieldsFragment = { __typename?: 'DeliveryFinancePeriod', id?: string | null, month: string, status: string, revision: number, changedBy?: string | null, changedByName?: string | null, changedAt?: string | null, reason?: string | null };
+
+export type FinancePeriodCurrencyFieldsFragment = { __typename?: 'DeliveryFinancePeriodCurrencySummary', currency: string, revenueMicros: string, costMicros: string, resultMicros: string, draftCount: number, postedCount: number, voidCount: number, projects: Array<{ __typename?: 'DeliveryFinancePeriodProjectSummary', projectId?: string | null, projectName?: string | null, revenueMicros: string, costMicros: string, resultMicros: string, postedCount: number }> };
+
+export type ChangeDeliveryFinancePeriodMutationVariables = Exact<{
+  input: DeliveryFinancePeriodChangeInput;
+}>;
+
+
+export type ChangeDeliveryFinancePeriodMutation = { __typename?: 'Mutation', changeDeliveryFinancePeriod: { __typename?: 'DeliveryFinancePeriodChangeResult', replayed: boolean, period: { __typename?: 'DeliveryFinancePeriod', id?: string | null, month: string, status: string, revision: number, changedBy?: string | null, changedByName?: string | null, changedAt?: string | null, reason?: string | null } } };
+
+export type DeliveryFinancePeriodHistoryQueryVariables = Exact<{
+  input: DeliveryFinancePeriodHistoryInput;
+}>;
+
+
+export type DeliveryFinancePeriodHistoryQuery = { __typename?: 'Query', deliveryFinancePeriodHistory: { __typename?: 'DeliveryFinancePeriodHistory', workspaceId: string, memberId: string, userWorkspaceId: string, month: string, nextBeforeId?: string | null, events: Array<{ __typename?: 'DeliveryFinancePeriodEvent', id: string, action: string, beforeStatus: string, afterStatus: string, revision: number, reason: string, actorId: string, actorName: string, createdAt: string, recognitionHash: string, summaries: Array<{ __typename?: 'DeliveryFinancePeriodCurrencySummary', currency: string, revenueMicros: string, costMicros: string, resultMicros: string, draftCount: number, postedCount: number, voidCount: number, projects: Array<{ __typename?: 'DeliveryFinancePeriodProjectSummary', projectId?: string | null, projectName?: string | null, revenueMicros: string, costMicros: string, resultMicros: string, postedCount: number }> }> }> } };
+
+export type DeliveryFinanceRecognitionAvailabilityQueryVariables = Exact<{
+  input: DeliveryFinancePeriodInput;
+  replacedInput: DeliveryFinancePeriodInput;
+  includeReplaced: Scalars['Boolean']['input'];
+}>;
+
+
+export type DeliveryFinanceRecognitionAvailabilityQuery = { __typename?: 'Query', deliveryFinancePeriod: { __typename?: 'DeliveryFinancePeriodSnapshot', workspaceId: string, memberId: string, userWorkspaceId: string, canManage: boolean, period: { __typename?: 'DeliveryFinancePeriod', month: string, status: string } }, replacedPeriod?: { __typename?: 'DeliveryFinancePeriodSnapshot', workspaceId: string, memberId: string, userWorkspaceId: string, canManage: boolean, period: { __typename?: 'DeliveryFinancePeriod', month: string, status: string } } };
+
+export type DeliveryFinanceQueryVariables = Exact<{
+  input: DeliveryFinanceInput;
+}>;
+
+
+export type DeliveryFinanceQuery = { __typename?: 'Query', deliveryFinance: { __typename?: 'DeliveryFinanceSnapshot', workspaceId: string, memberId: string, userWorkspaceId: string, month: string, currency?: string | null, canManage: boolean, planTotal: number, entryTotal: number, nextPlanId?: string | null, nextEntryId?: string | null, period: { __typename?: 'DeliveryFinancePeriod', id?: string | null, month: string, status: string, revision: number, changedBy?: string | null, changedByName?: string | null, changedAt?: string | null, reason?: string | null }, projects: Array<{ __typename?: 'DeliveryFinanceProject', id: string, name: string }>, members: Array<{ __typename?: 'DeliveryFinancePerson', id: string, name: string }>, plans: Array<{ __typename?: 'DeliveryFinancePlan', id: string, revision: number, type: string, name: string, currency: string, monthlyAmountMicros: string, memberId?: string | null, memberName?: string | null, memberActive?: boolean | null, startMonth: string, endMonth?: string | null, dueDay: number, active: boolean, createdAt: string, updatedAt: string }>, selectedPlan?: { __typename?: 'DeliveryFinancePlan', id: string, revision: number, type: string, name: string, currency: string, monthlyAmountMicros: string, memberId?: string | null, memberName?: string | null, memberActive?: boolean | null, startMonth: string, endMonth?: string | null, dueDay: number, active: boolean, createdAt: string, updatedAt: string } | null, entries: Array<{ __typename?: 'DeliveryFinanceEntry', id: string, revision: number, month: string, kind: string, category: string, title: string, currency: string, amountMicros: string, note: string, evidenceUrl?: string | null, status: string, sourceType: string, sourceWarnings: Array<string>, lockedMonths: Array<string>, sourceReviewToken?: string | null, dueDate?: string | null, remainingAllocationMicros: string, createdBy: string, createdAt: string, updatedAt: string, postedAt?: string | null, voidedAt?: string | null, voidReason?: string | null, sourcePlan?: { __typename?: 'DeliveryFinancePlanSource', planId: string, revision: number, type: string, name: string, memberId?: string | null, memberName?: string | null, monthlyAmountMicros: string, startMonth: string, endMonth?: string | null, dueDay: number } | null, sourceAiSpend?: { __typename?: 'DeliveryFinanceAiCostOrigin', spendId: string, spendRevision: number, evidenceEventId: string, basis: string, amountMicros: string, currency: string, modelId: string, sourceKind: string, recordedAt: string, projectId?: string | null, projectName?: string | null, replacesEntryId?: string | null, correctionReason?: string | null } | null, allocations: Array<{ __typename?: 'DeliveryFinanceAllocation', projectId?: string | null, projectName?: string | null, amountMicros: string }> }>, selectedEntry?: { __typename?: 'DeliveryFinanceEntry', id: string, revision: number, month: string, kind: string, category: string, title: string, currency: string, amountMicros: string, note: string, evidenceUrl?: string | null, status: string, sourceType: string, sourceWarnings: Array<string>, lockedMonths: Array<string>, sourceReviewToken?: string | null, dueDate?: string | null, remainingAllocationMicros: string, createdBy: string, createdAt: string, updatedAt: string, postedAt?: string | null, voidedAt?: string | null, voidReason?: string | null, sourcePlan?: { __typename?: 'DeliveryFinancePlanSource', planId: string, revision: number, type: string, name: string, memberId?: string | null, memberName?: string | null, monthlyAmountMicros: string, startMonth: string, endMonth?: string | null, dueDay: number } | null, sourceAiSpend?: { __typename?: 'DeliveryFinanceAiCostOrigin', spendId: string, spendRevision: number, evidenceEventId: string, basis: string, amountMicros: string, currency: string, modelId: string, sourceKind: string, recordedAt: string, projectId?: string | null, projectName?: string | null, replacesEntryId?: string | null, correctionReason?: string | null } | null, allocations: Array<{ __typename?: 'DeliveryFinanceAllocation', projectId?: string | null, projectName?: string | null, amountMicros: string }> } | null, summaries: Array<{ __typename?: 'DeliveryFinanceSummary', currency: string, revenueMicros: string, costMicros: string, resultMicros: string, unassignedRevenueMicros: string, unassignedCostMicros: string, draftCount: number, postedCount: number, voidCount: number, projects: Array<{ __typename?: 'DeliveryFinanceProjectResult', projectId?: string | null, projectName?: string | null, revenueMicros: string, costMicros: string, resultMicros: string }> }> } };
+
+export type FinancePlanFieldsFragment = { __typename?: 'DeliveryFinancePlan', id: string, revision: number, type: string, name: string, currency: string, monthlyAmountMicros: string, memberId?: string | null, memberName?: string | null, memberActive?: boolean | null, startMonth: string, endMonth?: string | null, dueDay: number, active: boolean, createdAt: string, updatedAt: string };
+
+export type FinanceEntryFieldsFragment = { __typename?: 'DeliveryFinanceEntry', id: string, revision: number, month: string, kind: string, category: string, title: string, currency: string, amountMicros: string, note: string, evidenceUrl?: string | null, status: string, sourceType: string, sourceWarnings: Array<string>, lockedMonths: Array<string>, sourceReviewToken?: string | null, dueDate?: string | null, remainingAllocationMicros: string, createdBy: string, createdAt: string, updatedAt: string, postedAt?: string | null, voidedAt?: string | null, voidReason?: string | null, sourcePlan?: { __typename?: 'DeliveryFinancePlanSource', planId: string, revision: number, type: string, name: string, memberId?: string | null, memberName?: string | null, monthlyAmountMicros: string, startMonth: string, endMonth?: string | null, dueDay: number } | null, sourceAiSpend?: { __typename?: 'DeliveryFinanceAiCostOrigin', spendId: string, spendRevision: number, evidenceEventId: string, basis: string, amountMicros: string, currency: string, modelId: string, sourceKind: string, recordedAt: string, projectId?: string | null, projectName?: string | null, replacesEntryId?: string | null, correctionReason?: string | null } | null, allocations: Array<{ __typename?: 'DeliveryFinanceAllocation', projectId?: string | null, projectName?: string | null, amountMicros: string }> };
+
+export type SaveDeliveryFinancePlanMutationVariables = Exact<{
+  input: DeliveryFinancePlanInput;
+}>;
+
+
+export type SaveDeliveryFinancePlanMutation = { __typename?: 'Mutation', saveDeliveryFinancePlan: string };
+
+export type SaveDeliveryFinanceEntryMutationVariables = Exact<{
+  input: DeliveryFinanceEntryInput;
+}>;
+
+
+export type SaveDeliveryFinanceEntryMutation = { __typename?: 'Mutation', saveDeliveryFinanceEntry: string };
+
+export type PrepareDeliveryFinanceMonthMutationVariables = Exact<{
+  input: DeliveryFinancePrepareInput;
+}>;
+
+
+export type PrepareDeliveryFinanceMonthMutation = { __typename?: 'Mutation', prepareDeliveryFinanceMonth: { __typename?: 'DeliveryFinancePreparation', createdCount: number, existingCount: number, nextPlanId?: string | null, skipped: Array<{ __typename?: 'DeliveryFinancePrepareSkipped', planId: string, reason: string }> } };
+
+export type PostDeliveryFinanceEntryMutationVariables = Exact<{
+  input: DeliveryFinancePostInput;
+}>;
+
+
+export type PostDeliveryFinanceEntryMutation = { __typename?: 'Mutation', postDeliveryFinanceEntry: string };
+
+export type VoidDeliveryFinanceEntryMutationVariables = Exact<{
+  input: DeliveryFinanceVoidInput;
+}>;
+
+
+export type VoidDeliveryFinanceEntryMutation = { __typename?: 'Mutation', voidDeliveryFinanceEntry: string };
+
+export type DeliveryFinanceEntryHistoryQueryVariables = Exact<{
+  input: DeliveryFinanceHistoryInput;
+}>;
+
+
+export type DeliveryFinanceEntryHistoryQuery = { __typename?: 'Query', deliveryFinanceEntryHistory: { __typename?: 'DeliveryFinanceHistory', workspaceId: string, memberId: string, userWorkspaceId: string, entryId: string, nextBeforeId?: string | null, events: Array<{ __typename?: 'DeliveryFinanceEvent', id: string, actorId: string, actorName: string, action: string, revision: number, reason: string, createdAt: string, beforeAmountMicros?: string | null, afterAmountMicros?: string | null, beforeStatus?: string | null, afterStatus?: string | null }> } };
+
+export type DeliveryHandoffsQueryVariables = Exact<{
+  search?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+
+export type DeliveryHandoffsQuery = { __typename?: 'Query', deliveryHandoffs: { __typename?: 'DeliveryHandoffDirectory', workspaceId: string, memberId: string, userWorkspaceId: string, search: string, hasMore: boolean, opportunities: Array<{ __typename?: 'DeliveryHandoffCandidate', id: string, name: string, hasCompany: boolean, quotes: Array<{ __typename?: 'DeliveryHandoffQuote', id: string, name: string }> }>, handoffs: Array<{ __typename?: 'DeliveryHandoff', id: string, opportunityId: string, projectId: string, engagementId: string, managerId: string, reviewerId: string, setupTaskIds: Array<string>, createdAt: string }> } };
+
+export type DeliveryHandoffPreviewQueryVariables = Exact<{
+  input: DeliveryHandoffPreviewInput;
+}>;
+
+
+export type DeliveryHandoffPreviewQuery = { __typename?: 'Query', deliveryHandoffPreview: { __typename?: 'DeliveryHandoffPreview', workspaceId: string, memberId: string, userWorkspaceId: string, source: { __typename?: 'DeliveryHandoffSource', opportunityId: string, opportunityName: string, companyId: string, companyName: string, quoteId: string, quoteNumber: string, scope: string, fingerprint: string, totalAmountMicros?: string | null, currency?: string | null } } };
+
+export type CreateDeliveryHandoffMutationVariables = Exact<{
+  input: DeliveryHandoffCreateInput;
+}>;
+
+
+export type CreateDeliveryHandoffMutation = { __typename?: 'Mutation', createDeliveryHandoff: { __typename?: 'DeliveryHandoff', id: string, opportunityId: string, projectId: string, engagementId: string, managerId: string, reviewerId: string, setupTaskIds: Array<string>, createdAt: string } };
+
+export type DeliveryKnowledgeQueryVariables = Exact<{
+  input: DeliveryKnowledgeInput;
+}>;
+
+
+export type DeliveryKnowledgeQuery = { __typename?: 'Query', deliveryKnowledge: { __typename?: 'DeliveryKnowledgeSnapshot', workspaceId: string, memberId: string, userWorkspaceId: string, canPublish: boolean, nextCursor?: string | null, items: Array<{ __typename?: 'DeliveryKnowledgeItem', id: string, revision: number, title: string, category: string, meetingDate: string, version: number, publishedVersion?: number | null, publishedAt?: string | null, createdBy: string, canEdit: boolean }>, detail?: { __typename?: 'DeliveryKnowledgeDetail', id: string, revision: number, title: string, category: string, meetingDate: string, version: number, currentVersion: number, publishedVersion?: number | null, publishedAt?: string | null, createdBy: string, canEdit: boolean, sourceUrl: string, transcript?: string | null, knowledge: string } | null } };
+
+export type SaveDeliveryKnowledgeMutationVariables = Exact<{
+  input: DeliveryKnowledgeSaveInput;
+}>;
+
+
+export type SaveDeliveryKnowledgeMutation = { __typename?: 'Mutation', saveDeliveryKnowledge: string };
+
+export type PublishDeliveryKnowledgeMutationVariables = Exact<{
+  input: DeliveryKnowledgePublishInput;
+}>;
+
+
+export type PublishDeliveryKnowledgeMutation = { __typename?: 'Mutation', publishDeliveryKnowledge: boolean };
+
+export type DeliveryReadinessQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type DeliveryReadinessQuery = { __typename?: 'Query', deliveryReadiness: { __typename?: 'DeliveryReadinessSnapshot', workspaceId: string, memberId: string, userWorkspaceId: string, observedAt: string, items: Array<{ __typename?: 'DeliveryReadinessItem', id: string, capability: string, accountName?: string | null, status: string, reason: string, destination: string, lastSuccessAt?: string | null }> } };
+
+export type DeliveryRevisionsQueryVariables = Exact<{
+  input: DeliveryRevisionsInput;
+}>;
+
+
+export type DeliveryRevisionsQuery = { __typename?: 'Query', deliveryRevisions: { __typename?: 'DeliveryRevisions', workspaceId: string, memberId: string, userWorkspaceId: string, taskId: string, canManage: boolean, canReadFinance: boolean, canManageFinance: boolean, total: number, nextBeforeRound?: number | null, rounds: Array<{ __typename?: 'DeliveryRevision', id: string, round: number, revision: number, submissionVersion?: number | null, source: string, reason: string, cause: string, createdAt: string, effortMinutes?: number | null, internalCost?: number | null, proposedCharge?: number | null, currency?: string | null }> } };
+
+export type SaveDeliveryRevisionMutationVariables = Exact<{
+  input: DeliveryRevisionSaveInput;
+}>;
+
+
+export type SaveDeliveryRevisionMutation = { __typename?: 'Mutation', saveDeliveryRevision: boolean };
+
+export type DeliveryRevisionCostsQueryVariables = Exact<{
+  input: DeliveryRevisionCostsInput;
+}>;
+
+
+export type DeliveryRevisionCostsQuery = { __typename?: 'Query', deliveryRevisionCosts: { __typename?: 'DeliveryRevisionCosts', workspaceId: string, memberId: string, userWorkspaceId: string, startDate: string, endDate: string, projectId?: string | null, groups: Array<{ __typename?: 'DeliveryRevisionCostGroup', projectId: string, projectName: string, cause: string, currency?: string | null, rounds: number, missingCostCount: number, missingEffortCount: number, recordedCost: number, proposedCharges: number, recordedEffortMinutes: number }> } };
+
+export type DeliveryWorkflowDefinitionFieldsFragment = { __typename?: 'DeliveryWorkflowDefinition', name: string, description: string, service: string, definitionOfDone: string, checklist: Array<{ __typename?: 'DeliveryWorkflowCheck', id: string, label: string, required: boolean }>, evidence: Array<{ __typename?: 'DeliveryWorkflowEvidence', id: string, label: string, instructions: string, kind: string, required: boolean }>, reviewChecks: Array<{ __typename?: 'DeliveryWorkflowCheck', id: string, label: string, required: boolean }> };
+
+export type DeliveryAppliedWorkflowFieldsFragment = { __typename?: 'DeliveryAppliedWorkflow', templateId: string, version: number, revision: number, appliedAt: string, appliedByName: string, checkedIds: Array<string>, definition: { __typename?: 'DeliveryWorkflowDefinition', name: string, description: string, service: string, definitionOfDone: string, checklist: Array<{ __typename?: 'DeliveryWorkflowCheck', id: string, label: string, required: boolean }>, evidence: Array<{ __typename?: 'DeliveryWorkflowEvidence', id: string, label: string, instructions: string, kind: string, required: boolean }>, reviewChecks: Array<{ __typename?: 'DeliveryWorkflowCheck', id: string, label: string, required: boolean }> }, evidence: Array<{ __typename?: 'DeliveryWorkflowAnswer', requirementId: string, value: string }> };
+
+export type DeliveryWorkflowCatalogFieldsFragment = { __typename?: 'DeliveryWorkflowCatalog', workspaceId: string, memberId: string, userWorkspaceId: string, templates: Array<{ __typename?: 'DeliveryWorkflowTemplate', id: string, revision: number, archived: boolean, stateReason: string, current: { __typename?: 'DeliveryWorkflowVersion', templateId: string, version: number, publishedAt: string, publishedByName: string, reason: string, definition: { __typename?: 'DeliveryWorkflowDefinition', name: string, description: string, service: string, definitionOfDone: string, checklist: Array<{ __typename?: 'DeliveryWorkflowCheck', id: string, label: string, required: boolean }>, evidence: Array<{ __typename?: 'DeliveryWorkflowEvidence', id: string, label: string, instructions: string, kind: string, required: boolean }>, reviewChecks: Array<{ __typename?: 'DeliveryWorkflowCheck', id: string, label: string, required: boolean }> } } }>, versions: Array<{ __typename?: 'DeliveryWorkflowVersion', templateId: string, version: number, publishedAt: string, publishedByName: string, reason: string, definition: { __typename?: 'DeliveryWorkflowDefinition', name: string, description: string, service: string, definitionOfDone: string, checklist: Array<{ __typename?: 'DeliveryWorkflowCheck', id: string, label: string, required: boolean }>, evidence: Array<{ __typename?: 'DeliveryWorkflowEvidence', id: string, label: string, instructions: string, kind: string, required: boolean }>, reviewChecks: Array<{ __typename?: 'DeliveryWorkflowCheck', id: string, label: string, required: boolean }> } }>, starters: Array<{ __typename?: 'DeliveryWorkflowStarter', key: string, definition: { __typename?: 'DeliveryWorkflowDefinition', name: string, description: string, service: string, definitionOfDone: string, checklist: Array<{ __typename?: 'DeliveryWorkflowCheck', id: string, label: string, required: boolean }>, evidence: Array<{ __typename?: 'DeliveryWorkflowEvidence', id: string, label: string, instructions: string, kind: string, required: boolean }>, reviewChecks: Array<{ __typename?: 'DeliveryWorkflowCheck', id: string, label: string, required: boolean }> } }> };
+
+export type DeliveryTaskWorkflowFieldsFragment = { __typename?: 'DeliveryTaskWorkflow', workspaceId: string, memberId: string, userWorkspaceId: string, taskId: string, taskRevision: number, canManage: boolean, canEdit: boolean, locked: boolean, missingRequirements: Array<string>, nextHistoryCursor?: string | null, workflow?: { __typename?: 'DeliveryAppliedWorkflow', templateId: string, version: number, revision: number, appliedAt: string, appliedByName: string, checkedIds: Array<string>, definition: { __typename?: 'DeliveryWorkflowDefinition', name: string, description: string, service: string, definitionOfDone: string, checklist: Array<{ __typename?: 'DeliveryWorkflowCheck', id: string, label: string, required: boolean }>, evidence: Array<{ __typename?: 'DeliveryWorkflowEvidence', id: string, label: string, instructions: string, kind: string, required: boolean }>, reviewChecks: Array<{ __typename?: 'DeliveryWorkflowCheck', id: string, label: string, required: boolean }> }, evidence: Array<{ __typename?: 'DeliveryWorkflowAnswer', requirementId: string, value: string }> } | null, previousApplications: Array<{ __typename?: 'DeliveryAppliedWorkflow', templateId: string, version: number, revision: number, appliedAt: string, appliedByName: string, checkedIds: Array<string>, definition: { __typename?: 'DeliveryWorkflowDefinition', name: string, description: string, service: string, definitionOfDone: string, checklist: Array<{ __typename?: 'DeliveryWorkflowCheck', id: string, label: string, required: boolean }>, evidence: Array<{ __typename?: 'DeliveryWorkflowEvidence', id: string, label: string, instructions: string, kind: string, required: boolean }>, reviewChecks: Array<{ __typename?: 'DeliveryWorkflowCheck', id: string, label: string, required: boolean }> }, evidence: Array<{ __typename?: 'DeliveryWorkflowAnswer', requirementId: string, value: string }> }> };
+
+export type DeliveryWorkflowCatalogQueryVariables = Exact<{
+  input: DeliveryWorkflowCatalogInput;
+}>;
+
+
+export type DeliveryWorkflowCatalogQuery = { __typename?: 'Query', deliveryWorkflowCatalog: { __typename?: 'DeliveryWorkflowCatalog', workspaceId: string, memberId: string, userWorkspaceId: string, templates: Array<{ __typename?: 'DeliveryWorkflowTemplate', id: string, revision: number, archived: boolean, stateReason: string, current: { __typename?: 'DeliveryWorkflowVersion', templateId: string, version: number, publishedAt: string, publishedByName: string, reason: string, definition: { __typename?: 'DeliveryWorkflowDefinition', name: string, description: string, service: string, definitionOfDone: string, checklist: Array<{ __typename?: 'DeliveryWorkflowCheck', id: string, label: string, required: boolean }>, evidence: Array<{ __typename?: 'DeliveryWorkflowEvidence', id: string, label: string, instructions: string, kind: string, required: boolean }>, reviewChecks: Array<{ __typename?: 'DeliveryWorkflowCheck', id: string, label: string, required: boolean }> } } }>, versions: Array<{ __typename?: 'DeliveryWorkflowVersion', templateId: string, version: number, publishedAt: string, publishedByName: string, reason: string, definition: { __typename?: 'DeliveryWorkflowDefinition', name: string, description: string, service: string, definitionOfDone: string, checklist: Array<{ __typename?: 'DeliveryWorkflowCheck', id: string, label: string, required: boolean }>, evidence: Array<{ __typename?: 'DeliveryWorkflowEvidence', id: string, label: string, instructions: string, kind: string, required: boolean }>, reviewChecks: Array<{ __typename?: 'DeliveryWorkflowCheck', id: string, label: string, required: boolean }> } }>, starters: Array<{ __typename?: 'DeliveryWorkflowStarter', key: string, definition: { __typename?: 'DeliveryWorkflowDefinition', name: string, description: string, service: string, definitionOfDone: string, checklist: Array<{ __typename?: 'DeliveryWorkflowCheck', id: string, label: string, required: boolean }>, evidence: Array<{ __typename?: 'DeliveryWorkflowEvidence', id: string, label: string, instructions: string, kind: string, required: boolean }>, reviewChecks: Array<{ __typename?: 'DeliveryWorkflowCheck', id: string, label: string, required: boolean }> } }> } };
+
+export type SaveDeliveryWorkflowMutationVariables = Exact<{
+  input: DeliveryWorkflowSaveInput;
+}>;
+
+
+export type SaveDeliveryWorkflowMutation = { __typename?: 'Mutation', saveDeliveryWorkflow: { __typename?: 'DeliveryWorkflowCatalog', workspaceId: string, memberId: string, userWorkspaceId: string, templates: Array<{ __typename?: 'DeliveryWorkflowTemplate', id: string, revision: number, archived: boolean, stateReason: string, current: { __typename?: 'DeliveryWorkflowVersion', templateId: string, version: number, publishedAt: string, publishedByName: string, reason: string, definition: { __typename?: 'DeliveryWorkflowDefinition', name: string, description: string, service: string, definitionOfDone: string, checklist: Array<{ __typename?: 'DeliveryWorkflowCheck', id: string, label: string, required: boolean }>, evidence: Array<{ __typename?: 'DeliveryWorkflowEvidence', id: string, label: string, instructions: string, kind: string, required: boolean }>, reviewChecks: Array<{ __typename?: 'DeliveryWorkflowCheck', id: string, label: string, required: boolean }> } } }>, versions: Array<{ __typename?: 'DeliveryWorkflowVersion', templateId: string, version: number, publishedAt: string, publishedByName: string, reason: string, definition: { __typename?: 'DeliveryWorkflowDefinition', name: string, description: string, service: string, definitionOfDone: string, checklist: Array<{ __typename?: 'DeliveryWorkflowCheck', id: string, label: string, required: boolean }>, evidence: Array<{ __typename?: 'DeliveryWorkflowEvidence', id: string, label: string, instructions: string, kind: string, required: boolean }>, reviewChecks: Array<{ __typename?: 'DeliveryWorkflowCheck', id: string, label: string, required: boolean }> } }>, starters: Array<{ __typename?: 'DeliveryWorkflowStarter', key: string, definition: { __typename?: 'DeliveryWorkflowDefinition', name: string, description: string, service: string, definitionOfDone: string, checklist: Array<{ __typename?: 'DeliveryWorkflowCheck', id: string, label: string, required: boolean }>, evidence: Array<{ __typename?: 'DeliveryWorkflowEvidence', id: string, label: string, instructions: string, kind: string, required: boolean }>, reviewChecks: Array<{ __typename?: 'DeliveryWorkflowCheck', id: string, label: string, required: boolean }> } }> } };
+
+export type ArchiveDeliveryWorkflowMutationVariables = Exact<{
+  input: DeliveryWorkflowArchiveInput;
+}>;
+
+
+export type ArchiveDeliveryWorkflowMutation = { __typename?: 'Mutation', archiveDeliveryWorkflow: { __typename?: 'DeliveryWorkflowCatalog', workspaceId: string, memberId: string, userWorkspaceId: string, templates: Array<{ __typename?: 'DeliveryWorkflowTemplate', id: string, revision: number, archived: boolean, stateReason: string, current: { __typename?: 'DeliveryWorkflowVersion', templateId: string, version: number, publishedAt: string, publishedByName: string, reason: string, definition: { __typename?: 'DeliveryWorkflowDefinition', name: string, description: string, service: string, definitionOfDone: string, checklist: Array<{ __typename?: 'DeliveryWorkflowCheck', id: string, label: string, required: boolean }>, evidence: Array<{ __typename?: 'DeliveryWorkflowEvidence', id: string, label: string, instructions: string, kind: string, required: boolean }>, reviewChecks: Array<{ __typename?: 'DeliveryWorkflowCheck', id: string, label: string, required: boolean }> } } }>, versions: Array<{ __typename?: 'DeliveryWorkflowVersion', templateId: string, version: number, publishedAt: string, publishedByName: string, reason: string, definition: { __typename?: 'DeliveryWorkflowDefinition', name: string, description: string, service: string, definitionOfDone: string, checklist: Array<{ __typename?: 'DeliveryWorkflowCheck', id: string, label: string, required: boolean }>, evidence: Array<{ __typename?: 'DeliveryWorkflowEvidence', id: string, label: string, instructions: string, kind: string, required: boolean }>, reviewChecks: Array<{ __typename?: 'DeliveryWorkflowCheck', id: string, label: string, required: boolean }> } }>, starters: Array<{ __typename?: 'DeliveryWorkflowStarter', key: string, definition: { __typename?: 'DeliveryWorkflowDefinition', name: string, description: string, service: string, definitionOfDone: string, checklist: Array<{ __typename?: 'DeliveryWorkflowCheck', id: string, label: string, required: boolean }>, evidence: Array<{ __typename?: 'DeliveryWorkflowEvidence', id: string, label: string, instructions: string, kind: string, required: boolean }>, reviewChecks: Array<{ __typename?: 'DeliveryWorkflowCheck', id: string, label: string, required: boolean }> } }> } };
+
+export type DeliveryTaskWorkflowQueryVariables = Exact<{
+  input: DeliveryTaskWorkflowInput;
+}>;
+
+
+export type DeliveryTaskWorkflowQuery = { __typename?: 'Query', deliveryTaskWorkflow: { __typename?: 'DeliveryTaskWorkflow', workspaceId: string, memberId: string, userWorkspaceId: string, taskId: string, taskRevision: number, canManage: boolean, canEdit: boolean, locked: boolean, missingRequirements: Array<string>, nextHistoryCursor?: string | null, workflow?: { __typename?: 'DeliveryAppliedWorkflow', templateId: string, version: number, revision: number, appliedAt: string, appliedByName: string, checkedIds: Array<string>, definition: { __typename?: 'DeliveryWorkflowDefinition', name: string, description: string, service: string, definitionOfDone: string, checklist: Array<{ __typename?: 'DeliveryWorkflowCheck', id: string, label: string, required: boolean }>, evidence: Array<{ __typename?: 'DeliveryWorkflowEvidence', id: string, label: string, instructions: string, kind: string, required: boolean }>, reviewChecks: Array<{ __typename?: 'DeliveryWorkflowCheck', id: string, label: string, required: boolean }> }, evidence: Array<{ __typename?: 'DeliveryWorkflowAnswer', requirementId: string, value: string }> } | null, previousApplications: Array<{ __typename?: 'DeliveryAppliedWorkflow', templateId: string, version: number, revision: number, appliedAt: string, appliedByName: string, checkedIds: Array<string>, definition: { __typename?: 'DeliveryWorkflowDefinition', name: string, description: string, service: string, definitionOfDone: string, checklist: Array<{ __typename?: 'DeliveryWorkflowCheck', id: string, label: string, required: boolean }>, evidence: Array<{ __typename?: 'DeliveryWorkflowEvidence', id: string, label: string, instructions: string, kind: string, required: boolean }>, reviewChecks: Array<{ __typename?: 'DeliveryWorkflowCheck', id: string, label: string, required: boolean }> }, evidence: Array<{ __typename?: 'DeliveryWorkflowAnswer', requirementId: string, value: string }> }> } };
+
+export type ApplyDeliveryWorkflowMutationVariables = Exact<{
+  input: DeliveryWorkflowApplyInput;
+}>;
+
+
+export type ApplyDeliveryWorkflowMutation = { __typename?: 'Mutation', applyDeliveryWorkflow: { __typename?: 'DeliveryTaskWorkflow', workspaceId: string, memberId: string, userWorkspaceId: string, taskId: string, taskRevision: number, canManage: boolean, canEdit: boolean, locked: boolean, missingRequirements: Array<string>, nextHistoryCursor?: string | null, workflow?: { __typename?: 'DeliveryAppliedWorkflow', templateId: string, version: number, revision: number, appliedAt: string, appliedByName: string, checkedIds: Array<string>, definition: { __typename?: 'DeliveryWorkflowDefinition', name: string, description: string, service: string, definitionOfDone: string, checklist: Array<{ __typename?: 'DeliveryWorkflowCheck', id: string, label: string, required: boolean }>, evidence: Array<{ __typename?: 'DeliveryWorkflowEvidence', id: string, label: string, instructions: string, kind: string, required: boolean }>, reviewChecks: Array<{ __typename?: 'DeliveryWorkflowCheck', id: string, label: string, required: boolean }> }, evidence: Array<{ __typename?: 'DeliveryWorkflowAnswer', requirementId: string, value: string }> } | null, previousApplications: Array<{ __typename?: 'DeliveryAppliedWorkflow', templateId: string, version: number, revision: number, appliedAt: string, appliedByName: string, checkedIds: Array<string>, definition: { __typename?: 'DeliveryWorkflowDefinition', name: string, description: string, service: string, definitionOfDone: string, checklist: Array<{ __typename?: 'DeliveryWorkflowCheck', id: string, label: string, required: boolean }>, evidence: Array<{ __typename?: 'DeliveryWorkflowEvidence', id: string, label: string, instructions: string, kind: string, required: boolean }>, reviewChecks: Array<{ __typename?: 'DeliveryWorkflowCheck', id: string, label: string, required: boolean }> }, evidence: Array<{ __typename?: 'DeliveryWorkflowAnswer', requirementId: string, value: string }> }> } };
+
+export type SaveDeliveryWorkflowProgressMutationVariables = Exact<{
+  input: DeliveryWorkflowProgressInput;
+}>;
+
+
+export type SaveDeliveryWorkflowProgressMutation = { __typename?: 'Mutation', saveDeliveryWorkflowProgress: { __typename?: 'DeliveryTaskWorkflow', workspaceId: string, memberId: string, userWorkspaceId: string, taskId: string, taskRevision: number, canManage: boolean, canEdit: boolean, locked: boolean, missingRequirements: Array<string>, nextHistoryCursor?: string | null, workflow?: { __typename?: 'DeliveryAppliedWorkflow', templateId: string, version: number, revision: number, appliedAt: string, appliedByName: string, checkedIds: Array<string>, definition: { __typename?: 'DeliveryWorkflowDefinition', name: string, description: string, service: string, definitionOfDone: string, checklist: Array<{ __typename?: 'DeliveryWorkflowCheck', id: string, label: string, required: boolean }>, evidence: Array<{ __typename?: 'DeliveryWorkflowEvidence', id: string, label: string, instructions: string, kind: string, required: boolean }>, reviewChecks: Array<{ __typename?: 'DeliveryWorkflowCheck', id: string, label: string, required: boolean }> }, evidence: Array<{ __typename?: 'DeliveryWorkflowAnswer', requirementId: string, value: string }> } | null, previousApplications: Array<{ __typename?: 'DeliveryAppliedWorkflow', templateId: string, version: number, revision: number, appliedAt: string, appliedByName: string, checkedIds: Array<string>, definition: { __typename?: 'DeliveryWorkflowDefinition', name: string, description: string, service: string, definitionOfDone: string, checklist: Array<{ __typename?: 'DeliveryWorkflowCheck', id: string, label: string, required: boolean }>, evidence: Array<{ __typename?: 'DeliveryWorkflowEvidence', id: string, label: string, instructions: string, kind: string, required: boolean }>, reviewChecks: Array<{ __typename?: 'DeliveryWorkflowCheck', id: string, label: string, required: boolean }> }, evidence: Array<{ __typename?: 'DeliveryWorkflowAnswer', requirementId: string, value: string }> }> } };
+
 export type CompleteFileUploadMutationVariables = Exact<{
   fileId: Scalars['String']['input'];
 }>;
@@ -8425,6 +11280,78 @@ export type GetInviteSuggestionsQueryVariables = Exact<{ [key: string]: never; }
 
 
 export type GetInviteSuggestionsQuery = { __typename?: 'Query', getInviteSuggestions: Array<{ __typename?: 'InviteSuggestion', email: string, displayName?: string | null }> };
+
+export type OtogrowAccessFieldsFragment = { __typename?: 'OtogrowAccess', workspaceId: string, memberId: string, userWorkspaceId: string, roleIds: Array<string>, capabilities: Array<string>, nativeAdministrator: boolean, grants: Array<{ __typename?: 'OtogrowAccessGrant', capability: string, sourceId: string, sourceName: string, sourceType: string }> };
+
+export type OtogrowAccessQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type OtogrowAccessQuery = { __typename?: 'Query', otogrowAccess: { __typename?: 'OtogrowAccess', workspaceId: string, memberId: string, userWorkspaceId: string, roleIds: Array<string>, capabilities: Array<string>, nativeAdministrator: boolean, grants: Array<{ __typename?: 'OtogrowAccessGrant', capability: string, sourceId: string, sourceName: string, sourceType: string }> } };
+
+export type OtogrowDirectoryFieldsFragment = { __typename?: 'OtogrowRoleDirectory', actor: { __typename?: 'OtogrowAccess', workspaceId: string, memberId: string, userWorkspaceId: string, roleIds: Array<string>, capabilities: Array<string>, nativeAdministrator: boolean, grants: Array<{ __typename?: 'OtogrowAccessGrant', capability: string, sourceId: string, sourceName: string, sourceType: string }> }, roles: Array<{ __typename?: 'OtogrowRole', id: string, name: string, description: string, capabilities: Array<string>, revision: number }>, members: Array<{ __typename?: 'OtogrowRoleMember', memberId: string, name: string, roleIds: Array<string>, revision: number, access: { __typename?: 'OtogrowAccess', workspaceId: string, memberId: string, userWorkspaceId: string, roleIds: Array<string>, capabilities: Array<string>, nativeAdministrator: boolean, grants: Array<{ __typename?: 'OtogrowAccessGrant', capability: string, sourceId: string, sourceName: string, sourceType: string }> } }> };
+
+export type OtogrowRoleDirectoryQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type OtogrowRoleDirectoryQuery = { __typename?: 'Query', otogrowRoleDirectory: { __typename?: 'OtogrowRoleDirectory', actor: { __typename?: 'OtogrowAccess', workspaceId: string, memberId: string, userWorkspaceId: string, roleIds: Array<string>, capabilities: Array<string>, nativeAdministrator: boolean, grants: Array<{ __typename?: 'OtogrowAccessGrant', capability: string, sourceId: string, sourceName: string, sourceType: string }> }, roles: Array<{ __typename?: 'OtogrowRole', id: string, name: string, description: string, capabilities: Array<string>, revision: number }>, members: Array<{ __typename?: 'OtogrowRoleMember', memberId: string, name: string, roleIds: Array<string>, revision: number, access: { __typename?: 'OtogrowAccess', workspaceId: string, memberId: string, userWorkspaceId: string, roleIds: Array<string>, capabilities: Array<string>, nativeAdministrator: boolean, grants: Array<{ __typename?: 'OtogrowAccessGrant', capability: string, sourceId: string, sourceName: string, sourceType: string }> } }> } };
+
+export type SaveOtogrowRoleMutationVariables = Exact<{
+  input: OtogrowRoleInput;
+}>;
+
+
+export type SaveOtogrowRoleMutation = { __typename?: 'Mutation', saveOtogrowRole: { __typename?: 'OtogrowRoleDirectory', actor: { __typename?: 'OtogrowAccess', workspaceId: string, memberId: string, userWorkspaceId: string, roleIds: Array<string>, capabilities: Array<string>, nativeAdministrator: boolean, grants: Array<{ __typename?: 'OtogrowAccessGrant', capability: string, sourceId: string, sourceName: string, sourceType: string }> }, roles: Array<{ __typename?: 'OtogrowRole', id: string, name: string, description: string, capabilities: Array<string>, revision: number }>, members: Array<{ __typename?: 'OtogrowRoleMember', memberId: string, name: string, roleIds: Array<string>, revision: number, access: { __typename?: 'OtogrowAccess', workspaceId: string, memberId: string, userWorkspaceId: string, roleIds: Array<string>, capabilities: Array<string>, nativeAdministrator: boolean, grants: Array<{ __typename?: 'OtogrowAccessGrant', capability: string, sourceId: string, sourceName: string, sourceType: string }> } }> } };
+
+export type AssignOtogrowRolesMutationVariables = Exact<{
+  input: OtogrowRoleAssignmentInput;
+}>;
+
+
+export type AssignOtogrowRolesMutation = { __typename?: 'Mutation', assignOtogrowRoles: { __typename?: 'OtogrowRoleDirectory', actor: { __typename?: 'OtogrowAccess', workspaceId: string, memberId: string, userWorkspaceId: string, roleIds: Array<string>, capabilities: Array<string>, nativeAdministrator: boolean, grants: Array<{ __typename?: 'OtogrowAccessGrant', capability: string, sourceId: string, sourceName: string, sourceType: string }> }, roles: Array<{ __typename?: 'OtogrowRole', id: string, name: string, description: string, capabilities: Array<string>, revision: number }>, members: Array<{ __typename?: 'OtogrowRoleMember', memberId: string, name: string, roleIds: Array<string>, revision: number, access: { __typename?: 'OtogrowAccess', workspaceId: string, memberId: string, userWorkspaceId: string, roleIds: Array<string>, capabilities: Array<string>, nativeAdministrator: boolean, grants: Array<{ __typename?: 'OtogrowAccessGrant', capability: string, sourceId: string, sourceName: string, sourceType: string }> } }> } };
+
+export type OtogrowActivityQueryVariables = Exact<{
+  input: OtogrowActivityInput;
+}>;
+
+
+export type OtogrowActivityQuery = { __typename?: 'Query', otogrowActivity: { __typename?: 'OtogrowActivityFeed', workspaceId: string, memberId: string, userWorkspaceId: string, nextCursor?: string | null, coverageStartedAt?: string | null, events: Array<{ __typename?: 'OtogrowActivityEvent', id: string, occurredAt: string, actorId?: string | null, actorName: string, actorType: string, subjectMemberId?: string | null, subjectName?: string | null, action: string, category: string, outcome: string, summary: string, projectId?: string | null, projectName?: string | null, clientId?: string | null, clientName?: string | null, taskId?: string | null, taskName?: string | null, agentName?: string | null, sourceType: string, sourceId: string, changes: Array<{ __typename?: 'OtogrowActivityChange', field: string, before?: string | null, after?: string | null }> }>, people: Array<{ __typename?: 'OtogrowActivityOption', id: string, name: string }>, projects: Array<{ __typename?: 'OtogrowActivityOption', id: string, name: string }>, clients: Array<{ __typename?: 'OtogrowActivityOption', id: string, name: string }> } };
+
+export type OtogrowAiBudgetFieldsFragment = { __typename?: 'OtogrowAiBudgetSnapshot', workspaceId: string, memberId: string, userWorkspaceId: string, coverageStartedAt?: string | null, configured: boolean, chargedUsd: string, heldUsd: string, unresolvedCount: number, nextCursor?: string | null, budgets: Array<{ __typename?: 'OtogrowAiBudget', id: string, scope: string, scopeId: string, scopeName: string, revision: number, enabled: boolean, capUsd: string, openingSpentUsd: string, chargedUsd: string, heldUsd: string, remainingUsd: string }>, priceProfiles: Array<{ __typename?: 'OtogrowAiPriceProfile', id: string, modelId: string, kind: string, revision: number, enabled: boolean, source: string, verifiedAt: string, pricing: { __typename?: 'OtogrowAiPricing', inputUsdPerMillionTokens: string, outputUsdPerMillionTokens: string, reasoningUsdPerMillionTokens: string, cacheReadUsdPerMillionTokens: string, cacheWriteUsdPerMillionTokens: string, maxInputTokens: number, maxOutputTokens: number, maxReasoningTokens: number, outputIncludesReasoning: boolean, longContextThresholdTokens?: number | null, longInputUsdPerMillionTokens?: string | null, longOutputUsdPerMillionTokens?: string | null, longReasoningUsdPerMillionTokens?: string | null, longCacheReadUsdPerMillionTokens?: string | null, longCacheWriteUsdPerMillionTokens?: string | null } }>, recentSpend: Array<{ __typename?: 'OtogrowAiSpend', id: string, revision: number, sourceKind: string, sourceRunId: string, state: string, modelId: string, kind: string, clientName?: string | null, taskName?: string | null, reservedUsd: string, actualUsd?: string | null, reportedActualUsd?: string | null, heldUsd: string, boundSource: string, priceSource: string, priceRevision: number, priceVerifiedAt: string, createdAt: string, dispatchedAt?: string | null, settledAt?: string | null, attentionReason?: string | null }>, clients: Array<{ __typename?: 'OtogrowAiBudgetOption', id: string, name: string }>, tasks: Array<{ __typename?: 'OtogrowAiBudgetOption', id: string, name: string }> };
+
+export type OtogrowAiBudgetSnapshotQueryVariables = Exact<{
+  input: OtogrowAiBudgetSnapshotInput;
+}>;
+
+
+export type OtogrowAiBudgetSnapshotQuery = { __typename?: 'Query', otogrowAiBudgetSnapshot: { __typename?: 'OtogrowAiBudgetSnapshot', workspaceId: string, memberId: string, userWorkspaceId: string, coverageStartedAt?: string | null, configured: boolean, chargedUsd: string, heldUsd: string, unresolvedCount: number, nextCursor?: string | null, budgets: Array<{ __typename?: 'OtogrowAiBudget', id: string, scope: string, scopeId: string, scopeName: string, revision: number, enabled: boolean, capUsd: string, openingSpentUsd: string, chargedUsd: string, heldUsd: string, remainingUsd: string }>, priceProfiles: Array<{ __typename?: 'OtogrowAiPriceProfile', id: string, modelId: string, kind: string, revision: number, enabled: boolean, source: string, verifiedAt: string, pricing: { __typename?: 'OtogrowAiPricing', inputUsdPerMillionTokens: string, outputUsdPerMillionTokens: string, reasoningUsdPerMillionTokens: string, cacheReadUsdPerMillionTokens: string, cacheWriteUsdPerMillionTokens: string, maxInputTokens: number, maxOutputTokens: number, maxReasoningTokens: number, outputIncludesReasoning: boolean, longContextThresholdTokens?: number | null, longInputUsdPerMillionTokens?: string | null, longOutputUsdPerMillionTokens?: string | null, longReasoningUsdPerMillionTokens?: string | null, longCacheReadUsdPerMillionTokens?: string | null, longCacheWriteUsdPerMillionTokens?: string | null } }>, recentSpend: Array<{ __typename?: 'OtogrowAiSpend', id: string, revision: number, sourceKind: string, sourceRunId: string, state: string, modelId: string, kind: string, clientName?: string | null, taskName?: string | null, reservedUsd: string, actualUsd?: string | null, reportedActualUsd?: string | null, heldUsd: string, boundSource: string, priceSource: string, priceRevision: number, priceVerifiedAt: string, createdAt: string, dispatchedAt?: string | null, settledAt?: string | null, attentionReason?: string | null }>, clients: Array<{ __typename?: 'OtogrowAiBudgetOption', id: string, name: string }>, tasks: Array<{ __typename?: 'OtogrowAiBudgetOption', id: string, name: string }> } };
+
+export type SaveOtogrowAiBudgetMutationVariables = Exact<{
+  input: OtogrowAiBudgetSaveInput;
+}>;
+
+
+export type SaveOtogrowAiBudgetMutation = { __typename?: 'Mutation', saveOtogrowAiBudget: { __typename?: 'OtogrowAiBudgetSnapshot', workspaceId: string, memberId: string, userWorkspaceId: string, coverageStartedAt?: string | null, configured: boolean, chargedUsd: string, heldUsd: string, unresolvedCount: number, nextCursor?: string | null, budgets: Array<{ __typename?: 'OtogrowAiBudget', id: string, scope: string, scopeId: string, scopeName: string, revision: number, enabled: boolean, capUsd: string, openingSpentUsd: string, chargedUsd: string, heldUsd: string, remainingUsd: string }>, priceProfiles: Array<{ __typename?: 'OtogrowAiPriceProfile', id: string, modelId: string, kind: string, revision: number, enabled: boolean, source: string, verifiedAt: string, pricing: { __typename?: 'OtogrowAiPricing', inputUsdPerMillionTokens: string, outputUsdPerMillionTokens: string, reasoningUsdPerMillionTokens: string, cacheReadUsdPerMillionTokens: string, cacheWriteUsdPerMillionTokens: string, maxInputTokens: number, maxOutputTokens: number, maxReasoningTokens: number, outputIncludesReasoning: boolean, longContextThresholdTokens?: number | null, longInputUsdPerMillionTokens?: string | null, longOutputUsdPerMillionTokens?: string | null, longReasoningUsdPerMillionTokens?: string | null, longCacheReadUsdPerMillionTokens?: string | null, longCacheWriteUsdPerMillionTokens?: string | null } }>, recentSpend: Array<{ __typename?: 'OtogrowAiSpend', id: string, revision: number, sourceKind: string, sourceRunId: string, state: string, modelId: string, kind: string, clientName?: string | null, taskName?: string | null, reservedUsd: string, actualUsd?: string | null, reportedActualUsd?: string | null, heldUsd: string, boundSource: string, priceSource: string, priceRevision: number, priceVerifiedAt: string, createdAt: string, dispatchedAt?: string | null, settledAt?: string | null, attentionReason?: string | null }>, clients: Array<{ __typename?: 'OtogrowAiBudgetOption', id: string, name: string }>, tasks: Array<{ __typename?: 'OtogrowAiBudgetOption', id: string, name: string }> } };
+
+export type SaveOtogrowAiPriceMutationVariables = Exact<{
+  input: OtogrowAiPriceSaveInput;
+}>;
+
+
+export type SaveOtogrowAiPriceMutation = { __typename?: 'Mutation', saveOtogrowAiPrice: { __typename?: 'OtogrowAiBudgetSnapshot', workspaceId: string, memberId: string, userWorkspaceId: string, coverageStartedAt?: string | null, configured: boolean, chargedUsd: string, heldUsd: string, unresolvedCount: number, nextCursor?: string | null, budgets: Array<{ __typename?: 'OtogrowAiBudget', id: string, scope: string, scopeId: string, scopeName: string, revision: number, enabled: boolean, capUsd: string, openingSpentUsd: string, chargedUsd: string, heldUsd: string, remainingUsd: string }>, priceProfiles: Array<{ __typename?: 'OtogrowAiPriceProfile', id: string, modelId: string, kind: string, revision: number, enabled: boolean, source: string, verifiedAt: string, pricing: { __typename?: 'OtogrowAiPricing', inputUsdPerMillionTokens: string, outputUsdPerMillionTokens: string, reasoningUsdPerMillionTokens: string, cacheReadUsdPerMillionTokens: string, cacheWriteUsdPerMillionTokens: string, maxInputTokens: number, maxOutputTokens: number, maxReasoningTokens: number, outputIncludesReasoning: boolean, longContextThresholdTokens?: number | null, longInputUsdPerMillionTokens?: string | null, longOutputUsdPerMillionTokens?: string | null, longReasoningUsdPerMillionTokens?: string | null, longCacheReadUsdPerMillionTokens?: string | null, longCacheWriteUsdPerMillionTokens?: string | null } }>, recentSpend: Array<{ __typename?: 'OtogrowAiSpend', id: string, revision: number, sourceKind: string, sourceRunId: string, state: string, modelId: string, kind: string, clientName?: string | null, taskName?: string | null, reservedUsd: string, actualUsd?: string | null, reportedActualUsd?: string | null, heldUsd: string, boundSource: string, priceSource: string, priceRevision: number, priceVerifiedAt: string, createdAt: string, dispatchedAt?: string | null, settledAt?: string | null, attentionReason?: string | null }>, clients: Array<{ __typename?: 'OtogrowAiBudgetOption', id: string, name: string }>, tasks: Array<{ __typename?: 'OtogrowAiBudgetOption', id: string, name: string }> } };
+
+export type ReconcileOtogrowAiSpendMutationVariables = Exact<{
+  input: OtogrowAiSpendReconcileInput;
+}>;
+
+
+export type ReconcileOtogrowAiSpendMutation = { __typename?: 'Mutation', reconcileOtogrowAiSpend: { __typename?: 'OtogrowAiBudgetSnapshot', workspaceId: string, memberId: string, userWorkspaceId: string, coverageStartedAt?: string | null, configured: boolean, chargedUsd: string, heldUsd: string, unresolvedCount: number, nextCursor?: string | null, budgets: Array<{ __typename?: 'OtogrowAiBudget', id: string, scope: string, scopeId: string, scopeName: string, revision: number, enabled: boolean, capUsd: string, openingSpentUsd: string, chargedUsd: string, heldUsd: string, remainingUsd: string }>, priceProfiles: Array<{ __typename?: 'OtogrowAiPriceProfile', id: string, modelId: string, kind: string, revision: number, enabled: boolean, source: string, verifiedAt: string, pricing: { __typename?: 'OtogrowAiPricing', inputUsdPerMillionTokens: string, outputUsdPerMillionTokens: string, reasoningUsdPerMillionTokens: string, cacheReadUsdPerMillionTokens: string, cacheWriteUsdPerMillionTokens: string, maxInputTokens: number, maxOutputTokens: number, maxReasoningTokens: number, outputIncludesReasoning: boolean, longContextThresholdTokens?: number | null, longInputUsdPerMillionTokens?: string | null, longOutputUsdPerMillionTokens?: string | null, longReasoningUsdPerMillionTokens?: string | null, longCacheReadUsdPerMillionTokens?: string | null, longCacheWriteUsdPerMillionTokens?: string | null } }>, recentSpend: Array<{ __typename?: 'OtogrowAiSpend', id: string, revision: number, sourceKind: string, sourceRunId: string, state: string, modelId: string, kind: string, clientName?: string | null, taskName?: string | null, reservedUsd: string, actualUsd?: string | null, reportedActualUsd?: string | null, heldUsd: string, boundSource: string, priceSource: string, priceRevision: number, priceVerifiedAt: string, createdAt: string, dispatchedAt?: string | null, settledAt?: string | null, attentionReason?: string | null }>, clients: Array<{ __typename?: 'OtogrowAiBudgetOption', id: string, name: string }>, tasks: Array<{ __typename?: 'OtogrowAiBudgetOption', id: string, name: string }> } };
+
+export type OtogrowAiSpendHistoryQueryVariables = Exact<{
+  input: OtogrowAiSpendHistoryInput;
+}>;
+
+
+export type OtogrowAiSpendHistoryQuery = { __typename?: 'Query', otogrowAiSpendHistory: { __typename?: 'OtogrowAiSpendHistory', workspaceId: string, memberId: string, userWorkspaceId: string, spendId: string, sourceKind: string, sourceRunId: string, modelId: string, kind: string, clientName?: string | null, taskName?: string | null, priceSource: string, priceRevision: number, priceVerifiedAt: string, nextCursor?: string | null, events: Array<{ __typename?: 'OtogrowAiSpendEvent', id: string, action: string, actorId?: string | null, actorName?: string | null, actorAttribution: string, createdAt: string, evidenceReference?: string | null, reason?: string | null, before: { __typename?: 'OtogrowAiFinancialState', state?: string | null, revision?: number | null, reservedUsd?: string | null, actualUsd?: string | null, reportedActualUsd?: string | null }, after: { __typename?: 'OtogrowAiFinancialState', state?: string | null, revision?: number | null, reservedUsd?: string | null, actualUsd?: string | null, reportedActualUsd?: string | null } }> } };
 
 export type PageLayoutWidgetFragmentFragment = { __typename?: 'PageLayoutWidget', id: string, applicationId: string, universalIdentifier: string, isSystemSideEffect: boolean, title: string, type: WidgetType, objectMetadataId?: string | null, createdAt: string, updatedAt: string, isActive: boolean, deletedAt?: string | null, conditionalDisplay?: any | null, conditionalAvailabilityExpression?: string | null, pageLayoutTabId: string, gridPosition: { __typename?: 'GridPosition', column: number, columnSpan: number, row: number, rowSpan: number }, position?:
     | { __typename?: 'PageLayoutWidgetCanvasPosition', layoutMode: PageLayoutTabLayoutMode }
@@ -10105,10 +13032,31 @@ export const CommandMenuItemFieldsFragmentDoc = {"kind":"Document","definitions"
 export const PageLayoutWidgetFragmentFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"PageLayoutWidgetFragment"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PageLayoutWidget"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"applicationId"}},{"kind":"Field","name":{"kind":"Name","value":"universalIdentifier"}},{"kind":"Field","name":{"kind":"Name","value":"isSystemSideEffect"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"type"}},{"kind":"Field","name":{"kind":"Name","value":"objectMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"isActive"}},{"kind":"Field","name":{"kind":"Name","value":"deletedAt"}},{"kind":"Field","name":{"kind":"Name","value":"conditionalDisplay"}},{"kind":"Field","name":{"kind":"Name","value":"conditionalAvailabilityExpression"}},{"kind":"Field","name":{"kind":"Name","value":"gridPosition"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"column"}},{"kind":"Field","name":{"kind":"Name","value":"columnSpan"}},{"kind":"Field","name":{"kind":"Name","value":"row"}},{"kind":"Field","name":{"kind":"Name","value":"rowSpan"}}]}},{"kind":"Field","name":{"kind":"Name","value":"position"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PageLayoutWidgetGridPosition"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"layoutMode"}},{"kind":"Field","name":{"kind":"Name","value":"row"}},{"kind":"Field","name":{"kind":"Name","value":"column"}},{"kind":"Field","name":{"kind":"Name","value":"rowSpan"}},{"kind":"Field","name":{"kind":"Name","value":"columnSpan"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PageLayoutWidgetVerticalListPosition"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"layoutMode"}},{"kind":"Field","name":{"kind":"Name","value":"index"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PageLayoutWidgetCanvasPosition"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"layoutMode"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"configuration"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"BarChartConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateOperation"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisGroupByFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisGroupBySubFieldName"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisDateGranularity"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisOrderBy"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisManualSortOrder"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisGroupByFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisGroupBySubFieldName"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisGroupByDateGranularity"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisOrderBy"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisManualSortOrder"}},{"kind":"Field","name":{"kind":"Name","value":"omitNullValues"}},{"kind":"Field","name":{"kind":"Name","value":"axisNameDisplay"}},{"kind":"Field","name":{"kind":"Name","value":"displayDataLabel"}},{"kind":"Field","name":{"kind":"Name","value":"displayLegend"}},{"kind":"Field","name":{"kind":"Name","value":"numberFormat"}},{"kind":"Field","name":{"kind":"Name","value":"rangeMin"}},{"kind":"Field","name":{"kind":"Name","value":"rangeMax"}},{"kind":"Field","name":{"kind":"Name","value":"color"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"filter"}},{"kind":"Field","name":{"kind":"Name","value":"groupMode"}},{"kind":"Field","name":{"kind":"Name","value":"layout"}},{"kind":"Field","name":{"kind":"Name","value":"isCumulative"}},{"kind":"Field","name":{"kind":"Name","value":"splitMultiValueFields"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"firstDayOfTheWeek"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"LineChartConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateOperation"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisGroupByFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisGroupBySubFieldName"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisDateGranularity"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisOrderBy"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisManualSortOrder"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisGroupByFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisGroupBySubFieldName"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisGroupByDateGranularity"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisOrderBy"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisManualSortOrder"}},{"kind":"Field","name":{"kind":"Name","value":"omitNullValues"}},{"kind":"Field","name":{"kind":"Name","value":"axisNameDisplay"}},{"kind":"Field","name":{"kind":"Name","value":"displayDataLabel"}},{"kind":"Field","name":{"kind":"Name","value":"displayLegend"}},{"kind":"Field","name":{"kind":"Name","value":"numberFormat"}},{"kind":"Field","name":{"kind":"Name","value":"rangeMin"}},{"kind":"Field","name":{"kind":"Name","value":"rangeMax"}},{"kind":"Field","name":{"kind":"Name","value":"color"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"filter"}},{"kind":"Field","name":{"kind":"Name","value":"isStacked"}},{"kind":"Field","name":{"kind":"Name","value":"isCumulative"}},{"kind":"Field","name":{"kind":"Name","value":"splitMultiValueFields"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"firstDayOfTheWeek"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PieChartConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"groupByFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateOperation"}},{"kind":"Field","name":{"kind":"Name","value":"groupBySubFieldName"}},{"kind":"Field","name":{"kind":"Name","value":"dateGranularity"}},{"kind":"Field","name":{"kind":"Name","value":"orderBy"}},{"kind":"Field","name":{"kind":"Name","value":"manualSortOrder"}},{"kind":"Field","name":{"kind":"Name","value":"displayDataLabel"}},{"kind":"Field","name":{"kind":"Name","value":"showCenterMetric"}},{"kind":"Field","name":{"kind":"Name","value":"displayLegend"}},{"kind":"Field","name":{"kind":"Name","value":"numberFormat"}},{"kind":"Field","name":{"kind":"Name","value":"hideEmptyCategory"}},{"kind":"Field","name":{"kind":"Name","value":"splitMultiValueFields"}},{"kind":"Field","name":{"kind":"Name","value":"color"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"filter"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"firstDayOfTheWeek"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"AggregateChartConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateOperation"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"displayDataLabel"}},{"kind":"Field","name":{"kind":"Name","value":"numberFormat"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"filter"}},{"kind":"Field","name":{"kind":"Name","value":"prefix"}},{"kind":"Field","name":{"kind":"Name","value":"suffix"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"firstDayOfTheWeek"}},{"kind":"Field","name":{"kind":"Name","value":"ratioAggregateConfig"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"fieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"optionValue"}}]}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"IframeConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"url"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"StandaloneRichTextConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"body"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"blocknote"}},{"kind":"Field","name":{"kind":"Name","value":"markdown"}}]}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"CalendarConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"EmailsConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"EmailThreadConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"CallRecordingSummaryConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"CallRecordingTranscriptConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"MessageCampaignBodyConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"MessageCampaignDetailsConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"SequenceBuilderConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"QuoteBuilderConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PortalAccessConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"FieldConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"fieldDisplayMode"}},{"kind":"Field","name":{"kind":"Name","value":"fieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"viewId"}},{"kind":"Field","name":{"kind":"Name","value":"nestedRelationFieldMetadataId"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"FieldRichTextConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"FieldsConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"viewId"}},{"kind":"Field","name":{"kind":"Name","value":"newFieldDefaultVisibility"}},{"kind":"Field","name":{"kind":"Name","value":"shouldAllowUserToSeeHiddenFields"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"FilesConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"NotesConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"TasksConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"TimelineConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"ViewConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"RecordTableConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"viewId"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"WorkflowConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"WorkflowRunConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"WorkflowVersionConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"FrontComponentConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"frontComponentId"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"pageLayoutTabId"}}]}}]} as unknown as DocumentNode<PageLayoutWidgetFragmentFragment, unknown>;
 export const PageLayoutTabFragmentFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"PageLayoutTabFragment"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PageLayoutTab"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"applicationId"}},{"kind":"Field","name":{"kind":"Name","value":"universalIdentifier"}},{"kind":"Field","name":{"kind":"Name","value":"isSystemSideEffect"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"icon"}},{"kind":"Field","name":{"kind":"Name","value":"position"}},{"kind":"Field","name":{"kind":"Name","value":"layoutMode"}},{"kind":"Field","name":{"kind":"Name","value":"widgets"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"PageLayoutWidgetFragment"}}]}},{"kind":"Field","name":{"kind":"Name","value":"pageLayoutId"}},{"kind":"Field","name":{"kind":"Name","value":"isActive"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"PageLayoutWidgetFragment"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PageLayoutWidget"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"applicationId"}},{"kind":"Field","name":{"kind":"Name","value":"universalIdentifier"}},{"kind":"Field","name":{"kind":"Name","value":"isSystemSideEffect"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"type"}},{"kind":"Field","name":{"kind":"Name","value":"objectMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"isActive"}},{"kind":"Field","name":{"kind":"Name","value":"deletedAt"}},{"kind":"Field","name":{"kind":"Name","value":"conditionalDisplay"}},{"kind":"Field","name":{"kind":"Name","value":"conditionalAvailabilityExpression"}},{"kind":"Field","name":{"kind":"Name","value":"gridPosition"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"column"}},{"kind":"Field","name":{"kind":"Name","value":"columnSpan"}},{"kind":"Field","name":{"kind":"Name","value":"row"}},{"kind":"Field","name":{"kind":"Name","value":"rowSpan"}}]}},{"kind":"Field","name":{"kind":"Name","value":"position"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PageLayoutWidgetGridPosition"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"layoutMode"}},{"kind":"Field","name":{"kind":"Name","value":"row"}},{"kind":"Field","name":{"kind":"Name","value":"column"}},{"kind":"Field","name":{"kind":"Name","value":"rowSpan"}},{"kind":"Field","name":{"kind":"Name","value":"columnSpan"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PageLayoutWidgetVerticalListPosition"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"layoutMode"}},{"kind":"Field","name":{"kind":"Name","value":"index"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PageLayoutWidgetCanvasPosition"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"layoutMode"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"configuration"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"BarChartConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateOperation"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisGroupByFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisGroupBySubFieldName"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisDateGranularity"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisOrderBy"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisManualSortOrder"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisGroupByFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisGroupBySubFieldName"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisGroupByDateGranularity"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisOrderBy"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisManualSortOrder"}},{"kind":"Field","name":{"kind":"Name","value":"omitNullValues"}},{"kind":"Field","name":{"kind":"Name","value":"axisNameDisplay"}},{"kind":"Field","name":{"kind":"Name","value":"displayDataLabel"}},{"kind":"Field","name":{"kind":"Name","value":"displayLegend"}},{"kind":"Field","name":{"kind":"Name","value":"numberFormat"}},{"kind":"Field","name":{"kind":"Name","value":"rangeMin"}},{"kind":"Field","name":{"kind":"Name","value":"rangeMax"}},{"kind":"Field","name":{"kind":"Name","value":"color"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"filter"}},{"kind":"Field","name":{"kind":"Name","value":"groupMode"}},{"kind":"Field","name":{"kind":"Name","value":"layout"}},{"kind":"Field","name":{"kind":"Name","value":"isCumulative"}},{"kind":"Field","name":{"kind":"Name","value":"splitMultiValueFields"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"firstDayOfTheWeek"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"LineChartConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateOperation"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisGroupByFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisGroupBySubFieldName"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisDateGranularity"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisOrderBy"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisManualSortOrder"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisGroupByFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisGroupBySubFieldName"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisGroupByDateGranularity"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisOrderBy"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisManualSortOrder"}},{"kind":"Field","name":{"kind":"Name","value":"omitNullValues"}},{"kind":"Field","name":{"kind":"Name","value":"axisNameDisplay"}},{"kind":"Field","name":{"kind":"Name","value":"displayDataLabel"}},{"kind":"Field","name":{"kind":"Name","value":"displayLegend"}},{"kind":"Field","name":{"kind":"Name","value":"numberFormat"}},{"kind":"Field","name":{"kind":"Name","value":"rangeMin"}},{"kind":"Field","name":{"kind":"Name","value":"rangeMax"}},{"kind":"Field","name":{"kind":"Name","value":"color"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"filter"}},{"kind":"Field","name":{"kind":"Name","value":"isStacked"}},{"kind":"Field","name":{"kind":"Name","value":"isCumulative"}},{"kind":"Field","name":{"kind":"Name","value":"splitMultiValueFields"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"firstDayOfTheWeek"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PieChartConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"groupByFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateOperation"}},{"kind":"Field","name":{"kind":"Name","value":"groupBySubFieldName"}},{"kind":"Field","name":{"kind":"Name","value":"dateGranularity"}},{"kind":"Field","name":{"kind":"Name","value":"orderBy"}},{"kind":"Field","name":{"kind":"Name","value":"manualSortOrder"}},{"kind":"Field","name":{"kind":"Name","value":"displayDataLabel"}},{"kind":"Field","name":{"kind":"Name","value":"showCenterMetric"}},{"kind":"Field","name":{"kind":"Name","value":"displayLegend"}},{"kind":"Field","name":{"kind":"Name","value":"numberFormat"}},{"kind":"Field","name":{"kind":"Name","value":"hideEmptyCategory"}},{"kind":"Field","name":{"kind":"Name","value":"splitMultiValueFields"}},{"kind":"Field","name":{"kind":"Name","value":"color"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"filter"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"firstDayOfTheWeek"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"AggregateChartConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateOperation"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"displayDataLabel"}},{"kind":"Field","name":{"kind":"Name","value":"numberFormat"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"filter"}},{"kind":"Field","name":{"kind":"Name","value":"prefix"}},{"kind":"Field","name":{"kind":"Name","value":"suffix"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"firstDayOfTheWeek"}},{"kind":"Field","name":{"kind":"Name","value":"ratioAggregateConfig"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"fieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"optionValue"}}]}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"IframeConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"url"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"StandaloneRichTextConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"body"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"blocknote"}},{"kind":"Field","name":{"kind":"Name","value":"markdown"}}]}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"CalendarConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"EmailsConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"EmailThreadConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"CallRecordingSummaryConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"CallRecordingTranscriptConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"MessageCampaignBodyConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"MessageCampaignDetailsConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"SequenceBuilderConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"QuoteBuilderConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PortalAccessConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"FieldConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"fieldDisplayMode"}},{"kind":"Field","name":{"kind":"Name","value":"fieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"viewId"}},{"kind":"Field","name":{"kind":"Name","value":"nestedRelationFieldMetadataId"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"FieldRichTextConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"FieldsConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"viewId"}},{"kind":"Field","name":{"kind":"Name","value":"newFieldDefaultVisibility"}},{"kind":"Field","name":{"kind":"Name","value":"shouldAllowUserToSeeHiddenFields"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"FilesConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"NotesConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"TasksConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"TimelineConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"ViewConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"RecordTableConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"viewId"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"WorkflowConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"WorkflowRunConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"WorkflowVersionConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"FrontComponentConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"frontComponentId"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"pageLayoutTabId"}}]}}]} as unknown as DocumentNode<PageLayoutTabFragmentFragment, unknown>;
 export const PageLayoutFragmentFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"PageLayoutFragment"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PageLayout"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"applicationId"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"objectMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"type"}},{"kind":"Field","name":{"kind":"Name","value":"universalIdentifier"}},{"kind":"Field","name":{"kind":"Name","value":"isSystemSideEffect"}},{"kind":"Field","name":{"kind":"Name","value":"defaultTabToFocusOnMobileAndSidePanelId"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"tabs"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"PageLayoutTabFragment"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"PageLayoutWidgetFragment"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PageLayoutWidget"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"applicationId"}},{"kind":"Field","name":{"kind":"Name","value":"universalIdentifier"}},{"kind":"Field","name":{"kind":"Name","value":"isSystemSideEffect"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"type"}},{"kind":"Field","name":{"kind":"Name","value":"objectMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"isActive"}},{"kind":"Field","name":{"kind":"Name","value":"deletedAt"}},{"kind":"Field","name":{"kind":"Name","value":"conditionalDisplay"}},{"kind":"Field","name":{"kind":"Name","value":"conditionalAvailabilityExpression"}},{"kind":"Field","name":{"kind":"Name","value":"gridPosition"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"column"}},{"kind":"Field","name":{"kind":"Name","value":"columnSpan"}},{"kind":"Field","name":{"kind":"Name","value":"row"}},{"kind":"Field","name":{"kind":"Name","value":"rowSpan"}}]}},{"kind":"Field","name":{"kind":"Name","value":"position"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PageLayoutWidgetGridPosition"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"layoutMode"}},{"kind":"Field","name":{"kind":"Name","value":"row"}},{"kind":"Field","name":{"kind":"Name","value":"column"}},{"kind":"Field","name":{"kind":"Name","value":"rowSpan"}},{"kind":"Field","name":{"kind":"Name","value":"columnSpan"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PageLayoutWidgetVerticalListPosition"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"layoutMode"}},{"kind":"Field","name":{"kind":"Name","value":"index"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PageLayoutWidgetCanvasPosition"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"layoutMode"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"configuration"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"BarChartConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateOperation"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisGroupByFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisGroupBySubFieldName"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisDateGranularity"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisOrderBy"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisManualSortOrder"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisGroupByFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisGroupBySubFieldName"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisGroupByDateGranularity"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisOrderBy"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisManualSortOrder"}},{"kind":"Field","name":{"kind":"Name","value":"omitNullValues"}},{"kind":"Field","name":{"kind":"Name","value":"axisNameDisplay"}},{"kind":"Field","name":{"kind":"Name","value":"displayDataLabel"}},{"kind":"Field","name":{"kind":"Name","value":"displayLegend"}},{"kind":"Field","name":{"kind":"Name","value":"numberFormat"}},{"kind":"Field","name":{"kind":"Name","value":"rangeMin"}},{"kind":"Field","name":{"kind":"Name","value":"rangeMax"}},{"kind":"Field","name":{"kind":"Name","value":"color"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"filter"}},{"kind":"Field","name":{"kind":"Name","value":"groupMode"}},{"kind":"Field","name":{"kind":"Name","value":"layout"}},{"kind":"Field","name":{"kind":"Name","value":"isCumulative"}},{"kind":"Field","name":{"kind":"Name","value":"splitMultiValueFields"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"firstDayOfTheWeek"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"LineChartConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateOperation"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisGroupByFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisGroupBySubFieldName"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisDateGranularity"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisOrderBy"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisManualSortOrder"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisGroupByFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisGroupBySubFieldName"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisGroupByDateGranularity"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisOrderBy"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisManualSortOrder"}},{"kind":"Field","name":{"kind":"Name","value":"omitNullValues"}},{"kind":"Field","name":{"kind":"Name","value":"axisNameDisplay"}},{"kind":"Field","name":{"kind":"Name","value":"displayDataLabel"}},{"kind":"Field","name":{"kind":"Name","value":"displayLegend"}},{"kind":"Field","name":{"kind":"Name","value":"numberFormat"}},{"kind":"Field","name":{"kind":"Name","value":"rangeMin"}},{"kind":"Field","name":{"kind":"Name","value":"rangeMax"}},{"kind":"Field","name":{"kind":"Name","value":"color"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"filter"}},{"kind":"Field","name":{"kind":"Name","value":"isStacked"}},{"kind":"Field","name":{"kind":"Name","value":"isCumulative"}},{"kind":"Field","name":{"kind":"Name","value":"splitMultiValueFields"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"firstDayOfTheWeek"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PieChartConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"groupByFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateOperation"}},{"kind":"Field","name":{"kind":"Name","value":"groupBySubFieldName"}},{"kind":"Field","name":{"kind":"Name","value":"dateGranularity"}},{"kind":"Field","name":{"kind":"Name","value":"orderBy"}},{"kind":"Field","name":{"kind":"Name","value":"manualSortOrder"}},{"kind":"Field","name":{"kind":"Name","value":"displayDataLabel"}},{"kind":"Field","name":{"kind":"Name","value":"showCenterMetric"}},{"kind":"Field","name":{"kind":"Name","value":"displayLegend"}},{"kind":"Field","name":{"kind":"Name","value":"numberFormat"}},{"kind":"Field","name":{"kind":"Name","value":"hideEmptyCategory"}},{"kind":"Field","name":{"kind":"Name","value":"splitMultiValueFields"}},{"kind":"Field","name":{"kind":"Name","value":"color"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"filter"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"firstDayOfTheWeek"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"AggregateChartConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateOperation"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"displayDataLabel"}},{"kind":"Field","name":{"kind":"Name","value":"numberFormat"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"filter"}},{"kind":"Field","name":{"kind":"Name","value":"prefix"}},{"kind":"Field","name":{"kind":"Name","value":"suffix"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"firstDayOfTheWeek"}},{"kind":"Field","name":{"kind":"Name","value":"ratioAggregateConfig"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"fieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"optionValue"}}]}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"IframeConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"url"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"StandaloneRichTextConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"body"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"blocknote"}},{"kind":"Field","name":{"kind":"Name","value":"markdown"}}]}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"CalendarConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"EmailsConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"EmailThreadConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"CallRecordingSummaryConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"CallRecordingTranscriptConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"MessageCampaignBodyConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"MessageCampaignDetailsConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"SequenceBuilderConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"QuoteBuilderConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PortalAccessConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"FieldConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"fieldDisplayMode"}},{"kind":"Field","name":{"kind":"Name","value":"fieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"viewId"}},{"kind":"Field","name":{"kind":"Name","value":"nestedRelationFieldMetadataId"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"FieldRichTextConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"FieldsConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"viewId"}},{"kind":"Field","name":{"kind":"Name","value":"newFieldDefaultVisibility"}},{"kind":"Field","name":{"kind":"Name","value":"shouldAllowUserToSeeHiddenFields"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"FilesConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"NotesConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"TasksConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"TimelineConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"ViewConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"RecordTableConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"viewId"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"WorkflowConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"WorkflowRunConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"WorkflowVersionConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"FrontComponentConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"frontComponentId"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"pageLayoutTabId"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"PageLayoutTabFragment"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PageLayoutTab"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"applicationId"}},{"kind":"Field","name":{"kind":"Name","value":"universalIdentifier"}},{"kind":"Field","name":{"kind":"Name","value":"isSystemSideEffect"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"icon"}},{"kind":"Field","name":{"kind":"Name","value":"position"}},{"kind":"Field","name":{"kind":"Name","value":"layoutMode"}},{"kind":"Field","name":{"kind":"Name","value":"widgets"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"PageLayoutWidgetFragment"}}]}},{"kind":"Field","name":{"kind":"Name","value":"pageLayoutId"}},{"kind":"Field","name":{"kind":"Name","value":"isActive"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]} as unknown as DocumentNode<PageLayoutFragmentFragment, unknown>;
+export const DeliveryBatchFieldsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DeliveryBatchFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryBatches"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"canManage"}},{"kind":"Field","name":{"kind":"Name","value":"batches"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"periodId"}},{"kind":"Field","name":{"kind":"Name","value":"startDate"}},{"kind":"Field","name":{"kind":"Name","value":"endDate"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"closed"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}}]}},{"kind":"Field","name":{"kind":"Name","value":"selected"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"periodId"}},{"kind":"Field","name":{"kind":"Name","value":"startDate"}},{"kind":"Field","name":{"kind":"Name","value":"endDate"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"closed"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}}]}},{"kind":"Field","name":{"kind":"Name","value":"tasks"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"concept"}},{"kind":"Field","name":{"kind":"Name","value":"available"}},{"kind":"Field","name":{"kind":"Name","value":"state"}},{"kind":"Field","name":{"kind":"Name","value":"taskRevision"}},{"kind":"Field","name":{"kind":"Name","value":"assigneeName"}},{"kind":"Field","name":{"kind":"Name","value":"reviewerName"}},{"kind":"Field","name":{"kind":"Name","value":"submissionVersion"}},{"kind":"Field","name":{"kind":"Name","value":"unit"}},{"kind":"Field","name":{"kind":"Name","value":"approved"}},{"kind":"Field","name":{"kind":"Name","value":"fulfilled"}}]}},{"kind":"Field","name":{"kind":"Name","value":"counts"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"key"}},{"kind":"Field","name":{"kind":"Name","value":"total"}},{"kind":"Field","name":{"kind":"Name","value":"approved"}},{"kind":"Field","name":{"kind":"Name","value":"fulfilled"}}]}},{"kind":"Field","name":{"kind":"Name","value":"history"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"actorName"}},{"kind":"Field","name":{"kind":"Name","value":"action"}},{"kind":"Field","name":{"kind":"Name","value":"occurredAt"}},{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"taskName"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}},{"kind":"Field","name":{"kind":"Name","value":"changes"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"field"}},{"kind":"Field","name":{"kind":"Name","value":"before"}},{"kind":"Field","name":{"kind":"Name","value":"after"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"taskOptions"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"taskRevision"}}]}},{"kind":"Field","name":{"kind":"Name","value":"moreTaskOptions"}},{"kind":"Field","name":{"kind":"Name","value":"periods"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}}]}},{"kind":"Field","name":{"kind":"Name","value":"nextCursor"}},{"kind":"Field","name":{"kind":"Name","value":"nextTaskCursor"}},{"kind":"Field","name":{"kind":"Name","value":"nextHistoryCursor"}}]}}]} as unknown as DocumentNode<DeliveryBatchFieldsFragment, unknown>;
+export const DeliveryCommitmentFieldsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DeliveryCommitmentFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryCommitments"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"engagementId"}},{"kind":"Field","name":{"kind":"Name","value":"engagementName"}},{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"canManage"}},{"kind":"Field","name":{"kind":"Name","value":"legacyAllowance"}},{"kind":"Field","name":{"kind":"Name","value":"selectedPeriodId"}},{"kind":"Field","name":{"kind":"Name","value":"periods"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"billing"}},{"kind":"Field","name":{"kind":"Name","value":"startDate"}},{"kind":"Field","name":{"kind":"Name","value":"endDateExclusive"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"state"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}}]}},{"kind":"Field","name":{"kind":"Name","value":"lines"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"periodId"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"unit"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"promisedQuantity"}},{"kind":"Field","name":{"kind":"Name","value":"assignedQuantity"}},{"kind":"Field","name":{"kind":"Name","value":"fulfilledQuantity"}},{"kind":"Field","name":{"kind":"Name","value":"remainingQuantity"}},{"kind":"Field","name":{"kind":"Name","value":"overdeliveredQuantity"}}]}},{"kind":"Field","name":{"kind":"Name","value":"allocations"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"taskName"}},{"kind":"Field","name":{"kind":"Name","value":"periodId"}},{"kind":"Field","name":{"kind":"Name","value":"lineId"}},{"kind":"Field","name":{"kind":"Name","value":"parentTaskId"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"state"}},{"kind":"Field","name":{"kind":"Name","value":"credited"}},{"kind":"Field","name":{"kind":"Name","value":"creditReason"}},{"kind":"Field","name":{"kind":"Name","value":"fulfilledAt"}},{"kind":"Field","name":{"kind":"Name","value":"creditedCycle"}},{"kind":"Field","name":{"kind":"Name","value":"creditedSubmissionVersion"}}]}},{"kind":"Field","name":{"kind":"Name","value":"taskOptions"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"taskRevision"}},{"kind":"Field","name":{"kind":"Name","value":"state"}},{"kind":"Field","name":{"kind":"Name","value":"allocationRevision"}},{"kind":"Field","name":{"kind":"Name","value":"allocatedPeriodId"}},{"kind":"Field","name":{"kind":"Name","value":"allocatedLineId"}},{"kind":"Field","name":{"kind":"Name","value":"allocatedUnit"}}]}},{"kind":"Field","name":{"kind":"Name","value":"moreTaskOptions"}},{"kind":"Field","name":{"kind":"Name","value":"history"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"action"}},{"kind":"Field","name":{"kind":"Name","value":"actorName"}},{"kind":"Field","name":{"kind":"Name","value":"actorType"}},{"kind":"Field","name":{"kind":"Name","value":"occurredAt"}},{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"taskName"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}},{"kind":"Field","name":{"kind":"Name","value":"changes"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"field"}},{"kind":"Field","name":{"kind":"Name","value":"before"}},{"kind":"Field","name":{"kind":"Name","value":"after"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"nextAllocationCursor"}},{"kind":"Field","name":{"kind":"Name","value":"nextHistoryCursor"}}]}}]} as unknown as DocumentNode<DeliveryCommitmentFieldsFragment, unknown>;
+export const FinanceAiCostEntryReferenceFieldsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"FinanceAiCostEntryReferenceFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinanceAiCostEntryReference"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"month"}},{"kind":"Field","name":{"kind":"Name","value":"amountMicros"}},{"kind":"Field","name":{"kind":"Name","value":"matchedMicros"}},{"kind":"Field","name":{"kind":"Name","value":"activeMatchCount"}}]}}]} as unknown as DocumentNode<FinanceAiCostEntryReferenceFieldsFragment, unknown>;
+export const FinanceAiCostSourceFieldsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"FinanceAiCostSourceFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinanceAiCostSource"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"state"}},{"kind":"Field","name":{"kind":"Name","value":"sourceKind"}},{"kind":"Field","name":{"kind":"Name","value":"modelId"}},{"kind":"Field","name":{"kind":"Name","value":"currency"}},{"kind":"Field","name":{"kind":"Name","value":"settledAmountMicros"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"dispatchedAt"}},{"kind":"Field","name":{"kind":"Name","value":"settledAt"}},{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"projectName"}},{"kind":"Field","name":{"kind":"Name","value":"eligible"}},{"kind":"Field","name":{"kind":"Name","value":"sourceWarnings"}},{"kind":"Field","name":{"kind":"Name","value":"sourceReviewToken"}},{"kind":"Field","name":{"kind":"Name","value":"nextEvidenceId"}},{"kind":"Field","name":{"kind":"Name","value":"claim"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"currentEntry"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"FinanceAiCostEntryReferenceFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"replacementEntry"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"FinanceAiCostEntryReferenceFields"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"evidenceOptions"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"basis"}},{"kind":"Field","name":{"kind":"Name","value":"amountMicros"}},{"kind":"Field","name":{"kind":"Name","value":"recordedAt"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"FinanceAiCostEntryReferenceFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinanceAiCostEntryReference"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"month"}},{"kind":"Field","name":{"kind":"Name","value":"amountMicros"}},{"kind":"Field","name":{"kind":"Name","value":"matchedMicros"}},{"kind":"Field","name":{"kind":"Name","value":"activeMatchCount"}}]}}]} as unknown as DocumentNode<FinanceAiCostSourceFieldsFragment, unknown>;
+export const FinanceForecastItemFieldsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"FinanceForecastItemFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinanceForecastItem"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"sourceType"}},{"kind":"Field","name":{"kind":"Name","value":"sourceId"}},{"kind":"Field","name":{"kind":"Name","value":"planMonth"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"currency"}},{"kind":"Field","name":{"kind":"Name","value":"amountMicros"}},{"kind":"Field","name":{"kind":"Name","value":"remainingMicros"}},{"kind":"Field","name":{"kind":"Name","value":"appliedMicros"}},{"kind":"Field","name":{"kind":"Name","value":"expectedDate"}},{"kind":"Field","name":{"kind":"Name","value":"contractualDueDate"}},{"kind":"Field","name":{"kind":"Name","value":"ownerId"}},{"kind":"Field","name":{"kind":"Name","value":"ownerName"}},{"kind":"Field","name":{"kind":"Name","value":"ownerEligible"}},{"kind":"Field","name":{"kind":"Name","value":"nextActionDate"}},{"kind":"Field","name":{"kind":"Name","value":"note"}},{"kind":"Field","name":{"kind":"Name","value":"sourceReviewToken"}},{"kind":"Field","name":{"kind":"Name","value":"reviewToken"}},{"kind":"Field","name":{"kind":"Name","value":"eligible"}},{"kind":"Field","name":{"kind":"Name","value":"warnings"}},{"kind":"Field","name":{"kind":"Name","value":"changedAt"}},{"kind":"Field","name":{"kind":"Name","value":"changedByName"}}]}}]} as unknown as DocumentNode<FinanceForecastItemFieldsFragment, unknown>;
+export const FinanceForecastRealizationFieldsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"FinanceForecastRealizationFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinanceForecastRealization"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"itemId"}},{"kind":"Field","name":{"kind":"Name","value":"cashId"}},{"kind":"Field","name":{"kind":"Name","value":"cashTitle"}},{"kind":"Field","name":{"kind":"Name","value":"targetTitle"}},{"kind":"Field","name":{"kind":"Name","value":"currency"}},{"kind":"Field","name":{"kind":"Name","value":"amountMicros"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"note"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"createdByName"}},{"kind":"Field","name":{"kind":"Name","value":"reversedAt"}},{"kind":"Field","name":{"kind":"Name","value":"reversedByName"}},{"kind":"Field","name":{"kind":"Name","value":"reversalReason"}}]}}]} as unknown as DocumentNode<FinanceForecastRealizationFieldsFragment, unknown>;
+export const FinanceForecastSourceFieldsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"FinanceForecastSourceFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinanceForecastSource"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"sourceType"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"category"}},{"kind":"Field","name":{"kind":"Name","value":"currency"}},{"kind":"Field","name":{"kind":"Name","value":"date"}},{"kind":"Field","name":{"kind":"Name","value":"dueDate"}},{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"projectName"}},{"kind":"Field","name":{"kind":"Name","value":"amountMicros"}},{"kind":"Field","name":{"kind":"Name","value":"remainingMicros"}},{"kind":"Field","name":{"kind":"Name","value":"planMonth"}},{"kind":"Field","name":{"kind":"Name","value":"suggestedDate"}},{"kind":"Field","name":{"kind":"Name","value":"occurrenceItemId"}},{"kind":"Field","name":{"kind":"Name","value":"sourceReviewToken"}},{"kind":"Field","name":{"kind":"Name","value":"eligible"}},{"kind":"Field","name":{"kind":"Name","value":"warnings"}}]}}]} as unknown as DocumentNode<FinanceForecastSourceFieldsFragment, unknown>;
+export const FinanceCashSourceFieldsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"FinanceCashSourceFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinanceCashSource"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"category"}},{"kind":"Field","name":{"kind":"Name","value":"currency"}},{"kind":"Field","name":{"kind":"Name","value":"amountMicros"}},{"kind":"Field","name":{"kind":"Name","value":"date"}},{"kind":"Field","name":{"kind":"Name","value":"dueDate"}},{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"projectName"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"evidenceUrl"}},{"kind":"Field","name":{"kind":"Name","value":"note"}},{"kind":"Field","name":{"kind":"Name","value":"sourceReviewToken"}},{"kind":"Field","name":{"kind":"Name","value":"sourceWarnings"}},{"kind":"Field","name":{"kind":"Name","value":"settledMicros"}},{"kind":"Field","name":{"kind":"Name","value":"remainingSettlementMicros"}},{"kind":"Field","name":{"kind":"Name","value":"matchedMicros"}},{"kind":"Field","name":{"kind":"Name","value":"remainingMatchMicros"}},{"kind":"Field","name":{"kind":"Name","value":"outstandingMicros"}}]}}]} as unknown as DocumentNode<FinanceCashSourceFieldsFragment, unknown>;
+export const FinanceMatchableEntryFieldsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"FinanceMatchableEntryFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinanceMatchableEntry"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"month"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"currency"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"sourceReviewToken"}},{"kind":"Field","name":{"kind":"Name","value":"allocations"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"projectName"}},{"kind":"Field","name":{"kind":"Name","value":"amountMicros"}},{"kind":"Field","name":{"kind":"Name","value":"matchedMicros"}},{"kind":"Field","name":{"kind":"Name","value":"remainingMatchMicros"}}]}}]}}]} as unknown as DocumentNode<FinanceMatchableEntryFieldsFragment, unknown>;
+export const FinanceCashRelationFieldsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"FinanceCashRelationFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinanceCashRelation"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"cashId"}},{"kind":"Field","name":{"kind":"Name","value":"cashTitle"}},{"kind":"Field","name":{"kind":"Name","value":"receivableId"}},{"kind":"Field","name":{"kind":"Name","value":"entryId"}},{"kind":"Field","name":{"kind":"Name","value":"targetTitle"}},{"kind":"Field","name":{"kind":"Name","value":"month"}},{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"projectName"}},{"kind":"Field","name":{"kind":"Name","value":"currency"}},{"kind":"Field","name":{"kind":"Name","value":"amountMicros"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"legacy"}},{"kind":"Field","name":{"kind":"Name","value":"canReverse"}},{"kind":"Field","name":{"kind":"Name","value":"createdBy"}},{"kind":"Field","name":{"kind":"Name","value":"createdByName"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"reversedBy"}},{"kind":"Field","name":{"kind":"Name","value":"reversedByName"}},{"kind":"Field","name":{"kind":"Name","value":"reversedAt"}},{"kind":"Field","name":{"kind":"Name","value":"reversalReason"}}]}}]} as unknown as DocumentNode<FinanceCashRelationFieldsFragment, unknown>;
+export const FinancePeriodFieldsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"FinancePeriodFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinancePeriod"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"month"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"changedBy"}},{"kind":"Field","name":{"kind":"Name","value":"changedByName"}},{"kind":"Field","name":{"kind":"Name","value":"changedAt"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}}]}}]} as unknown as DocumentNode<FinancePeriodFieldsFragment, unknown>;
+export const FinancePeriodCurrencyFieldsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"FinancePeriodCurrencyFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinancePeriodCurrencySummary"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"currency"}},{"kind":"Field","name":{"kind":"Name","value":"revenueMicros"}},{"kind":"Field","name":{"kind":"Name","value":"costMicros"}},{"kind":"Field","name":{"kind":"Name","value":"resultMicros"}},{"kind":"Field","name":{"kind":"Name","value":"draftCount"}},{"kind":"Field","name":{"kind":"Name","value":"postedCount"}},{"kind":"Field","name":{"kind":"Name","value":"voidCount"}},{"kind":"Field","name":{"kind":"Name","value":"projects"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"projectName"}},{"kind":"Field","name":{"kind":"Name","value":"revenueMicros"}},{"kind":"Field","name":{"kind":"Name","value":"costMicros"}},{"kind":"Field","name":{"kind":"Name","value":"resultMicros"}},{"kind":"Field","name":{"kind":"Name","value":"postedCount"}}]}}]}}]} as unknown as DocumentNode<FinancePeriodCurrencyFieldsFragment, unknown>;
+export const FinancePlanFieldsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"FinancePlanFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinancePlan"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"type"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"currency"}},{"kind":"Field","name":{"kind":"Name","value":"monthlyAmountMicros"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"memberName"}},{"kind":"Field","name":{"kind":"Name","value":"memberActive"}},{"kind":"Field","name":{"kind":"Name","value":"startMonth"}},{"kind":"Field","name":{"kind":"Name","value":"endMonth"}},{"kind":"Field","name":{"kind":"Name","value":"dueDay"}},{"kind":"Field","name":{"kind":"Name","value":"active"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]} as unknown as DocumentNode<FinancePlanFieldsFragment, unknown>;
+export const FinanceEntryFieldsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"FinanceEntryFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinanceEntry"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"month"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"category"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"currency"}},{"kind":"Field","name":{"kind":"Name","value":"amountMicros"}},{"kind":"Field","name":{"kind":"Name","value":"note"}},{"kind":"Field","name":{"kind":"Name","value":"evidenceUrl"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"sourceType"}},{"kind":"Field","name":{"kind":"Name","value":"sourcePlan"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"planId"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"type"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"memberName"}},{"kind":"Field","name":{"kind":"Name","value":"monthlyAmountMicros"}},{"kind":"Field","name":{"kind":"Name","value":"startMonth"}},{"kind":"Field","name":{"kind":"Name","value":"endMonth"}},{"kind":"Field","name":{"kind":"Name","value":"dueDay"}}]}},{"kind":"Field","name":{"kind":"Name","value":"sourceAiSpend"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"spendId"}},{"kind":"Field","name":{"kind":"Name","value":"spendRevision"}},{"kind":"Field","name":{"kind":"Name","value":"evidenceEventId"}},{"kind":"Field","name":{"kind":"Name","value":"basis"}},{"kind":"Field","name":{"kind":"Name","value":"amountMicros"}},{"kind":"Field","name":{"kind":"Name","value":"currency"}},{"kind":"Field","name":{"kind":"Name","value":"modelId"}},{"kind":"Field","name":{"kind":"Name","value":"sourceKind"}},{"kind":"Field","name":{"kind":"Name","value":"recordedAt"}},{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"projectName"}},{"kind":"Field","name":{"kind":"Name","value":"replacesEntryId"}},{"kind":"Field","name":{"kind":"Name","value":"correctionReason"}}]}},{"kind":"Field","name":{"kind":"Name","value":"sourceWarnings"}},{"kind":"Field","name":{"kind":"Name","value":"lockedMonths"}},{"kind":"Field","name":{"kind":"Name","value":"sourceReviewToken"}},{"kind":"Field","name":{"kind":"Name","value":"dueDate"}},{"kind":"Field","name":{"kind":"Name","value":"remainingAllocationMicros"}},{"kind":"Field","name":{"kind":"Name","value":"allocations"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"projectName"}},{"kind":"Field","name":{"kind":"Name","value":"amountMicros"}}]}},{"kind":"Field","name":{"kind":"Name","value":"createdBy"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"postedAt"}},{"kind":"Field","name":{"kind":"Name","value":"voidedAt"}},{"kind":"Field","name":{"kind":"Name","value":"voidReason"}}]}}]} as unknown as DocumentNode<FinanceEntryFieldsFragment, unknown>;
+export const DeliveryWorkflowDefinitionFieldsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DeliveryWorkflowDefinitionFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryWorkflowDefinition"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"service"}},{"kind":"Field","name":{"kind":"Name","value":"definitionOfDone"}},{"kind":"Field","name":{"kind":"Name","value":"checklist"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"required"}}]}},{"kind":"Field","name":{"kind":"Name","value":"evidence"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"instructions"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"required"}}]}},{"kind":"Field","name":{"kind":"Name","value":"reviewChecks"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"required"}}]}}]}}]} as unknown as DocumentNode<DeliveryWorkflowDefinitionFieldsFragment, unknown>;
+export const DeliveryWorkflowCatalogFieldsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DeliveryWorkflowCatalogFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryWorkflowCatalog"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"templates"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"archived"}},{"kind":"Field","name":{"kind":"Name","value":"stateReason"}},{"kind":"Field","name":{"kind":"Name","value":"current"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"templateId"}},{"kind":"Field","name":{"kind":"Name","value":"version"}},{"kind":"Field","name":{"kind":"Name","value":"publishedAt"}},{"kind":"Field","name":{"kind":"Name","value":"publishedByName"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}},{"kind":"Field","name":{"kind":"Name","value":"definition"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DeliveryWorkflowDefinitionFields"}}]}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"versions"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"templateId"}},{"kind":"Field","name":{"kind":"Name","value":"version"}},{"kind":"Field","name":{"kind":"Name","value":"publishedAt"}},{"kind":"Field","name":{"kind":"Name","value":"publishedByName"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}},{"kind":"Field","name":{"kind":"Name","value":"definition"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DeliveryWorkflowDefinitionFields"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"starters"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"key"}},{"kind":"Field","name":{"kind":"Name","value":"definition"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DeliveryWorkflowDefinitionFields"}}]}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DeliveryWorkflowDefinitionFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryWorkflowDefinition"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"service"}},{"kind":"Field","name":{"kind":"Name","value":"definitionOfDone"}},{"kind":"Field","name":{"kind":"Name","value":"checklist"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"required"}}]}},{"kind":"Field","name":{"kind":"Name","value":"evidence"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"instructions"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"required"}}]}},{"kind":"Field","name":{"kind":"Name","value":"reviewChecks"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"required"}}]}}]}}]} as unknown as DocumentNode<DeliveryWorkflowCatalogFieldsFragment, unknown>;
+export const DeliveryAppliedWorkflowFieldsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DeliveryAppliedWorkflowFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryAppliedWorkflow"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"templateId"}},{"kind":"Field","name":{"kind":"Name","value":"version"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"appliedAt"}},{"kind":"Field","name":{"kind":"Name","value":"appliedByName"}},{"kind":"Field","name":{"kind":"Name","value":"definition"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DeliveryWorkflowDefinitionFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"checkedIds"}},{"kind":"Field","name":{"kind":"Name","value":"evidence"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"requirementId"}},{"kind":"Field","name":{"kind":"Name","value":"value"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DeliveryWorkflowDefinitionFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryWorkflowDefinition"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"service"}},{"kind":"Field","name":{"kind":"Name","value":"definitionOfDone"}},{"kind":"Field","name":{"kind":"Name","value":"checklist"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"required"}}]}},{"kind":"Field","name":{"kind":"Name","value":"evidence"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"instructions"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"required"}}]}},{"kind":"Field","name":{"kind":"Name","value":"reviewChecks"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"required"}}]}}]}}]} as unknown as DocumentNode<DeliveryAppliedWorkflowFieldsFragment, unknown>;
+export const DeliveryTaskWorkflowFieldsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DeliveryTaskWorkflowFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryTaskWorkflow"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"taskRevision"}},{"kind":"Field","name":{"kind":"Name","value":"canManage"}},{"kind":"Field","name":{"kind":"Name","value":"canEdit"}},{"kind":"Field","name":{"kind":"Name","value":"locked"}},{"kind":"Field","name":{"kind":"Name","value":"workflow"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DeliveryAppliedWorkflowFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"previousApplications"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DeliveryAppliedWorkflowFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"missingRequirements"}},{"kind":"Field","name":{"kind":"Name","value":"nextHistoryCursor"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DeliveryWorkflowDefinitionFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryWorkflowDefinition"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"service"}},{"kind":"Field","name":{"kind":"Name","value":"definitionOfDone"}},{"kind":"Field","name":{"kind":"Name","value":"checklist"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"required"}}]}},{"kind":"Field","name":{"kind":"Name","value":"evidence"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"instructions"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"required"}}]}},{"kind":"Field","name":{"kind":"Name","value":"reviewChecks"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"required"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DeliveryAppliedWorkflowFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryAppliedWorkflow"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"templateId"}},{"kind":"Field","name":{"kind":"Name","value":"version"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"appliedAt"}},{"kind":"Field","name":{"kind":"Name","value":"appliedByName"}},{"kind":"Field","name":{"kind":"Name","value":"definition"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DeliveryWorkflowDefinitionFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"checkedIds"}},{"kind":"Field","name":{"kind":"Name","value":"evidence"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"requirementId"}},{"kind":"Field","name":{"kind":"Name","value":"value"}}]}}]}}]} as unknown as DocumentNode<DeliveryTaskWorkflowFieldsFragment, unknown>;
 export const MarketplaceAppDetailFieldsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"MarketplaceAppDetailFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"MarketplaceAppDetail"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"universalIdentifier"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"sourceType"}},{"kind":"Field","name":{"kind":"Name","value":"sourcePackage"}},{"kind":"Field","name":{"kind":"Name","value":"latestAvailableVersion"}},{"kind":"Field","name":{"kind":"Name","value":"isListed"}},{"kind":"Field","name":{"kind":"Name","value":"isVetted"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"author"}},{"kind":"Field","name":{"kind":"Name","value":"category"}},{"kind":"Field","name":{"kind":"Name","value":"logoUrl"}},{"kind":"Field","name":{"kind":"Name","value":"websiteUrl"}},{"kind":"Field","name":{"kind":"Name","value":"aboutDescription"}},{"kind":"Field","name":{"kind":"Name","value":"termsUrl"}},{"kind":"Field","name":{"kind":"Name","value":"emailSupport"}},{"kind":"Field","name":{"kind":"Name","value":"issueReportUrl"}},{"kind":"Field","name":{"kind":"Name","value":"galleryImages"}},{"kind":"Field","name":{"kind":"Name","value":"defaultRoleUniversalIdentifier"}},{"kind":"Field","name":{"kind":"Name","value":"roles"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"universalIdentifier"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"icon"}},{"kind":"Field","name":{"kind":"Name","value":"canUpdateAllSettings"}},{"kind":"Field","name":{"kind":"Name","value":"canAccessAllTools"}},{"kind":"Field","name":{"kind":"Name","value":"canReadAllObjectRecords"}},{"kind":"Field","name":{"kind":"Name","value":"canUpdateAllObjectRecords"}},{"kind":"Field","name":{"kind":"Name","value":"canSoftDeleteAllObjectRecords"}},{"kind":"Field","name":{"kind":"Name","value":"canDestroyAllObjectRecords"}},{"kind":"Field","name":{"kind":"Name","value":"permissionFlagUniversalIdentifiers"}},{"kind":"Field","name":{"kind":"Name","value":"objectPermissions"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"universalIdentifier"}},{"kind":"Field","name":{"kind":"Name","value":"objectUniversalIdentifier"}},{"kind":"Field","name":{"kind":"Name","value":"canReadObjectRecords"}},{"kind":"Field","name":{"kind":"Name","value":"canUpdateObjectRecords"}},{"kind":"Field","name":{"kind":"Name","value":"canSoftDeleteObjectRecords"}},{"kind":"Field","name":{"kind":"Name","value":"canDestroyObjectRecords"}}]}},{"kind":"Field","name":{"kind":"Name","value":"fieldPermissions"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"universalIdentifier"}},{"kind":"Field","name":{"kind":"Name","value":"objectUniversalIdentifier"}},{"kind":"Field","name":{"kind":"Name","value":"fieldUniversalIdentifier"}},{"kind":"Field","name":{"kind":"Name","value":"canReadFieldValue"}},{"kind":"Field","name":{"kind":"Name","value":"canUpdateFieldValue"}}]}}]}}]}}]} as unknown as DocumentNode<MarketplaceAppDetailFieldsFragment, unknown>;
 export const MarketplaceAppFieldsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"MarketplaceAppFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"MarketplaceApp"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"author"}},{"kind":"Field","name":{"kind":"Name","value":"category"}},{"kind":"Field","name":{"kind":"Name","value":"logoUrl"}},{"kind":"Field","name":{"kind":"Name","value":"sourcePackage"}},{"kind":"Field","name":{"kind":"Name","value":"isVetted"}}]}}]} as unknown as DocumentNode<MarketplaceAppFieldsFragment, unknown>;
 export const NavigationMenuItemFieldsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"NavigationMenuItemFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"NavigationMenuItem"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"type"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"targetRecordId"}},{"kind":"Field","name":{"kind":"Name","value":"targetObjectMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"viewId"}},{"kind":"Field","name":{"kind":"Name","value":"folderId"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"link"}},{"kind":"Field","name":{"kind":"Name","value":"icon"}},{"kind":"Field","name":{"kind":"Name","value":"color"}},{"kind":"Field","name":{"kind":"Name","value":"pageLayoutId"}},{"kind":"Field","name":{"kind":"Name","value":"position"}},{"kind":"Field","name":{"kind":"Name","value":"applicationId"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]} as unknown as DocumentNode<NavigationMenuItemFieldsFragment, unknown>;
 export const NavigationMenuItemQueryFieldsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"NavigationMenuItemQueryFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"NavigationMenuItem"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"NavigationMenuItemFields"}},{"kind":"Field","name":{"kind":"Name","value":"targetRecordIdentifier"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"labelIdentifier"}},{"kind":"Field","name":{"kind":"Name","value":"imageIdentifier"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"NavigationMenuItemFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"NavigationMenuItem"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"type"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"targetRecordId"}},{"kind":"Field","name":{"kind":"Name","value":"targetObjectMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"viewId"}},{"kind":"Field","name":{"kind":"Name","value":"folderId"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"link"}},{"kind":"Field","name":{"kind":"Name","value":"icon"}},{"kind":"Field","name":{"kind":"Name","value":"color"}},{"kind":"Field","name":{"kind":"Name","value":"pageLayoutId"}},{"kind":"Field","name":{"kind":"Name","value":"position"}},{"kind":"Field","name":{"kind":"Name","value":"applicationId"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]} as unknown as DocumentNode<NavigationMenuItemQueryFieldsFragment, unknown>;
+export const OtogrowAccessFieldsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"OtogrowAccessFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"OtogrowAccess"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"roleIds"}},{"kind":"Field","name":{"kind":"Name","value":"capabilities"}},{"kind":"Field","name":{"kind":"Name","value":"nativeAdministrator"}},{"kind":"Field","name":{"kind":"Name","value":"grants"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"capability"}},{"kind":"Field","name":{"kind":"Name","value":"sourceId"}},{"kind":"Field","name":{"kind":"Name","value":"sourceName"}},{"kind":"Field","name":{"kind":"Name","value":"sourceType"}}]}}]}}]} as unknown as DocumentNode<OtogrowAccessFieldsFragment, unknown>;
+export const OtogrowDirectoryFieldsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"OtogrowDirectoryFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"OtogrowRoleDirectory"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"actor"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"OtogrowAccessFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"roles"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"capabilities"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}}]}},{"kind":"Field","name":{"kind":"Name","value":"members"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"roleIds"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"access"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"OtogrowAccessFields"}}]}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"OtogrowAccessFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"OtogrowAccess"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"roleIds"}},{"kind":"Field","name":{"kind":"Name","value":"capabilities"}},{"kind":"Field","name":{"kind":"Name","value":"nativeAdministrator"}},{"kind":"Field","name":{"kind":"Name","value":"grants"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"capability"}},{"kind":"Field","name":{"kind":"Name","value":"sourceId"}},{"kind":"Field","name":{"kind":"Name","value":"sourceName"}},{"kind":"Field","name":{"kind":"Name","value":"sourceType"}}]}}]}}]} as unknown as DocumentNode<OtogrowDirectoryFieldsFragment, unknown>;
+export const OtogrowAiBudgetFieldsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"OtogrowAiBudgetFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"OtogrowAiBudgetSnapshot"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"coverageStartedAt"}},{"kind":"Field","name":{"kind":"Name","value":"configured"}},{"kind":"Field","name":{"kind":"Name","value":"chargedUsd"}},{"kind":"Field","name":{"kind":"Name","value":"heldUsd"}},{"kind":"Field","name":{"kind":"Name","value":"unresolvedCount"}},{"kind":"Field","name":{"kind":"Name","value":"budgets"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"scope"}},{"kind":"Field","name":{"kind":"Name","value":"scopeId"}},{"kind":"Field","name":{"kind":"Name","value":"scopeName"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"enabled"}},{"kind":"Field","name":{"kind":"Name","value":"capUsd"}},{"kind":"Field","name":{"kind":"Name","value":"openingSpentUsd"}},{"kind":"Field","name":{"kind":"Name","value":"chargedUsd"}},{"kind":"Field","name":{"kind":"Name","value":"heldUsd"}},{"kind":"Field","name":{"kind":"Name","value":"remainingUsd"}}]}},{"kind":"Field","name":{"kind":"Name","value":"priceProfiles"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"modelId"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"enabled"}},{"kind":"Field","name":{"kind":"Name","value":"source"}},{"kind":"Field","name":{"kind":"Name","value":"verifiedAt"}},{"kind":"Field","name":{"kind":"Name","value":"pricing"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"inputUsdPerMillionTokens"}},{"kind":"Field","name":{"kind":"Name","value":"outputUsdPerMillionTokens"}},{"kind":"Field","name":{"kind":"Name","value":"reasoningUsdPerMillionTokens"}},{"kind":"Field","name":{"kind":"Name","value":"cacheReadUsdPerMillionTokens"}},{"kind":"Field","name":{"kind":"Name","value":"cacheWriteUsdPerMillionTokens"}},{"kind":"Field","name":{"kind":"Name","value":"maxInputTokens"}},{"kind":"Field","name":{"kind":"Name","value":"maxOutputTokens"}},{"kind":"Field","name":{"kind":"Name","value":"maxReasoningTokens"}},{"kind":"Field","name":{"kind":"Name","value":"outputIncludesReasoning"}},{"kind":"Field","name":{"kind":"Name","value":"longContextThresholdTokens"}},{"kind":"Field","name":{"kind":"Name","value":"longInputUsdPerMillionTokens"}},{"kind":"Field","name":{"kind":"Name","value":"longOutputUsdPerMillionTokens"}},{"kind":"Field","name":{"kind":"Name","value":"longReasoningUsdPerMillionTokens"}},{"kind":"Field","name":{"kind":"Name","value":"longCacheReadUsdPerMillionTokens"}},{"kind":"Field","name":{"kind":"Name","value":"longCacheWriteUsdPerMillionTokens"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"recentSpend"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"sourceKind"}},{"kind":"Field","name":{"kind":"Name","value":"sourceRunId"}},{"kind":"Field","name":{"kind":"Name","value":"state"}},{"kind":"Field","name":{"kind":"Name","value":"modelId"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"clientName"}},{"kind":"Field","name":{"kind":"Name","value":"taskName"}},{"kind":"Field","name":{"kind":"Name","value":"reservedUsd"}},{"kind":"Field","name":{"kind":"Name","value":"actualUsd"}},{"kind":"Field","name":{"kind":"Name","value":"reportedActualUsd"}},{"kind":"Field","name":{"kind":"Name","value":"heldUsd"}},{"kind":"Field","name":{"kind":"Name","value":"boundSource"}},{"kind":"Field","name":{"kind":"Name","value":"priceSource"}},{"kind":"Field","name":{"kind":"Name","value":"priceRevision"}},{"kind":"Field","name":{"kind":"Name","value":"priceVerifiedAt"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"dispatchedAt"}},{"kind":"Field","name":{"kind":"Name","value":"settledAt"}},{"kind":"Field","name":{"kind":"Name","value":"attentionReason"}}]}},{"kind":"Field","name":{"kind":"Name","value":"clients"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"tasks"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"nextCursor"}}]}}]} as unknown as DocumentNode<OtogrowAiBudgetFieldsFragment, unknown>;
 export const ApplicationRegistrationFragmentFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ApplicationRegistrationFragment"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"ApplicationRegistration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"universalIdentifier"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"logoUrl"}},{"kind":"Field","name":{"kind":"Name","value":"galleryImagesUrls"}},{"kind":"Field","name":{"kind":"Name","value":"oAuthClientId"}},{"kind":"Field","name":{"kind":"Name","value":"oAuthRedirectUris"}},{"kind":"Field","name":{"kind":"Name","value":"oAuthScopes"}},{"kind":"Field","name":{"kind":"Name","value":"sourceType"}},{"kind":"Field","name":{"kind":"Name","value":"sourcePackage"}},{"kind":"Field","name":{"kind":"Name","value":"latestAvailableVersion"}},{"kind":"Field","name":{"kind":"Name","value":"isListed"}},{"kind":"Field","name":{"kind":"Name","value":"isVetted"}},{"kind":"Field","name":{"kind":"Name","value":"isPreInstalled"}},{"kind":"Field","name":{"kind":"Name","value":"isConfigured"}},{"kind":"Field","name":{"kind":"Name","value":"ownerWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]} as unknown as DocumentNode<ApplicationRegistrationFragmentFragment, unknown>;
 export const ApplicationRegistrationListItemFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ApplicationRegistrationListItem"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"ApplicationRegistration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"universalIdentifier"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"sourceType"}},{"kind":"Field","name":{"kind":"Name","value":"logoUrl"}}]}}]} as unknown as DocumentNode<ApplicationRegistrationListItemFragment, unknown>;
 export const BillingPriceLicensedFragmentFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"BillingPriceLicensedFragment"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"BillingPriceLicensed"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"stripePriceId"}},{"kind":"Field","name":{"kind":"Name","value":"unitAmount"}},{"kind":"Field","name":{"kind":"Name","value":"recurringInterval"}},{"kind":"Field","name":{"kind":"Name","value":"priceUsageType"}},{"kind":"Field","name":{"kind":"Name","value":"creditAmount"}}]}}]} as unknown as DocumentNode<BillingPriceLicensedFragmentFragment, unknown>;
@@ -10226,6 +13174,64 @@ export const FindManyCommandMenuItemsDocument = {"kind":"Document","definitions"
 export const DuplicateDashboardDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DuplicateDashboard"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UUID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"duplicateDashboard"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"pageLayoutId"}},{"kind":"Field","name":{"kind":"Name","value":"position"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]}}]} as unknown as DocumentNode<DuplicateDashboardMutation, DuplicateDashboardMutationVariables>;
 export const FindOnePageLayoutDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"FindOnePageLayout"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"getPageLayout"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"PageLayoutFragment"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"PageLayoutWidgetFragment"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PageLayoutWidget"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"applicationId"}},{"kind":"Field","name":{"kind":"Name","value":"universalIdentifier"}},{"kind":"Field","name":{"kind":"Name","value":"isSystemSideEffect"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"type"}},{"kind":"Field","name":{"kind":"Name","value":"objectMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"isActive"}},{"kind":"Field","name":{"kind":"Name","value":"deletedAt"}},{"kind":"Field","name":{"kind":"Name","value":"conditionalDisplay"}},{"kind":"Field","name":{"kind":"Name","value":"conditionalAvailabilityExpression"}},{"kind":"Field","name":{"kind":"Name","value":"gridPosition"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"column"}},{"kind":"Field","name":{"kind":"Name","value":"columnSpan"}},{"kind":"Field","name":{"kind":"Name","value":"row"}},{"kind":"Field","name":{"kind":"Name","value":"rowSpan"}}]}},{"kind":"Field","name":{"kind":"Name","value":"position"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PageLayoutWidgetGridPosition"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"layoutMode"}},{"kind":"Field","name":{"kind":"Name","value":"row"}},{"kind":"Field","name":{"kind":"Name","value":"column"}},{"kind":"Field","name":{"kind":"Name","value":"rowSpan"}},{"kind":"Field","name":{"kind":"Name","value":"columnSpan"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PageLayoutWidgetVerticalListPosition"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"layoutMode"}},{"kind":"Field","name":{"kind":"Name","value":"index"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PageLayoutWidgetCanvasPosition"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"layoutMode"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"configuration"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"BarChartConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateOperation"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisGroupByFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisGroupBySubFieldName"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisDateGranularity"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisOrderBy"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisManualSortOrder"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisGroupByFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisGroupBySubFieldName"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisGroupByDateGranularity"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisOrderBy"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisManualSortOrder"}},{"kind":"Field","name":{"kind":"Name","value":"omitNullValues"}},{"kind":"Field","name":{"kind":"Name","value":"axisNameDisplay"}},{"kind":"Field","name":{"kind":"Name","value":"displayDataLabel"}},{"kind":"Field","name":{"kind":"Name","value":"displayLegend"}},{"kind":"Field","name":{"kind":"Name","value":"numberFormat"}},{"kind":"Field","name":{"kind":"Name","value":"rangeMin"}},{"kind":"Field","name":{"kind":"Name","value":"rangeMax"}},{"kind":"Field","name":{"kind":"Name","value":"color"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"filter"}},{"kind":"Field","name":{"kind":"Name","value":"groupMode"}},{"kind":"Field","name":{"kind":"Name","value":"layout"}},{"kind":"Field","name":{"kind":"Name","value":"isCumulative"}},{"kind":"Field","name":{"kind":"Name","value":"splitMultiValueFields"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"firstDayOfTheWeek"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"LineChartConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateOperation"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisGroupByFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisGroupBySubFieldName"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisDateGranularity"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisOrderBy"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisManualSortOrder"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisGroupByFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisGroupBySubFieldName"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisGroupByDateGranularity"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisOrderBy"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisManualSortOrder"}},{"kind":"Field","name":{"kind":"Name","value":"omitNullValues"}},{"kind":"Field","name":{"kind":"Name","value":"axisNameDisplay"}},{"kind":"Field","name":{"kind":"Name","value":"displayDataLabel"}},{"kind":"Field","name":{"kind":"Name","value":"displayLegend"}},{"kind":"Field","name":{"kind":"Name","value":"numberFormat"}},{"kind":"Field","name":{"kind":"Name","value":"rangeMin"}},{"kind":"Field","name":{"kind":"Name","value":"rangeMax"}},{"kind":"Field","name":{"kind":"Name","value":"color"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"filter"}},{"kind":"Field","name":{"kind":"Name","value":"isStacked"}},{"kind":"Field","name":{"kind":"Name","value":"isCumulative"}},{"kind":"Field","name":{"kind":"Name","value":"splitMultiValueFields"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"firstDayOfTheWeek"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PieChartConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"groupByFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateOperation"}},{"kind":"Field","name":{"kind":"Name","value":"groupBySubFieldName"}},{"kind":"Field","name":{"kind":"Name","value":"dateGranularity"}},{"kind":"Field","name":{"kind":"Name","value":"orderBy"}},{"kind":"Field","name":{"kind":"Name","value":"manualSortOrder"}},{"kind":"Field","name":{"kind":"Name","value":"displayDataLabel"}},{"kind":"Field","name":{"kind":"Name","value":"showCenterMetric"}},{"kind":"Field","name":{"kind":"Name","value":"displayLegend"}},{"kind":"Field","name":{"kind":"Name","value":"numberFormat"}},{"kind":"Field","name":{"kind":"Name","value":"hideEmptyCategory"}},{"kind":"Field","name":{"kind":"Name","value":"splitMultiValueFields"}},{"kind":"Field","name":{"kind":"Name","value":"color"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"filter"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"firstDayOfTheWeek"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"AggregateChartConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateOperation"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"displayDataLabel"}},{"kind":"Field","name":{"kind":"Name","value":"numberFormat"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"filter"}},{"kind":"Field","name":{"kind":"Name","value":"prefix"}},{"kind":"Field","name":{"kind":"Name","value":"suffix"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"firstDayOfTheWeek"}},{"kind":"Field","name":{"kind":"Name","value":"ratioAggregateConfig"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"fieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"optionValue"}}]}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"IframeConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"url"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"StandaloneRichTextConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"body"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"blocknote"}},{"kind":"Field","name":{"kind":"Name","value":"markdown"}}]}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"CalendarConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"EmailsConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"EmailThreadConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"CallRecordingSummaryConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"CallRecordingTranscriptConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"MessageCampaignBodyConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"MessageCampaignDetailsConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"SequenceBuilderConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"QuoteBuilderConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PortalAccessConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"FieldConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"fieldDisplayMode"}},{"kind":"Field","name":{"kind":"Name","value":"fieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"viewId"}},{"kind":"Field","name":{"kind":"Name","value":"nestedRelationFieldMetadataId"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"FieldRichTextConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"FieldsConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"viewId"}},{"kind":"Field","name":{"kind":"Name","value":"newFieldDefaultVisibility"}},{"kind":"Field","name":{"kind":"Name","value":"shouldAllowUserToSeeHiddenFields"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"FilesConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"NotesConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"TasksConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"TimelineConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"ViewConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"RecordTableConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"viewId"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"WorkflowConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"WorkflowRunConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"WorkflowVersionConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"FrontComponentConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"frontComponentId"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"pageLayoutTabId"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"PageLayoutTabFragment"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PageLayoutTab"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"applicationId"}},{"kind":"Field","name":{"kind":"Name","value":"universalIdentifier"}},{"kind":"Field","name":{"kind":"Name","value":"isSystemSideEffect"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"icon"}},{"kind":"Field","name":{"kind":"Name","value":"position"}},{"kind":"Field","name":{"kind":"Name","value":"layoutMode"}},{"kind":"Field","name":{"kind":"Name","value":"widgets"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"PageLayoutWidgetFragment"}}]}},{"kind":"Field","name":{"kind":"Name","value":"pageLayoutId"}},{"kind":"Field","name":{"kind":"Name","value":"isActive"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"PageLayoutFragment"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PageLayout"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"applicationId"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"objectMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"type"}},{"kind":"Field","name":{"kind":"Name","value":"universalIdentifier"}},{"kind":"Field","name":{"kind":"Name","value":"isSystemSideEffect"}},{"kind":"Field","name":{"kind":"Name","value":"defaultTabToFocusOnMobileAndSidePanelId"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"tabs"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"PageLayoutTabFragment"}}]}}]}}]} as unknown as DocumentNode<FindOnePageLayoutQuery, FindOnePageLayoutQueryVariables>;
 export const FindOnePageLayoutTypeDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"FindOnePageLayoutType"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"getPageLayout"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"type"}}]}}]}}]} as unknown as DocumentNode<FindOnePageLayoutTypeQuery, FindOnePageLayoutTypeQueryVariables>;
+export const DeliveryBatchesDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"DeliveryBatches"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryBatchesInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deliveryBatches"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DeliveryBatchFields"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DeliveryBatchFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryBatches"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"canManage"}},{"kind":"Field","name":{"kind":"Name","value":"batches"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"periodId"}},{"kind":"Field","name":{"kind":"Name","value":"startDate"}},{"kind":"Field","name":{"kind":"Name","value":"endDate"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"closed"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}}]}},{"kind":"Field","name":{"kind":"Name","value":"selected"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"periodId"}},{"kind":"Field","name":{"kind":"Name","value":"startDate"}},{"kind":"Field","name":{"kind":"Name","value":"endDate"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"closed"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}}]}},{"kind":"Field","name":{"kind":"Name","value":"tasks"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"concept"}},{"kind":"Field","name":{"kind":"Name","value":"available"}},{"kind":"Field","name":{"kind":"Name","value":"state"}},{"kind":"Field","name":{"kind":"Name","value":"taskRevision"}},{"kind":"Field","name":{"kind":"Name","value":"assigneeName"}},{"kind":"Field","name":{"kind":"Name","value":"reviewerName"}},{"kind":"Field","name":{"kind":"Name","value":"submissionVersion"}},{"kind":"Field","name":{"kind":"Name","value":"unit"}},{"kind":"Field","name":{"kind":"Name","value":"approved"}},{"kind":"Field","name":{"kind":"Name","value":"fulfilled"}}]}},{"kind":"Field","name":{"kind":"Name","value":"counts"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"key"}},{"kind":"Field","name":{"kind":"Name","value":"total"}},{"kind":"Field","name":{"kind":"Name","value":"approved"}},{"kind":"Field","name":{"kind":"Name","value":"fulfilled"}}]}},{"kind":"Field","name":{"kind":"Name","value":"history"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"actorName"}},{"kind":"Field","name":{"kind":"Name","value":"action"}},{"kind":"Field","name":{"kind":"Name","value":"occurredAt"}},{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"taskName"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}},{"kind":"Field","name":{"kind":"Name","value":"changes"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"field"}},{"kind":"Field","name":{"kind":"Name","value":"before"}},{"kind":"Field","name":{"kind":"Name","value":"after"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"taskOptions"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"taskRevision"}}]}},{"kind":"Field","name":{"kind":"Name","value":"moreTaskOptions"}},{"kind":"Field","name":{"kind":"Name","value":"periods"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}}]}},{"kind":"Field","name":{"kind":"Name","value":"nextCursor"}},{"kind":"Field","name":{"kind":"Name","value":"nextTaskCursor"}},{"kind":"Field","name":{"kind":"Name","value":"nextHistoryCursor"}}]}}]} as unknown as DocumentNode<DeliveryBatchesQuery, DeliveryBatchesQueryVariables>;
+export const SaveDeliveryBatchDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SaveDeliveryBatch"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryBatchSaveInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"saveDeliveryBatch"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DeliveryBatchFields"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DeliveryBatchFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryBatches"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"canManage"}},{"kind":"Field","name":{"kind":"Name","value":"batches"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"periodId"}},{"kind":"Field","name":{"kind":"Name","value":"startDate"}},{"kind":"Field","name":{"kind":"Name","value":"endDate"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"closed"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}}]}},{"kind":"Field","name":{"kind":"Name","value":"selected"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"periodId"}},{"kind":"Field","name":{"kind":"Name","value":"startDate"}},{"kind":"Field","name":{"kind":"Name","value":"endDate"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"closed"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}}]}},{"kind":"Field","name":{"kind":"Name","value":"tasks"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"concept"}},{"kind":"Field","name":{"kind":"Name","value":"available"}},{"kind":"Field","name":{"kind":"Name","value":"state"}},{"kind":"Field","name":{"kind":"Name","value":"taskRevision"}},{"kind":"Field","name":{"kind":"Name","value":"assigneeName"}},{"kind":"Field","name":{"kind":"Name","value":"reviewerName"}},{"kind":"Field","name":{"kind":"Name","value":"submissionVersion"}},{"kind":"Field","name":{"kind":"Name","value":"unit"}},{"kind":"Field","name":{"kind":"Name","value":"approved"}},{"kind":"Field","name":{"kind":"Name","value":"fulfilled"}}]}},{"kind":"Field","name":{"kind":"Name","value":"counts"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"key"}},{"kind":"Field","name":{"kind":"Name","value":"total"}},{"kind":"Field","name":{"kind":"Name","value":"approved"}},{"kind":"Field","name":{"kind":"Name","value":"fulfilled"}}]}},{"kind":"Field","name":{"kind":"Name","value":"history"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"actorName"}},{"kind":"Field","name":{"kind":"Name","value":"action"}},{"kind":"Field","name":{"kind":"Name","value":"occurredAt"}},{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"taskName"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}},{"kind":"Field","name":{"kind":"Name","value":"changes"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"field"}},{"kind":"Field","name":{"kind":"Name","value":"before"}},{"kind":"Field","name":{"kind":"Name","value":"after"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"taskOptions"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"taskRevision"}}]}},{"kind":"Field","name":{"kind":"Name","value":"moreTaskOptions"}},{"kind":"Field","name":{"kind":"Name","value":"periods"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}}]}},{"kind":"Field","name":{"kind":"Name","value":"nextCursor"}},{"kind":"Field","name":{"kind":"Name","value":"nextTaskCursor"}},{"kind":"Field","name":{"kind":"Name","value":"nextHistoryCursor"}}]}}]} as unknown as DocumentNode<SaveDeliveryBatchMutation, SaveDeliveryBatchMutationVariables>;
+export const SetDeliveryBatchStateDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SetDeliveryBatchState"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryBatchStateInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"setDeliveryBatchState"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DeliveryBatchFields"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DeliveryBatchFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryBatches"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"canManage"}},{"kind":"Field","name":{"kind":"Name","value":"batches"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"periodId"}},{"kind":"Field","name":{"kind":"Name","value":"startDate"}},{"kind":"Field","name":{"kind":"Name","value":"endDate"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"closed"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}}]}},{"kind":"Field","name":{"kind":"Name","value":"selected"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"periodId"}},{"kind":"Field","name":{"kind":"Name","value":"startDate"}},{"kind":"Field","name":{"kind":"Name","value":"endDate"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"closed"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}}]}},{"kind":"Field","name":{"kind":"Name","value":"tasks"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"concept"}},{"kind":"Field","name":{"kind":"Name","value":"available"}},{"kind":"Field","name":{"kind":"Name","value":"state"}},{"kind":"Field","name":{"kind":"Name","value":"taskRevision"}},{"kind":"Field","name":{"kind":"Name","value":"assigneeName"}},{"kind":"Field","name":{"kind":"Name","value":"reviewerName"}},{"kind":"Field","name":{"kind":"Name","value":"submissionVersion"}},{"kind":"Field","name":{"kind":"Name","value":"unit"}},{"kind":"Field","name":{"kind":"Name","value":"approved"}},{"kind":"Field","name":{"kind":"Name","value":"fulfilled"}}]}},{"kind":"Field","name":{"kind":"Name","value":"counts"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"key"}},{"kind":"Field","name":{"kind":"Name","value":"total"}},{"kind":"Field","name":{"kind":"Name","value":"approved"}},{"kind":"Field","name":{"kind":"Name","value":"fulfilled"}}]}},{"kind":"Field","name":{"kind":"Name","value":"history"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"actorName"}},{"kind":"Field","name":{"kind":"Name","value":"action"}},{"kind":"Field","name":{"kind":"Name","value":"occurredAt"}},{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"taskName"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}},{"kind":"Field","name":{"kind":"Name","value":"changes"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"field"}},{"kind":"Field","name":{"kind":"Name","value":"before"}},{"kind":"Field","name":{"kind":"Name","value":"after"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"taskOptions"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"taskRevision"}}]}},{"kind":"Field","name":{"kind":"Name","value":"moreTaskOptions"}},{"kind":"Field","name":{"kind":"Name","value":"periods"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}}]}},{"kind":"Field","name":{"kind":"Name","value":"nextCursor"}},{"kind":"Field","name":{"kind":"Name","value":"nextTaskCursor"}},{"kind":"Field","name":{"kind":"Name","value":"nextHistoryCursor"}}]}}]} as unknown as DocumentNode<SetDeliveryBatchStateMutation, SetDeliveryBatchStateMutationVariables>;
+export const SaveDeliveryBatchItemDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SaveDeliveryBatchItem"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryBatchItemInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"saveDeliveryBatchItem"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DeliveryBatchFields"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DeliveryBatchFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryBatches"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"canManage"}},{"kind":"Field","name":{"kind":"Name","value":"batches"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"periodId"}},{"kind":"Field","name":{"kind":"Name","value":"startDate"}},{"kind":"Field","name":{"kind":"Name","value":"endDate"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"closed"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}}]}},{"kind":"Field","name":{"kind":"Name","value":"selected"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"periodId"}},{"kind":"Field","name":{"kind":"Name","value":"startDate"}},{"kind":"Field","name":{"kind":"Name","value":"endDate"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"closed"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}}]}},{"kind":"Field","name":{"kind":"Name","value":"tasks"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"concept"}},{"kind":"Field","name":{"kind":"Name","value":"available"}},{"kind":"Field","name":{"kind":"Name","value":"state"}},{"kind":"Field","name":{"kind":"Name","value":"taskRevision"}},{"kind":"Field","name":{"kind":"Name","value":"assigneeName"}},{"kind":"Field","name":{"kind":"Name","value":"reviewerName"}},{"kind":"Field","name":{"kind":"Name","value":"submissionVersion"}},{"kind":"Field","name":{"kind":"Name","value":"unit"}},{"kind":"Field","name":{"kind":"Name","value":"approved"}},{"kind":"Field","name":{"kind":"Name","value":"fulfilled"}}]}},{"kind":"Field","name":{"kind":"Name","value":"counts"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"key"}},{"kind":"Field","name":{"kind":"Name","value":"total"}},{"kind":"Field","name":{"kind":"Name","value":"approved"}},{"kind":"Field","name":{"kind":"Name","value":"fulfilled"}}]}},{"kind":"Field","name":{"kind":"Name","value":"history"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"actorName"}},{"kind":"Field","name":{"kind":"Name","value":"action"}},{"kind":"Field","name":{"kind":"Name","value":"occurredAt"}},{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"taskName"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}},{"kind":"Field","name":{"kind":"Name","value":"changes"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"field"}},{"kind":"Field","name":{"kind":"Name","value":"before"}},{"kind":"Field","name":{"kind":"Name","value":"after"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"taskOptions"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"taskRevision"}}]}},{"kind":"Field","name":{"kind":"Name","value":"moreTaskOptions"}},{"kind":"Field","name":{"kind":"Name","value":"periods"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}}]}},{"kind":"Field","name":{"kind":"Name","value":"nextCursor"}},{"kind":"Field","name":{"kind":"Name","value":"nextTaskCursor"}},{"kind":"Field","name":{"kind":"Name","value":"nextHistoryCursor"}}]}}]} as unknown as DocumentNode<SaveDeliveryBatchItemMutation, SaveDeliveryBatchItemMutationVariables>;
+export const DeliveryCapacityDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"DeliveryCapacity"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryCapacityInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deliveryCapacity"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"startDate"}},{"kind":"Field","name":{"kind":"Name","value":"availability"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"date"}},{"kind":"Field","name":{"kind":"Name","value":"minutes"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}}]}}]}}]}}]} as unknown as DocumentNode<DeliveryCapacityQuery, DeliveryCapacityQueryVariables>;
+export const SaveDeliveryAvailabilityDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SaveDeliveryAvailability"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryAvailabilityInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"saveDeliveryAvailability"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"date"}},{"kind":"Field","name":{"kind":"Name","value":"minutes"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}}]}}]}}]} as unknown as DocumentNode<SaveDeliveryAvailabilityMutation, SaveDeliveryAvailabilityMutationVariables>;
+export const DeliveryChatDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"DeliveryChat"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryChatInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deliveryChat"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"before"}},{"kind":"Field","name":{"kind":"Name","value":"olderCursor"}},{"kind":"Field","name":{"kind":"Name","value":"telegramReady"}},{"kind":"Field","name":{"kind":"Name","value":"peopleTotal"}},{"kind":"Field","name":{"kind":"Name","value":"people"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"active"}},{"kind":"Field","name":{"kind":"Name","value":"unread"}},{"kind":"Field","name":{"kind":"Name","value":"lastMessageAt"}}]}},{"kind":"Field","name":{"kind":"Name","value":"peer"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"active"}},{"kind":"Field","name":{"kind":"Name","value":"unread"}},{"kind":"Field","name":{"kind":"Name","value":"lastMessageAt"}}]}},{"kind":"Field","name":{"kind":"Name","value":"messages"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"position"}},{"kind":"Field","name":{"kind":"Name","value":"senderId"}},{"kind":"Field","name":{"kind":"Name","value":"recipientId"}},{"kind":"Field","name":{"kind":"Name","value":"senderName"}},{"kind":"Field","name":{"kind":"Name","value":"text"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"viewedAt"}},{"kind":"Field","name":{"kind":"Name","value":"reminderState"}}]}}]}}]}}]} as unknown as DocumentNode<DeliveryChatQuery, DeliveryChatQueryVariables>;
+export const SendDeliveryChatMessageDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SendDeliveryChatMessage"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryChatSendInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"sendDeliveryChatMessage"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}]}]}}]} as unknown as DocumentNode<SendDeliveryChatMessageMutation, SendDeliveryChatMessageMutationVariables>;
+export const ViewDeliveryChatMessagesDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"ViewDeliveryChatMessages"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryChatViewedInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"viewDeliveryChatMessages"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}]}]}}]} as unknown as DocumentNode<ViewDeliveryChatMessagesMutation, ViewDeliveryChatMessagesMutationVariables>;
+export const DeliveryCommitmentsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"DeliveryCommitments"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryCommitmentsInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deliveryCommitments"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DeliveryCommitmentFields"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DeliveryCommitmentFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryCommitments"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"engagementId"}},{"kind":"Field","name":{"kind":"Name","value":"engagementName"}},{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"canManage"}},{"kind":"Field","name":{"kind":"Name","value":"legacyAllowance"}},{"kind":"Field","name":{"kind":"Name","value":"selectedPeriodId"}},{"kind":"Field","name":{"kind":"Name","value":"periods"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"billing"}},{"kind":"Field","name":{"kind":"Name","value":"startDate"}},{"kind":"Field","name":{"kind":"Name","value":"endDateExclusive"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"state"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}}]}},{"kind":"Field","name":{"kind":"Name","value":"lines"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"periodId"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"unit"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"promisedQuantity"}},{"kind":"Field","name":{"kind":"Name","value":"assignedQuantity"}},{"kind":"Field","name":{"kind":"Name","value":"fulfilledQuantity"}},{"kind":"Field","name":{"kind":"Name","value":"remainingQuantity"}},{"kind":"Field","name":{"kind":"Name","value":"overdeliveredQuantity"}}]}},{"kind":"Field","name":{"kind":"Name","value":"allocations"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"taskName"}},{"kind":"Field","name":{"kind":"Name","value":"periodId"}},{"kind":"Field","name":{"kind":"Name","value":"lineId"}},{"kind":"Field","name":{"kind":"Name","value":"parentTaskId"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"state"}},{"kind":"Field","name":{"kind":"Name","value":"credited"}},{"kind":"Field","name":{"kind":"Name","value":"creditReason"}},{"kind":"Field","name":{"kind":"Name","value":"fulfilledAt"}},{"kind":"Field","name":{"kind":"Name","value":"creditedCycle"}},{"kind":"Field","name":{"kind":"Name","value":"creditedSubmissionVersion"}}]}},{"kind":"Field","name":{"kind":"Name","value":"taskOptions"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"taskRevision"}},{"kind":"Field","name":{"kind":"Name","value":"state"}},{"kind":"Field","name":{"kind":"Name","value":"allocationRevision"}},{"kind":"Field","name":{"kind":"Name","value":"allocatedPeriodId"}},{"kind":"Field","name":{"kind":"Name","value":"allocatedLineId"}},{"kind":"Field","name":{"kind":"Name","value":"allocatedUnit"}}]}},{"kind":"Field","name":{"kind":"Name","value":"moreTaskOptions"}},{"kind":"Field","name":{"kind":"Name","value":"history"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"action"}},{"kind":"Field","name":{"kind":"Name","value":"actorName"}},{"kind":"Field","name":{"kind":"Name","value":"actorType"}},{"kind":"Field","name":{"kind":"Name","value":"occurredAt"}},{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"taskName"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}},{"kind":"Field","name":{"kind":"Name","value":"changes"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"field"}},{"kind":"Field","name":{"kind":"Name","value":"before"}},{"kind":"Field","name":{"kind":"Name","value":"after"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"nextAllocationCursor"}},{"kind":"Field","name":{"kind":"Name","value":"nextHistoryCursor"}}]}}]} as unknown as DocumentNode<DeliveryCommitmentsQuery, DeliveryCommitmentsQueryVariables>;
+export const SaveDeliveryCommitmentPeriodDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SaveDeliveryCommitmentPeriod"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryCommitmentPeriodSaveInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"saveDeliveryCommitmentPeriod"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DeliveryCommitmentFields"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DeliveryCommitmentFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryCommitments"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"engagementId"}},{"kind":"Field","name":{"kind":"Name","value":"engagementName"}},{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"canManage"}},{"kind":"Field","name":{"kind":"Name","value":"legacyAllowance"}},{"kind":"Field","name":{"kind":"Name","value":"selectedPeriodId"}},{"kind":"Field","name":{"kind":"Name","value":"periods"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"billing"}},{"kind":"Field","name":{"kind":"Name","value":"startDate"}},{"kind":"Field","name":{"kind":"Name","value":"endDateExclusive"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"state"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}}]}},{"kind":"Field","name":{"kind":"Name","value":"lines"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"periodId"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"unit"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"promisedQuantity"}},{"kind":"Field","name":{"kind":"Name","value":"assignedQuantity"}},{"kind":"Field","name":{"kind":"Name","value":"fulfilledQuantity"}},{"kind":"Field","name":{"kind":"Name","value":"remainingQuantity"}},{"kind":"Field","name":{"kind":"Name","value":"overdeliveredQuantity"}}]}},{"kind":"Field","name":{"kind":"Name","value":"allocations"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"taskName"}},{"kind":"Field","name":{"kind":"Name","value":"periodId"}},{"kind":"Field","name":{"kind":"Name","value":"lineId"}},{"kind":"Field","name":{"kind":"Name","value":"parentTaskId"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"state"}},{"kind":"Field","name":{"kind":"Name","value":"credited"}},{"kind":"Field","name":{"kind":"Name","value":"creditReason"}},{"kind":"Field","name":{"kind":"Name","value":"fulfilledAt"}},{"kind":"Field","name":{"kind":"Name","value":"creditedCycle"}},{"kind":"Field","name":{"kind":"Name","value":"creditedSubmissionVersion"}}]}},{"kind":"Field","name":{"kind":"Name","value":"taskOptions"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"taskRevision"}},{"kind":"Field","name":{"kind":"Name","value":"state"}},{"kind":"Field","name":{"kind":"Name","value":"allocationRevision"}},{"kind":"Field","name":{"kind":"Name","value":"allocatedPeriodId"}},{"kind":"Field","name":{"kind":"Name","value":"allocatedLineId"}},{"kind":"Field","name":{"kind":"Name","value":"allocatedUnit"}}]}},{"kind":"Field","name":{"kind":"Name","value":"moreTaskOptions"}},{"kind":"Field","name":{"kind":"Name","value":"history"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"action"}},{"kind":"Field","name":{"kind":"Name","value":"actorName"}},{"kind":"Field","name":{"kind":"Name","value":"actorType"}},{"kind":"Field","name":{"kind":"Name","value":"occurredAt"}},{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"taskName"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}},{"kind":"Field","name":{"kind":"Name","value":"changes"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"field"}},{"kind":"Field","name":{"kind":"Name","value":"before"}},{"kind":"Field","name":{"kind":"Name","value":"after"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"nextAllocationCursor"}},{"kind":"Field","name":{"kind":"Name","value":"nextHistoryCursor"}}]}}]} as unknown as DocumentNode<SaveDeliveryCommitmentPeriodMutation, SaveDeliveryCommitmentPeriodMutationVariables>;
+export const SetDeliveryCommitmentPeriodStateDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SetDeliveryCommitmentPeriodState"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryCommitmentPeriodStateInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"setDeliveryCommitmentPeriodState"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DeliveryCommitmentFields"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DeliveryCommitmentFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryCommitments"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"engagementId"}},{"kind":"Field","name":{"kind":"Name","value":"engagementName"}},{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"canManage"}},{"kind":"Field","name":{"kind":"Name","value":"legacyAllowance"}},{"kind":"Field","name":{"kind":"Name","value":"selectedPeriodId"}},{"kind":"Field","name":{"kind":"Name","value":"periods"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"billing"}},{"kind":"Field","name":{"kind":"Name","value":"startDate"}},{"kind":"Field","name":{"kind":"Name","value":"endDateExclusive"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"state"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}}]}},{"kind":"Field","name":{"kind":"Name","value":"lines"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"periodId"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"unit"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"promisedQuantity"}},{"kind":"Field","name":{"kind":"Name","value":"assignedQuantity"}},{"kind":"Field","name":{"kind":"Name","value":"fulfilledQuantity"}},{"kind":"Field","name":{"kind":"Name","value":"remainingQuantity"}},{"kind":"Field","name":{"kind":"Name","value":"overdeliveredQuantity"}}]}},{"kind":"Field","name":{"kind":"Name","value":"allocations"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"taskName"}},{"kind":"Field","name":{"kind":"Name","value":"periodId"}},{"kind":"Field","name":{"kind":"Name","value":"lineId"}},{"kind":"Field","name":{"kind":"Name","value":"parentTaskId"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"state"}},{"kind":"Field","name":{"kind":"Name","value":"credited"}},{"kind":"Field","name":{"kind":"Name","value":"creditReason"}},{"kind":"Field","name":{"kind":"Name","value":"fulfilledAt"}},{"kind":"Field","name":{"kind":"Name","value":"creditedCycle"}},{"kind":"Field","name":{"kind":"Name","value":"creditedSubmissionVersion"}}]}},{"kind":"Field","name":{"kind":"Name","value":"taskOptions"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"taskRevision"}},{"kind":"Field","name":{"kind":"Name","value":"state"}},{"kind":"Field","name":{"kind":"Name","value":"allocationRevision"}},{"kind":"Field","name":{"kind":"Name","value":"allocatedPeriodId"}},{"kind":"Field","name":{"kind":"Name","value":"allocatedLineId"}},{"kind":"Field","name":{"kind":"Name","value":"allocatedUnit"}}]}},{"kind":"Field","name":{"kind":"Name","value":"moreTaskOptions"}},{"kind":"Field","name":{"kind":"Name","value":"history"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"action"}},{"kind":"Field","name":{"kind":"Name","value":"actorName"}},{"kind":"Field","name":{"kind":"Name","value":"actorType"}},{"kind":"Field","name":{"kind":"Name","value":"occurredAt"}},{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"taskName"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}},{"kind":"Field","name":{"kind":"Name","value":"changes"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"field"}},{"kind":"Field","name":{"kind":"Name","value":"before"}},{"kind":"Field","name":{"kind":"Name","value":"after"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"nextAllocationCursor"}},{"kind":"Field","name":{"kind":"Name","value":"nextHistoryCursor"}}]}}]} as unknown as DocumentNode<SetDeliveryCommitmentPeriodStateMutation, SetDeliveryCommitmentPeriodStateMutationVariables>;
+export const SaveDeliveryCommitmentLineDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SaveDeliveryCommitmentLine"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryCommitmentLineSaveInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"saveDeliveryCommitmentLine"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DeliveryCommitmentFields"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DeliveryCommitmentFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryCommitments"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"engagementId"}},{"kind":"Field","name":{"kind":"Name","value":"engagementName"}},{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"canManage"}},{"kind":"Field","name":{"kind":"Name","value":"legacyAllowance"}},{"kind":"Field","name":{"kind":"Name","value":"selectedPeriodId"}},{"kind":"Field","name":{"kind":"Name","value":"periods"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"billing"}},{"kind":"Field","name":{"kind":"Name","value":"startDate"}},{"kind":"Field","name":{"kind":"Name","value":"endDateExclusive"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"state"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}}]}},{"kind":"Field","name":{"kind":"Name","value":"lines"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"periodId"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"unit"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"promisedQuantity"}},{"kind":"Field","name":{"kind":"Name","value":"assignedQuantity"}},{"kind":"Field","name":{"kind":"Name","value":"fulfilledQuantity"}},{"kind":"Field","name":{"kind":"Name","value":"remainingQuantity"}},{"kind":"Field","name":{"kind":"Name","value":"overdeliveredQuantity"}}]}},{"kind":"Field","name":{"kind":"Name","value":"allocations"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"taskName"}},{"kind":"Field","name":{"kind":"Name","value":"periodId"}},{"kind":"Field","name":{"kind":"Name","value":"lineId"}},{"kind":"Field","name":{"kind":"Name","value":"parentTaskId"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"state"}},{"kind":"Field","name":{"kind":"Name","value":"credited"}},{"kind":"Field","name":{"kind":"Name","value":"creditReason"}},{"kind":"Field","name":{"kind":"Name","value":"fulfilledAt"}},{"kind":"Field","name":{"kind":"Name","value":"creditedCycle"}},{"kind":"Field","name":{"kind":"Name","value":"creditedSubmissionVersion"}}]}},{"kind":"Field","name":{"kind":"Name","value":"taskOptions"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"taskRevision"}},{"kind":"Field","name":{"kind":"Name","value":"state"}},{"kind":"Field","name":{"kind":"Name","value":"allocationRevision"}},{"kind":"Field","name":{"kind":"Name","value":"allocatedPeriodId"}},{"kind":"Field","name":{"kind":"Name","value":"allocatedLineId"}},{"kind":"Field","name":{"kind":"Name","value":"allocatedUnit"}}]}},{"kind":"Field","name":{"kind":"Name","value":"moreTaskOptions"}},{"kind":"Field","name":{"kind":"Name","value":"history"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"action"}},{"kind":"Field","name":{"kind":"Name","value":"actorName"}},{"kind":"Field","name":{"kind":"Name","value":"actorType"}},{"kind":"Field","name":{"kind":"Name","value":"occurredAt"}},{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"taskName"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}},{"kind":"Field","name":{"kind":"Name","value":"changes"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"field"}},{"kind":"Field","name":{"kind":"Name","value":"before"}},{"kind":"Field","name":{"kind":"Name","value":"after"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"nextAllocationCursor"}},{"kind":"Field","name":{"kind":"Name","value":"nextHistoryCursor"}}]}}]} as unknown as DocumentNode<SaveDeliveryCommitmentLineMutation, SaveDeliveryCommitmentLineMutationVariables>;
+export const AssignDeliveryCommitmentTaskDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"AssignDeliveryCommitmentTask"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryCommitmentTaskAssignInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"assignDeliveryCommitmentTask"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DeliveryCommitmentFields"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DeliveryCommitmentFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryCommitments"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"engagementId"}},{"kind":"Field","name":{"kind":"Name","value":"engagementName"}},{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"canManage"}},{"kind":"Field","name":{"kind":"Name","value":"legacyAllowance"}},{"kind":"Field","name":{"kind":"Name","value":"selectedPeriodId"}},{"kind":"Field","name":{"kind":"Name","value":"periods"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"billing"}},{"kind":"Field","name":{"kind":"Name","value":"startDate"}},{"kind":"Field","name":{"kind":"Name","value":"endDateExclusive"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"state"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}}]}},{"kind":"Field","name":{"kind":"Name","value":"lines"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"periodId"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"unit"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"promisedQuantity"}},{"kind":"Field","name":{"kind":"Name","value":"assignedQuantity"}},{"kind":"Field","name":{"kind":"Name","value":"fulfilledQuantity"}},{"kind":"Field","name":{"kind":"Name","value":"remainingQuantity"}},{"kind":"Field","name":{"kind":"Name","value":"overdeliveredQuantity"}}]}},{"kind":"Field","name":{"kind":"Name","value":"allocations"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"taskName"}},{"kind":"Field","name":{"kind":"Name","value":"periodId"}},{"kind":"Field","name":{"kind":"Name","value":"lineId"}},{"kind":"Field","name":{"kind":"Name","value":"parentTaskId"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"state"}},{"kind":"Field","name":{"kind":"Name","value":"credited"}},{"kind":"Field","name":{"kind":"Name","value":"creditReason"}},{"kind":"Field","name":{"kind":"Name","value":"fulfilledAt"}},{"kind":"Field","name":{"kind":"Name","value":"creditedCycle"}},{"kind":"Field","name":{"kind":"Name","value":"creditedSubmissionVersion"}}]}},{"kind":"Field","name":{"kind":"Name","value":"taskOptions"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"taskRevision"}},{"kind":"Field","name":{"kind":"Name","value":"state"}},{"kind":"Field","name":{"kind":"Name","value":"allocationRevision"}},{"kind":"Field","name":{"kind":"Name","value":"allocatedPeriodId"}},{"kind":"Field","name":{"kind":"Name","value":"allocatedLineId"}},{"kind":"Field","name":{"kind":"Name","value":"allocatedUnit"}}]}},{"kind":"Field","name":{"kind":"Name","value":"moreTaskOptions"}},{"kind":"Field","name":{"kind":"Name","value":"history"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"action"}},{"kind":"Field","name":{"kind":"Name","value":"actorName"}},{"kind":"Field","name":{"kind":"Name","value":"actorType"}},{"kind":"Field","name":{"kind":"Name","value":"occurredAt"}},{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"taskName"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}},{"kind":"Field","name":{"kind":"Name","value":"changes"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"field"}},{"kind":"Field","name":{"kind":"Name","value":"before"}},{"kind":"Field","name":{"kind":"Name","value":"after"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"nextAllocationCursor"}},{"kind":"Field","name":{"kind":"Name","value":"nextHistoryCursor"}}]}}]} as unknown as DocumentNode<AssignDeliveryCommitmentTaskMutation, AssignDeliveryCommitmentTaskMutationVariables>;
+export const RemoveDeliveryCommitmentTaskDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"RemoveDeliveryCommitmentTask"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryCommitmentTaskRemoveInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"removeDeliveryCommitmentTask"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DeliveryCommitmentFields"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DeliveryCommitmentFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryCommitments"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"engagementId"}},{"kind":"Field","name":{"kind":"Name","value":"engagementName"}},{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"canManage"}},{"kind":"Field","name":{"kind":"Name","value":"legacyAllowance"}},{"kind":"Field","name":{"kind":"Name","value":"selectedPeriodId"}},{"kind":"Field","name":{"kind":"Name","value":"periods"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"billing"}},{"kind":"Field","name":{"kind":"Name","value":"startDate"}},{"kind":"Field","name":{"kind":"Name","value":"endDateExclusive"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"state"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}}]}},{"kind":"Field","name":{"kind":"Name","value":"lines"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"periodId"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"unit"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"promisedQuantity"}},{"kind":"Field","name":{"kind":"Name","value":"assignedQuantity"}},{"kind":"Field","name":{"kind":"Name","value":"fulfilledQuantity"}},{"kind":"Field","name":{"kind":"Name","value":"remainingQuantity"}},{"kind":"Field","name":{"kind":"Name","value":"overdeliveredQuantity"}}]}},{"kind":"Field","name":{"kind":"Name","value":"allocations"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"taskName"}},{"kind":"Field","name":{"kind":"Name","value":"periodId"}},{"kind":"Field","name":{"kind":"Name","value":"lineId"}},{"kind":"Field","name":{"kind":"Name","value":"parentTaskId"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"state"}},{"kind":"Field","name":{"kind":"Name","value":"credited"}},{"kind":"Field","name":{"kind":"Name","value":"creditReason"}},{"kind":"Field","name":{"kind":"Name","value":"fulfilledAt"}},{"kind":"Field","name":{"kind":"Name","value":"creditedCycle"}},{"kind":"Field","name":{"kind":"Name","value":"creditedSubmissionVersion"}}]}},{"kind":"Field","name":{"kind":"Name","value":"taskOptions"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"taskRevision"}},{"kind":"Field","name":{"kind":"Name","value":"state"}},{"kind":"Field","name":{"kind":"Name","value":"allocationRevision"}},{"kind":"Field","name":{"kind":"Name","value":"allocatedPeriodId"}},{"kind":"Field","name":{"kind":"Name","value":"allocatedLineId"}},{"kind":"Field","name":{"kind":"Name","value":"allocatedUnit"}}]}},{"kind":"Field","name":{"kind":"Name","value":"moreTaskOptions"}},{"kind":"Field","name":{"kind":"Name","value":"history"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"action"}},{"kind":"Field","name":{"kind":"Name","value":"actorName"}},{"kind":"Field","name":{"kind":"Name","value":"actorType"}},{"kind":"Field","name":{"kind":"Name","value":"occurredAt"}},{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"taskName"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}},{"kind":"Field","name":{"kind":"Name","value":"changes"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"field"}},{"kind":"Field","name":{"kind":"Name","value":"before"}},{"kind":"Field","name":{"kind":"Name","value":"after"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"nextAllocationCursor"}},{"kind":"Field","name":{"kind":"Name","value":"nextHistoryCursor"}}]}}]} as unknown as DocumentNode<RemoveDeliveryCommitmentTaskMutation, RemoveDeliveryCommitmentTaskMutationVariables>;
+export const DeliveryCommitmentEngagementsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"DeliveryCommitmentEngagements"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deliveryCommitmentEngagements"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"engagements"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"billing"}}]}}]}}]}}]} as unknown as DocumentNode<DeliveryCommitmentEngagementsQuery, DeliveryCommitmentEngagementsQueryVariables>;
+export const DeliveryFinanceAiCostsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"DeliveryFinanceAiCosts"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinanceAiCostsInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deliveryFinanceAiCosts"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"canManage"}},{"kind":"Field","name":{"kind":"Name","value":"canReadBudget"}},{"kind":"Field","name":{"kind":"Name","value":"filter"}},{"kind":"Field","name":{"kind":"Name","value":"nextSpendId"}},{"kind":"Field","name":{"kind":"Name","value":"projects"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"sources"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"FinanceAiCostSourceFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"selectedSource"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"FinanceAiCostSourceFields"}}]}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"FinanceAiCostEntryReferenceFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinanceAiCostEntryReference"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"month"}},{"kind":"Field","name":{"kind":"Name","value":"amountMicros"}},{"kind":"Field","name":{"kind":"Name","value":"matchedMicros"}},{"kind":"Field","name":{"kind":"Name","value":"activeMatchCount"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"FinanceAiCostSourceFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinanceAiCostSource"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"state"}},{"kind":"Field","name":{"kind":"Name","value":"sourceKind"}},{"kind":"Field","name":{"kind":"Name","value":"modelId"}},{"kind":"Field","name":{"kind":"Name","value":"currency"}},{"kind":"Field","name":{"kind":"Name","value":"settledAmountMicros"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"dispatchedAt"}},{"kind":"Field","name":{"kind":"Name","value":"settledAt"}},{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"projectName"}},{"kind":"Field","name":{"kind":"Name","value":"eligible"}},{"kind":"Field","name":{"kind":"Name","value":"sourceWarnings"}},{"kind":"Field","name":{"kind":"Name","value":"sourceReviewToken"}},{"kind":"Field","name":{"kind":"Name","value":"nextEvidenceId"}},{"kind":"Field","name":{"kind":"Name","value":"claim"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"currentEntry"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"FinanceAiCostEntryReferenceFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"replacementEntry"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"FinanceAiCostEntryReferenceFields"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"evidenceOptions"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"basis"}},{"kind":"Field","name":{"kind":"Name","value":"amountMicros"}},{"kind":"Field","name":{"kind":"Name","value":"recordedAt"}}]}}]}}]} as unknown as DocumentNode<DeliveryFinanceAiCostsQuery, DeliveryFinanceAiCostsQueryVariables>;
+export const PrepareDeliveryFinanceAiCostDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"PrepareDeliveryFinanceAiCost"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinanceAiCostPrepareInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"prepareDeliveryFinanceAiCost"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"entryId"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"replayed"}}]}}]}}]} as unknown as DocumentNode<PrepareDeliveryFinanceAiCostMutation, PrepareDeliveryFinanceAiCostMutationVariables>;
+export const PostDeliveryFinanceAiCostDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"PostDeliveryFinanceAiCost"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinanceAiCostPostInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"postDeliveryFinanceAiCost"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"entryId"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"replayed"}}]}}]}}]} as unknown as DocumentNode<PostDeliveryFinanceAiCostMutation, PostDeliveryFinanceAiCostMutationVariables>;
+export const DeliveryFinanceForecastDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"DeliveryFinanceForecast"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinanceForecastInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deliveryFinanceForecast"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"canManage"}},{"kind":"Field","name":{"kind":"Name","value":"currency"}},{"kind":"Field","name":{"kind":"Name","value":"horizonDays"}},{"kind":"Field","name":{"kind":"Name","value":"businessDate"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"anchor"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"currency"}},{"kind":"Field","name":{"kind":"Name","value":"amountMicros"}},{"kind":"Field","name":{"kind":"Name","value":"closingDate"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"note"}},{"kind":"Field","name":{"kind":"Name","value":"evidenceUrl"}},{"kind":"Field","name":{"kind":"Name","value":"changedBy"}},{"kind":"Field","name":{"kind":"Name","value":"changedByName"}},{"kind":"Field","name":{"kind":"Name","value":"changedAt"}}]}},{"kind":"Field","name":{"kind":"Name","value":"actualInflowMicros"}},{"kind":"Field","name":{"kind":"Name","value":"actualOutflowMicros"}},{"kind":"Field","name":{"kind":"Name","value":"currentCashMicros"}},{"kind":"Field","name":{"kind":"Name","value":"expectedInflowMicros"}},{"kind":"Field","name":{"kind":"Name","value":"expectedOutflowMicros"}},{"kind":"Field","name":{"kind":"Name","value":"endingCashMicros"}},{"kind":"Field","name":{"kind":"Name","value":"firstNegativeDate"}},{"kind":"Field","name":{"kind":"Name","value":"knownUnscheduledInflowMicros"}},{"kind":"Field","name":{"kind":"Name","value":"knownUnscheduledOutflowMicros"}},{"kind":"Field","name":{"kind":"Name","value":"unknownCollectionCount"}},{"kind":"Field","name":{"kind":"Name","value":"unappliedActualOutflowMicros"}},{"kind":"Field","name":{"kind":"Name","value":"projectionComplete"}},{"kind":"Field","name":{"kind":"Name","value":"warnings"}},{"kind":"Field","name":{"kind":"Name","value":"owners"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"items"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"FinanceForecastItemFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"itemCount"}},{"kind":"Field","name":{"kind":"Name","value":"nextItemId"}},{"kind":"Field","name":{"kind":"Name","value":"selectedItem"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"FinanceForecastItemFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"realizations"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"FinanceForecastRealizationFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"nextRealizationId"}},{"kind":"Field","name":{"kind":"Name","value":"exceptions"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"key"}},{"kind":"Field","name":{"kind":"Name","value":"code"}},{"kind":"Field","name":{"kind":"Name","value":"itemId"}},{"kind":"Field","name":{"kind":"Name","value":"sourceId"}},{"kind":"Field","name":{"kind":"Name","value":"sourceType"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"date"}},{"kind":"Field","name":{"kind":"Name","value":"amountMicros"}}]}},{"kind":"Field","name":{"kind":"Name","value":"exceptionCount"}},{"kind":"Field","name":{"kind":"Name","value":"nextExceptionKey"}},{"kind":"Field","name":{"kind":"Name","value":"timeline"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"date"}},{"kind":"Field","name":{"kind":"Name","value":"inflowMicros"}},{"kind":"Field","name":{"kind":"Name","value":"outflowMicros"}},{"kind":"Field","name":{"kind":"Name","value":"closingMicros"}},{"kind":"Field","name":{"kind":"Name","value":"itemIds"}}]}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"FinanceForecastItemFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinanceForecastItem"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"sourceType"}},{"kind":"Field","name":{"kind":"Name","value":"sourceId"}},{"kind":"Field","name":{"kind":"Name","value":"planMonth"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"currency"}},{"kind":"Field","name":{"kind":"Name","value":"amountMicros"}},{"kind":"Field","name":{"kind":"Name","value":"remainingMicros"}},{"kind":"Field","name":{"kind":"Name","value":"appliedMicros"}},{"kind":"Field","name":{"kind":"Name","value":"expectedDate"}},{"kind":"Field","name":{"kind":"Name","value":"contractualDueDate"}},{"kind":"Field","name":{"kind":"Name","value":"ownerId"}},{"kind":"Field","name":{"kind":"Name","value":"ownerName"}},{"kind":"Field","name":{"kind":"Name","value":"ownerEligible"}},{"kind":"Field","name":{"kind":"Name","value":"nextActionDate"}},{"kind":"Field","name":{"kind":"Name","value":"note"}},{"kind":"Field","name":{"kind":"Name","value":"sourceReviewToken"}},{"kind":"Field","name":{"kind":"Name","value":"reviewToken"}},{"kind":"Field","name":{"kind":"Name","value":"eligible"}},{"kind":"Field","name":{"kind":"Name","value":"warnings"}},{"kind":"Field","name":{"kind":"Name","value":"changedAt"}},{"kind":"Field","name":{"kind":"Name","value":"changedByName"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"FinanceForecastRealizationFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinanceForecastRealization"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"itemId"}},{"kind":"Field","name":{"kind":"Name","value":"cashId"}},{"kind":"Field","name":{"kind":"Name","value":"cashTitle"}},{"kind":"Field","name":{"kind":"Name","value":"targetTitle"}},{"kind":"Field","name":{"kind":"Name","value":"currency"}},{"kind":"Field","name":{"kind":"Name","value":"amountMicros"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"note"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"createdByName"}},{"kind":"Field","name":{"kind":"Name","value":"reversedAt"}},{"kind":"Field","name":{"kind":"Name","value":"reversedByName"}},{"kind":"Field","name":{"kind":"Name","value":"reversalReason"}}]}}]} as unknown as DocumentNode<DeliveryFinanceForecastQuery, DeliveryFinanceForecastQueryVariables>;
+export const DeliveryFinanceForecastSourcesDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"DeliveryFinanceForecastSources"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinanceForecastSourcesInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deliveryFinanceForecastSources"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"canManage"}},{"kind":"Field","name":{"kind":"Name","value":"currency"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"nextId"}},{"kind":"Field","name":{"kind":"Name","value":"sources"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"FinanceForecastSourceFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"selectedSource"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"FinanceForecastSourceFields"}}]}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"FinanceForecastSourceFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinanceForecastSource"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"sourceType"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"category"}},{"kind":"Field","name":{"kind":"Name","value":"currency"}},{"kind":"Field","name":{"kind":"Name","value":"date"}},{"kind":"Field","name":{"kind":"Name","value":"dueDate"}},{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"projectName"}},{"kind":"Field","name":{"kind":"Name","value":"amountMicros"}},{"kind":"Field","name":{"kind":"Name","value":"remainingMicros"}},{"kind":"Field","name":{"kind":"Name","value":"planMonth"}},{"kind":"Field","name":{"kind":"Name","value":"suggestedDate"}},{"kind":"Field","name":{"kind":"Name","value":"occurrenceItemId"}},{"kind":"Field","name":{"kind":"Name","value":"sourceReviewToken"}},{"kind":"Field","name":{"kind":"Name","value":"eligible"}},{"kind":"Field","name":{"kind":"Name","value":"warnings"}}]}}]} as unknown as DocumentNode<DeliveryFinanceForecastSourcesQuery, DeliveryFinanceForecastSourcesQueryVariables>;
+export const DeliveryFinanceForecastHistoryDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"DeliveryFinanceForecastHistory"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinanceForecastHistoryInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deliveryFinanceForecastHistory"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"nextBeforeId"}},{"kind":"Field","name":{"kind":"Name","value":"events"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"sourceType"}},{"kind":"Field","name":{"kind":"Name","value":"sourceId"}},{"kind":"Field","name":{"kind":"Name","value":"action"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"actorName"}},{"kind":"Field","name":{"kind":"Name","value":"actorId"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}},{"kind":"Field","name":{"kind":"Name","value":"beforeStatus"}},{"kind":"Field","name":{"kind":"Name","value":"afterStatus"}},{"kind":"Field","name":{"kind":"Name","value":"currency"}},{"kind":"Field","name":{"kind":"Name","value":"amountMicros"}},{"kind":"Field","name":{"kind":"Name","value":"date"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"ownerName"}},{"kind":"Field","name":{"kind":"Name","value":"note"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"evidenceUrl"}},{"kind":"Field","name":{"kind":"Name","value":"originSourceType"}},{"kind":"Field","name":{"kind":"Name","value":"originSourceId"}},{"kind":"Field","name":{"kind":"Name","value":"planMonth"}},{"kind":"Field","name":{"kind":"Name","value":"sourceRevision"}},{"kind":"Field","name":{"kind":"Name","value":"sourceAmountMicros"}},{"kind":"Field","name":{"kind":"Name","value":"cashId"}},{"kind":"Field","name":{"kind":"Name","value":"itemId"}},{"kind":"Field","name":{"kind":"Name","value":"cashDate"}},{"kind":"Field","name":{"kind":"Name","value":"reversedAt"}}]}}]}}]}}]} as unknown as DocumentNode<DeliveryFinanceForecastHistoryQuery, DeliveryFinanceForecastHistoryQueryVariables>;
+export const SaveDeliveryFinanceForecastAnchorDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SaveDeliveryFinanceForecastAnchor"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinanceForecastAnchorInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"saveDeliveryFinanceForecastAnchor"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"anchor"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"currency"}},{"kind":"Field","name":{"kind":"Name","value":"amountMicros"}},{"kind":"Field","name":{"kind":"Name","value":"closingDate"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"note"}},{"kind":"Field","name":{"kind":"Name","value":"evidenceUrl"}},{"kind":"Field","name":{"kind":"Name","value":"changedBy"}},{"kind":"Field","name":{"kind":"Name","value":"changedByName"}},{"kind":"Field","name":{"kind":"Name","value":"changedAt"}}]}},{"kind":"Field","name":{"kind":"Name","value":"replayed"}}]}}]}}]} as unknown as DocumentNode<SaveDeliveryFinanceForecastAnchorMutation, SaveDeliveryFinanceForecastAnchorMutationVariables>;
+export const SaveDeliveryFinanceForecastItemDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SaveDeliveryFinanceForecastItem"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinanceForecastItemInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"saveDeliveryFinanceForecastItem"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"item"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"sourceType"}},{"kind":"Field","name":{"kind":"Name","value":"sourceId"}},{"kind":"Field","name":{"kind":"Name","value":"planMonth"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"currency"}},{"kind":"Field","name":{"kind":"Name","value":"amountMicros"}},{"kind":"Field","name":{"kind":"Name","value":"remainingMicros"}},{"kind":"Field","name":{"kind":"Name","value":"appliedMicros"}},{"kind":"Field","name":{"kind":"Name","value":"expectedDate"}},{"kind":"Field","name":{"kind":"Name","value":"contractualDueDate"}},{"kind":"Field","name":{"kind":"Name","value":"ownerId"}},{"kind":"Field","name":{"kind":"Name","value":"ownerName"}},{"kind":"Field","name":{"kind":"Name","value":"ownerEligible"}},{"kind":"Field","name":{"kind":"Name","value":"nextActionDate"}},{"kind":"Field","name":{"kind":"Name","value":"note"}},{"kind":"Field","name":{"kind":"Name","value":"sourceReviewToken"}},{"kind":"Field","name":{"kind":"Name","value":"reviewToken"}},{"kind":"Field","name":{"kind":"Name","value":"eligible"}},{"kind":"Field","name":{"kind":"Name","value":"warnings"}},{"kind":"Field","name":{"kind":"Name","value":"changedAt"}},{"kind":"Field","name":{"kind":"Name","value":"changedByName"}}]}},{"kind":"Field","name":{"kind":"Name","value":"replayed"}}]}}]}}]} as unknown as DocumentNode<SaveDeliveryFinanceForecastItemMutation, SaveDeliveryFinanceForecastItemMutationVariables>;
+export const RealizeDeliveryFinanceForecastOutflowDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"RealizeDeliveryFinanceForecastOutflow"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinanceForecastRealizeInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"realizeDeliveryFinanceForecastOutflow"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"realization"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"itemId"}},{"kind":"Field","name":{"kind":"Name","value":"cashId"}},{"kind":"Field","name":{"kind":"Name","value":"cashTitle"}},{"kind":"Field","name":{"kind":"Name","value":"targetTitle"}},{"kind":"Field","name":{"kind":"Name","value":"currency"}},{"kind":"Field","name":{"kind":"Name","value":"amountMicros"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"note"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"createdByName"}},{"kind":"Field","name":{"kind":"Name","value":"reversedAt"}},{"kind":"Field","name":{"kind":"Name","value":"reversedByName"}},{"kind":"Field","name":{"kind":"Name","value":"reversalReason"}}]}},{"kind":"Field","name":{"kind":"Name","value":"replayed"}}]}}]}}]} as unknown as DocumentNode<RealizeDeliveryFinanceForecastOutflowMutation, RealizeDeliveryFinanceForecastOutflowMutationVariables>;
+export const ReverseDeliveryFinanceForecastRealizationDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"ReverseDeliveryFinanceForecastRealization"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinanceForecastReverseInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"reverseDeliveryFinanceForecastRealization"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"realization"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"itemId"}},{"kind":"Field","name":{"kind":"Name","value":"cashId"}},{"kind":"Field","name":{"kind":"Name","value":"cashTitle"}},{"kind":"Field","name":{"kind":"Name","value":"targetTitle"}},{"kind":"Field","name":{"kind":"Name","value":"currency"}},{"kind":"Field","name":{"kind":"Name","value":"amountMicros"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"note"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"createdByName"}},{"kind":"Field","name":{"kind":"Name","value":"reversedAt"}},{"kind":"Field","name":{"kind":"Name","value":"reversedByName"}},{"kind":"Field","name":{"kind":"Name","value":"reversalReason"}}]}},{"kind":"Field","name":{"kind":"Name","value":"replayed"}}]}}]}}]} as unknown as DocumentNode<ReverseDeliveryFinanceForecastRealizationMutation, ReverseDeliveryFinanceForecastRealizationMutationVariables>;
+export const DeliveryFinancePaymentsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"DeliveryFinancePayments"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinancePaymentsInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deliveryFinancePayments"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"canManage"}},{"kind":"Field","name":{"kind":"Name","value":"currency"}},{"kind":"Field","name":{"kind":"Name","value":"rejectedCashCount"}},{"kind":"Field","name":{"kind":"Name","value":"cashTotal"}},{"kind":"Field","name":{"kind":"Name","value":"receivableTotal"}},{"kind":"Field","name":{"kind":"Name","value":"entryTotal"}},{"kind":"Field","name":{"kind":"Name","value":"nextCashId"}},{"kind":"Field","name":{"kind":"Name","value":"nextReceivableId"}},{"kind":"Field","name":{"kind":"Name","value":"nextEntryId"}},{"kind":"Field","name":{"kind":"Name","value":"settlementTotal"}},{"kind":"Field","name":{"kind":"Name","value":"matchTotal"}},{"kind":"Field","name":{"kind":"Name","value":"nextSettlementId"}},{"kind":"Field","name":{"kind":"Name","value":"nextMatchId"}},{"kind":"Field","name":{"kind":"Name","value":"projects"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"cash"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"FinanceCashSourceFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"receivables"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"FinanceCashSourceFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"entries"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"FinanceMatchableEntryFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"selectedCash"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"FinanceCashSourceFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"selectedReceivable"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"FinanceCashSourceFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"selectedEntry"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"FinanceMatchableEntryFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"settlements"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"FinanceCashRelationFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"matches"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"FinanceCashRelationFields"}}]}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"FinanceCashSourceFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinanceCashSource"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"category"}},{"kind":"Field","name":{"kind":"Name","value":"currency"}},{"kind":"Field","name":{"kind":"Name","value":"amountMicros"}},{"kind":"Field","name":{"kind":"Name","value":"date"}},{"kind":"Field","name":{"kind":"Name","value":"dueDate"}},{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"projectName"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"evidenceUrl"}},{"kind":"Field","name":{"kind":"Name","value":"note"}},{"kind":"Field","name":{"kind":"Name","value":"sourceReviewToken"}},{"kind":"Field","name":{"kind":"Name","value":"sourceWarnings"}},{"kind":"Field","name":{"kind":"Name","value":"settledMicros"}},{"kind":"Field","name":{"kind":"Name","value":"remainingSettlementMicros"}},{"kind":"Field","name":{"kind":"Name","value":"matchedMicros"}},{"kind":"Field","name":{"kind":"Name","value":"remainingMatchMicros"}},{"kind":"Field","name":{"kind":"Name","value":"outstandingMicros"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"FinanceMatchableEntryFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinanceMatchableEntry"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"month"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"currency"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"sourceReviewToken"}},{"kind":"Field","name":{"kind":"Name","value":"allocations"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"projectName"}},{"kind":"Field","name":{"kind":"Name","value":"amountMicros"}},{"kind":"Field","name":{"kind":"Name","value":"matchedMicros"}},{"kind":"Field","name":{"kind":"Name","value":"remainingMatchMicros"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"FinanceCashRelationFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinanceCashRelation"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"cashId"}},{"kind":"Field","name":{"kind":"Name","value":"cashTitle"}},{"kind":"Field","name":{"kind":"Name","value":"receivableId"}},{"kind":"Field","name":{"kind":"Name","value":"entryId"}},{"kind":"Field","name":{"kind":"Name","value":"targetTitle"}},{"kind":"Field","name":{"kind":"Name","value":"month"}},{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"projectName"}},{"kind":"Field","name":{"kind":"Name","value":"currency"}},{"kind":"Field","name":{"kind":"Name","value":"amountMicros"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"legacy"}},{"kind":"Field","name":{"kind":"Name","value":"canReverse"}},{"kind":"Field","name":{"kind":"Name","value":"createdBy"}},{"kind":"Field","name":{"kind":"Name","value":"createdByName"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"reversedBy"}},{"kind":"Field","name":{"kind":"Name","value":"reversedByName"}},{"kind":"Field","name":{"kind":"Name","value":"reversedAt"}},{"kind":"Field","name":{"kind":"Name","value":"reversalReason"}}]}}]} as unknown as DocumentNode<DeliveryFinancePaymentsQuery, DeliveryFinancePaymentsQueryVariables>;
+export const RecordDeliveryFinancePaymentDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"RecordDeliveryFinancePayment"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinancePaymentInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"recordDeliveryFinancePayment"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}]}]}}]} as unknown as DocumentNode<RecordDeliveryFinancePaymentMutation, RecordDeliveryFinancePaymentMutationVariables>;
+export const SettleDeliveryFinanceReceivableDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SettleDeliveryFinanceReceivable"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinanceSettlementInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"settleDeliveryFinanceReceivable"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}]}]}}]} as unknown as DocumentNode<SettleDeliveryFinanceReceivableMutation, SettleDeliveryFinanceReceivableMutationVariables>;
+export const MatchDeliveryFinanceCashDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"MatchDeliveryFinanceCash"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinanceCashMatchInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"matchDeliveryFinanceCash"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}]}]}}]} as unknown as DocumentNode<MatchDeliveryFinanceCashMutation, MatchDeliveryFinanceCashMutationVariables>;
+export const ReverseDeliveryFinanceRelationDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"ReverseDeliveryFinanceRelation"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinanceReverseRelationInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"reverseDeliveryFinanceRelation"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}]}]}}]} as unknown as DocumentNode<ReverseDeliveryFinanceRelationMutation, ReverseDeliveryFinanceRelationMutationVariables>;
+export const DeliveryFinancePeriodDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"DeliveryFinancePeriod"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinancePeriodInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deliveryFinancePeriod"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"canManage"}},{"kind":"Field","name":{"kind":"Name","value":"period"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"FinancePeriodFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"summaries"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"FinancePeriodCurrencyFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"recognitionHash"}},{"kind":"Field","name":{"kind":"Name","value":"previewToken"}},{"kind":"Field","name":{"kind":"Name","value":"blockerCount"}},{"kind":"Field","name":{"kind":"Name","value":"nextBlockerId"}},{"kind":"Field","name":{"kind":"Name","value":"blockers"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"entryId"}},{"kind":"Field","name":{"kind":"Name","value":"month"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"sourceType"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}}]}},{"kind":"Field","name":{"kind":"Name","value":"limitations"}},{"kind":"Field","name":{"kind":"Name","value":"canLock"}},{"kind":"Field","name":{"kind":"Name","value":"canReopen"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"FinancePeriodFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinancePeriod"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"month"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"changedBy"}},{"kind":"Field","name":{"kind":"Name","value":"changedByName"}},{"kind":"Field","name":{"kind":"Name","value":"changedAt"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"FinancePeriodCurrencyFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinancePeriodCurrencySummary"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"currency"}},{"kind":"Field","name":{"kind":"Name","value":"revenueMicros"}},{"kind":"Field","name":{"kind":"Name","value":"costMicros"}},{"kind":"Field","name":{"kind":"Name","value":"resultMicros"}},{"kind":"Field","name":{"kind":"Name","value":"draftCount"}},{"kind":"Field","name":{"kind":"Name","value":"postedCount"}},{"kind":"Field","name":{"kind":"Name","value":"voidCount"}},{"kind":"Field","name":{"kind":"Name","value":"projects"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"projectName"}},{"kind":"Field","name":{"kind":"Name","value":"revenueMicros"}},{"kind":"Field","name":{"kind":"Name","value":"costMicros"}},{"kind":"Field","name":{"kind":"Name","value":"resultMicros"}},{"kind":"Field","name":{"kind":"Name","value":"postedCount"}}]}}]}}]} as unknown as DocumentNode<DeliveryFinancePeriodQuery, DeliveryFinancePeriodQueryVariables>;
+export const ChangeDeliveryFinancePeriodDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"ChangeDeliveryFinancePeriod"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinancePeriodChangeInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"changeDeliveryFinancePeriod"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"period"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"month"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"changedBy"}},{"kind":"Field","name":{"kind":"Name","value":"changedByName"}},{"kind":"Field","name":{"kind":"Name","value":"changedAt"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}}]}},{"kind":"Field","name":{"kind":"Name","value":"replayed"}}]}}]}}]} as unknown as DocumentNode<ChangeDeliveryFinancePeriodMutation, ChangeDeliveryFinancePeriodMutationVariables>;
+export const DeliveryFinancePeriodHistoryDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"DeliveryFinancePeriodHistory"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinancePeriodHistoryInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deliveryFinancePeriodHistory"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"month"}},{"kind":"Field","name":{"kind":"Name","value":"nextBeforeId"}},{"kind":"Field","name":{"kind":"Name","value":"events"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"action"}},{"kind":"Field","name":{"kind":"Name","value":"beforeStatus"}},{"kind":"Field","name":{"kind":"Name","value":"afterStatus"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}},{"kind":"Field","name":{"kind":"Name","value":"actorId"}},{"kind":"Field","name":{"kind":"Name","value":"actorName"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"recognitionHash"}},{"kind":"Field","name":{"kind":"Name","value":"summaries"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"currency"}},{"kind":"Field","name":{"kind":"Name","value":"revenueMicros"}},{"kind":"Field","name":{"kind":"Name","value":"costMicros"}},{"kind":"Field","name":{"kind":"Name","value":"resultMicros"}},{"kind":"Field","name":{"kind":"Name","value":"draftCount"}},{"kind":"Field","name":{"kind":"Name","value":"postedCount"}},{"kind":"Field","name":{"kind":"Name","value":"voidCount"}},{"kind":"Field","name":{"kind":"Name","value":"projects"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"projectName"}},{"kind":"Field","name":{"kind":"Name","value":"revenueMicros"}},{"kind":"Field","name":{"kind":"Name","value":"costMicros"}},{"kind":"Field","name":{"kind":"Name","value":"resultMicros"}},{"kind":"Field","name":{"kind":"Name","value":"postedCount"}}]}}]}}]}}]}}]}}]} as unknown as DocumentNode<DeliveryFinancePeriodHistoryQuery, DeliveryFinancePeriodHistoryQueryVariables>;
+export const DeliveryFinanceRecognitionAvailabilityDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"DeliveryFinanceRecognitionAvailability"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinancePeriodInput"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"replacedInput"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinancePeriodInput"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"includeReplaced"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Boolean"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deliveryFinancePeriod"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"canManage"}},{"kind":"Field","name":{"kind":"Name","value":"period"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"month"}},{"kind":"Field","name":{"kind":"Name","value":"status"}}]}}]}},{"kind":"Field","alias":{"kind":"Name","value":"replacedPeriod"},"name":{"kind":"Name","value":"deliveryFinancePeriod"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"replacedInput"}}}],"directives":[{"kind":"Directive","name":{"kind":"Name","value":"include"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"if"},"value":{"kind":"Variable","name":{"kind":"Name","value":"includeReplaced"}}}]}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"canManage"}},{"kind":"Field","name":{"kind":"Name","value":"period"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"month"}},{"kind":"Field","name":{"kind":"Name","value":"status"}}]}}]}}]}}]} as unknown as DocumentNode<DeliveryFinanceRecognitionAvailabilityQuery, DeliveryFinanceRecognitionAvailabilityQueryVariables>;
+export const DeliveryFinanceDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"DeliveryFinance"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinanceInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deliveryFinance"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"month"}},{"kind":"Field","name":{"kind":"Name","value":"currency"}},{"kind":"Field","name":{"kind":"Name","value":"canManage"}},{"kind":"Field","name":{"kind":"Name","value":"period"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"month"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"changedBy"}},{"kind":"Field","name":{"kind":"Name","value":"changedByName"}},{"kind":"Field","name":{"kind":"Name","value":"changedAt"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}}]}},{"kind":"Field","name":{"kind":"Name","value":"planTotal"}},{"kind":"Field","name":{"kind":"Name","value":"entryTotal"}},{"kind":"Field","name":{"kind":"Name","value":"nextPlanId"}},{"kind":"Field","name":{"kind":"Name","value":"nextEntryId"}},{"kind":"Field","name":{"kind":"Name","value":"projects"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"members"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"plans"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"FinancePlanFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"selectedPlan"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"FinancePlanFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"entries"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"FinanceEntryFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"selectedEntry"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"FinanceEntryFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"summaries"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"currency"}},{"kind":"Field","name":{"kind":"Name","value":"revenueMicros"}},{"kind":"Field","name":{"kind":"Name","value":"costMicros"}},{"kind":"Field","name":{"kind":"Name","value":"resultMicros"}},{"kind":"Field","name":{"kind":"Name","value":"unassignedRevenueMicros"}},{"kind":"Field","name":{"kind":"Name","value":"unassignedCostMicros"}},{"kind":"Field","name":{"kind":"Name","value":"draftCount"}},{"kind":"Field","name":{"kind":"Name","value":"postedCount"}},{"kind":"Field","name":{"kind":"Name","value":"voidCount"}},{"kind":"Field","name":{"kind":"Name","value":"projects"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"projectName"}},{"kind":"Field","name":{"kind":"Name","value":"revenueMicros"}},{"kind":"Field","name":{"kind":"Name","value":"costMicros"}},{"kind":"Field","name":{"kind":"Name","value":"resultMicros"}}]}}]}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"FinancePlanFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinancePlan"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"type"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"currency"}},{"kind":"Field","name":{"kind":"Name","value":"monthlyAmountMicros"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"memberName"}},{"kind":"Field","name":{"kind":"Name","value":"memberActive"}},{"kind":"Field","name":{"kind":"Name","value":"startMonth"}},{"kind":"Field","name":{"kind":"Name","value":"endMonth"}},{"kind":"Field","name":{"kind":"Name","value":"dueDay"}},{"kind":"Field","name":{"kind":"Name","value":"active"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"FinanceEntryFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinanceEntry"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"month"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"category"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"currency"}},{"kind":"Field","name":{"kind":"Name","value":"amountMicros"}},{"kind":"Field","name":{"kind":"Name","value":"note"}},{"kind":"Field","name":{"kind":"Name","value":"evidenceUrl"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"sourceType"}},{"kind":"Field","name":{"kind":"Name","value":"sourcePlan"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"planId"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"type"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"memberName"}},{"kind":"Field","name":{"kind":"Name","value":"monthlyAmountMicros"}},{"kind":"Field","name":{"kind":"Name","value":"startMonth"}},{"kind":"Field","name":{"kind":"Name","value":"endMonth"}},{"kind":"Field","name":{"kind":"Name","value":"dueDay"}}]}},{"kind":"Field","name":{"kind":"Name","value":"sourceAiSpend"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"spendId"}},{"kind":"Field","name":{"kind":"Name","value":"spendRevision"}},{"kind":"Field","name":{"kind":"Name","value":"evidenceEventId"}},{"kind":"Field","name":{"kind":"Name","value":"basis"}},{"kind":"Field","name":{"kind":"Name","value":"amountMicros"}},{"kind":"Field","name":{"kind":"Name","value":"currency"}},{"kind":"Field","name":{"kind":"Name","value":"modelId"}},{"kind":"Field","name":{"kind":"Name","value":"sourceKind"}},{"kind":"Field","name":{"kind":"Name","value":"recordedAt"}},{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"projectName"}},{"kind":"Field","name":{"kind":"Name","value":"replacesEntryId"}},{"kind":"Field","name":{"kind":"Name","value":"correctionReason"}}]}},{"kind":"Field","name":{"kind":"Name","value":"sourceWarnings"}},{"kind":"Field","name":{"kind":"Name","value":"lockedMonths"}},{"kind":"Field","name":{"kind":"Name","value":"sourceReviewToken"}},{"kind":"Field","name":{"kind":"Name","value":"dueDate"}},{"kind":"Field","name":{"kind":"Name","value":"remainingAllocationMicros"}},{"kind":"Field","name":{"kind":"Name","value":"allocations"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"projectName"}},{"kind":"Field","name":{"kind":"Name","value":"amountMicros"}}]}},{"kind":"Field","name":{"kind":"Name","value":"createdBy"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"postedAt"}},{"kind":"Field","name":{"kind":"Name","value":"voidedAt"}},{"kind":"Field","name":{"kind":"Name","value":"voidReason"}}]}}]} as unknown as DocumentNode<DeliveryFinanceQuery, DeliveryFinanceQueryVariables>;
+export const SaveDeliveryFinancePlanDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SaveDeliveryFinancePlan"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinancePlanInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"saveDeliveryFinancePlan"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}]}]}}]} as unknown as DocumentNode<SaveDeliveryFinancePlanMutation, SaveDeliveryFinancePlanMutationVariables>;
+export const SaveDeliveryFinanceEntryDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SaveDeliveryFinanceEntry"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinanceEntryInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"saveDeliveryFinanceEntry"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}]}]}}]} as unknown as DocumentNode<SaveDeliveryFinanceEntryMutation, SaveDeliveryFinanceEntryMutationVariables>;
+export const PrepareDeliveryFinanceMonthDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"PrepareDeliveryFinanceMonth"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinancePrepareInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"prepareDeliveryFinanceMonth"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createdCount"}},{"kind":"Field","name":{"kind":"Name","value":"existingCount"}},{"kind":"Field","name":{"kind":"Name","value":"nextPlanId"}},{"kind":"Field","name":{"kind":"Name","value":"skipped"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"planId"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}}]}}]}}]}}]} as unknown as DocumentNode<PrepareDeliveryFinanceMonthMutation, PrepareDeliveryFinanceMonthMutationVariables>;
+export const PostDeliveryFinanceEntryDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"PostDeliveryFinanceEntry"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinancePostInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"postDeliveryFinanceEntry"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}]}]}}]} as unknown as DocumentNode<PostDeliveryFinanceEntryMutation, PostDeliveryFinanceEntryMutationVariables>;
+export const VoidDeliveryFinanceEntryDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"VoidDeliveryFinanceEntry"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinanceVoidInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"voidDeliveryFinanceEntry"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}]}]}}]} as unknown as DocumentNode<VoidDeliveryFinanceEntryMutation, VoidDeliveryFinanceEntryMutationVariables>;
+export const DeliveryFinanceEntryHistoryDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"DeliveryFinanceEntryHistory"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinanceHistoryInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deliveryFinanceEntryHistory"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"entryId"}},{"kind":"Field","name":{"kind":"Name","value":"nextBeforeId"}},{"kind":"Field","name":{"kind":"Name","value":"events"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"actorId"}},{"kind":"Field","name":{"kind":"Name","value":"actorName"}},{"kind":"Field","name":{"kind":"Name","value":"action"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"beforeAmountMicros"}},{"kind":"Field","name":{"kind":"Name","value":"afterAmountMicros"}},{"kind":"Field","name":{"kind":"Name","value":"beforeStatus"}},{"kind":"Field","name":{"kind":"Name","value":"afterStatus"}}]}}]}}]}}]} as unknown as DocumentNode<DeliveryFinanceEntryHistoryQuery, DeliveryFinanceEntryHistoryQueryVariables>;
+export const DeliveryHandoffsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"DeliveryHandoffs"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"search"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deliveryHandoffs"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"search"},"value":{"kind":"Variable","name":{"kind":"Name","value":"search"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"search"}},{"kind":"Field","name":{"kind":"Name","value":"hasMore"}},{"kind":"Field","name":{"kind":"Name","value":"opportunities"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"hasCompany"}},{"kind":"Field","name":{"kind":"Name","value":"quotes"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"handoffs"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"opportunityId"}},{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"engagementId"}},{"kind":"Field","name":{"kind":"Name","value":"managerId"}},{"kind":"Field","name":{"kind":"Name","value":"reviewerId"}},{"kind":"Field","name":{"kind":"Name","value":"setupTaskIds"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}}]}}]}}]} as unknown as DocumentNode<DeliveryHandoffsQuery, DeliveryHandoffsQueryVariables>;
+export const DeliveryHandoffPreviewDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"DeliveryHandoffPreview"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryHandoffPreviewInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deliveryHandoffPreview"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"source"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"opportunityId"}},{"kind":"Field","name":{"kind":"Name","value":"opportunityName"}},{"kind":"Field","name":{"kind":"Name","value":"companyId"}},{"kind":"Field","name":{"kind":"Name","value":"companyName"}},{"kind":"Field","name":{"kind":"Name","value":"quoteId"}},{"kind":"Field","name":{"kind":"Name","value":"quoteNumber"}},{"kind":"Field","name":{"kind":"Name","value":"scope"}},{"kind":"Field","name":{"kind":"Name","value":"fingerprint"}},{"kind":"Field","name":{"kind":"Name","value":"totalAmountMicros"}},{"kind":"Field","name":{"kind":"Name","value":"currency"}}]}}]}}]}}]} as unknown as DocumentNode<DeliveryHandoffPreviewQuery, DeliveryHandoffPreviewQueryVariables>;
+export const CreateDeliveryHandoffDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CreateDeliveryHandoff"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryHandoffCreateInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createDeliveryHandoff"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"opportunityId"}},{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"engagementId"}},{"kind":"Field","name":{"kind":"Name","value":"managerId"}},{"kind":"Field","name":{"kind":"Name","value":"reviewerId"}},{"kind":"Field","name":{"kind":"Name","value":"setupTaskIds"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}}]}}]} as unknown as DocumentNode<CreateDeliveryHandoffMutation, CreateDeliveryHandoffMutationVariables>;
+export const DeliveryKnowledgeDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"DeliveryKnowledge"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryKnowledgeInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deliveryKnowledge"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"canPublish"}},{"kind":"Field","name":{"kind":"Name","value":"nextCursor"}},{"kind":"Field","name":{"kind":"Name","value":"items"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"category"}},{"kind":"Field","name":{"kind":"Name","value":"meetingDate"}},{"kind":"Field","name":{"kind":"Name","value":"version"}},{"kind":"Field","name":{"kind":"Name","value":"publishedVersion"}},{"kind":"Field","name":{"kind":"Name","value":"publishedAt"}},{"kind":"Field","name":{"kind":"Name","value":"createdBy"}},{"kind":"Field","name":{"kind":"Name","value":"canEdit"}}]}},{"kind":"Field","name":{"kind":"Name","value":"detail"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"category"}},{"kind":"Field","name":{"kind":"Name","value":"meetingDate"}},{"kind":"Field","name":{"kind":"Name","value":"version"}},{"kind":"Field","name":{"kind":"Name","value":"currentVersion"}},{"kind":"Field","name":{"kind":"Name","value":"publishedVersion"}},{"kind":"Field","name":{"kind":"Name","value":"publishedAt"}},{"kind":"Field","name":{"kind":"Name","value":"createdBy"}},{"kind":"Field","name":{"kind":"Name","value":"canEdit"}},{"kind":"Field","name":{"kind":"Name","value":"sourceUrl"}},{"kind":"Field","name":{"kind":"Name","value":"transcript"}},{"kind":"Field","name":{"kind":"Name","value":"knowledge"}}]}}]}}]}}]} as unknown as DocumentNode<DeliveryKnowledgeQuery, DeliveryKnowledgeQueryVariables>;
+export const SaveDeliveryKnowledgeDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SaveDeliveryKnowledge"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryKnowledgeSaveInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"saveDeliveryKnowledge"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}]}]}}]} as unknown as DocumentNode<SaveDeliveryKnowledgeMutation, SaveDeliveryKnowledgeMutationVariables>;
+export const PublishDeliveryKnowledgeDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"PublishDeliveryKnowledge"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryKnowledgePublishInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"publishDeliveryKnowledge"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}]}]}}]} as unknown as DocumentNode<PublishDeliveryKnowledgeMutation, PublishDeliveryKnowledgeMutationVariables>;
+export const DeliveryReadinessDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"DeliveryReadiness"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deliveryReadiness"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"observedAt"}},{"kind":"Field","name":{"kind":"Name","value":"items"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"capability"}},{"kind":"Field","name":{"kind":"Name","value":"accountName"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}},{"kind":"Field","name":{"kind":"Name","value":"destination"}},{"kind":"Field","name":{"kind":"Name","value":"lastSuccessAt"}}]}}]}}]}}]} as unknown as DocumentNode<DeliveryReadinessQuery, DeliveryReadinessQueryVariables>;
+export const DeliveryRevisionsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"DeliveryRevisions"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryRevisionsInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deliveryRevisions"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"canManage"}},{"kind":"Field","name":{"kind":"Name","value":"canReadFinance"}},{"kind":"Field","name":{"kind":"Name","value":"canManageFinance"}},{"kind":"Field","name":{"kind":"Name","value":"total"}},{"kind":"Field","name":{"kind":"Name","value":"nextBeforeRound"}},{"kind":"Field","name":{"kind":"Name","value":"rounds"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"round"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"submissionVersion"}},{"kind":"Field","name":{"kind":"Name","value":"source"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}},{"kind":"Field","name":{"kind":"Name","value":"cause"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"effortMinutes"}},{"kind":"Field","name":{"kind":"Name","value":"internalCost"}},{"kind":"Field","name":{"kind":"Name","value":"proposedCharge"}},{"kind":"Field","name":{"kind":"Name","value":"currency"}}]}}]}}]}}]} as unknown as DocumentNode<DeliveryRevisionsQuery, DeliveryRevisionsQueryVariables>;
+export const SaveDeliveryRevisionDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SaveDeliveryRevision"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryRevisionSaveInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"saveDeliveryRevision"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}]}]}}]} as unknown as DocumentNode<SaveDeliveryRevisionMutation, SaveDeliveryRevisionMutationVariables>;
+export const DeliveryRevisionCostsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"DeliveryRevisionCosts"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryRevisionCostsInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deliveryRevisionCosts"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"startDate"}},{"kind":"Field","name":{"kind":"Name","value":"endDate"}},{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"groups"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"projectName"}},{"kind":"Field","name":{"kind":"Name","value":"cause"}},{"kind":"Field","name":{"kind":"Name","value":"currency"}},{"kind":"Field","name":{"kind":"Name","value":"rounds"}},{"kind":"Field","name":{"kind":"Name","value":"missingCostCount"}},{"kind":"Field","name":{"kind":"Name","value":"missingEffortCount"}},{"kind":"Field","name":{"kind":"Name","value":"recordedCost"}},{"kind":"Field","name":{"kind":"Name","value":"proposedCharges"}},{"kind":"Field","name":{"kind":"Name","value":"recordedEffortMinutes"}}]}}]}}]}}]} as unknown as DocumentNode<DeliveryRevisionCostsQuery, DeliveryRevisionCostsQueryVariables>;
+export const DeliveryWorkflowCatalogDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"DeliveryWorkflowCatalog"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryWorkflowCatalogInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deliveryWorkflowCatalog"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DeliveryWorkflowCatalogFields"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DeliveryWorkflowDefinitionFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryWorkflowDefinition"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"service"}},{"kind":"Field","name":{"kind":"Name","value":"definitionOfDone"}},{"kind":"Field","name":{"kind":"Name","value":"checklist"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"required"}}]}},{"kind":"Field","name":{"kind":"Name","value":"evidence"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"instructions"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"required"}}]}},{"kind":"Field","name":{"kind":"Name","value":"reviewChecks"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"required"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DeliveryWorkflowCatalogFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryWorkflowCatalog"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"templates"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"archived"}},{"kind":"Field","name":{"kind":"Name","value":"stateReason"}},{"kind":"Field","name":{"kind":"Name","value":"current"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"templateId"}},{"kind":"Field","name":{"kind":"Name","value":"version"}},{"kind":"Field","name":{"kind":"Name","value":"publishedAt"}},{"kind":"Field","name":{"kind":"Name","value":"publishedByName"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}},{"kind":"Field","name":{"kind":"Name","value":"definition"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DeliveryWorkflowDefinitionFields"}}]}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"versions"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"templateId"}},{"kind":"Field","name":{"kind":"Name","value":"version"}},{"kind":"Field","name":{"kind":"Name","value":"publishedAt"}},{"kind":"Field","name":{"kind":"Name","value":"publishedByName"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}},{"kind":"Field","name":{"kind":"Name","value":"definition"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DeliveryWorkflowDefinitionFields"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"starters"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"key"}},{"kind":"Field","name":{"kind":"Name","value":"definition"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DeliveryWorkflowDefinitionFields"}}]}}]}}]}}]} as unknown as DocumentNode<DeliveryWorkflowCatalogQuery, DeliveryWorkflowCatalogQueryVariables>;
+export const SaveDeliveryWorkflowDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SaveDeliveryWorkflow"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryWorkflowSaveInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"saveDeliveryWorkflow"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DeliveryWorkflowCatalogFields"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DeliveryWorkflowDefinitionFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryWorkflowDefinition"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"service"}},{"kind":"Field","name":{"kind":"Name","value":"definitionOfDone"}},{"kind":"Field","name":{"kind":"Name","value":"checklist"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"required"}}]}},{"kind":"Field","name":{"kind":"Name","value":"evidence"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"instructions"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"required"}}]}},{"kind":"Field","name":{"kind":"Name","value":"reviewChecks"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"required"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DeliveryWorkflowCatalogFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryWorkflowCatalog"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"templates"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"archived"}},{"kind":"Field","name":{"kind":"Name","value":"stateReason"}},{"kind":"Field","name":{"kind":"Name","value":"current"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"templateId"}},{"kind":"Field","name":{"kind":"Name","value":"version"}},{"kind":"Field","name":{"kind":"Name","value":"publishedAt"}},{"kind":"Field","name":{"kind":"Name","value":"publishedByName"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}},{"kind":"Field","name":{"kind":"Name","value":"definition"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DeliveryWorkflowDefinitionFields"}}]}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"versions"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"templateId"}},{"kind":"Field","name":{"kind":"Name","value":"version"}},{"kind":"Field","name":{"kind":"Name","value":"publishedAt"}},{"kind":"Field","name":{"kind":"Name","value":"publishedByName"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}},{"kind":"Field","name":{"kind":"Name","value":"definition"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DeliveryWorkflowDefinitionFields"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"starters"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"key"}},{"kind":"Field","name":{"kind":"Name","value":"definition"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DeliveryWorkflowDefinitionFields"}}]}}]}}]}}]} as unknown as DocumentNode<SaveDeliveryWorkflowMutation, SaveDeliveryWorkflowMutationVariables>;
+export const ArchiveDeliveryWorkflowDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"ArchiveDeliveryWorkflow"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryWorkflowArchiveInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"archiveDeliveryWorkflow"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DeliveryWorkflowCatalogFields"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DeliveryWorkflowDefinitionFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryWorkflowDefinition"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"service"}},{"kind":"Field","name":{"kind":"Name","value":"definitionOfDone"}},{"kind":"Field","name":{"kind":"Name","value":"checklist"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"required"}}]}},{"kind":"Field","name":{"kind":"Name","value":"evidence"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"instructions"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"required"}}]}},{"kind":"Field","name":{"kind":"Name","value":"reviewChecks"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"required"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DeliveryWorkflowCatalogFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryWorkflowCatalog"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"templates"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"archived"}},{"kind":"Field","name":{"kind":"Name","value":"stateReason"}},{"kind":"Field","name":{"kind":"Name","value":"current"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"templateId"}},{"kind":"Field","name":{"kind":"Name","value":"version"}},{"kind":"Field","name":{"kind":"Name","value":"publishedAt"}},{"kind":"Field","name":{"kind":"Name","value":"publishedByName"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}},{"kind":"Field","name":{"kind":"Name","value":"definition"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DeliveryWorkflowDefinitionFields"}}]}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"versions"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"templateId"}},{"kind":"Field","name":{"kind":"Name","value":"version"}},{"kind":"Field","name":{"kind":"Name","value":"publishedAt"}},{"kind":"Field","name":{"kind":"Name","value":"publishedByName"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}},{"kind":"Field","name":{"kind":"Name","value":"definition"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DeliveryWorkflowDefinitionFields"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"starters"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"key"}},{"kind":"Field","name":{"kind":"Name","value":"definition"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DeliveryWorkflowDefinitionFields"}}]}}]}}]}}]} as unknown as DocumentNode<ArchiveDeliveryWorkflowMutation, ArchiveDeliveryWorkflowMutationVariables>;
+export const DeliveryTaskWorkflowDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"DeliveryTaskWorkflow"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryTaskWorkflowInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deliveryTaskWorkflow"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DeliveryTaskWorkflowFields"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DeliveryWorkflowDefinitionFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryWorkflowDefinition"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"service"}},{"kind":"Field","name":{"kind":"Name","value":"definitionOfDone"}},{"kind":"Field","name":{"kind":"Name","value":"checklist"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"required"}}]}},{"kind":"Field","name":{"kind":"Name","value":"evidence"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"instructions"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"required"}}]}},{"kind":"Field","name":{"kind":"Name","value":"reviewChecks"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"required"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DeliveryAppliedWorkflowFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryAppliedWorkflow"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"templateId"}},{"kind":"Field","name":{"kind":"Name","value":"version"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"appliedAt"}},{"kind":"Field","name":{"kind":"Name","value":"appliedByName"}},{"kind":"Field","name":{"kind":"Name","value":"definition"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DeliveryWorkflowDefinitionFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"checkedIds"}},{"kind":"Field","name":{"kind":"Name","value":"evidence"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"requirementId"}},{"kind":"Field","name":{"kind":"Name","value":"value"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DeliveryTaskWorkflowFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryTaskWorkflow"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"taskRevision"}},{"kind":"Field","name":{"kind":"Name","value":"canManage"}},{"kind":"Field","name":{"kind":"Name","value":"canEdit"}},{"kind":"Field","name":{"kind":"Name","value":"locked"}},{"kind":"Field","name":{"kind":"Name","value":"workflow"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DeliveryAppliedWorkflowFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"previousApplications"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DeliveryAppliedWorkflowFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"missingRequirements"}},{"kind":"Field","name":{"kind":"Name","value":"nextHistoryCursor"}}]}}]} as unknown as DocumentNode<DeliveryTaskWorkflowQuery, DeliveryTaskWorkflowQueryVariables>;
+export const ApplyDeliveryWorkflowDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"ApplyDeliveryWorkflow"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryWorkflowApplyInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"applyDeliveryWorkflow"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DeliveryTaskWorkflowFields"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DeliveryWorkflowDefinitionFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryWorkflowDefinition"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"service"}},{"kind":"Field","name":{"kind":"Name","value":"definitionOfDone"}},{"kind":"Field","name":{"kind":"Name","value":"checklist"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"required"}}]}},{"kind":"Field","name":{"kind":"Name","value":"evidence"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"instructions"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"required"}}]}},{"kind":"Field","name":{"kind":"Name","value":"reviewChecks"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"required"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DeliveryAppliedWorkflowFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryAppliedWorkflow"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"templateId"}},{"kind":"Field","name":{"kind":"Name","value":"version"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"appliedAt"}},{"kind":"Field","name":{"kind":"Name","value":"appliedByName"}},{"kind":"Field","name":{"kind":"Name","value":"definition"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DeliveryWorkflowDefinitionFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"checkedIds"}},{"kind":"Field","name":{"kind":"Name","value":"evidence"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"requirementId"}},{"kind":"Field","name":{"kind":"Name","value":"value"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DeliveryTaskWorkflowFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryTaskWorkflow"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"taskRevision"}},{"kind":"Field","name":{"kind":"Name","value":"canManage"}},{"kind":"Field","name":{"kind":"Name","value":"canEdit"}},{"kind":"Field","name":{"kind":"Name","value":"locked"}},{"kind":"Field","name":{"kind":"Name","value":"workflow"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DeliveryAppliedWorkflowFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"previousApplications"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DeliveryAppliedWorkflowFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"missingRequirements"}},{"kind":"Field","name":{"kind":"Name","value":"nextHistoryCursor"}}]}}]} as unknown as DocumentNode<ApplyDeliveryWorkflowMutation, ApplyDeliveryWorkflowMutationVariables>;
+export const SaveDeliveryWorkflowProgressDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SaveDeliveryWorkflowProgress"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryWorkflowProgressInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"saveDeliveryWorkflowProgress"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DeliveryTaskWorkflowFields"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DeliveryWorkflowDefinitionFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryWorkflowDefinition"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"service"}},{"kind":"Field","name":{"kind":"Name","value":"definitionOfDone"}},{"kind":"Field","name":{"kind":"Name","value":"checklist"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"required"}}]}},{"kind":"Field","name":{"kind":"Name","value":"evidence"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"instructions"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"required"}}]}},{"kind":"Field","name":{"kind":"Name","value":"reviewChecks"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"required"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DeliveryAppliedWorkflowFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryAppliedWorkflow"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"templateId"}},{"kind":"Field","name":{"kind":"Name","value":"version"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"appliedAt"}},{"kind":"Field","name":{"kind":"Name","value":"appliedByName"}},{"kind":"Field","name":{"kind":"Name","value":"definition"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DeliveryWorkflowDefinitionFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"checkedIds"}},{"kind":"Field","name":{"kind":"Name","value":"evidence"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"requirementId"}},{"kind":"Field","name":{"kind":"Name","value":"value"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DeliveryTaskWorkflowFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryTaskWorkflow"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"taskRevision"}},{"kind":"Field","name":{"kind":"Name","value":"canManage"}},{"kind":"Field","name":{"kind":"Name","value":"canEdit"}},{"kind":"Field","name":{"kind":"Name","value":"locked"}},{"kind":"Field","name":{"kind":"Name","value":"workflow"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DeliveryAppliedWorkflowFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"previousApplications"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DeliveryAppliedWorkflowFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"missingRequirements"}},{"kind":"Field","name":{"kind":"Name","value":"nextHistoryCursor"}}]}}]} as unknown as DocumentNode<SaveDeliveryWorkflowProgressMutation, SaveDeliveryWorkflowProgressMutationVariables>;
 export const CompleteFileUploadDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CompleteFileUpload"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"fileId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"completeFileUpload"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"fileId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"fileId"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"path"}},{"kind":"Field","name":{"kind":"Name","value":"size"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"url"}}]}}]}}]} as unknown as DocumentNode<CompleteFileUploadMutation, CompleteFileUploadMutationVariables>;
 export const CreateFileUploadDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CreateFileUpload"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"filename"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"size"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Float"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"fileFolder"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"FileFolder"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"fieldMetadataId"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createFileUpload"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"filename"},"value":{"kind":"Variable","name":{"kind":"Name","value":"filename"}}},{"kind":"Argument","name":{"kind":"Name","value":"size"},"value":{"kind":"Variable","name":{"kind":"Name","value":"size"}}},{"kind":"Argument","name":{"kind":"Name","value":"fileFolder"},"value":{"kind":"Variable","name":{"kind":"Name","value":"fileFolder"}}},{"kind":"Argument","name":{"kind":"Name","value":"fieldMetadataId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"fieldMetadataId"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"fileId"}},{"kind":"Field","name":{"kind":"Name","value":"uploadUrl"}},{"kind":"Field","name":{"kind":"Name","value":"contentType"}},{"kind":"Field","name":{"kind":"Name","value":"expiresAt"}}]}}]}}]} as unknown as DocumentNode<CreateFileUploadMutation, CreateFileUploadMutationVariables>;
 export const UploadEmailAttachmentFileDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UploadEmailAttachmentFile"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"file"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Upload"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"uploadEmailAttachmentFile"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"file"},"value":{"kind":"Variable","name":{"kind":"Name","value":"file"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"path"}},{"kind":"Field","name":{"kind":"Name","value":"size"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"url"}}]}}]}}]} as unknown as DocumentNode<UploadEmailAttachmentFileMutation, UploadEmailAttachmentFileMutationVariables>;
@@ -10281,6 +13287,16 @@ export const SkipSyncEmailOnboardingStepDocument = {"kind":"Document","definitio
 export const StartWorkspaceSetupChatDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"StartWorkspaceSetupChat"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"companyContext"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"JSON"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"personContext"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"JSON"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"startWorkspaceSetupChat"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"companyContext"},"value":{"kind":"Variable","name":{"kind":"Name","value":"companyContext"}}},{"kind":"Argument","name":{"kind":"Name","value":"personContext"},"value":{"kind":"Variable","name":{"kind":"Name","value":"personContext"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"outcome"}},{"kind":"Field","name":{"kind":"Name","value":"thread"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"totalInputTokens"}},{"kind":"Field","name":{"kind":"Name","value":"totalOutputTokens"}},{"kind":"Field","name":{"kind":"Name","value":"contextWindowTokens"}},{"kind":"Field","name":{"kind":"Name","value":"conversationSize"}},{"kind":"Field","name":{"kind":"Name","value":"totalInputCredits"}},{"kind":"Field","name":{"kind":"Name","value":"totalOutputCredits"}},{"kind":"Field","name":{"kind":"Name","value":"deletedAt"}},{"kind":"Field","name":{"kind":"Name","value":"lastMessageAt"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]}}]}}]} as unknown as DocumentNode<StartWorkspaceSetupChatMutation, StartWorkspaceSetupChatMutationVariables>;
 export const TriggerInstallAppsOnboardingStepDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"TriggerInstallAppsOnboardingStep"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"universalIdentifiers"}},"type":{"kind":"NonNullType","type":{"kind":"ListType","type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"isAutoSkipped"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Boolean"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"triggerInstallAppsOnboardingStep"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"universalIdentifiers"},"value":{"kind":"Variable","name":{"kind":"Name","value":"universalIdentifiers"}}},{"kind":"Argument","name":{"kind":"Name","value":"isAutoSkipped"},"value":{"kind":"Variable","name":{"kind":"Name","value":"isAutoSkipped"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"success"}}]}}]}}]} as unknown as DocumentNode<TriggerInstallAppsOnboardingStepMutation, TriggerInstallAppsOnboardingStepMutationVariables>;
 export const GetInviteSuggestionsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetInviteSuggestions"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"getInviteSuggestions"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"displayName"}}]}}]}}]} as unknown as DocumentNode<GetInviteSuggestionsQuery, GetInviteSuggestionsQueryVariables>;
+export const OtogrowAccessDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"OtogrowAccess"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"otogrowAccess"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"OtogrowAccessFields"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"OtogrowAccessFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"OtogrowAccess"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"roleIds"}},{"kind":"Field","name":{"kind":"Name","value":"capabilities"}},{"kind":"Field","name":{"kind":"Name","value":"nativeAdministrator"}},{"kind":"Field","name":{"kind":"Name","value":"grants"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"capability"}},{"kind":"Field","name":{"kind":"Name","value":"sourceId"}},{"kind":"Field","name":{"kind":"Name","value":"sourceName"}},{"kind":"Field","name":{"kind":"Name","value":"sourceType"}}]}}]}}]} as unknown as DocumentNode<OtogrowAccessQuery, OtogrowAccessQueryVariables>;
+export const OtogrowRoleDirectoryDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"OtogrowRoleDirectory"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"otogrowRoleDirectory"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"OtogrowDirectoryFields"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"OtogrowAccessFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"OtogrowAccess"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"roleIds"}},{"kind":"Field","name":{"kind":"Name","value":"capabilities"}},{"kind":"Field","name":{"kind":"Name","value":"nativeAdministrator"}},{"kind":"Field","name":{"kind":"Name","value":"grants"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"capability"}},{"kind":"Field","name":{"kind":"Name","value":"sourceId"}},{"kind":"Field","name":{"kind":"Name","value":"sourceName"}},{"kind":"Field","name":{"kind":"Name","value":"sourceType"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"OtogrowDirectoryFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"OtogrowRoleDirectory"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"actor"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"OtogrowAccessFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"roles"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"capabilities"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}}]}},{"kind":"Field","name":{"kind":"Name","value":"members"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"roleIds"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"access"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"OtogrowAccessFields"}}]}}]}}]}}]} as unknown as DocumentNode<OtogrowRoleDirectoryQuery, OtogrowRoleDirectoryQueryVariables>;
+export const SaveOtogrowRoleDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SaveOtogrowRole"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"OtogrowRoleInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"saveOtogrowRole"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"OtogrowDirectoryFields"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"OtogrowAccessFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"OtogrowAccess"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"roleIds"}},{"kind":"Field","name":{"kind":"Name","value":"capabilities"}},{"kind":"Field","name":{"kind":"Name","value":"nativeAdministrator"}},{"kind":"Field","name":{"kind":"Name","value":"grants"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"capability"}},{"kind":"Field","name":{"kind":"Name","value":"sourceId"}},{"kind":"Field","name":{"kind":"Name","value":"sourceName"}},{"kind":"Field","name":{"kind":"Name","value":"sourceType"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"OtogrowDirectoryFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"OtogrowRoleDirectory"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"actor"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"OtogrowAccessFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"roles"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"capabilities"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}}]}},{"kind":"Field","name":{"kind":"Name","value":"members"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"roleIds"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"access"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"OtogrowAccessFields"}}]}}]}}]}}]} as unknown as DocumentNode<SaveOtogrowRoleMutation, SaveOtogrowRoleMutationVariables>;
+export const AssignOtogrowRolesDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"AssignOtogrowRoles"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"OtogrowRoleAssignmentInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"assignOtogrowRoles"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"OtogrowDirectoryFields"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"OtogrowAccessFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"OtogrowAccess"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"roleIds"}},{"kind":"Field","name":{"kind":"Name","value":"capabilities"}},{"kind":"Field","name":{"kind":"Name","value":"nativeAdministrator"}},{"kind":"Field","name":{"kind":"Name","value":"grants"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"capability"}},{"kind":"Field","name":{"kind":"Name","value":"sourceId"}},{"kind":"Field","name":{"kind":"Name","value":"sourceName"}},{"kind":"Field","name":{"kind":"Name","value":"sourceType"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"OtogrowDirectoryFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"OtogrowRoleDirectory"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"actor"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"OtogrowAccessFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"roles"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"capabilities"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}}]}},{"kind":"Field","name":{"kind":"Name","value":"members"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"roleIds"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"access"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"OtogrowAccessFields"}}]}}]}}]}}]} as unknown as DocumentNode<AssignOtogrowRolesMutation, AssignOtogrowRolesMutationVariables>;
+export const OtogrowActivityDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"OtogrowActivity"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"OtogrowActivityInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"otogrowActivity"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"events"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"occurredAt"}},{"kind":"Field","name":{"kind":"Name","value":"actorId"}},{"kind":"Field","name":{"kind":"Name","value":"actorName"}},{"kind":"Field","name":{"kind":"Name","value":"actorType"}},{"kind":"Field","name":{"kind":"Name","value":"subjectMemberId"}},{"kind":"Field","name":{"kind":"Name","value":"subjectName"}},{"kind":"Field","name":{"kind":"Name","value":"action"}},{"kind":"Field","name":{"kind":"Name","value":"category"}},{"kind":"Field","name":{"kind":"Name","value":"outcome"}},{"kind":"Field","name":{"kind":"Name","value":"summary"}},{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"projectName"}},{"kind":"Field","name":{"kind":"Name","value":"clientId"}},{"kind":"Field","name":{"kind":"Name","value":"clientName"}},{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"taskName"}},{"kind":"Field","name":{"kind":"Name","value":"agentName"}},{"kind":"Field","name":{"kind":"Name","value":"sourceType"}},{"kind":"Field","name":{"kind":"Name","value":"sourceId"}},{"kind":"Field","name":{"kind":"Name","value":"changes"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"field"}},{"kind":"Field","name":{"kind":"Name","value":"before"}},{"kind":"Field","name":{"kind":"Name","value":"after"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"nextCursor"}},{"kind":"Field","name":{"kind":"Name","value":"people"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"projects"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"clients"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"coverageStartedAt"}}]}}]}}]} as unknown as DocumentNode<OtogrowActivityQuery, OtogrowActivityQueryVariables>;
+export const OtogrowAiBudgetSnapshotDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"OtogrowAiBudgetSnapshot"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"OtogrowAiBudgetSnapshotInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"otogrowAiBudgetSnapshot"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"OtogrowAiBudgetFields"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"OtogrowAiBudgetFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"OtogrowAiBudgetSnapshot"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"coverageStartedAt"}},{"kind":"Field","name":{"kind":"Name","value":"configured"}},{"kind":"Field","name":{"kind":"Name","value":"chargedUsd"}},{"kind":"Field","name":{"kind":"Name","value":"heldUsd"}},{"kind":"Field","name":{"kind":"Name","value":"unresolvedCount"}},{"kind":"Field","name":{"kind":"Name","value":"budgets"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"scope"}},{"kind":"Field","name":{"kind":"Name","value":"scopeId"}},{"kind":"Field","name":{"kind":"Name","value":"scopeName"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"enabled"}},{"kind":"Field","name":{"kind":"Name","value":"capUsd"}},{"kind":"Field","name":{"kind":"Name","value":"openingSpentUsd"}},{"kind":"Field","name":{"kind":"Name","value":"chargedUsd"}},{"kind":"Field","name":{"kind":"Name","value":"heldUsd"}},{"kind":"Field","name":{"kind":"Name","value":"remainingUsd"}}]}},{"kind":"Field","name":{"kind":"Name","value":"priceProfiles"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"modelId"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"enabled"}},{"kind":"Field","name":{"kind":"Name","value":"source"}},{"kind":"Field","name":{"kind":"Name","value":"verifiedAt"}},{"kind":"Field","name":{"kind":"Name","value":"pricing"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"inputUsdPerMillionTokens"}},{"kind":"Field","name":{"kind":"Name","value":"outputUsdPerMillionTokens"}},{"kind":"Field","name":{"kind":"Name","value":"reasoningUsdPerMillionTokens"}},{"kind":"Field","name":{"kind":"Name","value":"cacheReadUsdPerMillionTokens"}},{"kind":"Field","name":{"kind":"Name","value":"cacheWriteUsdPerMillionTokens"}},{"kind":"Field","name":{"kind":"Name","value":"maxInputTokens"}},{"kind":"Field","name":{"kind":"Name","value":"maxOutputTokens"}},{"kind":"Field","name":{"kind":"Name","value":"maxReasoningTokens"}},{"kind":"Field","name":{"kind":"Name","value":"outputIncludesReasoning"}},{"kind":"Field","name":{"kind":"Name","value":"longContextThresholdTokens"}},{"kind":"Field","name":{"kind":"Name","value":"longInputUsdPerMillionTokens"}},{"kind":"Field","name":{"kind":"Name","value":"longOutputUsdPerMillionTokens"}},{"kind":"Field","name":{"kind":"Name","value":"longReasoningUsdPerMillionTokens"}},{"kind":"Field","name":{"kind":"Name","value":"longCacheReadUsdPerMillionTokens"}},{"kind":"Field","name":{"kind":"Name","value":"longCacheWriteUsdPerMillionTokens"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"recentSpend"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"sourceKind"}},{"kind":"Field","name":{"kind":"Name","value":"sourceRunId"}},{"kind":"Field","name":{"kind":"Name","value":"state"}},{"kind":"Field","name":{"kind":"Name","value":"modelId"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"clientName"}},{"kind":"Field","name":{"kind":"Name","value":"taskName"}},{"kind":"Field","name":{"kind":"Name","value":"reservedUsd"}},{"kind":"Field","name":{"kind":"Name","value":"actualUsd"}},{"kind":"Field","name":{"kind":"Name","value":"reportedActualUsd"}},{"kind":"Field","name":{"kind":"Name","value":"heldUsd"}},{"kind":"Field","name":{"kind":"Name","value":"boundSource"}},{"kind":"Field","name":{"kind":"Name","value":"priceSource"}},{"kind":"Field","name":{"kind":"Name","value":"priceRevision"}},{"kind":"Field","name":{"kind":"Name","value":"priceVerifiedAt"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"dispatchedAt"}},{"kind":"Field","name":{"kind":"Name","value":"settledAt"}},{"kind":"Field","name":{"kind":"Name","value":"attentionReason"}}]}},{"kind":"Field","name":{"kind":"Name","value":"clients"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"tasks"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"nextCursor"}}]}}]} as unknown as DocumentNode<OtogrowAiBudgetSnapshotQuery, OtogrowAiBudgetSnapshotQueryVariables>;
+export const SaveOtogrowAiBudgetDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SaveOtogrowAiBudget"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"OtogrowAiBudgetSaveInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"saveOtogrowAiBudget"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"OtogrowAiBudgetFields"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"OtogrowAiBudgetFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"OtogrowAiBudgetSnapshot"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"coverageStartedAt"}},{"kind":"Field","name":{"kind":"Name","value":"configured"}},{"kind":"Field","name":{"kind":"Name","value":"chargedUsd"}},{"kind":"Field","name":{"kind":"Name","value":"heldUsd"}},{"kind":"Field","name":{"kind":"Name","value":"unresolvedCount"}},{"kind":"Field","name":{"kind":"Name","value":"budgets"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"scope"}},{"kind":"Field","name":{"kind":"Name","value":"scopeId"}},{"kind":"Field","name":{"kind":"Name","value":"scopeName"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"enabled"}},{"kind":"Field","name":{"kind":"Name","value":"capUsd"}},{"kind":"Field","name":{"kind":"Name","value":"openingSpentUsd"}},{"kind":"Field","name":{"kind":"Name","value":"chargedUsd"}},{"kind":"Field","name":{"kind":"Name","value":"heldUsd"}},{"kind":"Field","name":{"kind":"Name","value":"remainingUsd"}}]}},{"kind":"Field","name":{"kind":"Name","value":"priceProfiles"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"modelId"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"enabled"}},{"kind":"Field","name":{"kind":"Name","value":"source"}},{"kind":"Field","name":{"kind":"Name","value":"verifiedAt"}},{"kind":"Field","name":{"kind":"Name","value":"pricing"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"inputUsdPerMillionTokens"}},{"kind":"Field","name":{"kind":"Name","value":"outputUsdPerMillionTokens"}},{"kind":"Field","name":{"kind":"Name","value":"reasoningUsdPerMillionTokens"}},{"kind":"Field","name":{"kind":"Name","value":"cacheReadUsdPerMillionTokens"}},{"kind":"Field","name":{"kind":"Name","value":"cacheWriteUsdPerMillionTokens"}},{"kind":"Field","name":{"kind":"Name","value":"maxInputTokens"}},{"kind":"Field","name":{"kind":"Name","value":"maxOutputTokens"}},{"kind":"Field","name":{"kind":"Name","value":"maxReasoningTokens"}},{"kind":"Field","name":{"kind":"Name","value":"outputIncludesReasoning"}},{"kind":"Field","name":{"kind":"Name","value":"longContextThresholdTokens"}},{"kind":"Field","name":{"kind":"Name","value":"longInputUsdPerMillionTokens"}},{"kind":"Field","name":{"kind":"Name","value":"longOutputUsdPerMillionTokens"}},{"kind":"Field","name":{"kind":"Name","value":"longReasoningUsdPerMillionTokens"}},{"kind":"Field","name":{"kind":"Name","value":"longCacheReadUsdPerMillionTokens"}},{"kind":"Field","name":{"kind":"Name","value":"longCacheWriteUsdPerMillionTokens"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"recentSpend"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"sourceKind"}},{"kind":"Field","name":{"kind":"Name","value":"sourceRunId"}},{"kind":"Field","name":{"kind":"Name","value":"state"}},{"kind":"Field","name":{"kind":"Name","value":"modelId"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"clientName"}},{"kind":"Field","name":{"kind":"Name","value":"taskName"}},{"kind":"Field","name":{"kind":"Name","value":"reservedUsd"}},{"kind":"Field","name":{"kind":"Name","value":"actualUsd"}},{"kind":"Field","name":{"kind":"Name","value":"reportedActualUsd"}},{"kind":"Field","name":{"kind":"Name","value":"heldUsd"}},{"kind":"Field","name":{"kind":"Name","value":"boundSource"}},{"kind":"Field","name":{"kind":"Name","value":"priceSource"}},{"kind":"Field","name":{"kind":"Name","value":"priceRevision"}},{"kind":"Field","name":{"kind":"Name","value":"priceVerifiedAt"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"dispatchedAt"}},{"kind":"Field","name":{"kind":"Name","value":"settledAt"}},{"kind":"Field","name":{"kind":"Name","value":"attentionReason"}}]}},{"kind":"Field","name":{"kind":"Name","value":"clients"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"tasks"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"nextCursor"}}]}}]} as unknown as DocumentNode<SaveOtogrowAiBudgetMutation, SaveOtogrowAiBudgetMutationVariables>;
+export const SaveOtogrowAiPriceDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SaveOtogrowAiPrice"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"OtogrowAiPriceSaveInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"saveOtogrowAiPrice"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"OtogrowAiBudgetFields"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"OtogrowAiBudgetFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"OtogrowAiBudgetSnapshot"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"coverageStartedAt"}},{"kind":"Field","name":{"kind":"Name","value":"configured"}},{"kind":"Field","name":{"kind":"Name","value":"chargedUsd"}},{"kind":"Field","name":{"kind":"Name","value":"heldUsd"}},{"kind":"Field","name":{"kind":"Name","value":"unresolvedCount"}},{"kind":"Field","name":{"kind":"Name","value":"budgets"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"scope"}},{"kind":"Field","name":{"kind":"Name","value":"scopeId"}},{"kind":"Field","name":{"kind":"Name","value":"scopeName"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"enabled"}},{"kind":"Field","name":{"kind":"Name","value":"capUsd"}},{"kind":"Field","name":{"kind":"Name","value":"openingSpentUsd"}},{"kind":"Field","name":{"kind":"Name","value":"chargedUsd"}},{"kind":"Field","name":{"kind":"Name","value":"heldUsd"}},{"kind":"Field","name":{"kind":"Name","value":"remainingUsd"}}]}},{"kind":"Field","name":{"kind":"Name","value":"priceProfiles"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"modelId"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"enabled"}},{"kind":"Field","name":{"kind":"Name","value":"source"}},{"kind":"Field","name":{"kind":"Name","value":"verifiedAt"}},{"kind":"Field","name":{"kind":"Name","value":"pricing"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"inputUsdPerMillionTokens"}},{"kind":"Field","name":{"kind":"Name","value":"outputUsdPerMillionTokens"}},{"kind":"Field","name":{"kind":"Name","value":"reasoningUsdPerMillionTokens"}},{"kind":"Field","name":{"kind":"Name","value":"cacheReadUsdPerMillionTokens"}},{"kind":"Field","name":{"kind":"Name","value":"cacheWriteUsdPerMillionTokens"}},{"kind":"Field","name":{"kind":"Name","value":"maxInputTokens"}},{"kind":"Field","name":{"kind":"Name","value":"maxOutputTokens"}},{"kind":"Field","name":{"kind":"Name","value":"maxReasoningTokens"}},{"kind":"Field","name":{"kind":"Name","value":"outputIncludesReasoning"}},{"kind":"Field","name":{"kind":"Name","value":"longContextThresholdTokens"}},{"kind":"Field","name":{"kind":"Name","value":"longInputUsdPerMillionTokens"}},{"kind":"Field","name":{"kind":"Name","value":"longOutputUsdPerMillionTokens"}},{"kind":"Field","name":{"kind":"Name","value":"longReasoningUsdPerMillionTokens"}},{"kind":"Field","name":{"kind":"Name","value":"longCacheReadUsdPerMillionTokens"}},{"kind":"Field","name":{"kind":"Name","value":"longCacheWriteUsdPerMillionTokens"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"recentSpend"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"sourceKind"}},{"kind":"Field","name":{"kind":"Name","value":"sourceRunId"}},{"kind":"Field","name":{"kind":"Name","value":"state"}},{"kind":"Field","name":{"kind":"Name","value":"modelId"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"clientName"}},{"kind":"Field","name":{"kind":"Name","value":"taskName"}},{"kind":"Field","name":{"kind":"Name","value":"reservedUsd"}},{"kind":"Field","name":{"kind":"Name","value":"actualUsd"}},{"kind":"Field","name":{"kind":"Name","value":"reportedActualUsd"}},{"kind":"Field","name":{"kind":"Name","value":"heldUsd"}},{"kind":"Field","name":{"kind":"Name","value":"boundSource"}},{"kind":"Field","name":{"kind":"Name","value":"priceSource"}},{"kind":"Field","name":{"kind":"Name","value":"priceRevision"}},{"kind":"Field","name":{"kind":"Name","value":"priceVerifiedAt"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"dispatchedAt"}},{"kind":"Field","name":{"kind":"Name","value":"settledAt"}},{"kind":"Field","name":{"kind":"Name","value":"attentionReason"}}]}},{"kind":"Field","name":{"kind":"Name","value":"clients"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"tasks"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"nextCursor"}}]}}]} as unknown as DocumentNode<SaveOtogrowAiPriceMutation, SaveOtogrowAiPriceMutationVariables>;
+export const ReconcileOtogrowAiSpendDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"ReconcileOtogrowAiSpend"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"OtogrowAiSpendReconcileInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"reconcileOtogrowAiSpend"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"OtogrowAiBudgetFields"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"OtogrowAiBudgetFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"OtogrowAiBudgetSnapshot"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"coverageStartedAt"}},{"kind":"Field","name":{"kind":"Name","value":"configured"}},{"kind":"Field","name":{"kind":"Name","value":"chargedUsd"}},{"kind":"Field","name":{"kind":"Name","value":"heldUsd"}},{"kind":"Field","name":{"kind":"Name","value":"unresolvedCount"}},{"kind":"Field","name":{"kind":"Name","value":"budgets"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"scope"}},{"kind":"Field","name":{"kind":"Name","value":"scopeId"}},{"kind":"Field","name":{"kind":"Name","value":"scopeName"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"enabled"}},{"kind":"Field","name":{"kind":"Name","value":"capUsd"}},{"kind":"Field","name":{"kind":"Name","value":"openingSpentUsd"}},{"kind":"Field","name":{"kind":"Name","value":"chargedUsd"}},{"kind":"Field","name":{"kind":"Name","value":"heldUsd"}},{"kind":"Field","name":{"kind":"Name","value":"remainingUsd"}}]}},{"kind":"Field","name":{"kind":"Name","value":"priceProfiles"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"modelId"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"enabled"}},{"kind":"Field","name":{"kind":"Name","value":"source"}},{"kind":"Field","name":{"kind":"Name","value":"verifiedAt"}},{"kind":"Field","name":{"kind":"Name","value":"pricing"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"inputUsdPerMillionTokens"}},{"kind":"Field","name":{"kind":"Name","value":"outputUsdPerMillionTokens"}},{"kind":"Field","name":{"kind":"Name","value":"reasoningUsdPerMillionTokens"}},{"kind":"Field","name":{"kind":"Name","value":"cacheReadUsdPerMillionTokens"}},{"kind":"Field","name":{"kind":"Name","value":"cacheWriteUsdPerMillionTokens"}},{"kind":"Field","name":{"kind":"Name","value":"maxInputTokens"}},{"kind":"Field","name":{"kind":"Name","value":"maxOutputTokens"}},{"kind":"Field","name":{"kind":"Name","value":"maxReasoningTokens"}},{"kind":"Field","name":{"kind":"Name","value":"outputIncludesReasoning"}},{"kind":"Field","name":{"kind":"Name","value":"longContextThresholdTokens"}},{"kind":"Field","name":{"kind":"Name","value":"longInputUsdPerMillionTokens"}},{"kind":"Field","name":{"kind":"Name","value":"longOutputUsdPerMillionTokens"}},{"kind":"Field","name":{"kind":"Name","value":"longReasoningUsdPerMillionTokens"}},{"kind":"Field","name":{"kind":"Name","value":"longCacheReadUsdPerMillionTokens"}},{"kind":"Field","name":{"kind":"Name","value":"longCacheWriteUsdPerMillionTokens"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"recentSpend"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"sourceKind"}},{"kind":"Field","name":{"kind":"Name","value":"sourceRunId"}},{"kind":"Field","name":{"kind":"Name","value":"state"}},{"kind":"Field","name":{"kind":"Name","value":"modelId"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"clientName"}},{"kind":"Field","name":{"kind":"Name","value":"taskName"}},{"kind":"Field","name":{"kind":"Name","value":"reservedUsd"}},{"kind":"Field","name":{"kind":"Name","value":"actualUsd"}},{"kind":"Field","name":{"kind":"Name","value":"reportedActualUsd"}},{"kind":"Field","name":{"kind":"Name","value":"heldUsd"}},{"kind":"Field","name":{"kind":"Name","value":"boundSource"}},{"kind":"Field","name":{"kind":"Name","value":"priceSource"}},{"kind":"Field","name":{"kind":"Name","value":"priceRevision"}},{"kind":"Field","name":{"kind":"Name","value":"priceVerifiedAt"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"dispatchedAt"}},{"kind":"Field","name":{"kind":"Name","value":"settledAt"}},{"kind":"Field","name":{"kind":"Name","value":"attentionReason"}}]}},{"kind":"Field","name":{"kind":"Name","value":"clients"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"tasks"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"nextCursor"}}]}}]} as unknown as DocumentNode<ReconcileOtogrowAiSpendMutation, ReconcileOtogrowAiSpendMutationVariables>;
+export const OtogrowAiSpendHistoryDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"OtogrowAiSpendHistory"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"OtogrowAiSpendHistoryInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"otogrowAiSpendHistory"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"spendId"}},{"kind":"Field","name":{"kind":"Name","value":"sourceKind"}},{"kind":"Field","name":{"kind":"Name","value":"sourceRunId"}},{"kind":"Field","name":{"kind":"Name","value":"modelId"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"clientName"}},{"kind":"Field","name":{"kind":"Name","value":"taskName"}},{"kind":"Field","name":{"kind":"Name","value":"priceSource"}},{"kind":"Field","name":{"kind":"Name","value":"priceRevision"}},{"kind":"Field","name":{"kind":"Name","value":"priceVerifiedAt"}},{"kind":"Field","name":{"kind":"Name","value":"nextCursor"}},{"kind":"Field","name":{"kind":"Name","value":"events"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"action"}},{"kind":"Field","name":{"kind":"Name","value":"actorId"}},{"kind":"Field","name":{"kind":"Name","value":"actorName"}},{"kind":"Field","name":{"kind":"Name","value":"actorAttribution"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"before"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"state"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"reservedUsd"}},{"kind":"Field","name":{"kind":"Name","value":"actualUsd"}},{"kind":"Field","name":{"kind":"Name","value":"reportedActualUsd"}}]}},{"kind":"Field","name":{"kind":"Name","value":"after"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"state"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"reservedUsd"}},{"kind":"Field","name":{"kind":"Name","value":"actualUsd"}},{"kind":"Field","name":{"kind":"Name","value":"reportedActualUsd"}}]}},{"kind":"Field","name":{"kind":"Name","value":"evidenceReference"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}}]}}]}}]}}]} as unknown as DocumentNode<OtogrowAiSpendHistoryQuery, OtogrowAiSpendHistoryQueryVariables>;
 export const ResetPageLayoutTabToDefaultDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"ResetPageLayoutTabToDefault"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"resetPageLayoutTabToDefault"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"PageLayoutTabFragment"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"PageLayoutWidgetFragment"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PageLayoutWidget"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"applicationId"}},{"kind":"Field","name":{"kind":"Name","value":"universalIdentifier"}},{"kind":"Field","name":{"kind":"Name","value":"isSystemSideEffect"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"type"}},{"kind":"Field","name":{"kind":"Name","value":"objectMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"isActive"}},{"kind":"Field","name":{"kind":"Name","value":"deletedAt"}},{"kind":"Field","name":{"kind":"Name","value":"conditionalDisplay"}},{"kind":"Field","name":{"kind":"Name","value":"conditionalAvailabilityExpression"}},{"kind":"Field","name":{"kind":"Name","value":"gridPosition"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"column"}},{"kind":"Field","name":{"kind":"Name","value":"columnSpan"}},{"kind":"Field","name":{"kind":"Name","value":"row"}},{"kind":"Field","name":{"kind":"Name","value":"rowSpan"}}]}},{"kind":"Field","name":{"kind":"Name","value":"position"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PageLayoutWidgetGridPosition"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"layoutMode"}},{"kind":"Field","name":{"kind":"Name","value":"row"}},{"kind":"Field","name":{"kind":"Name","value":"column"}},{"kind":"Field","name":{"kind":"Name","value":"rowSpan"}},{"kind":"Field","name":{"kind":"Name","value":"columnSpan"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PageLayoutWidgetVerticalListPosition"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"layoutMode"}},{"kind":"Field","name":{"kind":"Name","value":"index"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PageLayoutWidgetCanvasPosition"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"layoutMode"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"configuration"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"BarChartConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateOperation"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisGroupByFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisGroupBySubFieldName"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisDateGranularity"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisOrderBy"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisManualSortOrder"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisGroupByFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisGroupBySubFieldName"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisGroupByDateGranularity"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisOrderBy"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisManualSortOrder"}},{"kind":"Field","name":{"kind":"Name","value":"omitNullValues"}},{"kind":"Field","name":{"kind":"Name","value":"axisNameDisplay"}},{"kind":"Field","name":{"kind":"Name","value":"displayDataLabel"}},{"kind":"Field","name":{"kind":"Name","value":"displayLegend"}},{"kind":"Field","name":{"kind":"Name","value":"numberFormat"}},{"kind":"Field","name":{"kind":"Name","value":"rangeMin"}},{"kind":"Field","name":{"kind":"Name","value":"rangeMax"}},{"kind":"Field","name":{"kind":"Name","value":"color"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"filter"}},{"kind":"Field","name":{"kind":"Name","value":"groupMode"}},{"kind":"Field","name":{"kind":"Name","value":"layout"}},{"kind":"Field","name":{"kind":"Name","value":"isCumulative"}},{"kind":"Field","name":{"kind":"Name","value":"splitMultiValueFields"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"firstDayOfTheWeek"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"LineChartConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateOperation"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisGroupByFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisGroupBySubFieldName"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisDateGranularity"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisOrderBy"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisManualSortOrder"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisGroupByFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisGroupBySubFieldName"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisGroupByDateGranularity"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisOrderBy"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisManualSortOrder"}},{"kind":"Field","name":{"kind":"Name","value":"omitNullValues"}},{"kind":"Field","name":{"kind":"Name","value":"axisNameDisplay"}},{"kind":"Field","name":{"kind":"Name","value":"displayDataLabel"}},{"kind":"Field","name":{"kind":"Name","value":"displayLegend"}},{"kind":"Field","name":{"kind":"Name","value":"numberFormat"}},{"kind":"Field","name":{"kind":"Name","value":"rangeMin"}},{"kind":"Field","name":{"kind":"Name","value":"rangeMax"}},{"kind":"Field","name":{"kind":"Name","value":"color"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"filter"}},{"kind":"Field","name":{"kind":"Name","value":"isStacked"}},{"kind":"Field","name":{"kind":"Name","value":"isCumulative"}},{"kind":"Field","name":{"kind":"Name","value":"splitMultiValueFields"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"firstDayOfTheWeek"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PieChartConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"groupByFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateOperation"}},{"kind":"Field","name":{"kind":"Name","value":"groupBySubFieldName"}},{"kind":"Field","name":{"kind":"Name","value":"dateGranularity"}},{"kind":"Field","name":{"kind":"Name","value":"orderBy"}},{"kind":"Field","name":{"kind":"Name","value":"manualSortOrder"}},{"kind":"Field","name":{"kind":"Name","value":"displayDataLabel"}},{"kind":"Field","name":{"kind":"Name","value":"showCenterMetric"}},{"kind":"Field","name":{"kind":"Name","value":"displayLegend"}},{"kind":"Field","name":{"kind":"Name","value":"numberFormat"}},{"kind":"Field","name":{"kind":"Name","value":"hideEmptyCategory"}},{"kind":"Field","name":{"kind":"Name","value":"splitMultiValueFields"}},{"kind":"Field","name":{"kind":"Name","value":"color"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"filter"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"firstDayOfTheWeek"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"AggregateChartConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateOperation"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"displayDataLabel"}},{"kind":"Field","name":{"kind":"Name","value":"numberFormat"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"filter"}},{"kind":"Field","name":{"kind":"Name","value":"prefix"}},{"kind":"Field","name":{"kind":"Name","value":"suffix"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"firstDayOfTheWeek"}},{"kind":"Field","name":{"kind":"Name","value":"ratioAggregateConfig"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"fieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"optionValue"}}]}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"IframeConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"url"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"StandaloneRichTextConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"body"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"blocknote"}},{"kind":"Field","name":{"kind":"Name","value":"markdown"}}]}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"CalendarConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"EmailsConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"EmailThreadConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"CallRecordingSummaryConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"CallRecordingTranscriptConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"MessageCampaignBodyConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"MessageCampaignDetailsConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"SequenceBuilderConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"QuoteBuilderConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PortalAccessConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"FieldConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"fieldDisplayMode"}},{"kind":"Field","name":{"kind":"Name","value":"fieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"viewId"}},{"kind":"Field","name":{"kind":"Name","value":"nestedRelationFieldMetadataId"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"FieldRichTextConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"FieldsConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"viewId"}},{"kind":"Field","name":{"kind":"Name","value":"newFieldDefaultVisibility"}},{"kind":"Field","name":{"kind":"Name","value":"shouldAllowUserToSeeHiddenFields"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"FilesConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"NotesConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"TasksConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"TimelineConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"ViewConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"RecordTableConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"viewId"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"WorkflowConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"WorkflowRunConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"WorkflowVersionConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"FrontComponentConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"frontComponentId"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"pageLayoutTabId"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"PageLayoutTabFragment"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PageLayoutTab"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"applicationId"}},{"kind":"Field","name":{"kind":"Name","value":"universalIdentifier"}},{"kind":"Field","name":{"kind":"Name","value":"isSystemSideEffect"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"icon"}},{"kind":"Field","name":{"kind":"Name","value":"position"}},{"kind":"Field","name":{"kind":"Name","value":"layoutMode"}},{"kind":"Field","name":{"kind":"Name","value":"widgets"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"PageLayoutWidgetFragment"}}]}},{"kind":"Field","name":{"kind":"Name","value":"pageLayoutId"}},{"kind":"Field","name":{"kind":"Name","value":"isActive"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]} as unknown as DocumentNode<ResetPageLayoutTabToDefaultMutation, ResetPageLayoutTabToDefaultMutationVariables>;
 export const ResetPageLayoutToDefaultDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"ResetPageLayoutToDefault"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"resetPageLayoutToDefault"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"PageLayoutFragment"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"PageLayoutWidgetFragment"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PageLayoutWidget"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"applicationId"}},{"kind":"Field","name":{"kind":"Name","value":"universalIdentifier"}},{"kind":"Field","name":{"kind":"Name","value":"isSystemSideEffect"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"type"}},{"kind":"Field","name":{"kind":"Name","value":"objectMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"isActive"}},{"kind":"Field","name":{"kind":"Name","value":"deletedAt"}},{"kind":"Field","name":{"kind":"Name","value":"conditionalDisplay"}},{"kind":"Field","name":{"kind":"Name","value":"conditionalAvailabilityExpression"}},{"kind":"Field","name":{"kind":"Name","value":"gridPosition"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"column"}},{"kind":"Field","name":{"kind":"Name","value":"columnSpan"}},{"kind":"Field","name":{"kind":"Name","value":"row"}},{"kind":"Field","name":{"kind":"Name","value":"rowSpan"}}]}},{"kind":"Field","name":{"kind":"Name","value":"position"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PageLayoutWidgetGridPosition"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"layoutMode"}},{"kind":"Field","name":{"kind":"Name","value":"row"}},{"kind":"Field","name":{"kind":"Name","value":"column"}},{"kind":"Field","name":{"kind":"Name","value":"rowSpan"}},{"kind":"Field","name":{"kind":"Name","value":"columnSpan"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PageLayoutWidgetVerticalListPosition"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"layoutMode"}},{"kind":"Field","name":{"kind":"Name","value":"index"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PageLayoutWidgetCanvasPosition"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"layoutMode"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"configuration"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"BarChartConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateOperation"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisGroupByFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisGroupBySubFieldName"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisDateGranularity"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisOrderBy"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisManualSortOrder"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisGroupByFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisGroupBySubFieldName"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisGroupByDateGranularity"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisOrderBy"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisManualSortOrder"}},{"kind":"Field","name":{"kind":"Name","value":"omitNullValues"}},{"kind":"Field","name":{"kind":"Name","value":"axisNameDisplay"}},{"kind":"Field","name":{"kind":"Name","value":"displayDataLabel"}},{"kind":"Field","name":{"kind":"Name","value":"displayLegend"}},{"kind":"Field","name":{"kind":"Name","value":"numberFormat"}},{"kind":"Field","name":{"kind":"Name","value":"rangeMin"}},{"kind":"Field","name":{"kind":"Name","value":"rangeMax"}},{"kind":"Field","name":{"kind":"Name","value":"color"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"filter"}},{"kind":"Field","name":{"kind":"Name","value":"groupMode"}},{"kind":"Field","name":{"kind":"Name","value":"layout"}},{"kind":"Field","name":{"kind":"Name","value":"isCumulative"}},{"kind":"Field","name":{"kind":"Name","value":"splitMultiValueFields"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"firstDayOfTheWeek"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"LineChartConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateOperation"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisGroupByFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisGroupBySubFieldName"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisDateGranularity"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisOrderBy"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisManualSortOrder"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisGroupByFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisGroupBySubFieldName"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisGroupByDateGranularity"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisOrderBy"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisManualSortOrder"}},{"kind":"Field","name":{"kind":"Name","value":"omitNullValues"}},{"kind":"Field","name":{"kind":"Name","value":"axisNameDisplay"}},{"kind":"Field","name":{"kind":"Name","value":"displayDataLabel"}},{"kind":"Field","name":{"kind":"Name","value":"displayLegend"}},{"kind":"Field","name":{"kind":"Name","value":"numberFormat"}},{"kind":"Field","name":{"kind":"Name","value":"rangeMin"}},{"kind":"Field","name":{"kind":"Name","value":"rangeMax"}},{"kind":"Field","name":{"kind":"Name","value":"color"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"filter"}},{"kind":"Field","name":{"kind":"Name","value":"isStacked"}},{"kind":"Field","name":{"kind":"Name","value":"isCumulative"}},{"kind":"Field","name":{"kind":"Name","value":"splitMultiValueFields"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"firstDayOfTheWeek"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PieChartConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"groupByFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateOperation"}},{"kind":"Field","name":{"kind":"Name","value":"groupBySubFieldName"}},{"kind":"Field","name":{"kind":"Name","value":"dateGranularity"}},{"kind":"Field","name":{"kind":"Name","value":"orderBy"}},{"kind":"Field","name":{"kind":"Name","value":"manualSortOrder"}},{"kind":"Field","name":{"kind":"Name","value":"displayDataLabel"}},{"kind":"Field","name":{"kind":"Name","value":"showCenterMetric"}},{"kind":"Field","name":{"kind":"Name","value":"displayLegend"}},{"kind":"Field","name":{"kind":"Name","value":"numberFormat"}},{"kind":"Field","name":{"kind":"Name","value":"hideEmptyCategory"}},{"kind":"Field","name":{"kind":"Name","value":"splitMultiValueFields"}},{"kind":"Field","name":{"kind":"Name","value":"color"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"filter"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"firstDayOfTheWeek"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"AggregateChartConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateOperation"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"displayDataLabel"}},{"kind":"Field","name":{"kind":"Name","value":"numberFormat"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"filter"}},{"kind":"Field","name":{"kind":"Name","value":"prefix"}},{"kind":"Field","name":{"kind":"Name","value":"suffix"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"firstDayOfTheWeek"}},{"kind":"Field","name":{"kind":"Name","value":"ratioAggregateConfig"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"fieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"optionValue"}}]}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"IframeConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"url"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"StandaloneRichTextConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"body"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"blocknote"}},{"kind":"Field","name":{"kind":"Name","value":"markdown"}}]}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"CalendarConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"EmailsConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"EmailThreadConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"CallRecordingSummaryConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"CallRecordingTranscriptConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"MessageCampaignBodyConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"MessageCampaignDetailsConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"SequenceBuilderConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"QuoteBuilderConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PortalAccessConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"FieldConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"fieldDisplayMode"}},{"kind":"Field","name":{"kind":"Name","value":"fieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"viewId"}},{"kind":"Field","name":{"kind":"Name","value":"nestedRelationFieldMetadataId"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"FieldRichTextConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"FieldsConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"viewId"}},{"kind":"Field","name":{"kind":"Name","value":"newFieldDefaultVisibility"}},{"kind":"Field","name":{"kind":"Name","value":"shouldAllowUserToSeeHiddenFields"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"FilesConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"NotesConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"TasksConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"TimelineConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"ViewConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"RecordTableConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"viewId"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"WorkflowConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"WorkflowRunConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"WorkflowVersionConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"FrontComponentConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"frontComponentId"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"pageLayoutTabId"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"PageLayoutTabFragment"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PageLayoutTab"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"applicationId"}},{"kind":"Field","name":{"kind":"Name","value":"universalIdentifier"}},{"kind":"Field","name":{"kind":"Name","value":"isSystemSideEffect"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"icon"}},{"kind":"Field","name":{"kind":"Name","value":"position"}},{"kind":"Field","name":{"kind":"Name","value":"layoutMode"}},{"kind":"Field","name":{"kind":"Name","value":"widgets"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"PageLayoutWidgetFragment"}}]}},{"kind":"Field","name":{"kind":"Name","value":"pageLayoutId"}},{"kind":"Field","name":{"kind":"Name","value":"isActive"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"PageLayoutFragment"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PageLayout"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"applicationId"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"objectMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"type"}},{"kind":"Field","name":{"kind":"Name","value":"universalIdentifier"}},{"kind":"Field","name":{"kind":"Name","value":"isSystemSideEffect"}},{"kind":"Field","name":{"kind":"Name","value":"defaultTabToFocusOnMobileAndSidePanelId"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"tabs"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"PageLayoutTabFragment"}}]}}]}}]} as unknown as DocumentNode<ResetPageLayoutToDefaultMutation, ResetPageLayoutToDefaultMutationVariables>;
 export const ResetPageLayoutWidgetToDefaultDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"ResetPageLayoutWidgetToDefault"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"resetPageLayoutWidgetToDefault"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"PageLayoutWidgetFragment"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"PageLayoutWidgetFragment"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PageLayoutWidget"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"applicationId"}},{"kind":"Field","name":{"kind":"Name","value":"universalIdentifier"}},{"kind":"Field","name":{"kind":"Name","value":"isSystemSideEffect"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"type"}},{"kind":"Field","name":{"kind":"Name","value":"objectMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"isActive"}},{"kind":"Field","name":{"kind":"Name","value":"deletedAt"}},{"kind":"Field","name":{"kind":"Name","value":"conditionalDisplay"}},{"kind":"Field","name":{"kind":"Name","value":"conditionalAvailabilityExpression"}},{"kind":"Field","name":{"kind":"Name","value":"gridPosition"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"column"}},{"kind":"Field","name":{"kind":"Name","value":"columnSpan"}},{"kind":"Field","name":{"kind":"Name","value":"row"}},{"kind":"Field","name":{"kind":"Name","value":"rowSpan"}}]}},{"kind":"Field","name":{"kind":"Name","value":"position"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PageLayoutWidgetGridPosition"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"layoutMode"}},{"kind":"Field","name":{"kind":"Name","value":"row"}},{"kind":"Field","name":{"kind":"Name","value":"column"}},{"kind":"Field","name":{"kind":"Name","value":"rowSpan"}},{"kind":"Field","name":{"kind":"Name","value":"columnSpan"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PageLayoutWidgetVerticalListPosition"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"layoutMode"}},{"kind":"Field","name":{"kind":"Name","value":"index"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PageLayoutWidgetCanvasPosition"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"layoutMode"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"configuration"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"BarChartConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateOperation"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisGroupByFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisGroupBySubFieldName"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisDateGranularity"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisOrderBy"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisManualSortOrder"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisGroupByFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisGroupBySubFieldName"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisGroupByDateGranularity"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisOrderBy"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisManualSortOrder"}},{"kind":"Field","name":{"kind":"Name","value":"omitNullValues"}},{"kind":"Field","name":{"kind":"Name","value":"axisNameDisplay"}},{"kind":"Field","name":{"kind":"Name","value":"displayDataLabel"}},{"kind":"Field","name":{"kind":"Name","value":"displayLegend"}},{"kind":"Field","name":{"kind":"Name","value":"numberFormat"}},{"kind":"Field","name":{"kind":"Name","value":"rangeMin"}},{"kind":"Field","name":{"kind":"Name","value":"rangeMax"}},{"kind":"Field","name":{"kind":"Name","value":"color"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"filter"}},{"kind":"Field","name":{"kind":"Name","value":"groupMode"}},{"kind":"Field","name":{"kind":"Name","value":"layout"}},{"kind":"Field","name":{"kind":"Name","value":"isCumulative"}},{"kind":"Field","name":{"kind":"Name","value":"splitMultiValueFields"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"firstDayOfTheWeek"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"LineChartConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateOperation"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisGroupByFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisGroupBySubFieldName"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisDateGranularity"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisOrderBy"}},{"kind":"Field","name":{"kind":"Name","value":"primaryAxisManualSortOrder"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisGroupByFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisGroupBySubFieldName"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisGroupByDateGranularity"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisOrderBy"}},{"kind":"Field","name":{"kind":"Name","value":"secondaryAxisManualSortOrder"}},{"kind":"Field","name":{"kind":"Name","value":"omitNullValues"}},{"kind":"Field","name":{"kind":"Name","value":"axisNameDisplay"}},{"kind":"Field","name":{"kind":"Name","value":"displayDataLabel"}},{"kind":"Field","name":{"kind":"Name","value":"displayLegend"}},{"kind":"Field","name":{"kind":"Name","value":"numberFormat"}},{"kind":"Field","name":{"kind":"Name","value":"rangeMin"}},{"kind":"Field","name":{"kind":"Name","value":"rangeMax"}},{"kind":"Field","name":{"kind":"Name","value":"color"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"filter"}},{"kind":"Field","name":{"kind":"Name","value":"isStacked"}},{"kind":"Field","name":{"kind":"Name","value":"isCumulative"}},{"kind":"Field","name":{"kind":"Name","value":"splitMultiValueFields"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"firstDayOfTheWeek"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PieChartConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"groupByFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateOperation"}},{"kind":"Field","name":{"kind":"Name","value":"groupBySubFieldName"}},{"kind":"Field","name":{"kind":"Name","value":"dateGranularity"}},{"kind":"Field","name":{"kind":"Name","value":"orderBy"}},{"kind":"Field","name":{"kind":"Name","value":"manualSortOrder"}},{"kind":"Field","name":{"kind":"Name","value":"displayDataLabel"}},{"kind":"Field","name":{"kind":"Name","value":"showCenterMetric"}},{"kind":"Field","name":{"kind":"Name","value":"displayLegend"}},{"kind":"Field","name":{"kind":"Name","value":"numberFormat"}},{"kind":"Field","name":{"kind":"Name","value":"hideEmptyCategory"}},{"kind":"Field","name":{"kind":"Name","value":"splitMultiValueFields"}},{"kind":"Field","name":{"kind":"Name","value":"color"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"filter"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"firstDayOfTheWeek"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"AggregateChartConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateFieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateOperation"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"displayDataLabel"}},{"kind":"Field","name":{"kind":"Name","value":"numberFormat"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"filter"}},{"kind":"Field","name":{"kind":"Name","value":"prefix"}},{"kind":"Field","name":{"kind":"Name","value":"suffix"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"firstDayOfTheWeek"}},{"kind":"Field","name":{"kind":"Name","value":"ratioAggregateConfig"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"fieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"optionValue"}}]}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"IframeConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"url"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"StandaloneRichTextConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"body"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"blocknote"}},{"kind":"Field","name":{"kind":"Name","value":"markdown"}}]}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"CalendarConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"EmailsConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"EmailThreadConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"CallRecordingSummaryConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"CallRecordingTranscriptConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"MessageCampaignBodyConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"MessageCampaignDetailsConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"SequenceBuilderConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"QuoteBuilderConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PortalAccessConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"FieldConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"fieldDisplayMode"}},{"kind":"Field","name":{"kind":"Name","value":"fieldMetadataId"}},{"kind":"Field","name":{"kind":"Name","value":"viewId"}},{"kind":"Field","name":{"kind":"Name","value":"nestedRelationFieldMetadataId"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"FieldRichTextConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"FieldsConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"viewId"}},{"kind":"Field","name":{"kind":"Name","value":"newFieldDefaultVisibility"}},{"kind":"Field","name":{"kind":"Name","value":"shouldAllowUserToSeeHiddenFields"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"FilesConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"NotesConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"TasksConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"TimelineConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"ViewConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"RecordTableConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"viewId"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"WorkflowConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"WorkflowRunConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"WorkflowVersionConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"FrontComponentConfiguration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configurationType"}},{"kind":"Field","name":{"kind":"Name","value":"frontComponentId"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"pageLayoutTabId"}}]}}]} as unknown as DocumentNode<ResetPageLayoutWidgetToDefaultMutation, ResetPageLayoutWidgetToDefaultMutationVariables>;

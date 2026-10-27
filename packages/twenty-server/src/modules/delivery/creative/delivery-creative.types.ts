@@ -258,7 +258,7 @@ export const creativeCommandSchema = z.discriminatedUnion('action', [
       ...identity,
       action: z.literal('reopen'),
       notes: z.string().trim().min(1).max(6000),
-      revisionCharge: z.number().min(0).max(1000000),
+      revisionCharge: z.literal(0).optional(),
     })
     .strict(),
 ]);

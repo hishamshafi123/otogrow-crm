@@ -11,6 +11,41 @@ These requirements consolidate the user's discovery answers. Phase plans define 
 - Priority: delivery/task management, team management, approvals, task-specific dynamic agents and creative assistance.
 - Redesign for clarity: restrained raised cards, readable hierarchy, clear owners and next actions, visible progress and fewer competing controls.
 
+## Meeting knowledge — discovery update 2026-10-26
+
+- Add a Fathom/recording link and/or paste meeting transcripts or notes into the brand knowledge library after each meeting.
+- Agents working on that brand should receive the latest approved meeting decisions and use them when proposing task, brief and plan updates. Keep the meeting source and version traceable.
+- Preserve the distinction between original evidence, draft interpretation and published knowledge. Do not turn transcript text into authority to change permissions, spend money, communicate externally or bypass final approval.
+- The first implementation is explicitly project-scoped: authorized contributors save notes, managers publish reviewed knowledge, and the existing task assistants receive bounded approved context. Cross-project brand sharing must be configured deliberately.
+- Automatic Fathom import, recording transcription, AI extraction of decisions and broader task/plan automation remain separate pending capabilities. Storing a link alone does not mean its transcript was retrieved.
+
+## Dynamic roles and person-level activity — discovery update 2026-10-25
+
+Confirmed user requirements:
+
+- The founder can create and change roles dynamically, inspect what each role can see and do, and assign those roles to people. Job titles must not be hard-coded permission categories.
+- Show a person-level activity log so the founder can inspect who did what across the OS.
+- Allow AI analysis of the recorded activity, including summaries and questions about who performed particular actions.
+- These additions belong to the approved improvement work tracked in `OTOGROW-OS-IMPROVEMENTS.md` (39, 43 and 44). They remain requirements until their acceptance checks pass.
+
+Proposed behavior to refine in the approved plan:
+
+- Provide an understandable permission matrix covering visible areas and actions such as view, create, edit, assign, submit, review, approve, export, communicate with clients, run agents and manage models. Separately show client/project/conversation scope and any sensitive-field restrictions.
+- Offer editable starter roles for existing jobs, plus a read-only access preview for a role and an individual person's effective permissions. Show why access is granted or denied, including inherited rules and exceptions.
+- Reuse Twenty's existing role/permission infrastructure where appropriate. Apply the same rules in the sidebar, individual controls, APIs, files, search, background work and AI retrieval; hiding a menu alone is insufficient.
+- Preserve the founder and Amna's agreed company-wide access, explicit inbox grants, and independent final approval. A custom role does not permit an assignee to approve their own final deliverable. Protect against accidentally removing the last administrator's access.
+- Record meaningful work actions with actor, timestamp/timezone, affected client/project/task, action, outcome, and relevant before/after changes. Distinguish the human initiator, executing AI agent or integration, and human approver. Include role/access changes, assignments, submissions, revisions, approvals, client-message sends, budget requests/application evidence, financial changes and agent runs.
+- Support filters by person, date, client/project, action and outcome, with links to the underlying records. Preserve historical actor identity when staff leave and do not let ordinary edits rewrite audit history. Exclude secrets and unnecessary private content from log payloads.
+- AI summaries must cite the underlying events and respect the requesting person's permissions. Separate observed actions from explanations or hypotheses; missing integration data means unknown activity, not inactivity. Do not infer time worked or productivity solely from clicks, presence or log volume.
+- Example questions: "What did this editor complete this week?", "Who changed this assignment or advertising budget request?", "Which deliverables are waiting for Amna's review?", and "Where did work spend the most time waiting?" Reuse configured AI funding and spending controls; no additional paid access is authorized by this requirement.
+
+### Additional confirmed access rules — 2026-10-25
+
+- A person may hold multiple roles at the same time. Show the combined effective access and which role grants each permission.
+- Phone access is a distinct capability, including the dialer and calling APIs. Default grants belong only to Sales, Setter, Admin (founder) and Secondary Admin (Amna). Other roles, including Marketing by itself, do not grant phone access.
+- A person with an eligible additional role can use the phone; removing the final role that grants it removes access. Existing project/client scopes still apply and an assignee still cannot approve their own final work.
+- Implement these rules through real permissions, not editable job-title text or hiding the phone button. Role changes and call actions belong in the activity log.
+
 ## Delivery and team work
 
 - Amna plans and adjusts daily/weekly assignments across roles, with instructions such as music, references and general notes.
@@ -20,7 +55,8 @@ These requirements consolidate the user's discovery answers. Phase plans define 
 - Show revision numbers and request/history; unlimited revisions are allowed. Optional revision charges default to zero.
 - Work is fulfilled after delivery without an outstanding client objection and project-manager confirmation, not merely after production approval.
 - Ask the project manager 12 hours after delivery: Fulfilled, Not fulfilled, or Redoing. Not fulfilled repeats the question every 12 hours. Redoing returns work to revision; the proposed restart point is revised approval and delivery, followed by another 12-hour check.
-- Telegram reminders operate 24/7: one ping after five minutes of an unattended message or assignment, without repeated reminders. Exact seen versus acknowledgment semantics remain to be finalized.
+- Telegram reminders operate 24/7: one ping after five minutes of an unattended message or assignment, without repeated reminders. Task opening marks only the actual assignee's assignment seen; addressed task notes retain recipient-specific seen/acknowledgment state.
+- The OS includes internal Team chat, initially direct teammate conversations. A message is viewed only when it is visibly displayed in the recipient's focused window; opening a conversation must not clear hidden messages. Unviewed messages become eligible for a single Telegram ping after five minutes, dispatched on the next scheduler pass. Bot configuration, linked recipients and a running messaging worker are required.
 - Founder Telegram alerts cover unhappy clients, late work, budget overruns, contract changes and poor campaign performance. Thresholds still need definition.
 - Native boards and progress tracking; no Jira integration planned. Specialist development features need later discovery.
 
@@ -96,4 +132,4 @@ These requirements consolidate the user's discovery answers. Phase plans define 
 
 ## Current implementation authorization
 
-The user later instructed: “continue all the rest of the phases without my approval”. This supersedes the earlier per-phase approval pauses. Continue planning, implementation and verification autonomously, record unfinished items honestly, and request only genuinely missing account/setup details or necessary external-action authorization.
+The user has now requested a complete tracked list of all criticisms and implementation of every improvement to make the current system easier to use. This supersedes the redesign review's earlier planning-approval pause. Plan, implement and verify in manageable batches, using `OTOGROW-OS-IMPROVEMENTS.md` as the source of completion status. Preserve unfinished original roadmap scope, the existing spending limit and external-action boundaries. Do not mark dynamic roles, audit history or AI analysis implemented until their acceptance checks pass.

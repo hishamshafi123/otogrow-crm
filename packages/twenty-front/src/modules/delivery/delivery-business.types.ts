@@ -18,6 +18,12 @@ export type BusinessRecord = {
   history: { at: string; actorId: string; action: string; note: string }[];
   [key: string]: unknown;
 };
+export type FinanceReceivableBalance = {
+  id: string;
+  settledMicros: string;
+  outstandingMicros: string;
+  sourceWarnings: string[];
+};
 export type FinanceSummary = {
   currency: string;
   cash: number;
@@ -51,6 +57,12 @@ export type AdvertisingInsight = {
   signal: string;
 };
 export type BusinessSnapshot = {
+  workspaceId: string;
+  memberId: string;
+  userWorkspaceId: string;
+  financeAccess: { read: boolean; manage: boolean };
+  financeProjects: { id: string; name: string }[];
+  conversationAccess: Record<string, { draft: boolean }>;
   advertising?: AdvertisingInsight[];
   records: BusinessRecord[];
   inbox: {
@@ -65,5 +77,6 @@ export type BusinessSnapshot = {
   }[];
   seen: Record<string, string>;
   finance: FinanceSummary[];
+  financeReceivableBalances?: FinanceReceivableBalance[];
   connections: { channel: string; status: string }[];
 };

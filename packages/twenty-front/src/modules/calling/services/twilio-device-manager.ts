@@ -21,6 +21,39 @@ let twilioDevice: Device | null = null;
 let deviceInitPromise: Promise<Device> | null = null;
 let currentCall: Call | null = null;
 let ringbackAudio: HTMLAudioElement | null = null;
+let callingScope: string | null = null;
+let accessGeneration = 0;
+let registeringDevice: Device | null = null;
+let activePreflight: ReturnType<typeof Device.runPreflight> | null = null;
+
+const hasCurrentAccess = (generation: number) =>
+  callingScope !== null && generation === accessGeneration;
+
+const clearCallingSession = () => {
+  accessGeneration += 1;
+  deviceInitPromise = null;
+  const previousDevice = twilioDevice;
+  const previousRegisteringDevice = registeringDevice;
+  twilioDevice = null;
+  registeringDevice = null;
+  currentCall?.disconnect();
+  previousDevice?.destroy();
+  if (previousRegisteringDevice !== previousDevice)
+    previousRegisteringDevice?.destroy();
+  activePreflight?.stop();
+  activePreflight = null;
+  resetCallState();
+  jotaiStore.set(isDialerOpenState.atom, false);
+  jotaiStore.set(dialerNumberState.atom, '');
+  jotaiStore.set(dialerErrorState.atom, null);
+  jotaiStore.set(preflightReportState.atom, { status: 'IDLE', detail: null });
+};
+
+export const setCallingAccess = (scope: string | null) => {
+  if (scope === callingScope) return;
+  callingScope = scope;
+  clearCallingSession();
+};
 
 const stopRingback = () => {
   ringbackAudio?.pause();
@@ -112,24 +145,33 @@ const trackCall = (call: Call) => {
   }
 
   call.on('ringing', (hasEarlyMedia?: boolean) => {
+    if (currentCall !== call || callingScope === null) return;
     jotaiStore.set(callStatusState.atom, 'RINGING');
     startRingback(hasEarlyMedia);
   });
   call.on('accept', () => {
+    if (currentCall !== call || callingScope === null) return;
     stopRingback();
     jotaiStore.set(callStatusState.atom, 'IN_CALL');
     jotaiStore.set(callAnsweredAtState.atom, Date.now());
   });
-  call.on('disconnect', resetCallState);
-  call.on('cancel', resetCallState);
-  call.on('reject', resetCallState);
+  const resetIfCurrent = () => {
+    if (currentCall === call) resetCallState();
+  };
+  call.on('disconnect', resetIfCurrent);
+  call.on('cancel', resetIfCurrent);
+  call.on('reject', resetIfCurrent);
   call.on('error', (error: Error) => {
+    if (currentCall !== call) return;
     jotaiStore.set(dialerErrorState.atom, error.message || 'The call failed');
     resetCallState();
   });
 };
 
 const getOrInitDevice = async (): Promise<Device> => {
+  const generation = accessGeneration;
+  if (!hasCurrentAccess(generation))
+    throw new Error('Phone access is not available');
   if (isDefined(twilioDevice)) {
     return twilioDevice;
   }
@@ -137,18 +179,28 @@ const getOrInitDevice = async (): Promise<Device> => {
   // Concurrent opens share one init so two Device instances never register.
   deviceInitPromise ??= (async () => {
     const token = await fetchVoiceToken();
+    if (!hasCurrentAccess(generation)) throw new Error('Phone access changed');
     const device = new Device(token, {
       // Debug while we diagnose local media-path failures; trim before prod.
       logLevel: 'debug',
       codecPreferences: [Call.Codec.Opus, Call.Codec.PCMU],
     });
 
+    registeringDevice = device;
     device.on('tokenWillExpire', async () => {
+      if (!hasCurrentAccess(generation)) return;
       try {
         const freshToken = await fetchVoiceToken();
 
+        if (!hasCurrentAccess(generation)) {
+          device.destroy();
+          return;
+        }
         await device.updateToken(freshToken);
       } catch (error) {
+        if (!hasCurrentAccess(generation)) return;
+        // A transient renewal failure must permit a later server-checked retry.
+        clearCallingSession();
         jotaiStore.set(
           dialerErrorState.atom,
           error instanceof Error ? error.message : 'Call session expired',
@@ -157,6 +209,7 @@ const getOrInitDevice = async (): Promise<Device> => {
     });
 
     device.on('error', (error) => {
+      if (!hasCurrentAccess(generation)) return;
       jotaiStore.set(dialerErrorState.atom, error.message);
 
       // A token-expired device never recovers; drop it so the next call
@@ -168,6 +221,10 @@ const getOrInitDevice = async (): Promise<Device> => {
     });
 
     device.on('incoming', (call) => {
+      if (!hasCurrentAccess(generation)) {
+        call.reject();
+        return;
+      }
       trackCall(call);
 
       // The caller's PSTN number arrives as a connect parameter; mirroring
@@ -181,17 +238,26 @@ const getOrInitDevice = async (): Promise<Device> => {
       jotaiStore.set(isDialerOpenState.atom, true);
     });
 
-    await device.register();
-
-    twilioDevice = device;
+    try {
+      await device.register();
+      if (!hasCurrentAccess(generation))
+        throw new Error('Phone access changed');
+      twilioDevice = device;
+    } catch (error) {
+      device.destroy();
+      throw error;
+    } finally {
+      if (registeringDevice === device) registeringDevice = null;
+    }
 
     return device;
   })();
 
+  const pending = deviceInitPromise;
   try {
-    return await deviceInitPromise;
+    return await pending;
   } finally {
-    deviceInitPromise = null;
+    if (deviceInitPromise === pending) deviceInitPromise = null;
   }
 };
 
@@ -202,6 +268,8 @@ export const startOutgoingCall = async ({
   toNumber: string;
   personId?: string | null;
 }): Promise<void> => {
+  const generation = accessGeneration;
+  if (!hasCurrentAccess(generation)) return;
   jotaiStore.set(dialerErrorState.atom, null);
   jotaiStore.set(isDialerOpenState.atom, true);
   jotaiStore.set(callStatusState.atom, 'CONNECTING');
@@ -211,6 +279,7 @@ export const startOutgoingCall = async ({
     const device = await getOrInitDevice();
 
     await resumeDeviceAudioContext();
+    if (!hasCurrentAccess(generation)) return;
 
     const params: Record<string, string> = {
       To: toNumber,
@@ -224,9 +293,13 @@ export const startOutgoingCall = async ({
     }
 
     const call = await device.connect({ params });
-
+    if (!hasCurrentAccess(generation)) {
+      call.disconnect();
+      return;
+    }
     trackCall(call);
   } catch (error) {
+    if (!hasCurrentAccess(generation)) return;
     jotaiStore.set(
       dialerErrorState.atom,
       error instanceof Error ? error.message : 'The call failed to start',
@@ -248,6 +321,7 @@ export const initializeCallingDevice = async (): Promise<void> => {
 };
 
 export const acceptIncomingCall = () => {
+  if (callingScope === null) return;
   if (isDefined(currentCall)) {
     resumeDeviceAudioContext().catch(() => undefined);
     currentCall.accept();
@@ -273,6 +347,7 @@ export const hangUpCall = () => {
 };
 
 export const toggleCallMute = () => {
+  if (callingScope === null) return;
   if (!isDefined(currentCall)) {
     return;
   }
@@ -284,6 +359,7 @@ export const toggleCallMute = () => {
 };
 
 export const sendCallDigits = (digits: string) => {
+  if (callingScope === null) return;
   currentCall?.sendDigits(digits);
 };
 
@@ -291,6 +367,9 @@ export const sendCallDigits = (digits: string) => {
 // Twilio gateway (no PSTN leg) and measures RTP both ways. Used by the
 // dialer's "Test connection" link to split network failures from device ones.
 export const runVoicePreflight = async (): Promise<void> => {
+  const generation = accessGeneration;
+  if (!hasCurrentAccess(generation)) return;
+  activePreflight?.stop();
   jotaiStore.set(preflightReportState.atom, {
     status: 'RUNNING',
     detail: null,
@@ -298,11 +377,16 @@ export const runVoicePreflight = async (): Promise<void> => {
 
   try {
     const token = await fetchVoiceToken();
+    if (!hasCurrentAccess(generation)) return;
     const preflight = Device.runPreflight(token, {
       codecPreferences: [Call.Codec.Opus, Call.Codec.PCMU],
     });
 
+    activePreflight = preflight;
     preflight.on('completed', (report) => {
+      if (!hasCurrentAccess(generation) || activePreflight !== preflight)
+        return;
+      activePreflight = null;
       const stats = report.stats;
       const totals = report.totals;
       const parts = [
@@ -322,12 +406,16 @@ export const runVoicePreflight = async (): Promise<void> => {
     });
 
     preflight.on('failed', (error) => {
+      if (!hasCurrentAccess(generation) || activePreflight !== preflight)
+        return;
+      activePreflight = null;
       jotaiStore.set(preflightReportState.atom, {
         status: 'FAILED',
         detail: error.message,
       });
     });
   } catch (error) {
+    if (!hasCurrentAccess(generation)) return;
     jotaiStore.set(preflightReportState.atom, {
       status: 'FAILED',
       detail: error instanceof Error ? error.message : 'Preflight failed',

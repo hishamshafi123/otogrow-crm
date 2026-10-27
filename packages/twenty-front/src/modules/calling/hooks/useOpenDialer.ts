@@ -1,9 +1,11 @@
+import { useOtogrowAccess } from '@/otogrow-access/useOtogrowAccess';
 import { activeCallPersonIdState } from '@/calling/states/activeCallPersonIdState';
 import { dialerNumberState } from '@/calling/states/dialerNumberState';
 import { isDialerOpenState } from '@/calling/states/isDialerOpenState';
 import { useAtomState } from '@/ui/utilities/state/jotai/hooks/useAtomState';
 
 export const useOpenDialer = () => {
+  const { canUsePhone } = useOtogrowAccess();
   const [, setIsDialerOpen] = useAtomState(isDialerOpenState);
   const [, setDialerNumber] = useAtomState(dialerNumberState);
   const [, setActiveCallPersonId] = useAtomState(activeCallPersonIdState);
@@ -15,6 +17,7 @@ export const useOpenDialer = () => {
     phoneNumber?: string;
     personId?: string | null;
   } = {}) => {
+    if (!canUsePhone) return;
     if (phoneNumber !== undefined) {
       setDialerNumber(phoneNumber);
     }
@@ -23,5 +26,5 @@ export const useOpenDialer = () => {
     setIsDialerOpen(true);
   };
 
-  return { openDialer };
+  return { openDialer, canUsePhone };
 };

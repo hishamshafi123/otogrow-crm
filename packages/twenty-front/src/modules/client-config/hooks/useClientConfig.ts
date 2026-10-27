@@ -157,19 +157,6 @@ export const useClientConfig = (): UseClientConfigResult => {
 
     try {
       const clientConfig = await getClientConfig();
-      setClientConfigApiStatus((prev) => ({
-        ...prev,
-        isLoading: false,
-        isLoadedOnce: true,
-        isErrored: false,
-        error: undefined,
-        data: { clientConfig },
-      }));
-      setClientConfigApiStatus((currentStatus) => ({
-        ...currentStatus,
-        isErrored: false,
-        error: undefined,
-      }));
       setAppVersion(clientConfig.appVersion);
       setAuthProviders({
         google: clientConfig.authProviders.google,
@@ -215,10 +202,6 @@ export const useClientConfig = (): UseClientConfigResult => {
       setIsConfigVariablesInDbEnabled(
         clientConfig?.isConfigVariablesInDbEnabled,
       );
-      setClientConfigApiStatus((currentStatus) => ({
-        ...currentStatus,
-        isSaved: true,
-      }));
 
       setCalendarBookingPageId(clientConfig?.calendarBookingPageId ?? null);
       setIsBookCallOnboardingStepEnabled(
@@ -245,6 +228,15 @@ export const useClientConfig = (): UseClientConfigResult => {
         clientConfig?.enterpriseInstanceType ??
           ENTERPRISE_INSTANCE_TYPE.PRODUCTION,
       );
+      setClientConfigApiStatus((currentStatus) => ({
+        ...currentStatus,
+        isLoading: false,
+        isLoadedOnce: true,
+        isSaved: true,
+        isErrored: false,
+        error: undefined,
+        data: { clientConfig },
+      }));
     } catch (err) {
       const error =
         err instanceof Error ? err : new Error('Failed to fetch client config');

@@ -1,3 +1,17 @@
+import { getDeliveryLifecycle } from 'src/modules/delivery/lifecycle/delivery-lifecycle';
+import { recordDeliveryRevision } from 'src/modules/delivery/revisions/record-delivery-revision';
+import { type Fulfilment } from 'src/modules/delivery/operations/delivery-operations.types';
+import {
+  applyPublishedDeliveryWorkflow,
+  getPublishedDeliveryWorkflow,
+} from 'src/modules/delivery/workflows/apply-delivery-workflow';
+import {
+  assertWorkflowSubmission,
+  assertWorkflowReview,
+} from 'src/modules/delivery/workflows/delivery-workflows.policy';
+import { syncStoredDeliveryCommitment } from 'src/modules/delivery/commitments/record-delivery-commitment';
+import { canReadFinance } from 'src/modules/delivery/business/delivery-business.policy';
+import { readDeliverySnapshot } from 'src/modules/delivery/read-delivery-snapshot';
 import {
   assertCreativeSubmission,
   invalidateCreativeBrief,
@@ -11,11 +25,10 @@ import {
 } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, type EntityManager } from 'typeorm';
-import { PermissionFlagType } from 'twenty-shared/constants';
 import { isDefined } from 'twenty-shared/utils';
 import { v4 } from 'uuid';
 import { WorkspaceEntity } from 'src/engine/core-modules/workspace/workspace.entity';
-import { PermissionsService } from 'src/engine/metadata-modules/permissions/permissions.service';
+import { OtogrowAccessService } from 'src/modules/otogrow-access/otogrow-access.service';
 import { DeliveryProjectEntity } from 'src/modules/delivery/entities/delivery-project.entity';
 import { DeliveryTaskEntity } from 'src/modules/delivery/entities/delivery-task.entity';
 import { DeliveryMemberEntity } from 'src/modules/delivery/entities/delivery-member.entity';
@@ -25,8 +38,32 @@ import {
   canAccessDeliveryProject,
 } from 'src/modules/delivery/delivery-policy';
 import { type DeliveryDetails } from 'src/modules/delivery/delivery.types';
+import { recordOtogrowActivity } from 'src/modules/otogrow-activity/record-otogrow-activity';
 
-type DeliveryActor = { memberId: string; isAdmin: boolean; isManager: boolean };
+const planningActivity = (details: DeliveryDetails) => ({
+  workMinutes: isDefined(details.plan?.workMinutes)
+    ? String(details.plan.workMinutes)
+    : null,
+  revisionMinutes: isDefined(details.plan?.revisionMinutes)
+    ? String(details.plan.revisionMinutes)
+    : null,
+  waitMinutes: isDefined(details.plan?.waitMinutes)
+    ? String(details.plan.waitMinutes)
+    : null,
+  reviewMinutes: isDefined(details.plan?.reviewMinutes)
+    ? String(details.plan.reviewMinutes)
+    : null,
+  reviewDate: details.plan?.reviewDate ?? null,
+  complexity: details.plan?.complexity ?? null,
+});
+
+type DeliveryActor = {
+  memberId: string;
+  isAdmin: boolean;
+  isManager: boolean;
+  capabilities: string[];
+  roleIds: string[];
+};
 type NativeTask = {
   id: string;
   title: string;
@@ -39,7 +76,7 @@ type Member = { id: string; name: string };
 export class DeliveryService {
   constructor(
     @InjectDataSource() private readonly dataSource: DataSource,
-    private readonly permissions: PermissionsService,
+    private readonly access: OtogrowAccessService,
   ) {}
 
   schema(workspace: WorkspaceEntity): string {
@@ -60,21 +97,19 @@ export class DeliveryService {
   ): Promise<DeliveryActor> {
     if (!isDefined(memberId) || !isDefined(userWorkspaceId))
       throw new ForbiddenException();
-    const [profile, isWorkspaceAdmin] = await Promise.all([
-      manager
-        .getRepository(DeliveryMemberEntity)
-        .findOneBy({ workspaceId: workspace.id, workspaceMemberId: memberId }),
-      this.permissions.userHasWorkspaceSettingPermission({
-        workspaceId: workspace.id,
-        userWorkspaceId,
-        setting: PermissionFlagType.ROLES,
-      }),
-    ]);
-    const isAdmin = isWorkspaceAdmin || profile?.access === 'ADMIN';
+    const access = await this.access.accessForUser(
+      workspace.id,
+      memberId,
+      userWorkspaceId,
+      manager,
+    );
+    const isAdmin = access.capabilities.includes('workspace.admin');
     return {
       memberId,
+      capabilities: access.capabilities,
+      roleIds: access.roleIds,
       isAdmin,
-      isManager: isAdmin || profile?.access === 'MANAGER',
+      isManager: isAdmin || access.capabilities.includes('delivery.manage'),
     };
   }
 
@@ -82,8 +117,8 @@ export class DeliveryService {
     manager: EntityManager,
     workspace: WorkspaceEntity,
   ): Promise<Member[]> {
-    return manager.query(
-      `SELECT id, trim(concat_ws(' ', "nameFirstName", "nameLastName")) AS name FROM ${this.schema(workspace)}."workspaceMember" WHERE "deletedAt" IS NULL`,
+    return (await this.access.listActiveMembers(workspace.id, manager)).map(
+      (member) => ({ id: member.memberId, name: member.name }),
     );
   }
 
@@ -91,66 +126,130 @@ export class DeliveryService {
     workspace: WorkspaceEntity,
     memberId: string,
     userWorkspaceId: string,
+    transactionManager?: EntityManager,
   ) {
-    const actor = await this.actor(workspace, memberId, userWorkspaceId);
-    const projects = (
-      await this.dataSource
-        .getRepository(DeliveryProjectEntity)
-        .findBy({ workspaceId: workspace.id })
-    ).filter((project) =>
-      canAccessDeliveryProject(actor.isManager, memberId, project.memberIds),
+    return readDeliverySnapshot(
+      this.dataSource,
+      workspace.id,
+      async (manager) => {
+        const actor = await this.actor(
+          workspace,
+          memberId,
+          userWorkspaceId,
+          manager,
+        );
+        const projects = (
+          await manager
+            .getRepository(DeliveryProjectEntity)
+            .findBy({ workspaceId: workspace.id })
+        ).filter((project) =>
+          canAccessDeliveryProject(
+            actor.isManager,
+            memberId,
+            project.memberIds,
+          ),
+        );
+        const projectIds = projects.map((project) => project.id);
+        const tasks: (NativeTask & {
+          projectId: string;
+          details: DeliveryDetails;
+          revision: number;
+        })[] = projectIds.length
+          ? await manager.query(
+              `SELECT t.id, t.title, t."assigneeId", t."dueAt", d."projectId", d.details, d.revision FROM "core"."deliveryTask" d JOIN ${this.schema(workspace)}."task" t ON t.id = d."taskId" WHERE d."workspaceId" = $1 AND d."projectId" = ANY($2::uuid[]) AND t."deletedAt" IS NULL ORDER BY t."dueAt" ASC NULLS LAST, t."createdAt" DESC`,
+              [workspace.id, projectIds],
+            )
+          : [];
+        const profiles = await manager
+          .getRepository(DeliveryMemberEntity)
+          .findBy({ workspaceId: workspace.id });
+        const members = await this.members(manager, workspace);
+        const memberAccess = new Map(
+          (await this.access.listAccess(workspace.id, manager)).map(
+            (access) => [access.memberId, access],
+          ),
+        );
+        const visibleMemberIds = new Set([
+          memberId,
+          ...projects.flatMap((project) => project.memberIds),
+          ...tasks.flatMap((task) => [
+            task.assigneeId,
+            task.details.reviewerId,
+          ]),
+        ]);
+        const companies: { id: string; name: string }[] = actor.isManager
+          ? await manager.query(
+              `SELECT id, name FROM ${this.schema(workspace)}."company" WHERE "deletedAt" IS NULL ORDER BY name LIMIT 1000`,
+            )
+          : projects.some((project) => project.companyId)
+            ? await manager.query(
+                `SELECT id, name FROM ${this.schema(workspace)}."company" WHERE id = ANY($1::uuid[]) AND "deletedAt" IS NULL`,
+                [
+                  projects
+                    .map((project) => project.companyId)
+                    .filter(isDefined),
+                ],
+              )
+            : [];
+        const deliveryRows: { delivery: Fulfilment; timezone: string }[] =
+          tasks.length
+            ? await manager.query(
+                `SELECT jsonb_set(item, '{history}', CASE WHEN jsonb_array_length(item->'history') > 0 THEN jsonb_build_array(item->'history'->-1) ELSE '[]'::jsonb END) AS delivery, state->>'timezone' AS timezone FROM core."deliveryOperations", jsonb_array_elements(COALESCE(state->'fulfilments', '[]'::jsonb)) item WHERE "workspaceId"=$1 AND item->>'taskId'=ANY($2::text[])`,
+                [workspace.id, tasks.map((task) => task.id)],
+              )
+            : [];
+        const deliveries = new Map(
+          deliveryRows.map((row) => [row.delivery.taskId, row]),
+        );
+        return {
+          actor,
+          projects,
+          tasks: tasks.map((task) => ({
+            ...task,
+            details:
+              task.details.creative && !canReadFinance(actor)
+                ? {
+                    ...task.details,
+                    creative: { ...task.details.creative, revisionCharge: 0 },
+                  }
+                : task.details,
+            delivery: {
+              ...getDeliveryLifecycle(
+                task.details,
+                deliveries.get(task.id)?.delivery,
+              ),
+              timezone: deliveries.get(task.id)?.timezone ?? 'UTC',
+            },
+          })),
+          companies,
+          members: members
+            .filter(
+              (member) =>
+                memberAccess.has(member.id) &&
+                (actor.isManager || visibleMemberIds.has(member.id)),
+            )
+            .map((member) => {
+              const profile = profiles.find(
+                (candidate) => candidate.workspaceMemberId === member.id,
+              );
+              return {
+                ...member,
+                roleLabel: profile?.roleLabel ?? '',
+                access: memberAccess
+                  .get(member.id)
+                  ?.capabilities.includes('workspace.admin')
+                  ? 'ADMIN'
+                  : memberAccess
+                        .get(member.id)
+                        ?.capabilities.includes('delivery.manage')
+                    ? 'MANAGER'
+                    : 'MEMBER',
+              };
+            }),
+        };
+      },
+      transactionManager,
     );
-    const projectIds = projects.map((project) => project.id);
-    const tasks: (NativeTask & {
-      projectId: string;
-      details: DeliveryDetails;
-      revision: number;
-    })[] = projectIds.length
-      ? await this.dataSource.query(
-          `SELECT t.id, t.title, t."assigneeId", t."dueAt", d."projectId", d.details, d.revision FROM "core"."deliveryTask" d JOIN ${this.schema(workspace)}."task" t ON t.id = d."taskId" WHERE d."workspaceId" = $1 AND d."projectId" = ANY($2::uuid[]) AND t."deletedAt" IS NULL ORDER BY t."dueAt" ASC NULLS LAST, t."createdAt" DESC`,
-          [workspace.id, projectIds],
-        )
-      : [];
-    const profiles = await this.dataSource
-      .getRepository(DeliveryMemberEntity)
-      .findBy({ workspaceId: workspace.id });
-    const members = await this.members(this.dataSource.manager, workspace);
-    const visibleMemberIds = new Set([
-      memberId,
-      ...projects.flatMap((project) => project.memberIds),
-      ...tasks.flatMap((task) => [task.assigneeId, task.details.reviewerId]),
-    ]);
-    const companies: { id: string; name: string }[] = actor.isManager
-      ? await this.dataSource.query(
-          `SELECT id, name FROM ${this.schema(workspace)}."company" WHERE "deletedAt" IS NULL ORDER BY name LIMIT 1000`,
-        )
-      : projects.some((project) => project.companyId)
-        ? await this.dataSource.query(
-            `SELECT id, name FROM ${this.schema(workspace)}."company" WHERE id = ANY($1::uuid[]) AND "deletedAt" IS NULL`,
-            [projects.map((project) => project.companyId).filter(isDefined)],
-          )
-        : [];
-    return {
-      actor,
-      projects,
-      tasks,
-      companies,
-      members: members
-        .filter((member) => actor.isManager || visibleMemberIds.has(member.id))
-        .map((member) => {
-          const profile = profiles.find(
-            (candidate) => candidate.workspaceMemberId === member.id,
-          );
-          return {
-            ...member,
-            roleLabel: profile?.roleLabel ?? '',
-            access:
-              member.id === actor.memberId && actor.isAdmin
-                ? 'ADMIN'
-                : (profile?.access ?? 'MEMBER'),
-          };
-        }),
-    };
   }
 
   async command(
@@ -159,6 +258,7 @@ export class DeliveryService {
     userWorkspaceId: string,
     input: unknown,
     transactionManager?: EntityManager,
+    activityActor?: { actorType: 'SYSTEM' | 'CLIENT'; actorId: null },
   ) {
     const parsed = deliveryCommandSchema.safeParse(input);
     if (!parsed.success)
@@ -180,7 +280,6 @@ export class DeliveryService {
       );
       const projectRepository = manager.getRepository(DeliveryProjectEntity);
       const taskRepository = manager.getRepository(DeliveryTaskEntity);
-      const memberRepository = manager.getRepository(DeliveryMemberEntity);
       const members = await this.members(manager, workspace);
       const assertMembers = (ids: string[]) => {
         if (ids.some((id) => !members.some((member) => member.id === id)))
@@ -191,25 +290,9 @@ export class DeliveryService {
           throw new ForbiddenException('A delivery manager is required.');
       };
       if (command.action === 'member') {
-        if (!actor.isAdmin)
-          throw new ForbiddenException(
-            'Only an administrator can change access.',
-          );
-        if (command.workspaceMemberId === memberId)
-          throw new BadRequestException(
-            'Ask another administrator to change your access.',
-          );
-        assertMembers([command.workspaceMemberId]);
-        await memberRepository.upsert(
-          {
-            workspaceId: workspace.id,
-            workspaceMemberId: command.workspaceMemberId,
-            access: command.access,
-            roleLabel: command.roleLabel,
-          },
-          ['workspaceId', 'workspaceMemberId'],
+        throw new BadRequestException(
+          'Manage multiple roles in Team → People and roles. Reload the page to use the current role editor.',
         );
-        return;
       }
       if (command.action === 'project') {
         requireManager();
@@ -229,14 +312,52 @@ export class DeliveryService {
             })
           : null;
         if (command.id && !existing) throw new NotFoundException();
-        await projectRepository.save({
+        if (existing && existing.revision !== command.revision)
+          throw new ConflictException(
+            'This project changed. Refresh and reload the latest version before saving. Your draft has not been applied.',
+          );
+        const project = await projectRepository.save({
           ...existing,
           workspaceId: workspace.id,
           name: command.name,
           companyId: command.companyId,
           memberIds: [...new Set(command.memberIds)],
+          revision: (existing?.revision ?? 0) + 1,
         });
-        return;
+        await recordOtogrowActivity(manager, {
+          workspaceId: workspace.id,
+          actorId: activityActor ? activityActor.actorId : memberId,
+          actorType: activityActor?.actorType ?? 'HUMAN',
+          category: 'DELIVERY',
+          action: existing ? 'PROJECT_UPDATED' : 'PROJECT_CREATED',
+          outcome: 'RECORDED',
+          summary: existing
+            ? 'Updated a delivery project.'
+            : 'Created a delivery project.',
+          projectId: project.id,
+          sourceType: 'project',
+          sourceId: project.id,
+          changes: [
+            {
+              field: 'revision',
+              before: existing ? String(existing.revision) : null,
+              after: String(project.revision),
+            },
+            {
+              field: 'memberIds',
+              before: existing
+                ? [...existing.memberIds].sort().join(',')
+                : null,
+              after: [...project.memberIds].sort().join(','),
+            },
+            {
+              field: 'companyId',
+              before: existing?.companyId ?? null,
+              after: project.companyId,
+            },
+          ].filter((change) => change.before !== change.after),
+        });
+        return project.id;
       }
       const event = (action: string, text: string) => ({
         id: v4(),
@@ -259,17 +380,14 @@ export class DeliveryService {
           throw new BadRequestException(
             'Add the assignee to this project first.',
           );
-        // Workspace role administrators may review without an additional delivery profile.
-        const reviewerProfile = await memberRepository.findOneBy({
-          workspaceId: workspace.id,
-          workspaceMemberId: reviewerId,
-        });
-        if (
-          reviewerId !== memberId &&
-          !['ADMIN', 'MANAGER'].includes(reviewerProfile?.access ?? '')
-        )
+        const reviewerAccess = await this.access.getAccess(
+          workspace.id,
+          reviewerId,
+          manager,
+        );
+        if (!reviewerAccess.capabilities.includes('delivery.manage'))
           throw new BadRequestException(
-            'Give the reviewer manager access in Team access first.',
+            'Give the reviewer delivery management access in Team first.',
           );
       };
       if (command.action === 'create') {
@@ -286,7 +404,7 @@ export class DeliveryService {
           `INSERT INTO ${this.schema(workspace)}."task" (id, title, "assigneeId", "dueAt", status) VALUES ($1, $2, $3, $4, 'TODO')`,
           [taskId, fields.title, fields.assigneeId, fields.dueAt],
         );
-        await taskRepository.save({
+        const created = await taskRepository.save({
           workspaceId: workspace.id,
           taskId,
           projectId: project.id,
@@ -304,6 +422,50 @@ export class DeliveryService {
             submissions: [],
             events: [event('CREATED', fields.title)],
           },
+        });
+        if (command.workflow) {
+          const { published } = await getPublishedDeliveryWorkflow(
+            manager,
+            workspace.id,
+            command.workflow.templateId,
+            command.workflow.version,
+          );
+          await applyPublishedDeliveryWorkflow(
+            manager,
+            workspace,
+            created,
+            published,
+            activityActor ? activityActor.actorId : memberId,
+          );
+          await taskRepository.save(created);
+        }
+        await recordOtogrowActivity(manager, {
+          workspaceId: workspace.id,
+          actorId: activityActor ? activityActor.actorId : memberId,
+          actorType: activityActor?.actorType ?? 'HUMAN',
+          subjectMemberId: fields.assigneeId,
+          category: 'DELIVERY',
+          action: 'TASK_CREATED',
+          outcome: 'RECORDED',
+          summary:
+            activityActor?.actorType === 'SYSTEM'
+              ? 'Created a scheduled delivery task.'
+              : activityActor?.actorType === 'CLIENT'
+                ? 'Created and assigned a task from a client request.'
+                : 'Created and assigned a delivery task.',
+          projectId: project.id,
+          taskId,
+          sourceType: 'task',
+          sourceId: taskId,
+          changes: Object.entries({
+            state: 'PLANNED',
+            assigneeId: fields.assigneeId,
+            reviewerId: fields.reviewerId,
+            dueAt: fields.dueAt,
+            scheduledDate: fields.scheduledDate,
+            priority: fields.priority,
+            revision: String(created.revision),
+          }).map(([field, after]) => ({ field, before: null, after })),
         });
         return taskId;
       }
@@ -332,7 +494,36 @@ export class DeliveryService {
           'This task changed. Refresh it before saving.',
         );
       const details = deliveryTask.details;
-      if (command.action === 'edit') {
+      const before = {
+        ...planningActivity(details),
+        state: details.state,
+        assigneeId: task.assigneeId,
+        reviewerId: details.reviewerId,
+        dueAt: task.dueAt ? new Date(task.dueAt).toISOString() : null,
+        scheduledDate: details.scheduledDate,
+        priority: details.priority,
+        revision: String(deliveryTask.revision),
+        submissionVersion: String(details.submissions.length),
+        evidenceCount: String(details.evidence.length),
+        checklistCount: String(details.checklist.length),
+        checklistCompleted: String(
+          details.checklist.filter((item) => item.done).length,
+        ),
+      };
+      if (command.action === 'plan') {
+        requireManager();
+        if (details.state === 'APPROVED')
+          throw new BadRequestException(
+            'Approved work does not need a remaining effort estimate.',
+          );
+        details.plan = command.plan;
+        details.events.push(
+          event(
+            'PLANNING_UPDATED',
+            'Updated remaining effort and review planning.',
+          ),
+        );
+      } else if (command.action === 'edit') {
         requireManager();
         if (['IN_REVIEW', 'APPROVED'].includes(details.state))
           throw new BadRequestException(
@@ -364,7 +555,39 @@ export class DeliveryService {
           command.decision,
         );
         const submission = details.submissions[details.submissions.length - 1];
+        if (command.decision === 'CHANGES_REQUESTED')
+          await recordDeliveryRevision(
+            manager,
+            deliveryTask,
+            memberId,
+            'INTERNAL_REVIEW',
+            command.feedback,
+          );
+        if (command.decision === 'APPROVED') {
+          if (
+            details.workflow &&
+            (!submission.workflow ||
+              submission.workflow.revision !== details.workflow.revision ||
+              submission.workflow.templateId !== details.workflow.templateId ||
+              submission.workflow.version !== details.workflow.version)
+          )
+            throw new ConflictException(
+              'The submitted workflow requirements changed. Request a new submission.',
+            );
+        }
+        assertWorkflowReview(
+          submission.workflow,
+          command.workflowReview?.checkedIds,
+          command.decision === 'APPROVED',
+        );
         Object.assign(submission, {
+          ...(submission.workflow
+            ? {
+                workflowReview: {
+                  checkedIds: command.workflowReview?.checkedIds ?? [],
+                },
+              }
+            : {}),
           decision: command.decision,
           feedback: command.feedback,
           reviewedBy: memberId,
@@ -384,10 +607,14 @@ export class DeliveryService {
             'This submission is locked pending review.',
           );
         if (command.action === 'submit') {
+          assertWorkflowSubmission(details.workflow);
           if (details.creative) assertCreativeSubmission(details.creative);
           else if (!command.evidence.length)
             throw new BadRequestException('Add evidence before submitting.');
           details.submissions.push({
+            ...(details.workflow
+              ? { workflow: structuredClone(details.workflow) }
+              : {}),
             version: details.submissions.length + 1,
             ...(details.creative
               ? {
@@ -418,6 +645,11 @@ export class DeliveryService {
       }
       deliveryTask.revision += 1;
       await taskRepository.save(deliveryTask);
+      await syncStoredDeliveryCommitment(
+        manager,
+        deliveryTask,
+        activityActor ?? { actorId: memberId, actorType: 'HUMAN' },
+      );
       await manager.query(
         `UPDATE ${this.schema(workspace)}."task" SET status=$2, "updatedAt"=now() WHERE id=$1`,
         [
@@ -429,6 +661,68 @@ export class DeliveryService {
               : 'IN_PROGRESS',
         ],
       );
+      const after = {
+        ...planningActivity(details),
+        state: details.state,
+        assigneeId:
+          command.action === 'edit'
+            ? command.fields.assigneeId
+            : task.assigneeId,
+        reviewerId: details.reviewerId,
+        dueAt: command.action === 'edit' ? command.fields.dueAt : before.dueAt,
+        scheduledDate: details.scheduledDate,
+        priority: details.priority,
+        revision: String(deliveryTask.revision),
+        submissionVersion: String(details.submissions.length),
+        evidenceCount: String(details.evidence.length),
+        checklistCount: String(details.checklist.length),
+        checklistCompleted: String(
+          details.checklist.filter((item) => item.done).length,
+        ),
+      };
+      const activity = {
+        plan: {
+          action: 'TASK_PLANNING_UPDATED',
+          summary: 'Updated remaining effort and review planning.',
+        },
+        edit: { action: 'TASK_UPDATED', summary: 'Updated a delivery task.' },
+        progress: {
+          action: 'TASK_PROGRESS',
+          summary: 'Updated production progress.',
+        },
+        submit: {
+          action: 'TASK_SUBMITTED',
+          summary: 'Submitted a version for independent review.',
+        },
+        review: {
+          action: 'TASK_REVIEWED',
+          summary:
+            command.action === 'review' && command.decision === 'APPROVED'
+              ? 'Approved a submitted version.'
+              : 'Requested changes to a submitted version.',
+        },
+        comment: { action: 'TASK_COMMENTED', summary: 'Added a task note.' },
+      }[command.action];
+      await recordOtogrowActivity(manager, {
+        workspaceId: workspace.id,
+        actorId: activityActor ? activityActor.actorId : memberId,
+        actorType: activityActor?.actorType ?? 'HUMAN',
+        subjectMemberId: after.assigneeId,
+        category: 'DELIVERY',
+        ...activity,
+        outcome: command.action === 'review' ? command.decision : 'RECORDED',
+        projectId: project.id,
+        taskId: task.id,
+        sourceType: 'task',
+        sourceId: task.id,
+        changes: (Object.keys(after) as (keyof typeof after)[])
+          .filter((field) => before[field] !== after[field])
+          .map((field) => ({
+            field,
+            before: before[field],
+            after: after[field],
+          })),
+      });
     };
     if (transactionManager) {
       return apply(transactionManager);

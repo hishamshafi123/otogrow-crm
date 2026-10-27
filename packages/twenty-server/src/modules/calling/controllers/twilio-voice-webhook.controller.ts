@@ -25,6 +25,13 @@ import { PublicEndpointGuard } from 'src/engine/guards/public-endpoint.guard';
 import { TwilioConfigEntity } from 'src/engine/metadata-modules/twilio-config/entities/twilio-config.entity';
 import { TwilioConfigService } from 'src/engine/metadata-modules/twilio-config/twilio-config.service';
 import { CallLogService } from 'src/modules/calling/services/call-log.service';
+import { CallAccessService } from 'src/modules/calling/services/call-access.service';
+import { OtogrowAccessService } from 'src/modules/otogrow-access/otogrow-access.service';
+import { type UserWorkspaceAuthContext } from 'src/engine/core-modules/auth/types/workspace-auth-context.type';
+import {
+  PermissionsException,
+  PermissionsExceptionCode,
+} from 'src/engine/metadata-modules/permissions/permissions.exception';
 import { verifyTwilioSignature } from 'src/modules/messaging/channels/utils/twilio-signature-verifier.util';
 
 const TWILIO_VOICE_WEBHOOK_THROTTLE_LIMIT = 100;
@@ -45,6 +52,8 @@ export class TwilioVoiceWebhookController {
     private readonly callLogService: CallLogService,
     private readonly throttlerService: ThrottlerService,
     private readonly twentyConfigService: TwentyConfigService,
+    private readonly access: OtogrowAccessService,
+    private readonly callAccess: CallAccessService,
   ) {}
 
   @Post(`${ApiPath.Webhooks}/twilio/:workspaceId/voice`)
@@ -58,16 +67,30 @@ export class TwilioVoiceWebhookController {
     await this.throttle(workspaceId, request);
     const config = await this.assertValidSignature(workspaceId, request, body);
 
-    // Preflight test calls carry a temporary TJS… CallSid; answer and hold
-    // the line open so the SDK can measure the RTP path both ways.
-    if (body.CallSid?.startsWith('TJS')) {
-      return `<?xml version="1.0" encoding="UTF-8"?><Response><Say>${escapeXml('Otogrow connection check in progress.')}</Say><Pause length="60"/></Response>`;
-    }
-
-    const isOutboundSdkCall = body.CallDirection === 'outbound';
+    if (!config.isActive)
+      return this.sayTwiml('Calling is disabled for this workspace.');
+    const isClientIdentity = body.From?.startsWith('client:');
+    const isPreflight = body.CallSid?.startsWith('TJS');
+    const isOutboundSdkCall =
+      isClientIdentity || body.CallDirection === 'outbound' || isPreflight;
 
     if (isOutboundSdkCall) {
-      return this.buildOutboundTwiml(workspaceId, config, body);
+      let caller: UserWorkspaceAuthContext;
+      try {
+        caller = await this.callAccess.requireMemberContext(
+          workspaceId,
+          isClientIdentity ? body.From.slice('client:'.length) : undefined,
+        );
+      } catch (error) {
+        if (!(error instanceof ForbiddenException)) throw error;
+        return this.sayTwiml(
+          'Calling is not available for your current role. Ask an administrator to review your access.',
+        );
+      }
+      // The diagnostic is still a voice session, so old tokens must pass the same current access check.
+      if (isPreflight)
+        return `<?xml version="1.0" encoding="UTF-8"?><Response><Say>${escapeXml('Otogrow connection check in progress.')}</Say><Pause length="60"/></Response>`;
+      return this.buildOutboundTwiml(workspaceId, config, body, caller);
     }
 
     return this.handleInboundCall(workspaceId, body);
@@ -135,6 +158,7 @@ export class TwilioVoiceWebhookController {
     workspaceId: string,
     config: TwilioConfigEntity,
     body: Record<string, string>,
+    callerAuthContext: UserWorkspaceAuthContext,
   ): Promise<string> {
     if (!isDefined(config.voiceNumber)) {
       return this.sayTwiml('Calling is not configured for this workspace.');
@@ -163,13 +187,26 @@ export class TwilioVoiceWebhookController {
       return this.sayTwiml('The number you dialed is invalid.');
     }
 
-    await this.callLogService.upsertOutboundCall({
-      workspaceId,
-      callSid: body.CallSid,
-      fromNumber: config.voiceNumber,
-      toNumber: normalizedTo,
-      personId: isNonEmptyString(body.PersonId) ? body.PersonId : null,
-    });
+    try {
+      await this.callLogService.upsertOutboundCall({
+        workspaceId,
+        callSid: body.CallSid,
+        fromNumber: config.voiceNumber,
+        toNumber: normalizedTo,
+        personId: isNonEmptyString(body.PersonId) ? body.PersonId : null,
+        callerAuthContext,
+      });
+    } catch (error) {
+      if (
+        error instanceof ForbiddenException ||
+        (error instanceof PermissionsException &&
+          error.code === PermissionsExceptionCode.PERMISSION_DENIED)
+      )
+        return this.sayTwiml(
+          'This contact is not available for your current access.',
+        );
+      throw error;
+    }
 
     const serverUrl = this.twentyConfigService.get('SERVER_URL');
     const statusCallback = `${serverUrl}/${ApiPath.Webhooks}/twilio/${workspaceId}/voice/status`;
@@ -205,8 +242,10 @@ export class TwilioVoiceWebhookController {
     const recordingStatusCallback = `${serverUrl}/${ApiPath.Webhooks}/twilio/${workspaceId}/voice/recording`;
     const voicemailVerbs = this.voicemailTwimlVerbs(recordingStatusCallback);
 
-    const memberIdentities =
-      await this.callLogService.listWorkspaceMemberIds(workspaceId);
+    const memberIdentities = await this.access.listMemberIdsWithCapability(
+      workspaceId,
+      'phone.use',
+    );
 
     if (memberIdentities.length === 0) {
       return `<?xml version="1.0" encoding="UTF-8"?><Response>${voicemailVerbs}</Response>`;

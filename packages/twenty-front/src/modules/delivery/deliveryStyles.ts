@@ -1,4 +1,5 @@
 import { styled } from '@linaria/react';
+import { GRAY_SCALE_LIGHT } from 'twenty-ui/theme';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
 
 export const StyledDeliveryCanvas = styled.div`
@@ -40,7 +41,7 @@ export const StyledDeliveryCanvas = styled.div`
     cursor: pointer;
   }
   button:disabled {
-    cursor: wait;
+    cursor: not-allowed;
     opacity: 0.55;
   }
   button:focus-visible,
@@ -50,6 +51,17 @@ export const StyledDeliveryCanvas = styled.div`
   textarea:focus-visible {
     outline: 3px solid ${themeCssVariables.color.blue8};
     outline-offset: 3px;
+  }
+  summary {
+    cursor: pointer;
+    min-height: 24px;
+  }
+  summary:focus-visible {
+    outline: 3px solid ${themeCssVariables.color.blue8};
+    outline-offset: 3px;
+  }
+  details[open] > summary {
+    margin-bottom: 16px;
   }
   input,
   select,
@@ -134,12 +146,12 @@ export const StyledDeliveryButton = styled.button`
   &[data-primary='true'] {
     background: ${themeCssVariables.color.blue9};
     border-color: ${themeCssVariables.color.blue9};
-    color: ${themeCssVariables.font.color.inverted};
+    color: ${GRAY_SCALE_LIGHT.gray1};
   }
   &[aria-current='page'] {
     background: ${themeCssVariables.color.blue3};
     border-color: ${themeCssVariables.color.blue6};
-    color: ${themeCssVariables.color.blue9};
+    color: ${themeCssVariables.color.blue11};
   }
 `;
 export const StyledDeliveryTaskButton = styled.button`

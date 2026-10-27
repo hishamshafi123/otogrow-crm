@@ -1,7 +1,12 @@
+import { DeliveryGuardedForm } from '@/delivery/drafts/DeliveryGuardedForm';
+import {
+  useDeliveryDraftGuard,
+  useDeliveryDraftStatus,
+} from '@/delivery/drafts/DeliveryDraftGuard';
 import { gql } from '@apollo/client';
 import { useMutation, useQuery } from '@apollo/client/react';
 import { Trans, useLingui } from '@lingui/react/macro';
-import { useEffect, useState, type FormEvent } from 'react';
+import { useState } from 'react';
 import {
   type DeliveryTask,
   type DeliveryWorkspace,
@@ -50,15 +55,31 @@ export const DeliveryOperations = ({
     changeDeliveryOperations: OperationsSnapshot;
   }>(CHANGE_OPERATIONS);
   const [error, setError] = useState('');
+  const [changing, setChanging] = useState(false);
+  const busy = changing || mutation.loading;
+  const { requestAction } = useDeliveryDraftGuard();
+  useDeliveryDraftStatus({ dirty: false, saving: busy });
   const [link, setLink] = useState<string | null>(null);
   const [editing, setEditing] = useState<RecurringTemplate | null>(null);
   const data = query.data?.deliveryOperations;
   const actor = workspace.actor;
   const manager = actor.isManager;
   const run = async (input: Record<string, unknown>) => {
+    setError('');
+    setChanging(true);
+    let result;
     try {
-      setError('');
-      const result = await mutate({ variables: { input } });
+      result = await mutate({ variables: { input } });
+    } catch (failure) {
+      setError(
+        failure instanceof Error
+          ? failure.message
+          : t`Could not save this operation.`,
+      );
+      setChanging(false);
+      return false;
+    }
+    try {
       if (result.data) {
         query.client.writeQuery({
           query: GET_OPERATIONS,
@@ -68,28 +89,15 @@ export const DeliveryOperations = ({
           setLink(result.data.changeDeliveryOperations.link);
       }
       await onChanged();
-      return true;
-    } catch (failure) {
+    } catch {
       setError(
-        failure instanceof Error
-          ? failure.message
-          : t`Could not save this operation.`,
+        t`The operation was saved, but this page could not refresh. Refresh before making another change.`,
       );
-      return false;
     }
+    setChanging(false);
+    return true;
   };
   const taskId = task?.id;
-  const refetch = query.refetch;
-  useEffect(() => {
-    if (!taskId) return;
-    void mutate({ variables: { input: { action: 'seen', taskId } } })
-      .then(() => refetch())
-      .catch(() =>
-        setError(
-          t`Could not mark this task as seen. Use Acknowledge in Follow-through.`,
-        ),
-      );
-  }, [taskId, mutate, refetch, t]);
   const labels: Record<string, string> = {
     DAILY: t`Daily`,
     WEEKLY: t`Weekly`,
@@ -100,11 +108,12 @@ export const DeliveryOperations = ({
     NOT_FULFILLED: t`Not fulfilled`,
     DELIVERED: t`Delivery recorded`,
     PENDING: t`Waiting`,
+    QUEUED: t`Queued for Telegram`,
     SENDING: t`Sending`,
     SENT: t`Telegram sent`,
     UNCONFIGURED: t`Telegram unavailable`,
     FAILED: t`Send failed`,
-    UNCERTAIN: t`Delivery uncertain`,
+    UNCERTAIN: t`Delivery uncertain — check Telegram before following up. No automatic resend.`,
     SUPPRESSED: t`No ping needed`,
     NORMAL: t`Normal`,
     URGENT: t`Urgent`,
@@ -121,20 +130,34 @@ export const DeliveryOperations = ({
     new Date(value).toLocaleString(undefined, {
       timeZone: data?.timezone ?? 'UTC',
     });
-  const submit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    return new FormData(event.currentTarget);
-  };
   const field = (form: FormData, key: string) =>
     String(form.get(key) ?? '').trim();
-  if (query.error) return <p role="alert">{query.error.message}</p>;
+  if (query.error && !data) return <p role="alert">{query.error.message}</p>;
   if (!data)
     return (
       <p>
-        <Trans>Loading follow-through…</Trans>
+        <Trans>Loading delivery and reminders…</Trans>
       </p>
     );
+  const formTemplate =
+    data.templates.find((template) => template.id === editing?.id) ?? editing;
+  const templateSnapshot = JSON.stringify(
+    formTemplate
+      ? {
+          ...formTemplate,
+          skipped: undefined,
+          error: undefined,
+          lastDate: undefined,
+          lastTaskId: undefined,
+        }
+      : null,
+  );
   const fulfilment = data.fulfilments.find((item) => item.taskId === taskId);
+  const currentDelivery =
+    task?.details.state === 'APPROVED' &&
+    task.details.submissions.at(-1)?.decision === 'APPROVED' &&
+    task.details.submissions.at(-1)?.version ===
+      fulfilment?.deliveredSubmissionVersion;
   const notices = data.notices.filter((item) =>
     task ? item.taskId === task.id : item.recipientId === actor.memberId,
   );
@@ -145,14 +168,16 @@ export const DeliveryOperations = ({
   ));
   return (
     <StyledDeliveryStack>
-      {error && <p role="alert">{error}</p>}
+      {(error || query.error) && (
+        <p role="alert">{error || query.error?.message}</p>
+      )}
       <StyledDeliveryRow>
         <StyledDeliveryBadge>{data.timezone}</StyledDeliveryBadge>
         <StyledDeliveryBadge>
           {data.enabled ? t`Schedules enabled` : t`Schedules paused`}
         </StyledDeliveryBadge>
         <StyledDeliveryButton onClick={() => void query.refetch()}>
-          <Trans>Refresh follow-through</Trans>
+          <Trans>Refresh delivery and reminders</Trans>
         </StyledDeliveryButton>
       </StyledDeliveryRow>
       {task && (
@@ -167,6 +192,17 @@ export const DeliveryOperations = ({
                   ? `${label(fulfilment.status)} · ${t`Delivery cycle`} ${fulfilment.cycle}`
                   : t`No delivery recorded. Approval alone does not confirm delivery.`}
               </p>
+              {fulfilment &&
+                !currentDelivery &&
+                fulfilment.status !== 'REDOING' && (
+                  <p role="status">
+                    <Trans>
+                      This delivery belongs to an earlier or unverified version.
+                      Approve and record delivery of the current version before
+                      confirming fulfilment.
+                    </Trans>
+                  </p>
+                )}
               {fulfilment && (
                 <>
                   <p>
@@ -189,98 +225,96 @@ export const DeliveryOperations = ({
                   </details>
                 </>
               )}
-              {manager &&
-                task.assigneeId !== actor.memberId &&
-                task.details.state === 'APPROVED' &&
-                fulfilment?.status !== 'WAITING' && (
-                  <form
-                    onSubmit={async (event) => {
-                      const form = submit(event);
-                      await run({
-                        action: 'delivered',
-                        taskId,
-                        revision: task.revision,
-                        note: field(form, 'note'),
-                      });
-                    }}
-                  >
-                    <StyledDeliveryStack>
-                      <label>
-                        <Trans>Delivery evidence or note</Trans>
-                        <textarea
-                          name="note"
-                          required
-                          maxLength={2000}
-                          placeholder={t`Where and when did you send the work?`}
-                        />
-                      </label>
-                      <StyledDeliveryButton
-                        type="submit"
-                        disabled={mutation.loading}
-                      >
-                        <Trans>Record delivery now</Trans>
-                      </StyledDeliveryButton>
-                    </StyledDeliveryStack>
-                  </form>
-                )}
-              {manager &&
-                task.assigneeId !== actor.memberId &&
-                fulfilment?.status === 'WAITING' && (
-                  <form
-                    onSubmit={async (event) => {
-                      const form = submit(event);
-                      await run({
-                        action: 'fulfilment',
-                        taskId,
-                        cycle: fulfilment.cycle,
-                        historyLength: fulfilment.history.length,
-                        decision: field(form, 'decision'),
-                        note: field(form, 'note'),
-                      });
-                    }}
-                  >
-                    <StyledDeliveryStack>
-                      <label>
-                        <Trans>Fulfilment decision</Trans>
-                        <select name="decision">
-                          <option value="FULFILLED">{t`Fulfilled`}</option>
-                          <option value="NOT_FULFILLED">{t`Not fulfilled — ask again in 12 hours`}</option>
-                          <option value="REDOING">{t`Redoing — return to revision`}</option>
-                        </select>
-                      </label>
-                      <label>
-                        <Trans>Decision note</Trans>
-                        <textarea name="note" required maxLength={2000} />
-                      </label>
-                      <StyledDeliveryButton
-                        type="submit"
-                        disabled={mutation.loading}
-                      >
-                        <Trans>Save fulfilment decision</Trans>
-                      </StyledDeliveryButton>
-                    </StyledDeliveryStack>
-                  </form>
-                )}
+              <DeliveryGuardedForm
+                revision={task.revision}
+                busy={busy}
+                visible={
+                  manager &&
+                  task.assigneeId !== actor.memberId &&
+                  task.details.state === 'APPROVED' &&
+                  (fulfilment?.status !== 'WAITING' || !currentDelivery)
+                }
+                onSave={(form, revision) =>
+                  run({
+                    action: 'delivered',
+                    taskId,
+                    revision,
+                    note: field(form, 'note'),
+                  })
+                }
+              >
+                <StyledDeliveryStack>
+                  <label>
+                    <Trans>Delivery evidence or note</Trans>
+                    <textarea
+                      name="note"
+                      required
+                      maxLength={2000}
+                      placeholder={t`Where and when did you send the work?`}
+                    />
+                  </label>
+                  <StyledDeliveryButton type="submit" disabled={busy}>
+                    <Trans>Record delivery now</Trans>
+                  </StyledDeliveryButton>
+                </StyledDeliveryStack>
+              </DeliveryGuardedForm>
+              <DeliveryGuardedForm
+                revision={task.revision}
+                snapshot={JSON.stringify(fulfilment)}
+                busy={busy}
+                visible={
+                  manager &&
+                  task.assigneeId !== actor.memberId &&
+                  fulfilment?.status === 'WAITING' &&
+                  currentDelivery
+                }
+                onSave={(form) =>
+                  run({
+                    action: 'fulfilment',
+                    taskId,
+                    cycle: fulfilment?.cycle,
+                    historyLength: fulfilment?.history.length,
+                    decision: field(form, 'decision'),
+                    note: field(form, 'note'),
+                  })
+                }
+              >
+                <StyledDeliveryStack>
+                  <label>
+                    <Trans>Fulfilment decision</Trans>
+                    <select name="decision">
+                      <option value="FULFILLED">{t`Fulfilled`}</option>
+                      <option value="NOT_FULFILLED">{t`Not fulfilled — ask again in 12 hours`}</option>
+                      <option value="REDOING">{t`Redoing — return to revision`}</option>
+                    </select>
+                  </label>
+                  <label>
+                    <Trans>Decision note</Trans>
+                    <textarea name="note" required maxLength={2000} />
+                  </label>
+                  <StyledDeliveryButton type="submit" disabled={busy}>
+                    <Trans>Save fulfilment decision</Trans>
+                  </StyledDeliveryButton>
+                </StyledDeliveryStack>
+              </DeliveryGuardedForm>
             </StyledDeliveryStack>
           </StyledDeliveryCard>
           <StyledDeliveryCard>
             <h3>
               <Trans>Address an internal message</Trans>
             </h3>
-            <form
-              onSubmit={async (event) => {
-                const element = event.currentTarget;
-                const form = submit(event);
-                if (
-                  await run({
-                    action: 'message',
-                    taskId,
-                    recipientId: field(form, 'recipientId'),
-                    text: field(form, 'text'),
-                  })
-                )
-                  element.reset();
-              }}
+            <DeliveryGuardedForm
+              key={task.id}
+              revision={0}
+              busy={busy}
+              onSave={(form) =>
+                run({
+                  action: 'message',
+                  taskId,
+                  recipientId: field(form, 'recipientId'),
+                  text: field(form, 'text'),
+                })
+              }
             >
               <StyledDeliveryStack>
                 <label>
@@ -296,32 +330,35 @@ export const DeliveryOperations = ({
                 <small>
                   <Trans>
                     One Telegram ping after five minutes if unread and
-                    unacknowledged. Opening this task counts as seen.
+                    unacknowledged, at any time of day. The recipient can mark
+                    this message as read or acknowledge it to stop the ping.
                   </Trans>
                 </small>
-                <StyledDeliveryButton type="submit" disabled={mutation.loading}>
+                <StyledDeliveryButton type="submit" disabled={busy}>
                   <Trans>Send internal message</Trans>
                 </StyledDeliveryButton>
               </StyledDeliveryStack>
-            </form>
+            </DeliveryGuardedForm>
           </StyledDeliveryCard>
           {manager && (
             <StyledDeliveryCard>
               <h3>
                 <Trans>Flag for founder</Trans>
               </h3>
-              <form
-                onSubmit={async (event) => {
-                  const form = submit(event);
-                  await run({
+              <DeliveryGuardedForm
+                key={task.id}
+                revision={0}
+                busy={busy}
+                onSave={(form) =>
+                  run({
                     action: 'alert',
                     taskId,
                     category: field(form, 'category'),
                     severity: field(form, 'severity'),
                     ownerId: field(form, 'ownerId'),
                     reason: field(form, 'reason'),
-                  });
-                }}
+                  })
+                }
               >
                 <StyledDeliveryStack>
                   <label>
@@ -352,14 +389,11 @@ export const DeliveryOperations = ({
                     <Trans>Reason</Trans>
                     <textarea name="reason" required maxLength={2000} />
                   </label>
-                  <StyledDeliveryButton
-                    type="submit"
-                    disabled={mutation.loading}
-                  >
+                  <StyledDeliveryButton type="submit" disabled={busy}>
                     <Trans>Flag issue</Trans>
                   </StyledDeliveryButton>
                 </StyledDeliveryStack>
-              </form>
+              </DeliveryGuardedForm>
             </StyledDeliveryCard>
           )}
         </>
@@ -402,15 +436,29 @@ export const DeliveryOperations = ({
                 )}
                 {onOpenTask && !notice.taskId.startsWith('meta-report:') && (
                   <StyledDeliveryButton
-                    onClick={() => onOpenTask(notice.taskId)}
+                    onClick={() =>
+                      requestAction(() => onOpenTask(notice.taskId))
+                    }
                   >
                     <Trans>Open task</Trans>
                   </StyledDeliveryButton>
                 )}
                 {notice.recipientId === actor.memberId &&
+                  !notice.seenAt &&
                   !notice.acknowledgedAt && (
                     <StyledDeliveryButton
-                      disabled={mutation.loading}
+                      disabled={busy}
+                      onClick={() =>
+                        void run({ action: 'noticeSeen', id: notice.id })
+                      }
+                    >
+                      <Trans>Mark as read</Trans>
+                    </StyledDeliveryButton>
+                  )}
+                {notice.recipientId === actor.memberId &&
+                  !notice.acknowledgedAt && (
+                    <StyledDeliveryButton
+                      disabled={busy}
                       onClick={() =>
                         void run({ action: 'acknowledge', id: notice.id })
                       }
@@ -441,7 +489,9 @@ export const DeliveryOperations = ({
                         : t`Waiting for revised approval and redelivery`}
                     </p>
                     <StyledDeliveryButton
-                      onClick={() => onOpenTask?.(item.taskId)}
+                      onClick={() =>
+                        requestAction(() => onOpenTask?.(item.taskId))
+                      }
                     >
                       <Trans>Open delivery</Trans>
                     </StyledDeliveryButton>
@@ -474,12 +524,14 @@ export const DeliveryOperations = ({
                       {template.error && <p role="alert">{template.error}</p>}
                       <StyledDeliveryRow>
                         <StyledDeliveryButton
-                          onClick={() => setEditing(template)}
+                          onClick={() =>
+                            requestAction(() => setEditing(template))
+                          }
                         >
                           <Trans>Edit template</Trans>
                         </StyledDeliveryButton>
                         <StyledDeliveryButton
-                          disabled={mutation.loading}
+                          disabled={busy}
                           onClick={() =>
                             void run({
                               action: 'pause',
@@ -492,7 +544,11 @@ export const DeliveryOperations = ({
                         </StyledDeliveryButton>
                         {template.lastTaskId && (
                           <StyledDeliveryButton
-                            onClick={() => onOpenTask?.(template.lastTaskId!)}
+                            onClick={() =>
+                              requestAction(() =>
+                                onOpenTask?.(template.lastTaskId!),
+                              )
+                            }
                           >
                             <Trans>Last task</Trans>
                           </StyledDeliveryButton>
@@ -508,10 +564,12 @@ export const DeliveryOperations = ({
                     ? t`Edit recurring template`
                     : t`New recurring template`}
                 </h3>
-                <form
+                <DeliveryGuardedForm
+                  revision={0}
+                  snapshot={templateSnapshot}
+                  busy={busy}
                   key={editing?.id ?? 'new'}
-                  onSubmit={async (event) => {
-                    const form = submit(event);
+                  onSave={async (form) => {
                     const checklist = field(form, 'checklist')
                       .split('\n')
                       .map((text) => text.trim())
@@ -527,6 +585,10 @@ export const DeliveryOperations = ({
                         template: {
                           ...(editing ? { id: editing.id } : {}),
                           projectId: field(form, 'projectId'),
+                          workflow: workflowPinFromForm(
+                            form,
+                            formTemplate?.workflow,
+                          ),
                           frequency: field(form, 'frequency'),
                           weekdays: form.getAll('weekdays').map(Number),
                           monthDay: Number(field(form, 'monthDay')),
@@ -549,8 +611,11 @@ export const DeliveryOperations = ({
                           },
                         },
                       })
-                    )
+                    ) {
                       setEditing(null);
+                      return true;
+                    }
+                    return false;
                   }}
                 >
                   <StyledDeliveryStack>
@@ -561,7 +626,7 @@ export const DeliveryOperations = ({
                           name="title"
                           required
                           maxLength={200}
-                          defaultValue={editing?.fields.title}
+                          defaultValue={formTemplate?.fields.title}
                         />
                       </label>
                       <label>
@@ -569,7 +634,7 @@ export const DeliveryOperations = ({
                         <select
                           name="projectId"
                           required
-                          defaultValue={editing?.projectId}
+                          defaultValue={formTemplate?.projectId}
                         >
                           {workspace.projects.map((project) => (
                             <option key={project.id} value={project.id}>
@@ -583,7 +648,7 @@ export const DeliveryOperations = ({
                         <input
                           name="service"
                           maxLength={100}
-                          defaultValue={editing?.fields.service}
+                          defaultValue={formTemplate?.fields.service}
                           placeholder={t`SEO, advertising, design…`}
                         />
                       </label>
@@ -592,7 +657,7 @@ export const DeliveryOperations = ({
                         <select
                           name="assigneeId"
                           required
-                          defaultValue={editing?.fields.assigneeId}
+                          defaultValue={formTemplate?.fields.assigneeId}
                         >
                           {memberOptions}
                         </select>
@@ -603,7 +668,7 @@ export const DeliveryOperations = ({
                           name="reviewerId"
                           required
                           defaultValue={
-                            editing?.fields.reviewerId ?? actor.memberId
+                            formTemplate?.fields.reviewerId ?? actor.memberId
                           }
                         >
                           {workspace.members
@@ -621,7 +686,7 @@ export const DeliveryOperations = ({
                         <Trans>Frequency</Trans>
                         <select
                           name="frequency"
-                          defaultValue={editing?.frequency ?? 'WEEKLY'}
+                          defaultValue={formTemplate?.frequency ?? 'WEEKLY'}
                         >
                           <option value="DAILY">{t`Daily`}</option>
                           <option value="WEEKLY">{t`Weekly`}</option>
@@ -634,7 +699,7 @@ export const DeliveryOperations = ({
                           type="time"
                           name="time"
                           required
-                          defaultValue={editing?.time ?? '09:00'}
+                          defaultValue={formTemplate?.time ?? '09:00'}
                         />
                       </label>
                       <label>
@@ -645,7 +710,7 @@ export const DeliveryOperations = ({
                           min={1}
                           max={31}
                           required
-                          defaultValue={editing?.monthDay ?? 1}
+                          defaultValue={formTemplate?.monthDay ?? 1}
                         />
                       </label>
                       <label>
@@ -655,7 +720,7 @@ export const DeliveryOperations = ({
                           name="startDate"
                           required
                           defaultValue={
-                            editing?.startDate ??
+                            formTemplate?.startDate ??
                             new Date().toISOString().slice(0, 10)
                           }
                         />
@@ -665,7 +730,7 @@ export const DeliveryOperations = ({
                         <input
                           type="date"
                           name="endDate"
-                          defaultValue={editing?.endDate ?? ''}
+                          defaultValue={formTemplate?.endDate ?? ''}
                         />
                       </label>
                       <label>
@@ -676,7 +741,7 @@ export const DeliveryOperations = ({
                           min={1}
                           max={744}
                           required
-                          defaultValue={editing?.dueHours ?? 24}
+                          defaultValue={formTemplate?.dueHours ?? 24}
                         />
                       </label>
                     </StyledDeliveryGrid>
@@ -700,7 +765,7 @@ export const DeliveryOperations = ({
                               name="weekdays"
                               value={index}
                               defaultChecked={(
-                                editing?.weekdays ?? [1]
+                                formTemplate?.weekdays ?? [1]
                               ).includes(index)}
                             />
                             {day}
@@ -713,14 +778,15 @@ export const DeliveryOperations = ({
                       <textarea
                         name="brief"
                         maxLength={20000}
-                        defaultValue={editing?.fields.brief}
+                        defaultValue={formTemplate?.fields.brief}
                       />
                     </label>
+                    <WorkflowPinField initial={formTemplate?.workflow} />
                     <label>
                       <Trans>Checklist (one item per line)</Trans>
                       <textarea
                         name="checklist"
-                        defaultValue={editing?.fields.checklist
+                        defaultValue={formTemplate?.fields.checklist
                           .map((item) => item.text)
                           .join('\n')}
                       />
@@ -729,30 +795,28 @@ export const DeliveryOperations = ({
                       <input
                         type="checkbox"
                         name="paused"
-                        defaultChecked={editing?.paused ?? false}
+                        defaultChecked={formTemplate?.paused ?? false}
                       />
                       <Trans>Keep this template paused</Trans>
                     </label>
                     <StyledDeliveryRow>
                       <StyledDeliveryButton
                         type="submit"
-                        disabled={
-                          mutation.loading || !workspace.projects.length
-                        }
+                        disabled={busy || !workspace.projects.length}
                       >
                         <Trans>Save recurring template</Trans>
                       </StyledDeliveryButton>
                       {editing && (
                         <StyledDeliveryButton
                           type="button"
-                          onClick={() => setEditing(null)}
+                          onClick={() => requestAction(() => setEditing(null))}
                         >
                           <Trans>Cancel edit</Trans>
                         </StyledDeliveryButton>
                       )}
                     </StyledDeliveryRow>
                   </StyledDeliveryStack>
-                </form>
+                </DeliveryGuardedForm>
               </StyledDeliveryCard>
             </>
           )}
@@ -778,14 +842,16 @@ export const DeliveryOperations = ({
                     </small>
                     <StyledDeliveryRow>
                       <StyledDeliveryButton
-                        onClick={() => onOpenTask?.(alert.taskId)}
+                        onClick={() =>
+                          requestAction(() => onOpenTask?.(alert.taskId))
+                        }
                       >
                         <Trans>Open task</Trans>
                       </StyledDeliveryButton>
                       {!alert.resolvedAt && (
                         <>
                           <StyledDeliveryButton
-                            disabled={mutation.loading}
+                            disabled={busy}
                             onClick={() =>
                               void run({
                                 action: 'resolveAlert',
@@ -797,7 +863,7 @@ export const DeliveryOperations = ({
                             <Trans>Acknowledge alert</Trans>
                           </StyledDeliveryButton>
                           <StyledDeliveryButton
-                            disabled={mutation.loading}
+                            disabled={busy}
                             onClick={() =>
                               void run({
                                 action: 'resolveAlert',
@@ -835,13 +901,13 @@ export const DeliveryOperations = ({
               </p>
               <StyledDeliveryRow>
                 <StyledDeliveryButton
-                  disabled={!data.botAvailable || mutation.loading}
+                  disabled={!data.botAvailable || busy}
                   onClick={() => void run({ action: 'linkTelegram' })}
                 >
                   <Trans>Create private link</Trans>
                 </StyledDeliveryButton>
                 <StyledDeliveryButton
-                  disabled={mutation.loading}
+                  disabled={busy}
                   onClick={async () => {
                     if (await run({ action: 'unlinkTelegram' })) setLink(null);
                   }}
@@ -883,18 +949,24 @@ export const DeliveryOperations = ({
               <h3>
                 <Trans>Follow-through settings</Trans>
               </h3>
-              <form
-                key={`${data.timezone}-${data.enabled}-${data.telegramEnabled}-${data.founderId}`}
-                onSubmit={async (event) => {
-                  const form = submit(event);
-                  await run({
+              <DeliveryGuardedForm
+                revision={0}
+                busy={busy}
+                snapshot={JSON.stringify({
+                  timezone: data.timezone,
+                  enabled: data.enabled,
+                  telegramEnabled: data.telegramEnabled,
+                  founderId: data.founderId,
+                })}
+                onSave={(form) =>
+                  run({
                     action: 'settings',
                     timezone: field(form, 'timezone'),
                     enabled: form.has('enabled'),
                     telegramEnabled: form.has('telegramEnabled'),
                     founderId: field(form, 'founderId') || null,
-                  });
-                }}
+                  })
+                }
               >
                 <StyledDeliveryStack>
                   <label>
@@ -949,14 +1021,11 @@ export const DeliveryOperations = ({
                       Telegram messages are not automatically resent.
                     </Trans>
                   </small>
-                  <StyledDeliveryButton
-                    type="submit"
-                    disabled={mutation.loading}
-                  >
+                  <StyledDeliveryButton type="submit" disabled={busy}>
                     <Trans>Save follow-through settings</Trans>
                   </StyledDeliveryButton>
                 </StyledDeliveryStack>
-              </form>
+              </DeliveryGuardedForm>
             </StyledDeliveryCard>
           )}
         </>
@@ -964,3 +1033,7 @@ export const DeliveryOperations = ({
     </StyledDeliveryStack>
   );
 };
+import {
+  WorkflowPinField,
+  workflowPinFromForm,
+} from '@/delivery/workflows/WorkflowPinField';

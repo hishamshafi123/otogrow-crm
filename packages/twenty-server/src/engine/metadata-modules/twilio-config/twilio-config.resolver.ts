@@ -10,7 +10,8 @@ import { TwentyConfigService } from 'src/engine/core-modules/twenty-config/twent
 import { WorkspaceEntity } from 'src/engine/core-modules/workspace/workspace.entity';
 import { AuthWorkspace } from 'src/engine/decorators/auth/auth-workspace.decorator';
 import { AuthWorkspaceMemberId } from 'src/engine/decorators/auth/auth-workspace-member-id.decorator';
-import { NoPermissionGuard } from 'src/engine/guards/no-permission.guard';
+import { CustomPermissionGuard } from 'src/engine/guards/custom-permission.guard';
+import { RequireAccessTokenGuard } from 'src/engine/guards/require-access-token.guard';
 import { SettingsPermissionGuard } from 'src/engine/guards/settings-permission.guard';
 import { WorkspaceAuthGuard } from 'src/engine/guards/workspace-auth.guard';
 import { TwilioConfigDTO } from 'src/engine/metadata-modules/twilio-config/dtos/twilio-config.dto';
@@ -92,10 +93,9 @@ export class TwilioConfigResolver {
     return this.toDTO(config);
   }
 
-  // Every workspace member may place calls; the voice token carries no
-  // settings privileges.
+  // Calling capability is enforced by the token service, independently of credential settings rights.
   @Mutation(() => String)
-  @UseGuards(NoPermissionGuard)
+  @UseGuards(RequireAccessTokenGuard, CustomPermissionGuard)
   async generateTwilioVoiceToken(
     @AuthWorkspace() workspace: WorkspaceEntity,
     @AuthWorkspaceMemberId() workspaceMemberId: string | undefined,

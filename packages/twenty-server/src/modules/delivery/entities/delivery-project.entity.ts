@@ -22,6 +22,9 @@ export class DeliveryProjectEntity extends WorkspaceRelatedEntity {
   @Column({ type: 'jsonb', default: [] })
   memberIds: string[];
 
+  @Column({ type: 'integer', default: 1 })
+  revision: number;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 }

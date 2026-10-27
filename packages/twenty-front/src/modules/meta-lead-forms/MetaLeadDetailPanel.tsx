@@ -59,7 +59,7 @@ export const MetaLeadDetailPanel = ({
   useEffect(() => {
     panelReference.current?.focus();
   }, []);
-  const { openDialer } = useOpenDialer();
+  const { openDialer, canUsePhone } = useOpenDialer();
   const { objectMetadataItem } = useObjectMetadataItem({
     objectNameSingular: 'person',
   });
@@ -116,7 +116,7 @@ export const MetaLeadDetailPanel = ({
         <Button title={t`Close details`} onClick={onClose} />
       </StyledHeader>
       <StyledActions>
-        {lead.phone && (
+        {lead.phone && canUsePhone && (
           <Button
             title={t`Call ${lead.phone}`}
             variant="primary"

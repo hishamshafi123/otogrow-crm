@@ -118,7 +118,7 @@ const StyledNewLabel = styled.span`
 
 export const MetaLeadFormsPage = () => {
   const { t } = useLingui();
-  const { openDialer } = useOpenDialer();
+  const { openDialer, canUsePhone } = useOpenDialer();
   const [activeLeadId, setActiveLeadId] = useState<string | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedId = searchParams.get('form') ?? '';
@@ -541,7 +541,7 @@ export const MetaLeadFormsPage = () => {
                         </td>
                         <td>{lead.email}</td>
                         <td>
-                          {lead.phone ? (
+                          {lead.phone && canUsePhone ? (
                             <button
                               type="button"
                               onClick={() =>
@@ -555,7 +555,7 @@ export const MetaLeadFormsPage = () => {
                               {lead.phone}
                             </button>
                           ) : (
-                            '—'
+                            lead.phone || '—'
                           )}
                         </td>
                         <td>{new Date(lead.createdAt).toLocaleString()}</td>

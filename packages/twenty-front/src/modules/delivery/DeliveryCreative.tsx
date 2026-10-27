@@ -1,5 +1,17 @@
+import { DeliveryGuardedForm } from '@/delivery/drafts/DeliveryGuardedForm';
+import { useDeliveryDraft } from '@/delivery/drafts/useDeliveryDraft';
+import { DeliveryDraftConflict } from '@/delivery/drafts/DeliveryDraftConflict';
+import {
+  DeliveryCreativeBriefForm,
+  DeliveryCreativeAssemblyForm,
+  DeliveryCreativeShotForm,
+} from '@/delivery/DeliveryCreativeForms';
+import {
+  useDeliveryDraftGuard,
+  useDeliveryDraftStatus,
+} from '@/delivery/drafts/DeliveryDraftGuard';
 import { DeliveryMedia } from '@/delivery/DeliveryMedia';
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState } from 'react';
 import { gql } from '@apollo/client';
 import { useMutation } from '@apollo/client/react';
 import { Trans, useLingui } from '@lingui/react/macro';
@@ -13,7 +25,6 @@ import {
 } from '@/delivery/delivery.types';
 import {
   type CreativeAsset,
-  type CreativeBrief,
   type CreativeShot,
 } from '@/delivery/delivery-creative.types';
 import {
@@ -55,7 +66,6 @@ export const DeliveryCreative = ({
   const [stage, setStage] = useState('brief');
   const [error, setError] = useState('');
   const [uploading, setUploading] = useState(false);
-  const [selectedReferences, setSelectedReferences] = useState<string[]>([]);
   const [editingShot, setEditingShot] = useState<CreativeShot | null>(null);
   const [preview, setPreview] = useState<{
     url: string;
@@ -71,7 +81,16 @@ export const DeliveryCreative = ({
   const locked = ['IN_REVIEW', 'APPROVED'].includes(task.details.state);
   const canEdit =
     !locked && (manager || task.assigneeId === workspace.actor.memberId);
-  const busy = mutation.loading || uploading || rendering.loading;
+  const [changing, setChanging] = useState(false);
+  const busy = changing || mutation.loading || uploading || rendering.loading;
+  const referenceDraft = useDeliveryDraft({
+    initialValues: [] as string[],
+    revision: task.revision,
+    busy,
+  });
+  const selectedReferences = referenceDraft.values;
+  const { requestAction } = useDeliveryDraftGuard();
+  useDeliveryDraftStatus({ dirty: false, saving: busy });
   const labels: Record<string, string> = {
     brief: t`Brief`,
     references: t`References`,
@@ -80,19 +99,6 @@ export const DeliveryCreative = ({
     edit: t`Edit and variants`,
     final: t`Final review`,
     generate: t`Generation`,
-  };
-  const briefLabels: Record<string, string> = {
-    audience: t`Audience`,
-    painPoint: t`Customer pain point`,
-    angle: t`Angle`,
-    concept: t`Concept`,
-    productFacts: t`Approved product facts`,
-    mandatoryClaims: t`Required claims and disclaimers`,
-    visualDirection: t`Visual direction`,
-    format: t`Aspect ratio / format`,
-    hook: t`Hook`,
-    cta: t`Call to action`,
-    music: t`Music notes`,
   };
   const kindLabels: Record<string, string> = {
     REFERENCE: t`Reference / brand asset`,
@@ -110,32 +116,39 @@ export const DeliveryCreative = ({
       ?.token;
     return token ? { Authorization: `Bearer ${token}` } : {};
   };
-  const change = async (fields: Record<string, unknown>) => {
+  const change = async (
+    fields: Record<string, unknown>,
+    revision = task.revision,
+  ) => {
     setError('');
+    setChanging(true);
     try {
       await mutate({
         variables: {
-          input: { ...fields, taskId: task.id, revision: task.revision },
+          input: { ...fields, taskId: task.id, revision },
         },
       });
-      await onChanged();
-      return true;
     } catch (failure) {
       setError(
         failure instanceof Error
           ? failure.message
           : t`Unable to save creative work.`,
       );
+      setChanging(false);
       return false;
     }
+    try {
+      await onChanged();
+    } catch {
+      setError(
+        t`Creative work was saved, but this page could not refresh. Refresh before making another change.`,
+      );
+    }
+    setChanging(false);
+    return true;
   };
-  const values = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    return new FormData(event.currentTarget);
-  };
-  const upload = async (event: FormEvent<HTMLFormElement>) => {
-    const data = values(event);
-    data.set('revision', String(task.revision));
+  const upload = async (data: FormData, revision: number) => {
+    data.set('revision', String(revision));
     if (!String(data.get('shotId') ?? '')) data.delete('shotId');
     setUploading(true);
     setError('');
@@ -157,12 +170,20 @@ export const DeliveryCreative = ({
             : t`Upload failed. Refresh and try again.`,
         );
       }
-      await onChanged();
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : t`Upload failed.`);
-    } finally {
       setUploading(false);
+      return false;
     }
+    try {
+      await onChanged();
+    } catch {
+      setError(
+        t`Asset uploaded, but this page could not refresh. Refresh before making another change.`,
+      );
+    }
+    setUploading(false);
+    return true;
   };
   const openAsset = async (asset: CreativeAsset, download = false) => {
     setError('');
@@ -292,7 +313,13 @@ export const DeliveryCreative = ({
             <StyledDeliveryButton
               key={id}
               aria-current={stage === id ? 'step' : undefined}
-              onClick={() => setStage(id)}
+              onClick={() => {
+                if (id !== stage)
+                  requestAction(() => {
+                    referenceDraft.markSaved([]);
+                    setStage(id);
+                  });
+              }}
             >
               {label}
             </StyledDeliveryButton>
@@ -352,115 +379,15 @@ export const DeliveryCreative = ({
       )}
       {stage === 'brief' && (
         <StyledDeliveryCard>
-          <form
-            key={`brief-${document.briefVersion}`}
-            onSubmit={(event) => {
-              const data = values(event);
-              const brief = {
-                ...document.brief,
-                ...Object.fromEntries(
-                  Object.keys(briefLabels).map((key) => [
-                    key,
-                    String(data.get(key) ?? ''),
-                  ]),
-                ),
-                objective: data.get('objective'),
-                duration: Number(data.get('duration')),
-                brandAssets: data.getAll('brandAssets'),
-              };
-              void change({ action: 'brief', brief });
-            }}
-          >
-            <StyledDeliveryStack>
-              <StyledDeliveryRow>
-                <h4>
-                  <Trans>Brief</Trans> · v{document.briefVersion}
-                </h4>
-                <StyledDeliveryBadge>
-                  {document.approvedBriefVersion === document.briefVersion
-                    ? t`Approved`
-                    : t`Needs manager approval`}
-                </StyledDeliveryBadge>
-              </StyledDeliveryRow>
-              <p>
-                <Trans>
-                  Leave unknown facts blank. Changing the brief makes dependent
-                  production approvals outdated.
-                </Trans>
-              </p>
-              <fieldset
-                disabled={!manager || !canEdit || busy}
-                style={{ border: 0, padding: 0 }}
-              >
-                <StyledDeliveryGrid>
-                  <label>
-                    <Trans>Objective</Trans>
-                    <select
-                      name="objective"
-                      defaultValue={document.brief.objective}
-                    >
-                      <option value="ADS">{t`Performance ad`}</option>
-                      <option value="ORGANIC">{t`Organic brand content`}</option>
-                    </select>
-                  </label>
-                  <label>
-                    <Trans>Duration in seconds</Trans>
-                    <input
-                      name="duration"
-                      type="number"
-                      min={1}
-                      max={300}
-                      defaultValue={document.brief.duration}
-                    />
-                  </label>
-                  {Object.entries(briefLabels).map(([key, label]) => (
-                    <label key={key}>
-                      {label}
-                      <textarea
-                        name={key}
-                        maxLength={6000}
-                        rows={3}
-                        defaultValue={String(
-                          document.brief[key as keyof CreativeBrief] ?? '',
-                        )}
-                      />
-                    </label>
-                  ))}
-                </StyledDeliveryGrid>
-                <label>
-                  <Trans>Brand assets</Trans>
-                  <select
-                    name="brandAssets"
-                    multiple
-                    defaultValue={document.brief.brandAssets}
-                  >
-                    {document.assets
-                      .filter((asset) => asset.kind === 'REFERENCE')
-                      .map((asset) => (
-                        <option key={asset.id} value={asset.id}>
-                          {asset.name}
-                        </option>
-                      ))}
-                  </select>
-                </label>
-                <StyledDeliveryButton type="submit">
-                  <Trans>Save new brief version</Trans>
-                </StyledDeliveryButton>
-              </fieldset>
-              {manager && (
-                <StyledDeliveryButton
-                  disabled={
-                    !canEdit ||
-                    busy ||
-                    document.approvedBriefVersion === document.briefVersion
-                  }
-                  onClick={() => void change({ action: 'approveBrief' })}
-                >
-                  <Trans>Approve current brief</Trans>
-                </StyledDeliveryButton>
-              )}
-            </StyledDeliveryStack>
-          </form>
+          <DeliveryCreativeBriefForm
+            document={document}
+            revision={task.revision}
+            canEdit={canEdit}
+            busy={busy}
+            manager={manager}
+            save={change}
+            onApprove={() => change({ action: 'approveBrief' })}
+          />
         </StyledDeliveryCard>
       )}
       {stage === 'brief' && document.briefHistory.length > 0 && (
@@ -482,12 +409,13 @@ export const DeliveryCreative = ({
       {stage === 'references' && (
         <>
           <StyledDeliveryCard>
-            <form
-              onSubmit={async (event) => {
-                const form = event.currentTarget;
-                const data = values(event);
-                if (
-                  await change({
+            <DeliveryGuardedForm
+              revision={task.revision}
+              busy={busy}
+              disabled={!canEdit}
+              onSave={(data, revision) =>
+                change(
+                  {
                     action: 'reference',
                     fields: {
                       title: data.get('title'),
@@ -500,10 +428,10 @@ export const DeliveryCreative = ({
                         .map((tag) => tag.trim())
                         .filter(Boolean),
                     },
-                  })
+                  },
+                  revision,
                 )
-                  form.reset();
-              }}
+              }
             >
               <StyledDeliveryStack>
                 <h4>
@@ -546,36 +474,61 @@ export const DeliveryCreative = ({
                   </StyledDeliveryButton>
                 </fieldset>
               </StyledDeliveryStack>
-            </form>
+            </DeliveryGuardedForm>
           </StyledDeliveryCard>
+          {referenceDraft.stale && (
+            <DeliveryDraftConflict
+              onReload={referenceDraft.reload}
+              busy={busy}
+            />
+          )}
           {manager && (
             <StyledDeliveryRow>
               <StyledDeliveryButton
-                disabled={!canEdit || busy || !selectedReferences.length}
+                disabled={
+                  !canEdit ||
+                  busy ||
+                  referenceDraft.stale ||
+                  !selectedReferences.length
+                }
                 onClick={async () => {
                   if (
-                    await change({
-                      action: 'reviewReferences',
-                      ids: selectedReferences,
-                      decision: 'APPROVED',
-                      notes: '',
-                    })
+                    await change(
+                      {
+                        action: 'reviewReferences',
+                        ids: selectedReferences,
+                        decision: 'APPROVED',
+                        notes: '',
+                      },
+                      referenceDraft.revision,
+                    )
                   )
-                    setSelectedReferences([]);
+                    referenceDraft.markSaved([]);
                 }}
               >
                 <Trans>Approve selected references</Trans>
               </StyledDeliveryButton>
               <StyledDeliveryButton
-                disabled={!canEdit || busy || !selectedReferences.length}
-                onClick={() =>
-                  void change({
-                    action: 'reviewReferences',
-                    ids: selectedReferences,
-                    decision: 'REJECTED',
-                    notes: '',
-                  })
+                disabled={
+                  !canEdit ||
+                  busy ||
+                  referenceDraft.stale ||
+                  !selectedReferences.length
                 }
+                onClick={async () => {
+                  if (
+                    await change(
+                      {
+                        action: 'reviewReferences',
+                        ids: selectedReferences,
+                        decision: 'REJECTED',
+                        notes: '',
+                      },
+                      referenceDraft.revision,
+                    )
+                  )
+                    referenceDraft.markSaved([]);
+                }}
               >
                 <Trans>Reject selected</Trans>
               </StyledDeliveryButton>
@@ -589,9 +542,10 @@ export const DeliveryCreative = ({
                     <label>
                       <input
                         type="checkbox"
+                        disabled={!canEdit || busy || referenceDraft.stale}
                         checked={selectedReferences.includes(reference.id)}
                         onChange={(event) =>
-                          setSelectedReferences(
+                          referenceDraft.update(
                             event.target.checked
                               ? [...selectedReferences, reference.id]
                               : selectedReferences.filter(
@@ -700,7 +654,7 @@ export const DeliveryCreative = ({
                   </small>
                   <StyledDeliveryButton
                     disabled={!canEdit}
-                    onClick={() => setEditingShot(shot)}
+                    onClick={() => requestAction(() => setEditingShot(shot))}
                   >
                     <Trans>Edit shot</Trans>
                   </StyledDeliveryButton>
@@ -722,103 +676,17 @@ export const DeliveryCreative = ({
             ))}
           </StyledDeliveryGrid>
           <StyledDeliveryCard>
-            <form
-              key={
-                editingShot
-                  ? `${editingShot.id}-${editingShot.version}`
-                  : 'new-shot'
-              }
-              onSubmit={async (event) => {
-                const form = event.currentTarget;
-                const data = values(event);
-                if (
-                  await change({
-                    action: 'shot',
-                    ...(editingShot ? { id: editingShot.id } : {}),
-                    fields: {
-                      title: data.get('title'),
-                      imagePrompt: data.get('imagePrompt'),
-                      animationPrompt: data.get('animationPrompt'),
-                      duration: Number(data.get('duration')),
-                      subject: data.get('subject'),
-                      product: data.get('product'),
-                      location: data.get('location'),
-                      notes: data.get('notes'),
-                      referenceId:
-                        String(data.get('referenceId') ?? '') || null,
-                    },
-                  })
-                ) {
-                  setEditingShot(null);
-                  form.reset();
-                }
-              }}
-            >
-              <StyledDeliveryStack>
-                <h4>{editingShot ? t`Edit shot` : t`Add shot`}</h4>
-                <fieldset disabled={!canEdit || busy}>
-                  <StyledDeliveryGrid>
-                    {[
-                      ['title', t`Shot title`],
-                      ['imagePrompt', t`Image prompt`],
-                      ['animationPrompt', t`Animation prompt`],
-                      ['subject', t`Subject`],
-                      ['product', t`Product details`],
-                      ['location', t`Location`],
-                      ['notes', t`Notes`],
-                    ].map(([name, label]) => (
-                      <label key={name}>
-                        {label}
-                        <textarea
-                          name={name}
-                          required={name === 'title'}
-                          defaultValue={String(
-                            editingShot?.[name as keyof CreativeShot] ?? '',
-                          )}
-                        />
-                      </label>
-                    ))}
-                    <label>
-                      <Trans>Duration in seconds</Trans>
-                      <input
-                        name="duration"
-                        type="number"
-                        min={1}
-                        max={30}
-                        defaultValue={editingShot?.duration ?? 5}
-                      />
-                    </label>
-                    <label>
-                      <Trans>Approved reference</Trans>
-                      <select
-                        name="referenceId"
-                        defaultValue={editingShot?.referenceId ?? ''}
-                      >
-                        <option value="">{t`No reference`}</option>
-                        {document.references
-                          .filter(
-                            (item) =>
-                              item.reviews.at(-1)?.decision === 'APPROVED',
-                          )
-                          .map((item) => (
-                            <option value={item.id} key={item.id}>
-                              {item.title}
-                            </option>
-                          ))}
-                      </select>
-                    </label>
-                  </StyledDeliveryGrid>
-                  <StyledDeliveryButton type="submit">
-                    <Trans>Save shot</Trans>
-                  </StyledDeliveryButton>
-                </fieldset>
-                {editingShot && (
-                  <StyledDeliveryButton onClick={() => setEditingShot(null)}>
-                    <Trans>Cancel editing</Trans>
-                  </StyledDeliveryButton>
-                )}
-              </StyledDeliveryStack>
-            </form>
+            <DeliveryCreativeShotForm
+              key={editingShot?.id ?? 'new-shot'}
+              shot={document.shots.find((shot) => shot.id === editingShot?.id)}
+              document={document}
+              revision={task.revision}
+              canEdit={canEdit}
+              busy={busy}
+              save={change}
+              onSaved={() => setEditingShot(null)}
+              onCancel={() => requestAction(() => setEditingShot(null))}
+            />
           </StyledDeliveryCard>
         </>
       )}
@@ -834,7 +702,12 @@ export const DeliveryCreative = ({
                 file. No generation connection is needed.
               </Trans>
             </p>
-            <form onSubmit={(event) => void upload(event)}>
+            <DeliveryGuardedForm
+              revision={task.revision}
+              busy={busy}
+              disabled={!canEdit}
+              onSave={upload}
+            >
               <fieldset disabled={!canEdit || busy}>
                 <StyledDeliveryRow>
                   <label>
@@ -872,7 +745,7 @@ export const DeliveryCreative = ({
                   </StyledDeliveryButton>
                 </StyledDeliveryRow>
               </fieldset>
-            </form>
+            </DeliveryGuardedForm>
           </StyledDeliveryCard>
           <p>
             <Trans>
@@ -912,16 +785,26 @@ export const DeliveryCreative = ({
                     </StyledDeliveryButton>
                   </StyledDeliveryRow>
                   {asset.kind !== 'FINAL' && (
-                    <form
-                      onSubmit={(event) => {
-                        const data = values(event);
-                        void change({
-                          action: 'reviewAsset',
-                          assetId: asset.id,
-                          decision: data.get('decision'),
-                          notes: data.get('notes'),
-                        });
-                      }}
+                    <DeliveryGuardedForm
+                      revision={task.revision}
+                      busy={busy}
+                      disabled={
+                        !canEdit ||
+                        !current(asset) ||
+                        (!manager &&
+                          asset.reviews.at(-1)?.decision === 'ESCALATED')
+                      }
+                      onSave={(data, revision) =>
+                        change(
+                          {
+                            action: 'reviewAsset',
+                            assetId: asset.id,
+                            decision: data.get('decision'),
+                            notes: data.get('notes'),
+                          },
+                          revision,
+                        )
+                      }
                     >
                       <fieldset
                         disabled={
@@ -948,7 +831,7 @@ export const DeliveryCreative = ({
                           <Trans>Save review</Trans>
                         </StyledDeliveryButton>
                       </fieldset>
-                    </form>
+                    </DeliveryGuardedForm>
                   )}
                   {['IMAGE', 'CLIP', 'FINAL'].includes(asset.kind) && (
                     <StyledDeliveryButton
@@ -978,30 +861,32 @@ export const DeliveryCreative = ({
         <>
           <StyledDeliveryButton
             disabled={!canEdit || busy || !document.assembly.assetIds.length}
-            onClick={async () => {
-              setError('');
-              try {
-                await renderMedia({
-                  variables: {
-                    input: {
-                      action: 'render',
-                      taskId: task.id,
-                      revision: task.revision,
-                      requestId: crypto.randomUUID(),
-                      confirm: true,
+            onClick={() =>
+              requestAction(async () => {
+                setError('');
+                try {
+                  await renderMedia({
+                    variables: {
+                      input: {
+                        action: 'render',
+                        taskId: task.id,
+                        revision: task.revision,
+                        requestId: crypto.randomUUID(),
+                        confirm: true,
+                      },
                     },
-                  },
-                });
-                await onChanged();
-                setStage('generate');
-              } catch (failure) {
-                setError(
-                  failure instanceof Error
-                    ? failure.message
-                    : t`Unable to queue draft render.`,
-                );
-              }
-            }}
+                  });
+                  await onChanged();
+                  setStage('generate');
+                } catch (failure) {
+                  setError(
+                    failure instanceof Error
+                      ? failure.message
+                      : t`Unable to queue draft render.`,
+                  );
+                }
+              })
+            }
           >
             <Trans>Render saved assembly as a draft</Trans>
           </StyledDeliveryButton>
@@ -1018,73 +903,13 @@ export const DeliveryCreative = ({
                 editing.
               </Trans>
             </p>
-            <form
-              key={`assembly-${document.version}`}
-              onSubmit={(event) => {
-                const data = values(event);
-                void change({
-                  action: 'assembly',
-                  assetIds: data.getAll('assetIds'),
-                  overlayText: data.get('overlayText'),
-                  audioId: String(data.get('audioId') ?? '') || null,
-                  notes: data.get('notes'),
-                });
-              }}
-            >
-              <fieldset disabled={!canEdit || busy}>
-                <label>
-                  <Trans>Video assets in library order</Trans>
-                  <select
-                    name="assetIds"
-                    multiple
-                    defaultValue={document.assembly.assetIds}
-                  >
-                    {readyAssets
-                      .filter((asset) =>
-                        ['CLIP', 'BASE', 'HOOK', 'CTA'].includes(asset.kind),
-                      )
-                      .map((asset) => (
-                        <option value={asset.id} key={asset.id}>
-                          {asset.name}
-                        </option>
-                      ))}
-                  </select>
-                </label>
-                <label>
-                  <Trans>Overlay text</Trans>
-                  <textarea
-                    name="overlayText"
-                    defaultValue={document.assembly.overlayText}
-                  />
-                </label>
-                <label>
-                  <Trans>Audio</Trans>
-                  <select
-                    name="audioId"
-                    defaultValue={document.assembly.audioId ?? ''}
-                  >
-                    <option value="">{t`No audio`}</option>
-                    {readyAssets
-                      .filter((asset) => asset.kind === 'AUDIO')
-                      .map((asset) => (
-                        <option key={asset.id} value={asset.id}>
-                          {asset.name}
-                        </option>
-                      ))}
-                  </select>
-                </label>
-                <label>
-                  <Trans>Editing notes</Trans>
-                  <textarea
-                    name="notes"
-                    defaultValue={document.assembly.notes}
-                  />
-                </label>
-                <StyledDeliveryButton type="submit">
-                  <Trans>Save assembly plan</Trans>
-                </StyledDeliveryButton>
-              </fieldset>
-            </form>
+            <DeliveryCreativeAssemblyForm
+              document={document}
+              revision={task.revision}
+              canEdit={canEdit}
+              busy={busy}
+              save={change}
+            />
           </StyledDeliveryCard>
           {document.assembly.assetIds.map((id, index) => (
             <StyledDeliveryRow key={`${id}-${index}`}>
@@ -1115,16 +940,21 @@ export const DeliveryCreative = ({
             <h4>
               <Trans>Hook × CTA variants</Trans>
             </h4>
-            <form
-              onSubmit={(event) => {
-                const data = values(event);
-                void change({
-                  action: 'variants',
-                  baseId: data.get('baseId'),
-                  hookIds: data.getAll('hookIds'),
-                  ctaIds: data.getAll('ctaIds'),
-                });
-              }}
+            <DeliveryGuardedForm
+              revision={task.revision}
+              busy={busy}
+              disabled={!canEdit}
+              onSave={(data, revision) =>
+                change(
+                  {
+                    action: 'variants',
+                    baseId: data.get('baseId'),
+                    hookIds: data.getAll('hookIds'),
+                    ctaIds: data.getAll('ctaIds'),
+                  },
+                  revision,
+                )
+              }
             >
               <fieldset disabled={!canEdit || busy}>
                 <StyledDeliveryGrid>
@@ -1151,7 +981,7 @@ export const DeliveryCreative = ({
                   <Trans>Build variant matrix</Trans>
                 </StyledDeliveryButton>
               </fieldset>
-            </form>
+            </DeliveryGuardedForm>
             {document.variants.map((variant) => (
               <StyledDeliveryRow key={variant.id}>
                 <label>
@@ -1208,7 +1038,7 @@ export const DeliveryCreative = ({
       )}
       {stage === 'final' && (
         <StyledDeliveryCard>
-          <StyledDeliveryButton onClick={onOpenTask}>
+          <StyledDeliveryButton onClick={() => requestAction(onOpenTask)}>
             <Trans>Open task submission and final approval</Trans>
           </StyledDeliveryButton>
           <StyledDeliveryStack>
@@ -1227,40 +1057,43 @@ export const DeliveryCreative = ({
                 manager.
               </Trans>
             </p>
+            {document.revisionCharge > 0 && (
+              <small>
+                <Trans>Legacy revision amount</Trans>: {document.revisionCharge}{' '}
+                ·{' '}
+                <Trans>
+                  Currency was not recorded; excluded from cost reports.
+                </Trans>
+              </small>
+            )}
             <small>
-              <Trans>Revision charge</Trans>: {document.revisionCharge} ·{' '}
-              <Trans>Recorded only; not invoiced</Trans>
+              <Trans>
+                Track the reason, effort and optional charge in the task's
+                Revision rounds after reopening. New charges default to zero.
+              </Trans>
             </small>
-            {manager && locked && (
-              <form
-                onSubmit={(event) => {
-                  const data = values(event);
-                  void change({
+            <DeliveryGuardedForm
+              revision={task.revision}
+              busy={busy}
+              visible={manager && locked}
+              onSave={(data, revision) =>
+                change(
+                  {
                     action: 'reopen',
                     notes: data.get('notes'),
-                    revisionCharge: Number(data.get('revisionCharge')),
-                  });
-                }}
-              >
-                <label>
-                  <Trans>Revision request</Trans>
-                  <textarea name="notes" required />
-                </label>
-                <label>
-                  <Trans>Optional revision charge</Trans>
-                  <input
-                    name="revisionCharge"
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    defaultValue={0}
-                  />
-                </label>
-                <StyledDeliveryButton type="submit" disabled={busy}>
-                  <Trans>Reopen for revision</Trans>
-                </StyledDeliveryButton>
-              </form>
-            )}
+                  },
+                  revision,
+                )
+              }
+            >
+              <label>
+                <Trans>Revision request</Trans>
+                <textarea name="notes" required />
+              </label>
+              <StyledDeliveryButton type="submit" disabled={busy}>
+                <Trans>Reopen for revision</Trans>
+              </StyledDeliveryButton>
+            </DeliveryGuardedForm>
           </StyledDeliveryStack>
         </StyledDeliveryCard>
       )}

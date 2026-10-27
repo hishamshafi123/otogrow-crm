@@ -1,3 +1,11 @@
+import { resolveMetaClientRouting } from 'src/modules/delivery/advertising/delivery-meta-client-routing';
+import { matchesApprovedDelivery } from 'src/modules/delivery/lifecycle/delivery-lifecycle';
+import { recordDeliveryRevision } from 'src/modules/delivery/revisions/record-delivery-revision';
+import { isValidUuid } from 'twenty-shared/utils';
+import { getMetaReportIdentity } from 'src/modules/delivery/advertising/delivery-meta-report-store';
+import { getPublishedDeliveryWorkflow } from 'src/modules/delivery/workflows/apply-delivery-workflow';
+import { syncDeliveryCommitment } from 'src/modules/delivery/commitments/record-delivery-commitment';
+import { readDeliveryOperations } from 'src/modules/delivery/read-delivery-snapshot';
 import { DeliveryProjectEntity } from 'src/modules/delivery/entities/delivery-project.entity';
 import {
   BadRequestException,
@@ -11,7 +19,6 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { Cron } from '@nestjs/schedule';
 import { DataSource, type EntityManager } from 'typeorm';
 import { randomBytes, createHash, randomUUID } from 'node:crypto';
-import axios from 'axios';
 import { WorkspaceEntity } from 'src/engine/core-modules/workspace/workspace.entity';
 import { TwentyConfigService } from 'src/engine/core-modules/twenty-config/twenty-config.service';
 import { DeliveryService } from 'src/modules/delivery/delivery.service';
@@ -19,19 +26,56 @@ import { DeliveryCreativeService } from 'src/modules/delivery/creative/delivery-
 import { DeliveryTaskEntity } from 'src/modules/delivery/entities/delivery-task.entity';
 import { DeliveryOperationsEntity } from 'src/modules/delivery/entities/delivery-operations.entity';
 import { TelegramConfigService } from 'src/modules/lead-assignment/services/telegram-config.service';
+import { TelegramConfigEntity } from 'src/modules/lead-assignment/entities/telegram-config.entity';
 import { type TelegramUpdate } from 'src/modules/lead-assignment/services/telegram.service';
 import {
   operationsCommandSchema,
   newDeliveryOperations,
   type DeliveryNotice,
+  type DeliveryAlert,
   type DeliveryOperations,
+  type Recurrence,
 } from 'src/modules/delivery/operations/delivery-operations.types';
 import { latestRecurrence } from 'src/modules/delivery/operations/delivery-recurrence';
+import { recordOtogrowActivity } from 'src/modules/otogrow-activity/record-otogrow-activity';
+import { InjectMessageQueue } from 'src/engine/core-modules/message-queue/decorators/message-queue.decorator';
+import { MessageQueue } from 'src/engine/core-modules/message-queue/message-queue.constants';
+import { MessageQueueService } from 'src/engine/core-modules/message-queue/services/message-queue.service';
+import {
+  DeliveryReminderOutboxEntity,
+  type DeliveryReminderState,
+} from 'src/modules/delivery/entities/delivery-reminder-outbox.entity';
+import {
+  DELIVERY_REMINDER_JOB,
+  DELIVERY_REMINDER_CLAIM_TIMEOUT,
+} from 'src/modules/delivery/operations/delivery-reminder.constants';
 
 const HOURS_12 = 12 * 60 * 60 * 1000;
 const MINUTES_5 = 5 * 60 * 1000;
 const hashToken = (token: string) =>
   createHash('sha256').update(token).digest('hex');
+const recurrenceActivityFields = (template: Recurrence) => ({
+  projectId: template.projectId,
+  assigneeId: template.fields.assigneeId,
+  reviewerId: template.fields.reviewerId,
+  frequency: template.frequency,
+  weekdays: [...template.weekdays].sort().join(','),
+  monthDay: String(template.monthDay),
+  time: template.time,
+  startDate: template.startDate,
+  endDate: template.endDate,
+  paused: String(template.paused),
+  dueHours: String(template.dueHours),
+  checklistCount: String(template.fields.checklist.length),
+});
+
+const alertActivityFields = (alert: DeliveryAlert) => ({
+  alertCategory: alert.category,
+  severity: alert.severity,
+  ownerId: alert.ownerId,
+  acknowledged: String(Boolean(alert.acknowledgedAt)),
+  resolved: String(Boolean(alert.resolvedAt)),
+});
 
 @Injectable()
 export class DeliveryOperationsService {
@@ -42,6 +86,8 @@ export class DeliveryOperationsService {
     private readonly creative: DeliveryCreativeService,
     private readonly telegram: TelegramConfigService,
     private readonly config: TwentyConfigService,
+    @InjectMessageQueue(MessageQueue.messagingQueue)
+    private readonly queue: MessageQueueService,
   ) {}
 
   private async transact<TResult>(
@@ -67,6 +113,55 @@ export class DeliveryOperationsService {
         );
       await repository.save(record);
       return result;
+    });
+  }
+
+  private async recordAlertActivity(
+    manager: EntityManager,
+    workspaceId: string,
+    alert: DeliveryAlert,
+    actorId: string | null,
+    action:
+      | 'DELIVERY_ALERT_CREATED'
+      | 'DELIVERY_ALERT_UPDATED'
+      | 'DELIVERY_ALERT_ACKNOWLEDGED'
+      | 'DELIVERY_ALERT_RESOLVED',
+    before: ReturnType<typeof alertActivityFields> | null,
+    now: Date,
+  ) {
+    const task = await manager
+      .getRepository(DeliveryTaskEntity)
+      .findOneBy({ workspaceId, taskId: alert.taskId });
+    const after = alertActivityFields(alert);
+    await recordOtogrowActivity(manager, {
+      workspaceId,
+      actorId,
+      actorType: actorId ? 'HUMAN' : 'SYSTEM',
+      subjectMemberId: alert.ownerId,
+      category: 'DELIVERY',
+      action,
+      outcome: 'RECORDED',
+      summary: {
+        DELIVERY_ALERT_CREATED: actorId
+          ? 'Flagged a delivery issue for founder attention.'
+          : 'Flagged an overdue delivery for founder attention.',
+        DELIVERY_ALERT_UPDATED:
+          'Updated a delivery issue and its responsible owner.',
+        DELIVERY_ALERT_ACKNOWLEDGED: 'Acknowledged a delivery issue.',
+        DELIVERY_ALERT_RESOLVED: 'Resolved a delivery issue.',
+      }[action],
+      projectId: task?.projectId ?? null,
+      taskId: alert.taskId,
+      sourceType: 'alert',
+      sourceId: alert.id,
+      occurredAt: now,
+      changes: (Object.keys(after) as (keyof typeof after)[])
+        .filter((field) => before?.[field] !== after[field])
+        .map((field) => ({
+          field,
+          before: before?.[field] ?? null,
+          after: after[field],
+        })),
     });
   }
 
@@ -101,9 +196,9 @@ export class DeliveryOperationsService {
     reportKey: string,
     manager: EntityManager,
   ) {
-    const report = state.metaReporting?.reports.find(
-      (item) => `meta-report:${item.id}` === reportKey,
-    );
+    const reportId = reportKey.slice('meta-report:'.length);
+    if (!isValidUuid(reportId)) return false;
+    const report = await getMetaReportIdentity(manager, workspace.id, reportId);
     if (!report) return false;
     const actor = await this.actor(
       workspace,
@@ -111,11 +206,17 @@ export class DeliveryOperationsService {
       userWorkspaceId,
       manager,
     );
-    if (actor.isAdmin || (actor.isManager && report.managerId === memberId))
-      return true;
+    if (actor.isAdmin) return true;
+    let routing;
+    try {
+      routing = resolveMetaClientRouting(state, report);
+    } catch {
+      return false;
+    }
+    if (actor.isManager && routing.managerId === memberId) return true;
     if (
-      report.status !== 'APPROVED' ||
-      report.marketerId !== memberId ||
+      (!report.engagementId && report.status !== 'APPROVED') ||
+      routing.marketerId !== memberId ||
       !report.projectId
     )
       return false;
@@ -130,63 +231,75 @@ export class DeliveryOperationsService {
     memberId: string,
     userWorkspaceId: string,
   ) {
-    const actor = await this.actor(
-      workspace,
-      memberId,
-      userWorkspaceId,
-      this.dataSource.manager,
-    );
-    const snapshot = await this.delivery.snapshot(
-      workspace,
-      memberId,
-      userWorkspaceId,
-    );
-    const state =
-      (
-        await this.dataSource
-          .getRepository(DeliveryOperationsEntity)
-          .findOneBy({ workspaceId: workspace.id })
-      )?.state ?? newDeliveryOperations();
-    const taskIds = new Set(snapshot.tasks.map((task) => task.id));
-    for (const report of state.metaReporting?.reports ?? []) {
-      const key = `meta-report:${report.id}`;
-      if (
-        await this.metaNoticeAllowed(
-          state,
+    return readDeliveryOperations(
+      this.dataSource,
+      workspace.id,
+      async (state, manager) => {
+        const actor = await this.actor(
           workspace,
           memberId,
           userWorkspaceId,
-          key,
-          this.dataSource.manager,
-        )
-      )
-        taskIds.add(key);
-    }
-    const bot = await this.telegram.findByWorkspaceId(workspace.id);
-    return {
-      timezone: state.timezone,
-      enabled: state.enabled,
-      telegramEnabled: state.telegramEnabled,
-      founderId: state.founderId,
-      templates: actor.isManager ? state.templates : [],
-      fulfilments: state.fulfilments.filter((item) => taskIds.has(item.taskId)),
-      notices: state.notices.filter(
-        (item) =>
-          !item.cancelled &&
-          taskIds.has(item.taskId) &&
-          (item.recipientId === memberId || actor.isManager),
-      ),
-      alerts: actor.isAdmin
-        ? state.alerts.filter((item) => taskIds.has(item.taskId))
-        : [],
-      connections: Object.entries(state.connections)
-        .filter(([id]) => id === memberId || actor.isAdmin)
-        .map(([id, connection]) => ({
-          memberId: id,
-          linkedAt: connection.linkedAt,
-        })),
-      botAvailable: Boolean(bot?.isActive && bot.botUsername),
-    };
+          manager,
+        );
+        const snapshot = await this.delivery.snapshot(
+          workspace,
+          memberId,
+          userWorkspaceId,
+          manager,
+        );
+        const taskIds = new Set(snapshot.tasks.map((task) => task.id));
+        const reportKeys = new Set(
+          state.notices
+            .filter(
+              (notice) =>
+                !notice.cancelled && notice.taskId.startsWith('meta-report:'),
+            )
+            .map((notice) => notice.taskId),
+        );
+        for (const key of reportKeys) {
+          if (
+            await this.metaNoticeAllowed(
+              state,
+              workspace,
+              memberId,
+              userWorkspaceId,
+              key,
+              manager,
+            )
+          )
+            taskIds.add(key);
+        }
+        const bot = await manager
+          .getRepository(TelegramConfigEntity)
+          .findOneBy({ workspaceId: workspace.id });
+        return {
+          timezone: state.timezone,
+          enabled: state.enabled,
+          telegramEnabled: state.telegramEnabled,
+          founderId: state.founderId,
+          templates: actor.isManager ? state.templates : [],
+          fulfilments: state.fulfilments.filter((item) =>
+            taskIds.has(item.taskId),
+          ),
+          notices: state.notices.filter(
+            (item) =>
+              !item.cancelled &&
+              taskIds.has(item.taskId) &&
+              (item.recipientId === memberId || actor.isManager),
+          ),
+          alerts: actor.isAdmin
+            ? state.alerts.filter((item) => taskIds.has(item.taskId))
+            : [],
+          connections: Object.entries(state.connections)
+            .filter(([id]) => id === memberId || actor.isAdmin)
+            .map(([id, connection]) => ({
+              memberId: id,
+              linkedAt: connection.linkedAt,
+            })),
+          botAvailable: Boolean(bot?.isActive && bot.botUsername),
+        };
+      },
+    );
   }
 
   private notice(
@@ -274,12 +387,44 @@ export class DeliveryOperationsService {
               'Select an active administrator for founder alerts.',
             );
         }
+        const before = {
+          timezone: state.timezone,
+          enabled: String(state.enabled),
+          telegramEnabled: String(state.telegramEnabled),
+          founderId: state.founderId,
+        };
         Object.assign(state, {
           timezone: command.timezone,
           enabled: command.enabled,
           telegramEnabled: command.telegramEnabled,
           founderId: command.founderId,
         });
+        const after = {
+          timezone: state.timezone,
+          enabled: String(state.enabled),
+          telegramEnabled: String(state.telegramEnabled),
+          founderId: state.founderId,
+        };
+        const changes = (Object.keys(after) as (keyof typeof after)[])
+          .filter((field) => before[field] !== after[field])
+          .map((field) => ({
+            field,
+            before: before[field],
+            after: after[field],
+          }));
+        if (changes.length)
+          await recordOtogrowActivity(manager, {
+            workspaceId: workspace.id,
+            actorId: memberId,
+            category: 'DELIVERY',
+            action: 'DELIVERY_SETTINGS_UPDATED',
+            outcome: 'RECORDED',
+            summary: 'Updated delivery scheduling and reminder settings.',
+            sourceType: 'settings',
+            sourceId: workspace.id,
+            occurredAt: now,
+            changes,
+          });
         return;
       }
       if (command.action === 'linkTelegram') {
@@ -306,10 +451,25 @@ export class DeliveryOperationsService {
         return;
       }
       if (command.action === 'unlinkTelegram') {
+        const wasLinked = Boolean(state.connections[memberId]);
         delete state.connections[memberId];
         state.linkTokens = state.linkTokens.filter(
           (item) => item.memberId !== memberId,
         );
+        if (wasLinked)
+          await recordOtogrowActivity(manager, {
+            workspaceId: workspace.id,
+            actorId: memberId,
+            subjectMemberId: memberId,
+            category: 'DELIVERY',
+            action: 'TELEGRAM_UNLINKED',
+            outcome: 'RECORDED',
+            summary: 'Disconnected a Telegram reminder account.',
+            sourceType: 'connection',
+            sourceId: memberId,
+            occurredAt: now,
+            changes: [{ field: 'linked', before: 'true', after: 'false' }],
+          });
         return;
       }
       if (command.action === 'template') {
@@ -325,6 +485,7 @@ export class DeliveryOperationsService {
           workspace,
           memberId,
           userWorkspaceId,
+          manager,
         );
         const project = visible.projects.find(
           (item) => item.id === template.projectId,
@@ -359,45 +520,120 @@ export class DeliveryOperationsService {
           ).isManager
         )
           throw new BadRequestException('The reviewer must be a manager.');
-        if (existing)
-          Object.assign(existing, template, {
-            creatorId: memberId,
-            userWorkspaceId,
-            error: null,
-          });
-        else
-          state.templates.push({
-            ...template,
-            id: randomUUID(),
-            creatorId: memberId,
-            userWorkspaceId,
-            lastDate: null,
-            lastTaskId: null,
-            skipped: 0,
-            error: null,
-          });
+        if (template.workflow)
+          await getPublishedDeliveryWorkflow(
+            manager,
+            workspace.id,
+            template.workflow.templateId,
+            template.workflow.version,
+          );
+        const before = existing ? recurrenceActivityFields(existing) : null;
+        const saved: Recurrence = existing
+          ? Object.assign(existing, template, {
+              creatorId: memberId,
+              userWorkspaceId,
+              error: null,
+            })
+          : {
+              ...template,
+              id: randomUUID(),
+              creatorId: memberId,
+              userWorkspaceId,
+              lastDate: null,
+              lastTaskId: null,
+              skipped: 0,
+              error: null,
+            };
+        if (!existing) state.templates.push(saved);
+        const after = recurrenceActivityFields(saved);
+        await recordOtogrowActivity(manager, {
+          workspaceId: workspace.id,
+          actorId: memberId,
+          subjectMemberId: saved.fields.assigneeId,
+          category: 'DELIVERY',
+          action: existing
+            ? 'RECURRING_TEMPLATE_UPDATED'
+            : 'RECURRING_TEMPLATE_CREATED',
+          outcome: 'RECORDED',
+          summary: existing
+            ? 'Updated recurring work and its assignment schedule.'
+            : 'Scheduled recurring work with an assignee and independent reviewer.',
+          projectId: saved.projectId,
+          sourceType: 'recurrence',
+          sourceId: saved.id,
+          occurredAt: now,
+          changes: (Object.keys(after) as (keyof typeof after)[])
+            .filter((field) => before?.[field] !== after[field])
+            .map((field) => ({
+              field,
+              before: before?.[field] ?? null,
+              after: after[field],
+            })),
+        });
         return;
       }
       if (command.action === 'pause') {
         requireManager();
         const template = state.templates.find((item) => item.id === command.id);
         if (!template) throw new NotFoundException();
+        if (template.paused === command.paused) return;
+        const previousPaused = template.paused;
         template.paused = command.paused;
+        await recordOtogrowActivity(manager, {
+          workspaceId: workspace.id,
+          actorId: memberId,
+          subjectMemberId: template.fields.assigneeId,
+          category: 'DELIVERY',
+          action: command.paused
+            ? 'RECURRING_TEMPLATE_PAUSED'
+            : 'RECURRING_TEMPLATE_RESUMED',
+          outcome: 'RECORDED',
+          summary: command.paused
+            ? 'Paused a recurring work schedule.'
+            : 'Resumed a recurring work schedule.',
+          projectId: template.projectId,
+          sourceType: 'recurrence',
+          sourceId: template.id,
+          occurredAt: now,
+          changes: [
+            {
+              field: 'paused',
+              before: String(previousPaused),
+              after: String(command.paused),
+            },
+          ],
+        });
         return;
       }
       if (command.action === 'resolveAlert') {
         if (!actor.isAdmin) throw new ForbiddenException();
         const alert = state.alerts.find((item) => item.id === command.id);
         if (!alert) throw new NotFoundException();
+        const before = alertActivityFields(alert);
         alert.acknowledgedAt = now.toISOString();
         if (command.resolve) alert.resolvedAt = now.toISOString();
+        if (
+          before.acknowledged === 'false' ||
+          (command.resolve && before.resolved === 'false')
+        )
+          await this.recordAlertActivity(
+            manager,
+            workspace.id,
+            alert,
+            memberId,
+            command.resolve
+              ? 'DELIVERY_ALERT_RESOLVED'
+              : 'DELIVERY_ALERT_ACKNOWLEDGED',
+            before,
+            now,
+          );
         for (const notice of state.notices.filter(
           (item) => item.kind === 'ALERT' && item.taskId === alert.taskId,
         ))
           notice.cancelled = true;
         return;
       }
-      if (command.action === 'acknowledge') {
+      if (command.action === 'acknowledge' || command.action === 'noticeSeen') {
         const notice = state.notices.find(
           (item) =>
             item.id === command.id &&
@@ -426,7 +662,9 @@ export class DeliveryOperationsService {
             notice.taskId,
           );
         }
-        notice.acknowledgedAt = now.toISOString();
+        if (command.action === 'acknowledge')
+          notice.acknowledgedAt ??= now.toISOString();
+        else notice.seenAt ??= now.toISOString();
         return;
       }
       const scope = await this.creative.scope(
@@ -437,13 +675,16 @@ export class DeliveryOperationsService {
         command.taskId,
       );
       if (command.action === 'seen') {
-        if (scope.assigneeId === memberId)
-          state.assignments[command.taskId] =
-            `${memberId}:${scope.task.details.assignmentAt ?? 'legacy'}`;
+        if (scope.assigneeId !== memberId) return;
+        state.assignments[command.taskId] =
+          `${memberId}:${scope.task.details.assignmentAt ?? 'legacy'}`;
         for (const notice of state.notices.filter(
           (item) =>
             item.taskId === command.taskId &&
+            item.kind === 'ASSIGNMENT' &&
             item.recipientId === memberId &&
+            (!scope.task.details.assignmentAt ||
+              item.createdAt === scope.task.details.assignmentAt) &&
             !item.cancelled,
         ))
           notice.seenAt ??= now.toISOString();
@@ -464,7 +705,7 @@ export class DeliveryOperationsService {
           recipientUser,
           command.taskId,
         );
-        this.notice(
+        const notice = this.notice(
           state,
           command.taskId,
           command.recipientId,
@@ -473,6 +714,20 @@ export class DeliveryOperationsService {
           command.text,
           now,
         );
+        await recordOtogrowActivity(manager, {
+          workspaceId: workspace.id,
+          actorId: memberId,
+          subjectMemberId: command.recipientId,
+          category: 'DELIVERY',
+          action: 'TASK_MESSAGE_SENT',
+          outcome: 'RECORDED',
+          summary: 'Sent a task message to a team member.',
+          projectId: scope.task.projectId,
+          taskId: command.taskId,
+          sourceType: 'notice',
+          sourceId: notice.id,
+          occurredAt: now,
+        });
         return;
       }
       requireManager();
@@ -485,6 +740,7 @@ export class DeliveryOperationsService {
             item.category === command.category &&
             !item.resolvedAt,
         );
+        const before = current ? alertActivityFields(current) : null;
         if (current)
           Object.assign(current, {
             reason: command.reason,
@@ -514,6 +770,16 @@ export class DeliveryOperationsService {
               now,
             );
         }
+        const alert = current ?? state.alerts[state.alerts.length - 1];
+        await this.recordAlertActivity(
+          manager,
+          workspace.id,
+          alert,
+          memberId,
+          current ? 'DELIVERY_ALERT_UPDATED' : 'DELIVERY_ALERT_CREATED',
+          before,
+          now,
+        );
         return;
       }
       if (scope.assigneeId === memberId)
@@ -523,6 +789,12 @@ export class DeliveryOperationsService {
       let fulfilment = state.fulfilments.find(
         (item) => item.taskId === command.taskId,
       );
+      const previousFulfilment = {
+        fulfilmentStatus: fulfilment?.status ?? null,
+        deliveryCycle: fulfilment ? String(fulfilment.cycle) : null,
+        nextCheckAt: fulfilment?.nextCheckAt ?? null,
+        state: scope.task.details.state,
+      };
       if (command.action === 'delivered') {
         if (scope.task.revision !== command.revision)
           throw new ConflictException('Refresh the changed task.');
@@ -530,7 +802,10 @@ export class DeliveryOperationsService {
           throw new BadRequestException(
             'Approve the work before recording delivery.',
           );
-        if (fulfilment?.status === 'WAITING')
+        if (
+          fulfilment?.status === 'WAITING' &&
+          matchesApprovedDelivery(scope.task.details, fulfilment)
+        )
           throw new BadRequestException(
             'Answer the current fulfilment check first.',
           );
@@ -545,6 +820,10 @@ export class DeliveryOperationsService {
           };
           state.fulfilments.push(fulfilment);
         }
+        fulfilment.deliveredSubmissionVersion =
+          scope.task.details.submissions[
+            scope.task.details.submissions.length - 1
+          ]?.version;
         fulfilment.cycle++;
         fulfilment.status = 'WAITING';
         fulfilment.deliveredAt = now.toISOString();
@@ -565,6 +844,13 @@ export class DeliveryOperationsService {
           fulfilment.status !== 'WAITING'
         )
           throw new ConflictException('Refresh the delivery cycle.');
+        if (
+          command.decision !== 'REDOING' &&
+          !matchesApprovedDelivery(scope.task.details, fulfilment)
+        )
+          throw new ConflictException(
+            'The approved version changed. Record its delivery before confirming fulfilment.',
+          );
         fulfilment.history.push({
           at: now.toISOString(),
           actorId: memberId,
@@ -578,6 +864,13 @@ export class DeliveryOperationsService {
         if (command.decision !== 'NOT_FULFILLED')
           fulfilment.status = command.decision;
         if (command.decision === 'REDOING') {
+          await recordDeliveryRevision(
+            manager,
+            scope.task,
+            memberId,
+            'CLIENT_REDO',
+            command.note,
+          );
           scope.task.details.state = 'CHANGES_REQUESTED';
           scope.task.details.events.push({
             id: randomUUID(),
@@ -593,6 +886,66 @@ export class DeliveryOperationsService {
             [command.taskId],
           );
         }
+      }
+      if (
+        fulfilment &&
+        (command.action === 'delivered' || command.action === 'fulfilment')
+      ) {
+        await syncDeliveryCommitment(
+          manager,
+          workspace.id,
+          command.taskId,
+          scope.task.details,
+          fulfilment,
+          { actorId: memberId, actorType: 'HUMAN' },
+        );
+        const currentFulfilment = {
+          fulfilmentStatus: fulfilment.status,
+          deliveryCycle: String(fulfilment.cycle),
+          nextCheckAt: fulfilment.nextCheckAt,
+          state: scope.task.details.state,
+        };
+        await recordOtogrowActivity(manager, {
+          workspaceId: workspace.id,
+          actorId: memberId,
+          subjectMemberId: scope.assigneeId,
+          category: 'DELIVERY',
+          action:
+            command.action === 'delivered'
+              ? 'TASK_DELIVERED'
+              : 'TASK_FULFILMENT_CHECKED',
+          outcome:
+            command.action === 'fulfilment' && command.decision === 'FULFILLED'
+              ? 'FULFILLED'
+              : command.action === 'fulfilment' &&
+                  command.decision === 'REDOING'
+                ? 'CHANGES_REQUESTED'
+                : 'RECORDED',
+          summary:
+            command.action === 'delivered'
+              ? 'Recorded delivery of approved work for fulfilment follow-up.'
+              : command.decision === 'FULFILLED'
+                ? 'Confirmed that delivered work was fulfilled.'
+                : command.decision === 'REDOING'
+                  ? 'Reopened delivered work for revision and independent approval.'
+                  : 'Recorded that delivered work is not yet fulfilled; follow-up remains scheduled.',
+          projectId: scope.task.projectId,
+          taskId: command.taskId,
+          sourceType: 'delivery',
+          sourceId: command.taskId,
+          occurredAt: now,
+          changes: (
+            Object.keys(currentFulfilment) as (keyof typeof currentFulfilment)[]
+          )
+            .filter(
+              (field) => previousFulfilment[field] !== currentFulfilment[field],
+            )
+            .map((field) => ({
+              field,
+              before: previousFulfilment[field],
+              after: currentFulfilment[field],
+            })),
+        });
       }
       for (const notice of state.notices.filter(
         (item) => item.kind === 'FULFILMENT' && item.taskId === command.taskId,
@@ -635,10 +988,29 @@ export class DeliveryOperationsService {
         )
       )
         return;
+      const previousConnection = state.connections[token.memberId];
       state.connections[token.memberId] = {
         chatId: String(message.chat.id),
         linkedAt: now.toISOString(),
       };
+      if (previousConnection?.chatId !== String(message.chat.id))
+        await recordOtogrowActivity(manager, {
+          workspaceId,
+          actorId: token.memberId,
+          subjectMemberId: token.memberId,
+          category: 'DELIVERY',
+          action: 'TELEGRAM_LINKED',
+          outcome: 'RECORDED',
+          summary: previousConnection
+            ? 'Updated a Telegram reminder connection.'
+            : 'Linked a Telegram reminder account.',
+          sourceType: 'connection',
+          sourceId: token.memberId,
+          occurredAt: now,
+          changes: previousConnection
+            ? []
+            : [{ field: 'linked', before: 'false', after: 'true' }],
+        });
       state.linkTokens = state.linkTokens.filter(
         (item) => item.hash !== token.hash,
       );
@@ -662,33 +1034,41 @@ export class DeliveryOperationsService {
             template.error = 'Template creator no longer has manager access.';
             continue;
           }
-          const createdTaskId = await this.delivery.command(
-            workspace,
-            template.creatorId,
-            template.userWorkspaceId,
-            {
-              action: 'create',
-              projectId: template.projectId,
-              fields: {
-                ...template.fields,
-                scheduledDate: occurrence.date,
-                dueAt: new Date(
-                  now.getTime() + template.dueHours * 3600000,
-                ).toISOString(),
-                checklist: template.fields.checklist.map((item) => ({
-                  ...item,
-                  id: randomUUID(),
-                  done: false,
-                })),
-                evidence: [],
-              },
+          // An invalid occurrence must not leave a task behind when its error is retained.
+          const createdTaskId = await manager.transaction(
+            async (recurrenceManager) => {
+              const taskId = await this.delivery.command(
+                workspace,
+                template.creatorId,
+                template.userWorkspaceId,
+                {
+                  action: 'create',
+                  projectId: template.projectId,
+                  workflow: template.workflow ?? null,
+                  fields: {
+                    ...template.fields,
+                    scheduledDate: occurrence.date,
+                    dueAt: new Date(
+                      now.getTime() + template.dueHours * 3600000,
+                    ).toISOString(),
+                    checklist: template.fields.checklist.map((item) => ({
+                      ...item,
+                      id: randomUUID(),
+                      done: false,
+                    })),
+                    evidence: [],
+                  },
+                },
+                recurrenceManager,
+                { actorType: 'SYSTEM', actorId: null },
+              );
+              if (typeof taskId !== 'string')
+                throw new Error(
+                  'Recurring task creation did not return an identity.',
+                );
+              return taskId;
             },
-            manager,
           );
-          if (typeof createdTaskId !== 'string')
-            throw new Error(
-              'Recurring task creation did not return an identity.',
-            );
           template.lastTaskId = createdTaskId;
           template.lastDate = occurrence.date;
           template.skipped += occurrence.skipped;
@@ -702,17 +1082,19 @@ export class DeliveryOperationsService {
             )
           )
             throw error;
-          template.error =
-            'Assignment or access changed. Edit the template to select active members and reviewer.';
+          template.error = template.workflow
+            ? 'Schedule or service workflow changed. Check staff access and restore the pinned workflow or choose another published version.'
+            : 'Assignment or access changed. Edit the template to select active members and reviewer.';
         }
       }
       const tasks: {
         id: string;
+        projectId: string;
         assigneeId: string;
         dueAt: string | null;
         details: DeliveryTaskEntity['details'];
       }[] = await manager.query(
-        `SELECT t.id,t."assigneeId",t."dueAt",d.details FROM core."deliveryTask" d JOIN ${this.delivery.schema(workspace)}.task t ON t.id=d."taskId" WHERE d."workspaceId"=$1 AND t."deletedAt" IS NULL`,
+        `SELECT t.id,d."projectId",t."assigneeId",t."dueAt",d.details FROM core."deliveryTask" d JOIN ${this.delivery.schema(workspace)}.task t ON t.id=d."taskId" WHERE d."workspaceId"=$1 AND t."deletedAt" IS NULL`,
         [workspace.id],
       );
       for (const task of tasks) {
@@ -743,6 +1125,7 @@ export class DeliveryOperationsService {
           fulfilment?.status === 'WAITING' &&
           task.details.state !== 'APPROVED'
         ) {
+          const previousCheckAt = fulfilment.nextCheckAt;
           fulfilment.history.push({
             at: now.toISOString(),
             actorId: 'system',
@@ -751,6 +1134,30 @@ export class DeliveryOperationsService {
           });
           fulfilment.status = 'REDOING';
           fulfilment.nextCheckAt = null;
+          await recordOtogrowActivity(manager, {
+            workspaceId: workspace.id,
+            actorId: null,
+            actorType: 'SYSTEM',
+            subjectMemberId: task.assigneeId,
+            category: 'DELIVERY',
+            action: 'TASK_REOPENED',
+            outcome: 'CHANGES_REQUESTED',
+            summary:
+              'Reopened fulfilment because production requires renewed approval and delivery.',
+            projectId: task.projectId,
+            taskId: task.id,
+            sourceType: 'delivery',
+            sourceId: task.id,
+            occurredAt: now,
+            changes: [
+              {
+                field: 'fulfilmentStatus',
+                before: 'WAITING',
+                after: 'REDOING',
+              },
+              { field: 'nextCheckAt', before: previousCheckAt, after: null },
+            ],
+          });
           for (const notice of state.notices.filter(
             (item) => item.taskId === task.id && item.kind === 'FULFILMENT',
           ))
@@ -811,6 +1218,15 @@ export class DeliveryOperationsService {
             acknowledgedAt: null,
             resolvedAt: null,
           });
+          await this.recordAlertActivity(
+            manager,
+            workspace.id,
+            state.alerts[state.alerts.length - 1],
+            null,
+            'DELIVERY_ALERT_CREATED',
+            null,
+            now,
+          );
           if (state.founderId)
             this.notice(
               state,
@@ -827,137 +1243,253 @@ export class DeliveryOperationsService {
   }
 
   async dispatchWorkspace(workspace: WorkspaceEntity, now = new Date()) {
-    const claimed = await this.transact(workspace.id, async (state) => {
-      if (!state.enabled) return [];
-      const ids: string[] = [];
-      for (const notice of state.notices) {
+    const queuedIds = await this.transact(
+      workspace.id,
+      async (state, manager) => {
+        if (!state.enabled) return [];
+        const outbox = manager.getRepository(DeliveryReminderOutboxEntity);
+        let queuedCount = 0;
+        for (const notice of state.notices) {
+          if (
+            notice.sendState === 'SENDING' &&
+            notice.attemptedAt &&
+            new Date(notice.attemptedAt).getTime() <
+              now.getTime() - DELIVERY_REMINDER_CLAIM_TIMEOUT
+          ) {
+            notice.sendState = 'UNCERTAIN';
+            notice.error =
+              'Worker interrupted after claiming send. Check Telegram before any manual follow-up; no automatic resend.';
+            await outbox.update(
+              {
+                workspaceId: workspace.id,
+                noticeId: notice.id,
+                status: 'SENDING',
+              },
+              {
+                status: 'UNCERTAIN',
+                finishedAt: now,
+                error: notice.error,
+              },
+            );
+          }
+          if (
+            notice.sendState !== 'PENDING' ||
+            notice.remindAt > now.toISOString()
+          )
+            continue;
+          if (notice.cancelled || notice.seenAt || notice.acknowledgedAt) {
+            notice.sendState = 'SUPPRESSED';
+            continue;
+          }
+          if (
+            !state.telegramEnabled ||
+            !state.connections[notice.recipientId]
+          ) {
+            notice.sendState = 'UNCONFIGURED';
+            notice.error =
+              'Telegram is disabled or recipient is not linked. The OS notification remains available.';
+            continue;
+          }
+          if (queuedCount >= 20) continue;
+          const existing = await outbox.findOneBy({
+            workspaceId: workspace.id,
+            noticeId: notice.id,
+          });
+          if (existing) {
+            notice.sendState = existing.status;
+            notice.attemptedAt = existing.attemptedAt?.toISOString() ?? null;
+            notice.error = existing.error;
+            continue;
+          }
+          await outbox.insert({
+            workspaceId: workspace.id,
+            noticeId: notice.id,
+            status: 'QUEUED',
+          });
+          notice.sendState = 'QUEUED';
+          notice.error = null;
+          queuedCount++;
+        }
+        return (
+          await outbox.find({
+            where: { workspaceId: workspace.id, status: 'QUEUED' },
+            order: { createdAt: 'ASC' },
+            take: 20,
+          })
+        ).map((entry) => entry.id);
+      },
+    );
+    for (const outboxId of queuedIds) await this.enqueueReminder(outboxId);
+  }
+
+  async enqueueReminder(outboxId: string) {
+    try {
+      await this.queue.add(
+        DELIVERY_REMINDER_JOB,
+        { outboxId },
+        {
+          id: `delivery-reminder-${outboxId}`,
+          retryLimit: 2,
+          backoff: { strategy: 'exponential', initialDelayMilliseconds: 1000 },
+        },
+      );
+    } catch {
+      this.logger.warn(
+        'Telegram reminder queue is unavailable; the durable outbox will retry enqueueing.',
+      );
+    }
+  }
+
+  async claimReminder(outboxId: string, now = new Date()) {
+    const initial = await this.dataSource
+      .getRepository(DeliveryReminderOutboxEntity)
+      .findOneBy({ id: outboxId });
+    if (!initial || initial.status !== 'QUEUED') return null;
+    const workspace = await this.dataSource
+      .getRepository(WorkspaceEntity)
+      .findOneBy({ id: initial.workspaceId });
+    if (!workspace) return null;
+    return this.transact(workspace.id, async (state, manager) => {
+      const repository = manager.getRepository(DeliveryReminderOutboxEntity);
+      const entry = await repository.findOneBy({
+        id: outboxId,
+        workspaceId: workspace.id,
+        status: 'QUEUED',
+      });
+      if (!entry) return null;
+      const notice = state.notices.find((item) => item.id === entry.noticeId);
+      const finish = async (
+        status: 'SUPPRESSED' | 'UNCONFIGURED',
+        error: string | null = null,
+      ) => {
+        entry.status = status;
+        entry.finishedAt = now;
+        entry.error = error;
+        if (notice) {
+          notice.sendState = status;
+          notice.error = error;
+        }
+        await repository.save(entry);
+        return null;
+      };
+      if (
+        !notice ||
+        notice.sendState !== 'QUEUED' ||
+        notice.cancelled ||
+        notice.seenAt ||
+        notice.acknowledgedAt ||
+        !state.enabled ||
+        !state.telegramEnabled
+      )
+        return finish('SUPPRESSED');
+      try {
+        const userWorkspaceId = await this.active(
+          workspace,
+          notice.recipientId,
+          manager,
+        );
+        if (!userWorkspaceId) return finish('SUPPRESSED');
+        const isMetaReport = notice.taskId.startsWith('meta-report:');
         if (
-          notice.sendState === 'SENDING' &&
-          notice.attemptedAt &&
-          new Date(notice.attemptedAt).getTime() < now.getTime() - 120000
-        ) {
-          notice.sendState = 'UNCERTAIN';
-          notice.error =
-            'Worker interrupted after claiming send. Check Telegram before any manual follow-up.';
-        }
-        if (
-          notice.sendState !== 'PENDING' ||
-          notice.remindAt > now.toISOString()
-        )
-          continue;
-        if (notice.cancelled || notice.seenAt || notice.acknowledgedAt) {
-          notice.sendState = 'SUPPRESSED';
-          continue;
-        }
-        if (!state.telegramEnabled || !state.connections[notice.recipientId]) {
-          notice.sendState = 'UNCONFIGURED';
-          notice.error =
-            'Telegram is disabled or recipient is not linked. The OS notification remains available.';
-          continue;
-        }
-        if (ids.length >= 20) continue;
-        notice.sendState = 'SENDING';
-        notice.attemptedAt = now.toISOString();
-        ids.push(notice.id);
-      }
-      return ids;
-    });
-    for (const id of claimed)
-      await this.transact(workspace.id, async (state, manager) => {
-        const notice = state.notices.find((item) => item.id === id);
-        if (!notice || notice.sendState !== 'SENDING') return;
-        try {
-          const userWorkspaceId = await this.active(
+          isMetaReport &&
+          !(await this.metaNoticeAllowed(
+            state,
             workspace,
             notice.recipientId,
+            userWorkspaceId,
+            notice.taskId,
             manager,
-          );
-          if (!userWorkspaceId) throw new ForbiddenException();
-          const isMetaReport = notice.taskId.startsWith('meta-report:');
-          if (
-            isMetaReport &&
-            !(await this.metaNoticeAllowed(
-              state,
+          ))
+        )
+          return finish('SUPPRESSED');
+        const scope = isMetaReport
+          ? null
+          : await this.creative.scope(
+              manager,
               workspace,
               notice.recipientId,
               userWorkspaceId,
               notice.taskId,
-              manager,
-            ))
-          )
-            throw new ForbiddenException();
-          const scope = isMetaReport
-            ? null
-            : await this.creative.scope(
-                manager,
-                workspace,
-                notice.recipientId,
-                userWorkspaceId,
-                notice.taskId,
-              );
-          if (
-            (notice.kind === 'ASSIGNMENT' &&
-              (scope?.assigneeId !== notice.recipientId ||
-                (scope?.task.details.assignmentAt &&
-                  scope.task.details.assignmentAt !== notice.createdAt))) ||
-            (notice.kind === 'ALERT' && !scope?.actor.isAdmin) ||
-            (notice.kind === 'FULFILMENT' &&
-              (!scope?.actor.isManager ||
-                scope.task.details.reviewerId !== notice.recipientId)) ||
-            notice.cancelled ||
-            notice.seenAt ||
-            notice.acknowledgedAt ||
-            !state.enabled ||
-            !state.telegramEnabled
-          ) {
-            notice.sendState = 'SUPPRESSED';
-            return;
-          }
-          const bot = await this.telegram.findByWorkspaceId(workspace.id);
-          const connection = state.connections[notice.recipientId];
-          if (!bot?.isActive || !connection) {
-            notice.sendState = 'UNCONFIGURED';
-            notice.error = 'Bot or recipient connection unavailable.';
-            return;
-          }
-          const base =
-            this.config.get('FRONTEND_URL') ?? this.config.get('SERVER_URL');
-          const url = new URL('/delivery', base);
-          if (isMetaReport) url.searchParams.set('view', 'ads');
-          else url.searchParams.set('task', notice.taskId);
-          const response = await axios.post(
-            `https://api.telegram.org/bot${this.telegram.decryptBotToken(bot)}/sendMessage`,
-            {
-              chat_id: connection.chatId,
-              text: `Otogrow: ${notice.kind === 'MESSAGE' ? 'An internal task message needs your attention.' : notice.kind === 'ASSIGNMENT' ? 'A task assignment needs your attention.' : 'A delivery check needs your attention.'}\n${url}`,
-              link_preview_options: { is_disabled: true },
-            },
-            { timeout: 10000, maxRedirects: 0, proxy: false },
+            );
+        if (
+          (notice.kind === 'ASSIGNMENT' &&
+            (scope?.assigneeId !== notice.recipientId ||
+              (scope?.task.details.assignmentAt &&
+                scope.task.details.assignmentAt !== notice.createdAt))) ||
+          (notice.kind === 'ALERT' && !scope?.actor.isAdmin) ||
+          (notice.kind === 'FULFILMENT' &&
+            (!scope?.actor.isManager ||
+              scope.task.details.reviewerId !== notice.recipientId))
+        )
+          return finish('SUPPRESSED');
+        const bot = await this.telegram.findByWorkspaceId(workspace.id);
+        const connection = state.connections[notice.recipientId];
+        if (!bot?.isActive || !connection)
+          return finish(
+            'UNCONFIGURED',
+            'Bot or recipient connection unavailable.',
           );
-          notice.sendState = response.data?.ok === true ? 'SENT' : 'FAILED';
-          if (notice.sendState === 'FAILED')
-            notice.error = 'Telegram rejected the notification.';
-        } catch (error) {
-          if (
-            error instanceof ForbiddenException ||
-            error instanceof NotFoundException
-          ) {
-            notice.sendState = 'SUPPRESSED';
-            return;
-          }
-          notice.sendState =
-            axios.isAxiosError(error) &&
-            error.response &&
-            error.response.status >= 400 &&
-            error.response.status < 500
-              ? 'FAILED'
-              : 'UNCERTAIN';
-          notice.error =
-            notice.sendState === 'FAILED'
-              ? 'Telegram rejected the notification. Check the bot connection.'
-              : 'Delivery is uncertain. Check Telegram before following up; no automatic resend.';
-        }
+        const base =
+          this.config.get('FRONTEND_URL') ?? this.config.get('SERVER_URL');
+        const url = new URL('/delivery', base);
+        if (isMetaReport) url.searchParams.set('view', 'ads');
+        else url.searchParams.set('task', notice.taskId);
+        const botToken = this.telegram.decryptBotToken(bot);
+        entry.status = 'SENDING';
+        entry.attemptedAt = now;
+        notice.sendState = 'SENDING';
+        notice.attemptedAt = now.toISOString();
+        await repository.save(entry);
+        return {
+          botToken,
+          chatId: connection.chatId,
+          text: `Otogrow: ${notice.kind === 'MESSAGE' ? 'An internal task message needs your attention.' : notice.kind === 'ASSIGNMENT' ? 'A task assignment needs your attention.' : 'A delivery check needs your attention.'}\n${url}`,
+        };
+      } catch (error) {
+        if (
+          error instanceof ForbiddenException ||
+          error instanceof NotFoundException
+        )
+          return finish('SUPPRESSED');
+        throw error;
+      }
+    });
+  }
+
+  async finishReminder(
+    outboxId: string,
+    status: Extract<DeliveryReminderState, 'SENT' | 'FAILED' | 'UNCERTAIN'>,
+    error: string | null,
+    now = new Date(),
+    expiredBefore?: Date,
+  ) {
+    const initial = await this.dataSource
+      .getRepository(DeliveryReminderOutboxEntity)
+      .findOneBy({ id: outboxId });
+    if (!initial || initial.status !== 'SENDING') return;
+    await this.transact(initial.workspaceId, async (state, manager) => {
+      const repository = manager.getRepository(DeliveryReminderOutboxEntity);
+      const entry = await repository.findOneBy({
+        id: outboxId,
+        workspaceId: initial.workspaceId,
+        status: 'SENDING',
       });
+      if (
+        !entry ||
+        (expiredBefore &&
+          (!entry.attemptedAt || entry.attemptedAt >= expiredBefore))
+      )
+        return;
+      entry.status = status;
+      entry.error = error;
+      entry.finishedAt = now;
+      const notice = state.notices.find((item) => item.id === entry.noticeId);
+      if (notice) {
+        notice.sendState = status;
+        notice.error = error;
+      }
+      await repository.save(entry);
+    });
   }
 
   @Cron('* * * * *')

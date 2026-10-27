@@ -1,8 +1,11 @@
+import { useDeliveryDraftGuard } from '@/delivery/drafts/DeliveryDraftGuard';
+import { useDeliveryNativeDraft } from '@/delivery/drafts/useDeliveryNativeDraft';
+import { DeliveryDraftConflict } from '@/delivery/drafts/DeliveryDraftConflict';
+import { OtogrowTeamRoles } from '@/otogrow-access/OtogrowTeamRoles';
 import { useState } from 'react';
 import { Trans, useLingui } from '@lingui/react/macro';
 import {
   type DeliveryCommandRunner,
-  type DeliveryMember,
   type DeliveryProject,
   type DeliveryWorkspace,
 } from '@/delivery/delivery.types';
@@ -10,7 +13,6 @@ import {
   StyledDeliveryButton,
   StyledDeliveryCard,
   StyledDeliveryGrid,
-  StyledDeliveryRow,
   StyledDeliveryStack,
 } from '@/delivery/deliveryStyles';
 
@@ -18,8 +20,14 @@ type DeliveryTeamProps = {
   workspace: DeliveryWorkspace;
   run: DeliveryCommandRunner;
   busy: boolean;
+  onChanged?: () => Promise<unknown>;
 };
-export const DeliveryTeam = ({ workspace, run, busy }: DeliveryTeamProps) => (
+export const DeliveryTeam = ({
+  workspace,
+  run,
+  busy,
+  onChanged,
+}: DeliveryTeamProps) => (
   <StyledDeliveryStack>
     <h2>
       <Trans>Projects and access</Trans>
@@ -30,7 +38,12 @@ export const DeliveryTeam = ({ workspace, run, busy }: DeliveryTeamProps) => (
         plan and review all projects.
       </Trans>
     </p>
-    <DeliveryProjectForm workspace={workspace} run={run} busy={busy} />
+    <DeliveryProjectForm
+      workspace={workspace}
+      run={run}
+      busy={busy}
+      onChanged={onChanged}
+    />
     {workspace.projects.map((project) => (
       <DeliveryProjectForm
         key={project.id}
@@ -38,30 +51,11 @@ export const DeliveryTeam = ({ workspace, run, busy }: DeliveryTeamProps) => (
         workspace={workspace}
         run={run}
         busy={busy}
+        onChanged={onChanged}
       />
     ))}
     {workspace.actor.isAdmin && (
-      <>
-        <h2>
-          <Trans>Team roles</Trans>
-        </h2>
-        <p>
-          <Trans>
-            Administrators have full delivery access and can manage roles.
-            Managers can assign and review work. Members work within their
-            assigned projects.
-          </Trans>
-        </p>
-        {workspace.members.map((member) => (
-          <DeliveryMemberForm
-            key={`${member.id}:${member.access}:${member.roleLabel}`}
-            member={member}
-            workspace={workspace}
-            run={run}
-            busy={busy}
-          />
-        ))}
-      </>
+      <OtogrowTeamRoles onChanged={onChanged ?? (async () => undefined)} />
     )}
   </StyledDeliveryStack>
 );
@@ -71,144 +65,160 @@ const DeliveryProjectForm = ({
   run,
   busy,
   project,
+  onChanged,
 }: DeliveryTeamProps & { project?: DeliveryProject }) => {
   const { t } = useLingui();
   const [name, setName] = useState(project?.name ?? '');
   const [companyId, setCompanyId] = useState(project?.companyId ?? '');
   const [memberIds, setMemberIds] = useState(project?.memberIds ?? []);
+  const { requestAction } = useDeliveryDraftGuard();
+  const [saving, setSaving] = useState(false);
+  const [openedRevision, setOpenedRevision] = useState(project?.revision);
+  const [refreshFailed, setRefreshFailed] = useState(false);
+  const currentProject = {
+    name: project?.name ?? '',
+    companyId: project?.companyId ?? '',
+    memberIds: project?.memberIds ?? [],
+  };
+  const [openedProject, setOpenedProject] = useState(() =>
+    JSON.stringify(currentProject),
+  );
+  const draft = useDeliveryNativeDraft({
+    extraValues: { name, companyId, memberIds },
+    busy: busy || saving,
+  });
+  const stale = Boolean(
+    project &&
+    (project.revision !== openedRevision ||
+      JSON.stringify(currentProject) !== openedProject),
+  );
+  const reload = () =>
+    requestAction(() => {
+      setName(currentProject.name);
+      setCompanyId(currentProject.companyId);
+      setMemberIds(currentProject.memberIds);
+      setOpenedProject(JSON.stringify(currentProject));
+      setOpenedRevision(project?.revision);
+      setRefreshFailed(false);
+      draft.markSaved(currentProject);
+    });
   return (
     <StyledDeliveryCard>
       <form
+        aria-label={
+          project ? t`Edit project ${project.name}` : t`Create a project`
+        }
+        ref={draft.formRef}
+        onChange={draft.onChange}
         onSubmit={async (event) => {
           event.preventDefault();
-          if (
-            (await run({
-              action: 'project',
-              ...(project ? { id: project.id } : {}),
-              name,
-              companyId: companyId || null,
-              memberIds,
-            })) &&
-            !project
-          ) {
-            setName('');
-            setMemberIds([]);
+          if (busy || saving || stale || !draft.dirty) return;
+          setSaving(true);
+          setRefreshFailed(false);
+          const savedProject = { name: name.trim(), companyId, memberIds };
+          try {
+            if (
+              await run({
+                action: 'project',
+                ...(project
+                  ? { id: project.id, revision: openedRevision }
+                  : {}),
+                name: savedProject.name,
+                companyId: companyId || null,
+                memberIds,
+              })
+            ) {
+              if (project) {
+                setOpenedRevision(project.revision + 1);
+                setName(savedProject.name);
+                setOpenedProject(JSON.stringify(savedProject));
+                draft.markSaved(savedProject);
+              } else {
+                setName('');
+                setCompanyId('');
+                setMemberIds([]);
+                draft.markSaved({ name: '', companyId: '', memberIds: [] });
+              }
+            } else if (project && onChanged) {
+              try {
+                await onChanged();
+              } catch {
+                setRefreshFailed(true);
+              }
+            }
+          } finally {
+            setSaving(false);
           }
         }}
       >
-        <StyledDeliveryStack>
-          <h3>{project ? project.name : t`Create a project`}</h3>
-          <StyledDeliveryGrid>
-            <label>
-              <Trans>Project name</Trans>
-              <input
-                required
-                maxLength={200}
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-              />
-            </label>
-            <label>
-              <Trans>Client</Trans>
-              <select
-                value={companyId}
-                onChange={(event) => setCompanyId(event.target.value)}
-              >
-                <option value="">{t`Internal work`}</option>
-                {workspace.companies.map((company) => (
-                  <option key={company.id} value={company.id}>
-                    {company.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </StyledDeliveryGrid>
-          <strong>
-            <Trans>Project members</Trans>
-          </strong>
-          <StyledDeliveryGrid>
-            {workspace.members.map((member) => (
-              <label key={member.id} style={{ flexDirection: 'row' }}>
+        {stale && (
+          <DeliveryDraftConflict onReload={reload} busy={busy || saving} />
+        )}
+        {refreshFailed && (
+          <p role="alert">
+            <Trans>
+              Your draft is preserved. Use Refresh page to check the latest
+              project before retrying.
+            </Trans>
+          </p>
+        )}
+        <fieldset disabled={busy || saving}>
+          <StyledDeliveryStack>
+            <h3>{project ? project.name : t`Create a project`}</h3>
+            <StyledDeliveryGrid>
+              <label>
+                <Trans>Project name</Trans>
                 <input
-                  type="checkbox"
-                  checked={memberIds.includes(member.id)}
-                  onChange={(event) =>
-                    setMemberIds(
-                      event.target.checked
-                        ? [...memberIds, member.id]
-                        : memberIds.filter((id) => id !== member.id),
-                    )
-                  }
+                  required
+                  maxLength={200}
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
                 />
-                {member.name}
               </label>
-            ))}
-          </StyledDeliveryGrid>
-          <StyledDeliveryButton disabled={busy} type="submit">
-            {project ? t`Save project access` : t`Create project`}
-          </StyledDeliveryButton>
-        </StyledDeliveryStack>
-      </form>
-    </StyledDeliveryCard>
-  );
-};
-
-const DeliveryMemberForm = ({
-  member,
-  workspace,
-  run,
-  busy,
-}: DeliveryTeamProps & { member: DeliveryMember }) => {
-  const { t } = useLingui();
-  const [access, setAccess] = useState(member.access);
-  const [roleLabel, setRoleLabel] = useState(member.roleLabel);
-  return (
-    <StyledDeliveryCard>
-      <form
-        onSubmit={(event) => {
-          event.preventDefault();
-          void run({
-            action: 'member',
-            workspaceMemberId: member.id,
-            access,
-            roleLabel,
-          });
-        }}
-      >
-        <StyledDeliveryStack>
-          <h3>{member.name}</h3>
-          <StyledDeliveryRow>
-            <label>
-              <Trans>Role label</Trans>
-              <input
-                maxLength={100}
-                placeholder={t`Editor, SEO specialist…`}
-                value={roleLabel}
-                onChange={(event) => setRoleLabel(event.target.value)}
-              />
-            </label>
-            <label>
-              <Trans>Delivery access</Trans>
-              <select
-                disabled={member.id === workspace.actor.memberId}
-                value={access}
-                onChange={(event) =>
-                  setAccess(event.target.value as DeliveryMember['access'])
-                }
-              >
-                <option value="MEMBER">{t`Member`}</option>
-                <option value="MANAGER">{t`Manager`}</option>
-                <option value="ADMIN">{t`Administrator`}</option>
-              </select>
-            </label>
+              <label>
+                <Trans>Client</Trans>
+                <select
+                  value={companyId}
+                  onChange={(event) => setCompanyId(event.target.value)}
+                >
+                  <option value="">{t`Internal work`}</option>
+                  {workspace.companies.map((company) => (
+                    <option key={company.id} value={company.id}>
+                      {company.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </StyledDeliveryGrid>
+            <strong>
+              <Trans>Project members</Trans>
+            </strong>
+            <StyledDeliveryGrid>
+              {workspace.members.map((member) => (
+                <label key={member.id} style={{ flexDirection: 'row' }}>
+                  <input
+                    type="checkbox"
+                    checked={memberIds.includes(member.id)}
+                    onChange={(event) =>
+                      setMemberIds(
+                        event.target.checked
+                          ? [...memberIds, member.id]
+                          : memberIds.filter((id) => id !== member.id),
+                      )
+                    }
+                  />
+                  {member.name}
+                </label>
+              ))}
+            </StyledDeliveryGrid>
             <StyledDeliveryButton
-              disabled={busy || member.id === workspace.actor.memberId}
+              disabled={busy || saving || stale || !draft.dirty}
               type="submit"
             >
-              <Trans>Save role</Trans>
+              {project ? t`Save project access` : t`Create project`}
             </StyledDeliveryButton>
-          </StyledDeliveryRow>
-        </StyledDeliveryStack>
+          </StyledDeliveryStack>
+        </fieldset>
       </form>
     </StyledDeliveryCard>
   );

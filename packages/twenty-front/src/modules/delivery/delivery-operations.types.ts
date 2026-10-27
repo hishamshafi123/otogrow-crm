@@ -1,7 +1,9 @@
 import { type DeliveryTask } from '@/delivery/delivery.types';
+import { type WorkflowPin } from '@/delivery/workflows/WorkflowPinField';
 export type RecurringTemplate = {
   id: string;
   projectId: string;
+  workflow?: WorkflowPin | null;
   fields: {
     title: string;
     assigneeId: string;
@@ -50,6 +52,7 @@ export type OperationsSnapshot = {
     error: string | null;
   }[];
   fulfilments: {
+    deliveredSubmissionVersion?: number;
     taskId: string;
     status: string;
     deliveredAt: string;

@@ -1,4 +1,9 @@
+import {
+  workflowPinSchema,
+  workflowReviewSchema,
+} from 'src/modules/delivery/workflows/delivery-workflows.types';
 import { z } from 'zod';
+import { deliveryTaskPlanSchema } from 'src/modules/delivery/capacity/delivery-capacity.types';
 
 const text = z.string().trim().max(20000);
 const name = z.string().trim().min(1).max(200);
@@ -15,7 +20,7 @@ const date = z.iso.date().nullable();
 const checklist = z
   .array(z.object({ id, text: name, done: z.boolean() }).strict())
   .max(100);
-const taskFields = z
+export const deliveryTaskFieldsSchema = z
   .object({
     title: name,
     brief: text,
@@ -33,13 +38,23 @@ const taskFields = z
 export const deliveryCommandSchema = z.discriminatedUnion('action', [
   z
     .object({
+      action: z.literal('plan'),
+      taskId: id,
+      revision: z.number().int().positive(),
+      plan: deliveryTaskPlanSchema,
+    })
+    .strict(),
+  z
+    .object({
       action: z.literal('project'),
       id: id.optional(),
+      revision: z.number().int().positive().optional(),
       name,
       companyId: id.nullable(),
       memberIds: z.array(id).max(200),
     })
-    .strict(),
+    .strict()
+    .refine((command) => Boolean(command.id) === Boolean(command.revision)),
   z
     .object({
       action: z.literal('member'),
@@ -49,14 +64,19 @@ export const deliveryCommandSchema = z.discriminatedUnion('action', [
     })
     .strict(),
   z
-    .object({ action: z.literal('create'), projectId: id, fields: taskFields })
+    .object({
+      action: z.literal('create'),
+      projectId: id,
+      fields: deliveryTaskFieldsSchema,
+      workflow: workflowPinSchema.nullish(),
+    })
     .strict(),
   z
     .object({
       action: z.literal('edit'),
       taskId: id,
       revision: z.number().int().positive(),
-      fields: taskFields,
+      fields: deliveryTaskFieldsSchema,
     })
     .strict(),
   z
@@ -82,6 +102,7 @@ export const deliveryCommandSchema = z.discriminatedUnion('action', [
   z
     .object({
       action: z.literal('review'),
+      workflowReview: workflowReviewSchema.optional(),
       taskId: id,
       revision: z.number().int().positive(),
       decision: z.enum(['APPROVED', 'CHANGES_REQUESTED']),

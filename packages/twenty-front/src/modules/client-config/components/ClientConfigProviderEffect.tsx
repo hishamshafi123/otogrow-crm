@@ -1,22 +1,18 @@
 import { useClientConfig } from '@/client-config/hooks/useClientConfig';
 import { clientConfigApiStatusState } from '@/client-config/states/clientConfigApiStatusState';
-import { useAtomState } from '@/ui/utilities/state/jotai/hooks/useAtomState';
+import { useAtomStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomStateValue';
 import { useEffect } from 'react';
-import { isDefined } from 'twenty-shared/utils';
 
 export const ClientConfigProviderEffect = () => {
-  const [clientConfigApiStatus, setClientConfigApiStatus] = useAtomState(
-    clientConfigApiStatusState,
-  );
-
-  const { data, loading, error, fetchClientConfig } = useClientConfig();
+  const clientConfigApiStatus = useAtomStateValue(clientConfigApiStatusState);
+  const { fetchClientConfig } = useClientConfig();
 
   useEffect(() => {
     if (
       !clientConfigApiStatus.isLoadedOnce &&
       !clientConfigApiStatus.isLoading
     ) {
-      fetchClientConfig();
+      void fetchClientConfig();
     }
   }, [
     clientConfigApiStatus.isLoadedOnce,
@@ -24,22 +20,5 @@ export const ClientConfigProviderEffect = () => {
     fetchClientConfig,
   ]);
 
-  useEffect(() => {
-    if (loading) return;
-
-    if (error instanceof Error) {
-      setClientConfigApiStatus((currentStatus) => ({
-        ...currentStatus,
-        isErrored: true,
-        error,
-      }));
-      return;
-    }
-
-    if (!isDefined(data?.clientConfig)) {
-      return;
-    }
-  }, [data?.clientConfig, error, loading, setClientConfigApiStatus]);
-
-  return <></>;
+  return null;
 };

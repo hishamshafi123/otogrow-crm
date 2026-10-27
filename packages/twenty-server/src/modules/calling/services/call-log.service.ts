@@ -1,11 +1,17 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
 
 import { isNonEmptyString } from '@sniptt/guards';
 import { type CountryCode, parsePhoneNumberWithError } from 'libphonenumber-js';
 import { FieldActorSource } from 'twenty-shared/types';
 import { isDefined } from 'twenty-shared/utils';
 import { v4 } from 'uuid';
+import { isUUID } from 'class-validator';
 
+import { type UserWorkspaceAuthContext } from 'src/engine/core-modules/auth/types/workspace-auth-context.type';
+import {
+  PermissionsException,
+  PermissionsExceptionCode,
+} from 'src/engine/metadata-modules/permissions/permissions.exception';
 import { GlobalWorkspaceOrmManager } from 'src/engine/twenty-orm/global-workspace-datasource/global-workspace-orm.manager';
 import { buildSystemAuthContext } from 'src/engine/twenty-orm/utils/build-system-auth-context.util';
 import { CallWorkspaceEntity } from 'src/modules/calling/standard-objects/call.workspace-entity';
@@ -17,7 +23,6 @@ import { CallTimelineService } from 'src/modules/calling/services/call-timeline.
 import { CreatePersonService } from 'src/modules/contact-creation-manager/services/create-person.service';
 import { getE164MatchVariants } from 'src/modules/messaging/channels/utils/normalize-phone-number.util';
 import { PersonWorkspaceEntity } from 'src/modules/person/standard-objects/person.workspace-entity';
-import { WorkspaceMemberWorkspaceEntity } from 'src/modules/workspace-member/standard-objects/workspace-member.workspace-entity';
 
 @Injectable()
 export class CallLogService {
@@ -35,15 +40,45 @@ export class CallLogService {
     fromNumber,
     toNumber,
     personId,
+    callerAuthContext,
   }: {
     workspaceId: string;
     callSid: string;
     fromNumber: string;
     toNumber: string;
     personId: string | null;
+    callerAuthContext: UserWorkspaceAuthContext;
   }): Promise<{ callId: string | null; created: boolean }> {
+    if (callerAuthContext.workspace.id !== workspaceId)
+      throw new ForbiddenException('Contact is not available for this call.');
+    if (isDefined(personId)) {
+      if (!isUUID(personId))
+        throw new ForbiddenException('Contact is not available for this call.');
+      const person =
+        await this.globalWorkspaceOrmManager.executeInWorkspaceContext(
+          async () => {
+            const repository =
+              await this.globalWorkspaceOrmManager.getRepository(
+                workspaceId,
+                PersonWorkspaceEntity,
+              );
+            return repository.findOne({
+              where: { id: personId },
+              select: { id: true },
+            });
+          },
+          callerAuthContext,
+        );
+      if (!isDefined(person))
+        throw new ForbiddenException('Contact is not available for this call.');
+    }
     const resolvedPersonId =
-      personId ?? (await this.findPersonIdByPhone(workspaceId, toNumber));
+      personId ??
+      (await this.findPersonIdByPhone(
+        workspaceId,
+        toNumber,
+        callerAuthContext,
+      ));
 
     return this.insertCallIfAbsent({
       workspaceId,
@@ -52,6 +87,7 @@ export class CallLogService {
       fromNumber,
       toNumber,
       personId: resolvedPersonId,
+      callerAuthContext,
     });
   }
 
@@ -90,26 +126,6 @@ export class CallLogService {
     }
 
     return { callId, created };
-  }
-
-  // Voice tokens are minted with the workspace member id as the client
-  // identity, so these ids are the <Client> nouns Twilio can ring.
-  async listWorkspaceMemberIds(workspaceId: string): Promise<string[]> {
-    return this.globalWorkspaceOrmManager.executeInWorkspaceContext(
-      async () => {
-        const workspaceMemberRepository =
-          await this.globalWorkspaceOrmManager.getRepository(
-            workspaceId,
-            WorkspaceMemberWorkspaceEntity,
-            { shouldBypassPermissionChecks: true },
-          );
-
-        const workspaceMembers = await workspaceMemberRepository.find();
-
-        return workspaceMembers.map((member) => member.id);
-      },
-      buildSystemAuthContext(workspaceId),
-    );
   }
 
   async updateCallStatus({
@@ -198,6 +214,7 @@ export class CallLogService {
     fromNumber,
     toNumber,
     personId,
+    callerAuthContext,
   }: {
     workspaceId: string;
     callSid: string;
@@ -205,6 +222,7 @@ export class CallLogService {
     fromNumber: string;
     toNumber: string;
     personId: string | null;
+    callerAuthContext?: UserWorkspaceAuthContext;
   }): Promise<{ callId: string | null; created: boolean }> {
     return this.globalWorkspaceOrmManager.executeInWorkspaceContext(
       async () => {
@@ -226,7 +244,11 @@ export class CallLogService {
         }
 
         const companyId = isDefined(personId)
-          ? await this.findPersonCompanyId(workspaceId, personId)
+          ? await this.findPersonCompanyId(
+              workspaceId,
+              personId,
+              callerAuthContext,
+            )
           : null;
 
         const callId = v4();
@@ -257,29 +279,44 @@ export class CallLogService {
   private async findPersonCompanyId(
     workspaceId: string,
     personId: string,
+    callerAuthContext?: UserWorkspaceAuthContext,
   ): Promise<string | null> {
-    return this.globalWorkspaceOrmManager.executeInWorkspaceContext(
-      async () => {
-        const personRepository =
-          await this.globalWorkspaceOrmManager.getRepository(
-            workspaceId,
-            PersonWorkspaceEntity,
-            { shouldBypassPermissionChecks: true },
-          );
+    return this.globalWorkspaceOrmManager
+      .executeInWorkspaceContext(
+        async () => {
+          const personRepository =
+            await this.globalWorkspaceOrmManager.getRepository(
+              workspaceId,
+              PersonWorkspaceEntity,
+              isDefined(callerAuthContext)
+                ? undefined
+                : { shouldBypassPermissionChecks: true },
+            );
 
-        const person = await personRepository.findOne({
-          where: { id: personId },
-        });
+          const person = await personRepository.findOne({
+            where: { id: personId },
+            select: { companyId: true },
+          });
 
-        return person?.companyId ?? null;
-      },
-      buildSystemAuthContext(workspaceId),
-    );
+          return person?.companyId ?? null;
+        },
+        callerAuthContext ?? buildSystemAuthContext(workspaceId),
+      )
+      .catch((error: unknown) => {
+        if (
+          isDefined(callerAuthContext) &&
+          error instanceof PermissionsException &&
+          error.code === PermissionsExceptionCode.PERMISSION_DENIED
+        )
+          return null;
+        throw error;
+      });
   }
 
   private async findPersonIdByPhone(
     workspaceId: string,
     phoneNumber: string,
+    callerAuthContext?: UserWorkspaceAuthContext,
   ): Promise<string | null> {
     const variants = getE164MatchVariants(phoneNumber);
 
@@ -287,43 +324,56 @@ export class CallLogService {
       return null;
     }
 
-    return this.globalWorkspaceOrmManager.executeInWorkspaceContext(
-      async () => {
-        const personRepository =
-          await this.globalWorkspaceOrmManager.getRepository(
-            workspaceId,
-            PersonWorkspaceEntity,
-            { shouldBypassPermissionChecks: true },
-          );
+    return this.globalWorkspaceOrmManager
+      .executeInWorkspaceContext(
+        async () => {
+          const personRepository =
+            await this.globalWorkspaceOrmManager.getRepository(
+              workspaceId,
+              PersonWorkspaceEntity,
+              isDefined(callerAuthContext)
+                ? undefined
+                : { shouldBypassPermissionChecks: true },
+            );
 
-        const person = await personRepository
-          .createQueryBuilder('person')
-          .where(
-            '(person.phonesPrimaryPhoneNumber = :nationalNumber AND person.phonesPrimaryPhoneCallingCode IN (:...callingCodes))',
-            {
-              nationalNumber: variants.nationalNumber,
-              callingCodes: [
-                `+${variants.countryCallingCode}`,
-                variants.countryCallingCode,
-              ],
-            },
-          )
-          .orWhere(
-            'person.phonesPrimaryPhoneNumber IN (:...fullNumberVariants)',
-            {
-              fullNumberVariants: [
-                variants.e164,
-                variants.e164.slice(1),
-                variants.nationalNumber,
-              ],
-            },
-          )
-          .getOne();
+          const person = await personRepository
+            .createQueryBuilder('person')
+            .where(
+              '(person.phonesPrimaryPhoneNumber = :nationalNumber AND person.phonesPrimaryPhoneCallingCode IN (:...callingCodes))',
+              {
+                nationalNumber: variants.nationalNumber,
+                callingCodes: [
+                  `+${variants.countryCallingCode}`,
+                  variants.countryCallingCode,
+                ],
+              },
+            )
+            .orWhere(
+              'person.phonesPrimaryPhoneNumber IN (:...fullNumberVariants)',
+              {
+                fullNumberVariants: [
+                  variants.e164,
+                  variants.e164.slice(1),
+                  variants.nationalNumber,
+                ],
+              },
+            )
+            .getOne();
 
-        return person?.id ?? null;
-      },
-      buildSystemAuthContext(workspaceId),
-    );
+          return person?.id ?? null;
+        },
+        callerAuthContext ?? buildSystemAuthContext(workspaceId),
+      )
+      .catch((error: unknown) => {
+        // A caller may dial a known number without gaining access to restricted CRM contacts.
+        if (
+          isDefined(callerAuthContext) &&
+          error instanceof PermissionsException &&
+          error.code === PermissionsExceptionCode.PERMISSION_DENIED
+        )
+          return null;
+        throw error;
+      });
   }
 
   private async findOrCreatePersonId(

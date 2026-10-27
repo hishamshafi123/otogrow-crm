@@ -1,6 +1,21 @@
+import { ForbiddenException } from '@nestjs/common';
+
+import { type UserWorkspaceAuthContext } from 'src/engine/core-modules/auth/types/workspace-auth-context.type';
+import {
+  PermissionsException,
+  PermissionsExceptionCode,
+} from 'src/engine/metadata-modules/permissions/permissions.exception';
 import { CallLogService } from 'src/modules/calling/services/call-log.service';
+import { PersonWorkspaceEntity } from 'src/modules/person/standard-objects/person.workspace-entity';
 
 const WORKSPACE_ID = 'workspace-id';
+const PERSON_ID = '42d54d12-499f-4fa8-8395-7a427cd00d2c';
+const CALLER_CONTEXT = {
+  type: 'user',
+  workspace: { id: WORKSPACE_ID },
+  workspaceMemberId: 'member-id',
+  userWorkspaceId: 'user-workspace-id',
+} as UserWorkspaceAuthContext;
 
 describe('CallLogService', () => {
   const callRepository = {
@@ -17,11 +32,13 @@ describe('CallLogService', () => {
 
   const globalWorkspaceOrmManager = {
     executeInWorkspaceContext: jest.fn(
-      (callback: () => Promise<unknown>) => callback(),
+      (callback: () => Promise<unknown>, _context?: unknown) => callback(),
     ),
     getRepository: jest.fn((_workspaceId: string, entity: { name: string }) =>
       Promise.resolve(
-        entity.name === 'CallWorkspaceEntity' ? callRepository : personRepository,
+        entity.name === 'CallWorkspaceEntity'
+          ? callRepository
+          : personRepository,
       ),
     ),
   };
@@ -43,6 +60,117 @@ describe('CallLogService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    callRepository.findOne.mockReset().mockResolvedValue(null);
+    personRepository.findOne.mockReset().mockResolvedValue(null);
+    personRepository.createQueryBuilder.mockReset();
+  });
+
+  describe('outbound contact scope', () => {
+    const outbound = () => ({
+      workspaceId: WORKSPACE_ID,
+      callSid: 'CA123',
+      fromNumber: '+12533525757',
+      toNumber: '+14155552671',
+      personId: PERSON_ID,
+      callerAuthContext: CALLER_CONTEXT,
+    });
+
+    it('does not log or link an explicitly requested contact hidden by native record scope', async () => {
+      await expect(
+        buildService().upsertOutboundCall(outbound()),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(
+        globalWorkspaceOrmManager.executeInWorkspaceContext,
+      ).toHaveBeenCalledWith(expect.any(Function), CALLER_CONTEXT);
+      expect(globalWorkspaceOrmManager.getRepository).toHaveBeenCalledWith(
+        WORKSPACE_ID,
+        PersonWorkspaceEntity,
+      );
+      expect(callRepository.insert).not.toHaveBeenCalled();
+    });
+
+    it('preserves native object denial for an explicitly requested contact', async () => {
+      personRepository.findOne.mockRejectedValueOnce(
+        new PermissionsException(
+          'Denied',
+          PermissionsExceptionCode.PERMISSION_DENIED,
+        ),
+      );
+      await expect(
+        buildService().upsertOutboundCall(outbound()),
+      ).rejects.toBeInstanceOf(PermissionsException);
+      expect(callRepository.insert).not.toHaveBeenCalled();
+    });
+
+    it('rejects a caller context for another workspace before reading contacts', async () => {
+      await expect(
+        buildService().upsertOutboundCall({
+          ...outbound(),
+          workspaceId: 'other-workspace',
+        }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(globalWorkspaceOrmManager.getRepository).not.toHaveBeenCalled();
+      expect(callRepository.insert).not.toHaveBeenCalled();
+    });
+
+    it('links a visible contact and resolves its company using the same native caller scope', async () => {
+      personRepository.findOne
+        .mockResolvedValueOnce({ id: PERSON_ID })
+        .mockResolvedValueOnce({ companyId: 'company-id' });
+      const result = await buildService().upsertOutboundCall(outbound());
+      expect(result.created).toBe(true);
+      expect(callRepository.insert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          direction: 'OUTBOUND',
+          personId: PERSON_ID,
+          companyId: 'company-id',
+        }),
+      );
+      expect(
+        globalWorkspaceOrmManager.getRepository.mock.calls.filter(
+          ([, entity]) => entity === PersonWorkspaceEntity,
+        ),
+      ).toEqual([
+        [WORKSPACE_ID, PersonWorkspaceEntity],
+        [WORKSPACE_ID, PersonWorkspaceEntity, undefined],
+      ]);
+      expect(
+        globalWorkspaceOrmManager.executeInWorkspaceContext.mock.calls.filter(
+          ([, context]) => context === CALLER_CONTEXT,
+        ),
+      ).toHaveLength(2);
+    });
+
+    it('can dial a number without exposing restricted contacts through automatic phone matching', async () => {
+      const getOne = jest
+        .fn()
+        .mockRejectedValueOnce(
+          new PermissionsException(
+            'Denied',
+            PermissionsExceptionCode.PERMISSION_DENIED,
+          ),
+        );
+      personRepository.createQueryBuilder.mockReturnValue({
+        where: jest.fn().mockReturnThis(),
+        orWhere: jest.fn().mockReturnThis(),
+        getOne,
+      });
+      await buildService().upsertOutboundCall({
+        ...outbound(),
+        personId: null,
+      });
+      expect(globalWorkspaceOrmManager.getRepository).toHaveBeenCalledWith(
+        WORKSPACE_ID,
+        PersonWorkspaceEntity,
+        undefined,
+      );
+      expect(
+        globalWorkspaceOrmManager.executeInWorkspaceContext,
+      ).toHaveBeenCalledWith(expect.any(Function), CALLER_CONTEXT);
+      expect(callRepository.insert).toHaveBeenCalledWith(
+        expect.objectContaining({ personId: null, companyId: null }),
+      );
+    });
   });
 
   describe('updateCallStatus', () => {
@@ -197,13 +325,13 @@ describe('CallLogService', () => {
           companyId: 'company-id',
         }),
       );
-      expect(
-        callTimelineService.upsertPersonCallActivity,
-      ).toHaveBeenCalledWith({
-        workspaceId: WORKSPACE_ID,
-        personId: 'person-id',
-        callId: result.callId,
-      });
+      expect(callTimelineService.upsertPersonCallActivity).toHaveBeenCalledWith(
+        {
+          workspaceId: WORKSPACE_ID,
+          personId: 'person-id',
+          callId: result.callId,
+        },
+      );
     });
   });
 });
