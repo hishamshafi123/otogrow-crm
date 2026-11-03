@@ -197,6 +197,9 @@ export const AiPriceForm = ({
                   <option value="INSPECTION">
                     <Trans>Image inspection</Trans>
                   </option>
+                  <option value="VIDEO_QA">
+                    <Trans>Video and audio inspection</Trans>
+                  </option>
                 </select>
               </label>
               <label>

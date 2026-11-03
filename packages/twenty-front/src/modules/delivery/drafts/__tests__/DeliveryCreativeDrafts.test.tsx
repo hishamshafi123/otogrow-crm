@@ -12,6 +12,9 @@ import {
   type DeliveryWorkspace,
 } from '@/delivery/delivery.types';
 
+jest.mock('@/delivery/creative/atlas/AtlasProductionTools', () => ({
+  AtlasProductionTools: () => <section>Atlas generation tools</section>,
+}));
 jest.mock('@/delivery/deliveryStyles', () => ({
   StyledDeliveryStack: 'div',
   StyledDeliveryRow: 'div',
@@ -172,6 +175,37 @@ beforeEach(() => {
   changed.mockReset().mockResolvedValue(undefined);
 });
 
+it('keeps legacy video briefs and supports an explicit still-image deliverable without duration or music inputs', async () => {
+  const user = setup();
+  expect(screen.getByLabelText('Final deliverable')).toHaveValue('VIDEO');
+  expect(screen.getByLabelText('Duration in seconds')).toHaveValue(30);
+  await user.selectOptions(screen.getByLabelText('Final deliverable'), 'IMAGE');
+  expect(
+    screen.queryByLabelText('Duration in seconds'),
+  ).not.toBeInTheDocument();
+  expect(screen.queryByLabelText('Music notes')).not.toBeInTheDocument();
+  await user.click(
+    screen.getByRole('button', { name: 'Save new brief version' }),
+  );
+  expect(mockMutate).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      variables: {
+        input: expect.objectContaining({
+          action: 'brief',
+          revision: 3,
+          brief: expect.objectContaining({
+            outputKind: 'IMAGE',
+            productFacts: '',
+          }),
+        }),
+      },
+    }),
+  );
+  await user.selectOptions(screen.getByLabelText('Final deliverable'), 'VIDEO');
+  expect(screen.getByLabelText('Duration in seconds')).toHaveValue(30);
+  expect(screen.getByLabelText('Music notes')).toBeVisible();
+});
+
 it('protects reference proposals across stages and keeps an unsuccessful submission for retry', async () => {
   const user = setup();
   await user.click(screen.getByRole('button', { name: 'References' }));
@@ -243,7 +277,7 @@ it('protects shot Cancel and blocks submitting prompts against a refreshed revis
   ).not.toBeInTheDocument();
 });
 
-it('removes unknown-cost permission and blocks image generation until billing support exists', async () => {
+it('removes unknown-cost permission and separates blocked legacy Google generation from Atlas requests', async () => {
   const user = setup();
   await user.click(screen.getByRole('button', { name: 'Generation' }));
   await user.click(screen.getByText('Generation access for this production'));
@@ -266,8 +300,9 @@ it('removes unknown-cost permission and blocks image generation until billing su
     screen.getByRole('button', { name: 'Generation unavailable' }),
   ).toBeDisabled();
   expect(
-    screen.getByText(/Image and video generation are unavailable/),
+    screen.getByText(/Legacy Google generation remains unavailable here/),
   ).toBeVisible();
+  expect(screen.getByText('Atlas generation tools')).toBeVisible();
   expect(mockMutate).not.toHaveBeenCalled();
 });
 

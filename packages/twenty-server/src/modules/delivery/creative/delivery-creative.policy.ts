@@ -36,21 +36,41 @@ export const isCreativeAssetApproved = (
   isCreativeAssetCurrent(document, asset) &&
   asset.reviews[asset.reviews.length - 1]?.decision === 'APPROVED';
 
+export const assertCreativeAssetMime = (
+  document: CreativeDocument,
+  asset: Pick<CreativeAsset, 'kind' | 'mimeType'>,
+) => {
+  if (
+    (asset.kind === 'IMAGE' ||
+      (asset.kind === 'FINAL' && document.brief.outputKind === 'IMAGE')) &&
+    !asset.mimeType.startsWith('image/')
+  )
+    throw new BadRequestException('A still image is required for this asset.');
+  if (
+    (['CLIP', 'BASE', 'HOOK', 'CTA'].includes(asset.kind) ||
+      (asset.kind === 'FINAL' && document.brief.outputKind !== 'IMAGE')) &&
+    !asset.mimeType.startsWith('video/')
+  )
+    throw new BadRequestException('A video is required for this asset.');
+  if (asset.kind === 'AUDIO' && !asset.mimeType.startsWith('audio/'))
+    throw new BadRequestException('An audio file is required.');
+};
+
 export const assertCreativeSubmission = (document: CreativeDocument) => {
   if (document.approvedBriefVersion !== document.briefVersion)
     throw new BadRequestException(
       'Approve the current creative brief before submitting.',
     );
-  if (!document.shots.length)
+  const isImage = document.brief.outputKind === 'IMAGE';
+  if (!isImage && !document.shots.length)
     throw new BadRequestException('Add a shot before submitting.');
-  for (const shot of document.shots) {
+  for (const shot of isImage ? [] : document.shots) {
     const image = document.assets.find((item) => item.id === shot.imageId);
     const clip = document.assets.find((item) => item.id === shot.clipId);
     if (
       !image ||
-      !clip ||
       !isCreativeAssetApproved(document, image) ||
-      !isCreativeAssetApproved(document, clip)
+      !clip || !isCreativeAssetApproved(document, clip)
     )
       throw new BadRequestException(
         'Approve and select current images and clips for every shot.',
@@ -67,6 +87,7 @@ export const assertCreativeSubmission = (document: CreativeDocument) => {
     throw new BadRequestException(
       'Select a current final edit before submitting.',
     );
+  assertCreativeAssetMime(document, final);
 };
 
 export const invalidateCreativeAssembly = (document: CreativeDocument) => {

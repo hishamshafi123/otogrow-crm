@@ -1,11 +1,22 @@
 export type DeliveryAgentConfiguration = {
   name: string;
   purpose: string;
-  kind: 'BRIEF' | 'COPY' | 'SEO';
+  kind: 'BRIEF' | 'COPY' | 'SEO' | 'ADVERTISING' | 'ACTIVITY';
   enabled: boolean;
   instructions: string;
-  requiredInputs: ('brief' | 'copy' | 'requirements')[];
-  outputFormat: 'findings' | 'findings_and_edits';
+  requiredInputs: (
+    | 'brief'
+    | 'copy'
+    | 'requirements'
+    | 'report'
+    | 'activity'
+    | 'question'
+  )[];
+  outputFormat:
+    | 'findings'
+    | 'findings_and_edits'
+    | 'recommendations'
+    | 'analysis';
   tools: 'public_page_check'[];
   modelId: string | null;
   projectIds: string[];

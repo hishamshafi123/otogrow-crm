@@ -11,10 +11,12 @@ export type DeliveryState =
 export type DeliveryChecklistItem = { id: string; text: string; done: boolean };
 export type DeliverySubmission = {
   version: number;
+  creativeVersion?: number;
+  finalAssetId?: string;
   description: string;
   evidence: string[];
   submittedBy: string;
-  submittedAt: string;
+  submittedAt: string | null;
   decision?: string;
   feedback?: string;
   reviewedBy?: string;
@@ -23,6 +25,14 @@ export type DeliverySubmission = {
   workflowReview?: { checkedIds: string[] };
 };
 export type DeliveryTask = {
+  review?: {
+    submissionVersion: number | null;
+    effectiveReviewerId: string | null;
+    primaryReviewerId: string | null;
+    assignmentRevision: number;
+    assignmentMode: string;
+    reviewerState: string;
+  };
   delivery?: {
     timezone: string;
     status:
@@ -38,7 +48,7 @@ export type DeliveryTask = {
   };
   id: string;
   title: string;
-  assigneeId: string;
+  assigneeId: string | null;
   dueAt: string | null;
   projectId: string;
   revision: number;
@@ -81,6 +91,9 @@ export type DeliveryMember = {
   roleLabel: string;
 };
 export type DeliveryWorkspace = {
+  workspaceId?: string;
+  memberId?: string;
+  userWorkspaceId?: string;
   actor: { memberId: string; isAdmin: boolean; isManager: boolean };
   projects: DeliveryProject[];
   tasks: DeliveryTask[];
@@ -90,3 +103,7 @@ export type DeliveryWorkspace = {
 export type DeliveryCommandRunner = (
   input: Record<string, unknown>,
 ) => Promise<boolean>;
+export type DeliveryTaskContext = Pick<
+  DeliveryWorkspace,
+  'actor' | 'projects' | 'members' | 'companies'
+>;

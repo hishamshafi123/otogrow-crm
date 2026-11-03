@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Trans, useLingui } from '@lingui/react/macro';
 import {
   StyledDeliveryButton,
@@ -23,7 +23,13 @@ type ActivityFilterBarProps = {
   filters: ActivityFilters;
   options?: Pick<OtogrowActivityFeed, 'people' | 'projects' | 'clients'>;
   onApply: (filters: ActivityFilters) => void;
-  onReset: () => void;
+  onReset: (commitReset: () => void) => void;
+  recordPicker?: (
+    kind: 'personId' | 'projectId' | 'clientId',
+    label: string,
+    value: string,
+    onChange: (value: string) => void,
+  ) => ReactNode;
 };
 
 export const ActivityFilterBar = ({
@@ -31,6 +37,7 @@ export const ActivityFilterBar = ({
   options,
   onApply,
   onReset,
+  recordPicker,
 }: ActivityFilterBarProps) => {
   const { t } = useLingui();
   const { label } = useActivityLabels();
@@ -54,25 +61,29 @@ export const ActivityFilterBar = ({
     name: string,
     all: string,
     choices: { id: string; name: string }[],
-  ) => (
-    <label>
-      {name}
-      <select
-        value={draft[key]}
-        onChange={(event) => change(key, event.target.value)}
-      >
-        <option value="">{all}</option>
-        {draft[key] && !choices.some((choice) => choice.id === draft[key]) && (
-          <option value={draft[key]}>{t`Selected record`}</option>
-        )}
-        {choices.map((choice) => (
-          <option key={choice.id} value={choice.id}>
-            {choice.name}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
+  ) =>
+    recordPicker ? (
+      recordPicker(key, name, draft[key], (value) => change(key, value))
+    ) : (
+      <label>
+        {name}
+        <select
+          value={draft[key]}
+          onChange={(event) => change(key, event.target.value)}
+        >
+          <option value="">{all}</option>
+          {draft[key] &&
+            !choices.some((choice) => choice.id === draft[key]) && (
+              <option value={draft[key]}>{t`Selected record`}</option>
+            )}
+          {choices.map((choice) => (
+            <option key={choice.id} value={choice.id}>
+              {choice.name}
+            </option>
+          ))}
+        </select>
+      </label>
+    );
   return (
     <StyledDeliveryCard>
       <details open={!isMobile}>
@@ -191,13 +202,14 @@ export const ActivityFilterBar = ({
               <StyledDeliveryButton
                 type="button"
                 onClick={() => {
-                  setDraft(
-                    Object.fromEntries(
-                      Object.keys(draft).map((key) => [key, '']),
-                    ) as ActivityFilters,
-                  );
-                  setError('');
-                  onReset();
+                  onReset(() => {
+                    setDraft(
+                      Object.fromEntries(
+                        Object.keys(draft).map((key) => [key, '']),
+                      ) as ActivityFilters,
+                    );
+                    setError('');
+                  });
                 }}
               >
                 <Trans>Clear filters</Trans>

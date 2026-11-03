@@ -1,5 +1,7 @@
 import { DeliveryReminderJob } from 'src/modules/delivery/operations/delivery-reminder.job';
+import { DeliveryInboxSendJob } from 'src/modules/delivery/inbox/delivery-inbox-send.job';
 import { DeliveryMediaJob } from 'src/modules/delivery/creative/delivery-media.job';
+import { DeliveryAtlasJob } from 'src/modules/delivery/creative/atlas/delivery-atlas.job';
 import { Module } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { DeliveryModule } from 'src/modules/delivery/delivery.module';
@@ -117,9 +119,11 @@ import { WorkflowModule } from 'src/modules/workflow/workflow.module';
     BillingReminderModule,
   ],
   providers: [
+    DeliveryInboxSendJob,
     DeliveryAgentJob,
     DeliveryReminderJob,
     DeliveryMediaJob,
+    DeliveryAtlasJob,
     BillingReminderCronJob,
     CleanSuspendedWorkspacesJob,
     CleanOnboardingWorkspacesJob,

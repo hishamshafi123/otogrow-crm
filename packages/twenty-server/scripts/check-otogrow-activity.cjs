@@ -341,7 +341,7 @@ async function main() {
       Buffer.from(firstCursor, 'base64url').toString(),
     );
     for (const invalidCursor of [
-      { ...decodedCursor, version: 2 },
+      { ...decodedCursor, version: 1 },
       { ...decodedCursor, id: 'invalid' },
       { ...decodedCursor, at: 'invalid' },
       { ...decodedCursor, unknown: true },
@@ -477,15 +477,13 @@ async function main() {
     await assert.rejects(
       () =>
         scoped.transaction(async (manager) => {
-          await manager
-            .getRepository(DeliveryProjectEntity)
-            .insert({
-              id: rollbackProjectId,
-              workspaceId: workspace.id,
-              name: 'Must roll back',
-              companyId: clientId,
-              memberIds: [],
-            });
+          await manager.getRepository(DeliveryProjectEntity).insert({
+            id: rollbackProjectId,
+            workspaceId: workspace.id,
+            name: 'Must roll back',
+            companyId: clientId,
+            memberIds: [],
+          });
           await recordOtogrowActivity(manager, {
             ...validInput,
             projectId: rollbackProjectId,
@@ -501,15 +499,13 @@ async function main() {
     assert.deepEqual(await rows(), beforeRollback);
     await assert.rejects(() =>
       scoped.transaction(async (manager) => {
-        await manager
-          .getRepository(DeliveryProjectEntity)
-          .insert({
-            id: rollbackProjectId,
-            workspaceId: workspace.id,
-            name: 'Must roll back',
-            companyId: clientId,
-            memberIds: [],
-          });
+        await manager.getRepository(DeliveryProjectEntity).insert({
+          id: rollbackProjectId,
+          workspaceId: workspace.id,
+          name: 'Must roll back',
+          companyId: clientId,
+          memberIds: [],
+        });
         await recordOtogrowActivity(manager, {
           ...validInput,
           projectId: foreignProject.id,

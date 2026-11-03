@@ -56,6 +56,7 @@ export const AiSpendHistory = ({ spendId }: AiSpendHistoryProps) => {
   const labels: Record<string, string> = {
     RESERVED: t`Amount reserved`,
     DISPATCHED: t`Request dispatched`,
+    MEDIA_PREDICTION_ACCEPTED: t`Media request accepted by provider`,
     SETTLED: t`Provider charge recorded`,
     UNCERTAIN: t`Charge needs reconciliation`,
     RELEASED: t`Reservation released before dispatch`,

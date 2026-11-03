@@ -1,6 +1,9 @@
 import { Trans, useLingui } from '@lingui/react/macro';
 import { type DeliveryFinanceQuery } from '~/generated-metadata/graphql';
-import { formatFinanceAmountMicros } from '@/delivery/finance/finance-money';
+import {
+  formatFinanceAmountMicros,
+  formatFinanceRecordedMargin,
+} from '@/delivery/finance/finance-money';
 import {
   StyledDeliveryCard,
   StyledDeliveryGrid,
@@ -41,6 +44,17 @@ export const FinanceMonthlyResults = ({
                   <h3>{formatFinanceAmountMicros(amount, summary.currency)}</h3>
                 </div>
               ))}
+              <div>
+                <small>
+                  <Trans>Recorded margin</Trans>
+                </small>
+                <h3>
+                  {formatFinanceRecordedMargin(
+                    summary.revenueMicros,
+                    summary.resultMicros,
+                  ) ?? t`Unavailable`}
+                </h3>
+              </div>
             </StyledDeliveryGrid>
             <p>{t`${summary.postedCount} posted · ${summary.draftCount} draft · ${summary.voidCount} voided`}</p>
             {(summary.unassignedRevenueMicros !== '0' ||
@@ -86,13 +100,25 @@ export const FinanceMonthlyResults = ({
                   {formatFinanceAmountMicros(
                     project.resultMicros,
                     summary.currency,
-                  )}
+                  )}{' '}
+                  · {t`Recorded margin`}:{' '}
+                  {formatFinanceRecordedMargin(
+                    project.revenueMicros,
+                    project.resultMicros,
+                  ) ?? t`Unavailable`}
                 </p>
               </div>
             ))}
           </StyledDeliveryStack>
         </StyledDeliveryCard>
       ))}
+      <p>
+        <Trans>
+          Recorded margin is recorded result divided by recorded revenue,
+          rounded to two decimal places. It is unavailable when recorded revenue
+          is zero.
+        </Trans>
+      </p>
       <p>
         <Trans>
           Results include posted monthly entries only. Cash receipts, salary

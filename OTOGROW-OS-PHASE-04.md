@@ -2,6 +2,8 @@
 
 Status: approved by the user replying "approve". Implemented and verified locally. Live Telegram recipients are not yet authorized; no external message was sent.
 
+2026-11-01 follow-up: canonical Team chat now opens through its genuine typed page without first loading the legacy task snapshot. Confirmed query/send/view access denial disposes private drafts, uncertain-send bodies and blocked navigation before a later fresh authorization may reopen current history. Ordinary same-source outages retain hidden drafts; peer/page navigation and late replies cannot carry preparation into another conversation. The existing five-minute reminder/read-receipt server rules are unchanged. Fifteen actual chat-component cases plus shared-shell/router acceptance passed; the local workspace has no second real teammate, so no real employee message or viewed receipt was sent. Full batch evidence is in IMP-37/43 and the adjacent IMP-10/46 correction; live Telegram and production workers remain operational setup.
+
 ## Outcome
 
 Amna can schedule recurring work across roles, see what has actually been delivered, and follow up without manually chasing each task. Employees receive one Telegram reminder for unattended assignments or internal messages. Founder alerts surface actionable delivery risks.
@@ -75,3 +77,12 @@ There is a maximum of 100 recurring templates per workspace and a 10 MB operatio
 Automatic founder alerts cover overdue delivery. Client, contract and budget concerns are manager-entered flags; ad-performance and financial detection await their corresponding phases. A Telegram timeout remains visibly uncertain and requires manual review, not an automatic resend. Previously unconfigured notifications remain visible in the OS and are not sent retroactively on connection.
 
 Local Phase 4 implementation is complete. Phase 5 is proposed separately in `OTOGROW-OS-PHASE-05.md`; do not implement it until approved.
+
+## 2026-10-29 — scoped review-assignment handoff follow-up
+
+IMP-17 extends the existing addressed notice/durable outbox with a separate exact review-assignment source. Backups remain independent of native production assignees. Verified visible assignment/explicit receipt stops a once-only five-minute reminder; generic dashboard or production-task reads cannot mark it seen. Current review authority/source is rechecked before dispatch and obsolete notices are suppressed. Existing configuration, network-outside-lock and uncertainty rules remain.
+
+This extension is locally accepted, including primary null-origin/revision0 notices, same-owner deadline preservation, changed-owner/new-submission/decision suppression, exact visible receipt/acknowledgement, independent-session races and mocked once-only after-hours dispatch. Explicit elapsed-age founder rules passed paused-save/history/preview acceptance without activation. No live send, bot/channel setting change or production deployment occurred. The user reports the bot on another deployed copy. The mandatory decision, complete evidence and protected cleanup receipt are underIMP-17 in the improvement tracker.
+
+
+2026-10-29: The IMP-37 Approvals boundary is locally accepted: task-free context, bounded existing review queue, exact selected detail and thin exact acknowledgement, with no legacy workspace/Operations or task-list requests after entry.71backend/277distinct frontend cases, final direct types/lint/build/codegen,54-item actual rollback/snapshot-spy checks and55-item desktop390px guided/paged/backup/Seen/Acknowledge/independent-decision journeys passed. A discovered workflow-read outage/retry validity defect was repaired and repeat-tested without bypassing checks; IMP-17 returns to Local complete. All owned fixtures were removed with protected digests. Whole37 and broader06/10/11/34/40 remain unfinished; current totals21locally complete and25unfinished. No paid or live external action, Git push or deployment. Complete evidence is in OTOGROW-OS-IMPROVEMENTS.md.

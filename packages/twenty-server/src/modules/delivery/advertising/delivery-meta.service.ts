@@ -30,6 +30,7 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, type EntityManager } from 'typeorm';
 import { randomUUID } from 'node:crypto';
 import { v5 as uuidv5 } from 'uuid';
+import { assertLegacyAdvertisingAssignmentAvailable } from 'src/modules/delivery/advertising/workbench/delivery-advertising-legacy-guard';
 import { recordOtogrowActivity } from 'src/modules/otogrow-activity/record-otogrow-activity';
 import { SecretEncryptionService } from 'src/engine/core-modules/secret-encryption/secret-encryption.service';
 import { type PlaintextString } from 'src/engine/core-modules/secret-encryption/branded-strings/plaintext-string.type';
@@ -665,103 +666,182 @@ export class DeliveryMetaService {
       });
     } else {
       await this.transact(workspace.id, async (_state, operations, manager) => {
-        const reviewer = await this.actor(
+        await this.applyReportReview(
+          manager,
           workspace,
           memberId,
           userWorkspaceId,
-          manager,
+          operations,
+          command,
+          true,
         );
-        const report = await getMetaReport(manager, workspace.id, command.id);
-        const routing = report ? this.currentRouting(operations, report) : null;
-        if (
-          !report ||
-          !routing ||
-          !reviewer.isManager ||
-          (!reviewer.isAdmin && routing.managerId !== memberId) ||
-          routing.marketerId === memberId
-        )
-          throw new ForbiddenException();
-        if (
-          report.engagementId &&
-          (!command.expectedRouting ||
-            command.expectedRouting.projectId !== routing.projectId ||
-            command.expectedRouting.managerId !== routing.managerId ||
-            command.expectedRouting.marketerId !== routing.marketerId)
-        )
-          throw new ConflictException(
-            'Client responsibilities changed. Refresh and review the current PM and marketer before assigning follow-up.',
-          );
-        if (report.status !== 'REVIEW')
-          throw new ConflictException('This report has already been reviewed.');
-        if (command.status === 'APPROVED') {
-          await this.validateReportRouting(workspace, routing, manager);
-          const taskId = await this.delivery.command(
-            workspace,
-            memberId,
-            userWorkspaceId,
-            {
-              action: 'create',
-              projectId: report.projectId,
-              fields: {
-                title: `Meta advertising review: ${report.date}`,
-                brief: `Manager-approved Meta report for account ${report.accountId}. Open Advertising for account and ad-level performance.\nManager recommendations: ${command.note}\nNo live campaign or budget changes have been made by the OS.`,
-                service: 'PERFORMANCE_MARKETING',
-                priority: 'NORMAL',
-                scheduledDate: null,
-                dueAt: null,
-                assigneeId: routing.marketerId,
-                reviewerId: memberId,
-                checklist: [],
-                evidence: [],
-              },
-            },
-            manager,
-          );
-          if (typeof taskId !== 'string')
-            throw new BadRequestException(
-              'Could not create the marketer follow-up task.',
-            );
-          report.taskId = taskId;
-          this.notice(
-            operations,
-            report.id,
-            routing.marketerId!,
-            memberId,
-            `Approved Meta report for ${report.date}. Follow-up task assigned.`,
-          );
-        }
-        report.status = command.status;
-        report.reviewedBy = memberId;
-        report.reviewedAt = new Date().toISOString();
-        report.note = command.note;
-        await manager
-          .getRepository(DeliveryMetaReportEntity)
-          .update(
-            { workspaceId: workspace.id, id: report.id },
-            { report, status: report.status },
-          );
-        await recordOtogrowActivity(manager, {
-          workspaceId: workspace.id,
-          actorId: memberId,
-          subjectMemberId: routing.marketerId,
-          projectId: report.projectId,
-          taskId: report.taskId,
-          category: 'ADVERTISING',
-          action: 'META_REPORT_REVIEWED',
-          outcome: command.status,
-          summary:
-            command.status === 'APPROVED'
-              ? 'Approved a Meta report and assigned the marketer follow-up.'
-              : 'Requested changes to a Meta report.',
-          sourceType: 'meta-report',
-          sourceId: report.id,
-          changes: [
-            { field: 'state', before: 'REVIEW', after: command.status },
-          ],
-        });
       });
     }
     return this.snapshot(workspace, memberId, userWorkspaceId);
+  }
+  private async applyReportReview(
+    manager: EntityManager,
+    workspace: WorkspaceEntity,
+    memberId: string,
+    userWorkspaceId: string,
+    operations: DeliveryOperations,
+    command: Extract<z.infer<typeof metaCommandSchema>, { action: 'review' }>,
+    createGenericTask: boolean,
+  ) {
+    const reviewer = await this.actor(
+      workspace,
+      memberId,
+      userWorkspaceId,
+      manager,
+    );
+    if (createGenericTask)
+      await assertLegacyAdvertisingAssignmentAvailable(
+        manager,
+        workspace.id,
+        'META',
+        command.id,
+      );
+    const report = await getMetaReport(manager, workspace.id, command.id);
+    const routing = report ? this.currentRouting(operations, report) : null;
+    if (
+      !report ||
+      !routing ||
+      !reviewer.isManager ||
+      (!reviewer.isAdmin && routing.managerId !== memberId) ||
+      routing.marketerId === memberId
+    )
+      throw new ForbiddenException();
+    if (
+      report.engagementId &&
+      (!command.expectedRouting ||
+        command.expectedRouting.projectId !== routing.projectId ||
+        command.expectedRouting.managerId !== routing.managerId ||
+        command.expectedRouting.marketerId !== routing.marketerId)
+    )
+      throw new ConflictException(
+        'Client responsibilities changed. Refresh and review the current PM and marketer before assigning follow-up.',
+      );
+    if (report.engagementId) {
+      const engagement = operations.clients?.engagements.find(
+        (item) => item.id === report.engagementId,
+      );
+      const project = report.projectId
+        ? await manager
+            .getRepository(DeliveryProjectEntity)
+            .findOneBy({ workspaceId: workspace.id, id: report.projectId })
+        : null;
+      if (!engagement || !project || project.companyId !== engagement.companyId)
+        throw new ConflictException(
+          'The report client and current project no longer match. Preserve the original report and correct its project setup.',
+        );
+    }
+    if (report.status !== 'REVIEW')
+      throw new ConflictException('This report has already been reviewed.');
+    if (command.status === 'APPROVED')
+      await this.validateReportRouting(workspace, routing, manager);
+    if (command.status === 'APPROVED' && createGenericTask) {
+      const taskId = await this.delivery.command(
+        workspace,
+        memberId,
+        userWorkspaceId,
+        {
+          action: 'create',
+          projectId: report.projectId,
+          fields: {
+            title: `Meta advertising review: ${report.date}`,
+            brief: `Manager-approved Meta report for account ${report.accountId}. Open Advertising for account and ad-level performance.\nManager recommendations: ${command.note}\nNo live campaign or budget changes have been made by the OS.`,
+            service: 'PERFORMANCE_MARKETING',
+            priority: 'NORMAL',
+            scheduledDate: null,
+            dueAt: null,
+            assigneeId: routing.marketerId,
+            reviewerId: memberId,
+            checklist: [],
+            evidence: [],
+          },
+        },
+        manager,
+      );
+      if (typeof taskId !== 'string')
+        throw new BadRequestException(
+          'Could not create the marketer follow-up task.',
+        );
+      report.taskId = taskId;
+      this.notice(
+        operations,
+        report.id,
+        routing.marketerId!,
+        memberId,
+        `Approved Meta report for ${report.date}. Follow-up task assigned.`,
+      );
+    }
+    report.status = command.status;
+    report.reviewedBy = memberId;
+    report.reviewedAt = new Date().toISOString();
+    report.note = command.note;
+    await manager
+      .getRepository(DeliveryMetaReportEntity)
+      .update(
+        { workspaceId: workspace.id, id: report.id },
+        { report, status: report.status },
+      );
+    await recordOtogrowActivity(manager, {
+      workspaceId: workspace.id,
+      actorId: memberId,
+      subjectMemberId: routing.marketerId,
+      projectId: report.projectId,
+      taskId: report.taskId,
+      category: 'ADVERTISING',
+      action: 'META_REPORT_REVIEWED',
+      outcome: command.status,
+      summary:
+        command.status === 'APPROVED'
+          ? createGenericTask
+            ? 'Approved a Meta report and assigned the marketer follow-up.'
+            : 'Approved Meta report evidence for explicit recommendation tasks.'
+          : 'Requested changes to a Meta report.',
+      sourceType: 'meta-report',
+      sourceId: report.id,
+      changes: [{ field: 'state', before: 'REVIEW', after: command.status }],
+    });
+  }
+  async reviewForWorkbench(
+    manager: EntityManager,
+    workspace: WorkspaceEntity,
+    memberId: string,
+    userWorkspaceId: string,
+    command: Extract<z.infer<typeof metaCommandSchema>, { action: 'review' }>,
+  ) {
+    if (!manager.queryRunner?.isTransactionActive)
+      throw new Error('Advertising review requires an authorized transaction.');
+    await manager.query(
+      'SELECT pg_advisory_xact_lock(hashtextextended($1,0))',
+      [`delivery:${workspace.id}`],
+    );
+    const repository = manager.getRepository(DeliveryOperationsEntity);
+    const entity = await repository.findOneBy({ workspaceId: workspace.id });
+    if (!entity)
+      throw new ForbiddenException('This advertising source is unavailable.');
+    entity.state.metaReporting ??= newMetaReporting();
+    await migrateLegacyMetaReports(
+      manager,
+      workspace.id,
+      entity.state.metaReporting,
+    );
+    await this.applyReportReview(
+      manager,
+      workspace,
+      memberId,
+      userWorkspaceId,
+      entity.state,
+      command,
+      false,
+    );
+    if (JSON.stringify(entity.state).length > 10000000)
+      throw new BadRequestException(
+        'Reporting history needs archival before more decisions can be stored.',
+      );
+    await repository.save(entity);
   }
   private notice(
     operations: DeliveryOperations,

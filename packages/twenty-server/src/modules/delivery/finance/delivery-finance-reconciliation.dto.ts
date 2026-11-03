@@ -123,6 +123,13 @@ export class DeliveryFinanceCashRelationDTO {
   @Field(() => String, { nullable: true }) reversedAt: string | null;
   @Field(() => String, { nullable: true }) reversalReason: string | null;
 }
+@ObjectType('DeliveryFinanceReportingClock')
+export class DeliveryFinanceReportingClockDTO {
+  @Field() currency: string;
+  @Field() timezone: string;
+  @Field() businessDate: string;
+  @Field() confirmed: boolean;
+}
 @ObjectType('DeliveryFinancePaymentsSnapshot')
 export class DeliveryFinancePaymentsSnapshotDTO {
   @Field(() => ID) workspaceId: string;
@@ -130,6 +137,8 @@ export class DeliveryFinancePaymentsSnapshotDTO {
   @Field(() => ID) userWorkspaceId: string;
   @Field(() => String, { nullable: true }) currency: string | null;
   @Field() canManage: boolean;
+  @Field(() => [DeliveryFinanceReportingClockDTO])
+  reportingClocks: DeliveryFinanceReportingClockDTO[];
   @Field(() => [DeliveryFinanceCashSourceDTO])
   cash: DeliveryFinanceCashSourceDTO[];
   @Field(() => [DeliveryFinanceCashSourceDTO])

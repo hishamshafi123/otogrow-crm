@@ -323,10 +323,33 @@ const {
     budgetRequest.revision += 1;
     await clients.respond(credentialA, budgetRequest);
     await clients.respond(credentialA, budgetRequest);
+    await assert.rejects(
+      clients.respond(credentialA, {
+        ...budgetRequest,
+        amount: budgetRequest.amount + 1,
+      }),
+      /different budget request/,
+    );
+    await assert.rejects(
+      clients.respond(credentialA, {
+        ...budgetRequest,
+        revision: budgetRequest.revision + 1,
+      }),
+      /different budget request/,
+    );
     const budgetPortal = await clients.portal(credentialA);
     assert.equal(budgetPortal.advertising.requests.length, 1);
     assert.equal(budgetPortal.advertising.requests[0].amount, 12345);
     assert.equal(budgetPortal.advertising.requests[0].status, 'REVIEW');
+    assert.equal(
+      budgetPortal.advertising.requests[0].clientRequestId,
+      budgetRequest.requestId,
+    );
+    assert.equal(
+      budgetPortal.advertising.requests[0].clientRequestRevision,
+      budgetRequest.revision,
+    );
+    assert.equal(budgetPortal.advertising.requests[0].reason, budgetRequest.reason);
     assert(!JSON.stringify(budgetPortal.advertising).includes(editor));
     assert.equal((await clients.portal(credentialB)).advertising, null);
     const budgetState = await read();

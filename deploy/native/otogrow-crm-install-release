@@ -149,7 +149,12 @@ assert_archive_is_safe "$archive"
 
 # A failed backup must block activation once backup automation exists.
 if systemctl cat otogrow-crm-backup.service >/dev/null 2>&1; then
-  systemctl start otogrow-crm-backup.service
+  if ! systemctl cat otogrow-crm-backup-before-deploy.service >/dev/null 2>&1; then
+    echo 'Backup automation is installed without its required pre-release companion unit. Install the reviewed root-owned companion before deploying.' >&2
+    exit 78
+  fi
+  # A running oneshot is joined, including a backup left running by an interrupted installer.
+  systemctl start otogrow-crm-backup-before-deploy.service
 fi
 
 install -d -o root -g root -m 0755 "$release"
@@ -298,8 +303,10 @@ if [[ "$healthy" != 'true' ]]; then
 fi
 
 if ! systemctl is-active --quiet "$worker_unit"; then
-  echo 'Warning: the API is healthy but the worker is not running.' >&2
+  echo 'The API is healthy but the worker is not running; rolling the release back.' >&2
   journalctl -u "$worker_unit" -n 100 --no-pager >&2 || true
+  restore_previous
+  exit 1
 fi
 
 rm -f -- "$archive"

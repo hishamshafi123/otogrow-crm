@@ -10,8 +10,19 @@ import {
   useDeliveryDraftGuard,
   useDeliveryDraftStatus,
 } from '@/delivery/drafts/DeliveryDraftGuard';
+import { DeliveryVideoQa } from '@/delivery/creative/video-qa/DeliveryVideoQa';
+import { isCreativeAssetCurrent } from '@/delivery/creative/creative-asset-current';
 import { DeliveryMedia } from '@/delivery/DeliveryMedia';
-import { useEffect, useState } from 'react';
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { isCreativeSourceUnavailable } from '@/delivery/creative/production/creative-production-errors';
+import {
+  type CreativeProductionActor,
+  type CreativeProductionTask,
+} from '@/delivery/creative/production/creative-production.types';
+import { useWorkflowAccess } from '@/delivery/workflows/useWorkflowAccess';
+import { Link, useSearchParams } from 'react-router-dom';
+import { DeliveryCreativeReview } from '@/delivery/creative/review/DeliveryCreativeReview';
+import { creativeReviewDestination } from '@/delivery/creative/review/creative-review-navigation';
 import { gql } from '@apollo/client';
 import { useMutation } from '@apollo/client/react';
 import { Trans, useLingui } from '@lingui/react/macro';
@@ -19,10 +30,7 @@ import { useStore } from 'jotai';
 import { tokenPairState } from '@/auth/states/tokenPairState';
 import { isCookieAuthActiveState } from '@/auth/states/isCookieAuthActiveState';
 import { REACT_APP_SERVER_BASE_URL } from '~/config';
-import {
-  type DeliveryTask,
-  type DeliveryWorkspace,
-} from '@/delivery/delivery.types';
+import { type DeliveryWorkspace } from '@/delivery/delivery.types';
 import {
   type CreativeAsset,
   type CreativeShot,
@@ -47,8 +55,16 @@ const RENDER_CREATIVE = gql`
   }
 `;
 type DeliveryCreativeProps = {
-  task: DeliveryTask;
-  workspace: DeliveryWorkspace;
+  task: CreativeProductionTask;
+  workspace?: DeliveryWorkspace;
+  actor?: CreativeProductionActor;
+  stage?: string;
+  onStageChange?: (stage: string) => void;
+  onAuthorityLost?: () => void;
+  renderApprovedReferences?: (
+    reuse: (sourceTaskId: string, referenceId: string) => Promise<boolean>,
+    disabled: boolean,
+  ) => ReactNode;
   onChanged: () => Promise<unknown>;
   onOpenTask: () => void;
 };
@@ -56,31 +72,36 @@ type DeliveryCreativeProps = {
 export const DeliveryCreative = ({
   task,
   workspace,
+  actor: currentActor,
+  stage: currentStage,
+  onStageChange,
+  onAuthorityLost,
+  renderApprovedReferences,
   onChanged,
   onOpenTask,
 }: DeliveryCreativeProps) => {
   const { t } = useLingui();
   const store = useStore();
+  const [params] = useSearchParams();
   const [mutate, mutation] = useMutation(CHANGE_CREATIVE);
   const [renderMedia, rendering] = useMutation(RENDER_CREATIVE);
-  const [stage, setStage] = useState('brief');
+  const [localStage, setStage] = useState('brief');
+  const stage = currentStage ?? localStage;
+  const actor = currentActor ?? workspace?.actor;
   const [error, setError] = useState('');
   const [uploading, setUploading] = useState(false);
   const [editingShot, setEditingShot] = useState<CreativeShot | null>(null);
-  const [preview, setPreview] = useState<{
-    url: string;
-    asset: CreativeAsset;
-  } | null>(null);
-  useEffect(() => {
-    return () => {
-      if (preview) URL.revokeObjectURL(preview.url);
-    };
-  }, [preview]);
+  const permission = useWorkflowAccess();
+  // oxlint-disable-next-line twenty/no-state-useref -- A stale download must not publish after its current access scope ends.
+  const downloadController = useRef<AbortController | null>(null);
+  useLayoutEffect(() => {
+    downloadController.current?.abort();
+    return () => downloadController.current?.abort();
+  }, [permission.scope, permission.ready, task.id]);
   const document = task.details.creative;
-  const manager = workspace.actor.isManager;
+  const manager = actor?.isManager === true;
   const locked = ['IN_REVIEW', 'APPROVED'].includes(task.details.state);
-  const canEdit =
-    !locked && (manager || task.assigneeId === workspace.actor.memberId);
+  const canEdit = !locked && (manager || task.assigneeId === actor?.memberId);
   const [changing, setChanging] = useState(false);
   const busy = changing || mutation.loading || uploading || rendering.loading;
   const referenceDraft = useDeliveryDraft({
@@ -107,7 +128,8 @@ export const DeliveryCreative = ({
     BASE: t`Base video`,
     HOOK: t`Hook video`,
     CTA: t`CTA video`,
-    FINAL: t`Final edit`,
+    FINAL:
+      document?.brief.outputKind === 'IMAGE' ? t`Final image` : t`Final edit`,
     AUDIO: t`Audio`,
   };
   const headers = (): Record<string, string> => {
@@ -129,6 +151,7 @@ export const DeliveryCreative = ({
         },
       });
     } catch (failure) {
+      if (isCreativeSourceUnavailable(failure)) onAuthorityLost?.();
       setError(
         failure instanceof Error
           ? failure.message
@@ -163,6 +186,12 @@ export const DeliveryCreative = ({
         },
       );
       if (!response.ok) {
+        if (
+          response.status === 401 ||
+          response.status === 403 ||
+          response.status === 404
+        )
+          onAuthorityLost?.();
         const body = await response.json();
         throw new Error(
           typeof body.message === 'string'
@@ -185,32 +214,50 @@ export const DeliveryCreative = ({
     setUploading(false);
     return true;
   };
-  const openAsset = async (asset: CreativeAsset, download = false) => {
+  const downloadAsset = async (asset: CreativeAsset) => {
+    if (!permission.ready) return;
+    downloadController.current?.abort();
+    const controller = new AbortController();
+    downloadController.current = controller;
     setError('');
     try {
       const response = await fetch(
         `${REACT_APP_SERVER_BASE_URL}/delivery-creative/${task.id}/assets/${asset.id}`,
-        { headers: headers(), credentials: 'include' },
+        {
+          headers: headers(),
+          credentials: 'include',
+          signal: controller.signal,
+        },
       );
-      if (!response.ok)
+      if (!response.ok) {
+        if ([401, 403, 404].includes(response.status)) onAuthorityLost?.();
         throw new Error(
           t`Asset is unavailable. Your project access may have changed.`,
         );
-      const url = URL.createObjectURL(await response.blob());
-      if (download) {
-        const link = window.document.createElement('a');
-        link.href = url;
-        link.download = asset.name;
-        link.click();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-      } else {
-        if (preview) URL.revokeObjectURL(preview.url);
-        setPreview({ url, asset });
       }
+      const blob = await response.blob();
+      if (controller.signal.aborted) return;
+      if (
+        !blob.size ||
+        blob.size !== asset.size ||
+        blob.size > 100 * 1024 * 1024
+      )
+        throw new Error(
+          t`The asset could not be downloaded completely. Refresh before retrying.`,
+        );
+      const url = URL.createObjectURL(blob);
+      const link = window.document.createElement('a');
+      link.href = url;
+      link.download = asset.name;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (failure) {
-      setError(
-        failure instanceof Error ? failure.message : t`Unable to open asset.`,
-      );
+      if (!controller.signal.aborted)
+        setError(
+          failure instanceof Error
+            ? failure.message
+            : t`Unable to download asset.`,
+        );
     }
   };
   if (!document)
@@ -238,28 +285,8 @@ export const DeliveryCreative = ({
     );
   const approved = (asset: CreativeAsset) =>
     asset.reviews.at(-1)?.decision === 'APPROVED';
-  const current = (asset: CreativeAsset) => {
-    if (asset.storageState !== 'READY') return false;
-    if (['REFERENCE', 'AUDIO'].includes(asset.kind)) return true;
-    if (asset.briefVersion !== document.briefVersion) return false;
-    if (
-      ['BASE', 'FINAL'].includes(asset.kind) &&
-      asset.productionVersion !== document.productionVersion
-    )
-      return false;
-    if (
-      asset.kind === 'FINAL' &&
-      asset.assemblyVersion !== document.assemblyVersion
-    )
-      return false;
-    const shot = document.shots.find((item) => item.id === asset.shotId);
-    return (
-      !asset.shotId ||
-      (!!shot &&
-        shot.version === asset.shotVersion &&
-        (asset.kind !== 'CLIP' || shot.imageId === asset.parentAssetId))
-    );
-  };
+  const current = (asset: CreativeAsset) =>
+    isCreativeAssetCurrent(document, asset);
   const readyAssets = document.assets.filter(
     (asset) => approved(asset) && current(asset),
   );
@@ -317,7 +344,8 @@ export const DeliveryCreative = ({
                 if (id !== stage)
                   requestAction(() => {
                     referenceDraft.markSaved([]);
-                    setStage(id);
+                    if (onStageChange) onStageChange(id);
+                    else setStage(id);
                   });
               }}
             >
@@ -327,6 +355,13 @@ export const DeliveryCreative = ({
         </StyledDeliveryRow>
       </nav>
       {error && <p role="alert">{error}</p>}
+      {params.has('creativeAsset') && (
+        <DeliveryCreativeReview
+          taskId={task.id}
+          taskRevision={task.revision}
+          targetKind="ASSET"
+        />
+      )}
       {locked && (
         <p role="status">
           <Trans>
@@ -334,46 +369,22 @@ export const DeliveryCreative = ({
           </Trans>
         </p>
       )}
-      {preview && (
-        <StyledDeliveryCard>
-          <StyledDeliveryStack>
-            <StyledDeliveryRow>
-              <strong>{preview.asset.name}</strong>
-              <StyledDeliveryButton
-                onClick={() => {
-                  URL.revokeObjectURL(preview.url);
-                  setPreview(null);
-                }}
-              >
-                <Trans>Close preview</Trans>
-              </StyledDeliveryButton>
-            </StyledDeliveryRow>
-            {preview.asset.mimeType.startsWith('image/') ? (
-              <img
-                src={preview.url}
-                alt={preview.asset.name}
-                style={{
-                  maxWidth: '100%',
-                  maxHeight: 480,
-                  objectFit: 'contain',
-                }}
-              />
-            ) : preview.asset.mimeType.startsWith('video/') ? (
-              <video
-                src={preview.url}
-                controls
-                style={{ maxWidth: '100%', maxHeight: 480 }}
-              />
-            ) : (
-              <audio src={preview.url} controls />
-            )}
-          </StyledDeliveryStack>
-        </StyledDeliveryCard>
+      {(stage === 'generate' ||
+        stage === 'final' ||
+        params.has('creativeQaRequest') ||
+        params.has('creativeQaRun')) && (
+        <DeliveryVideoQa
+          key={stage}
+          task={task}
+          onChanged={onChanged}
+          onAuthorityLost={onAuthorityLost}
+        />
       )}
       {stage === 'generate' && (
         <DeliveryMedia
           task={task}
-          workspace={workspace}
+          actor={actor}
+          onAuthorityLost={onAuthorityLost}
           onChanged={onChanged}
         />
       )}
@@ -584,34 +595,45 @@ export const DeliveryCreative = ({
             <h4>
               <Trans>Reuse an approved reference</Trans>
             </h4>
-            {workspace.tasks
-              .filter(
-                (source) =>
-                  source.projectId === task.projectId && source.id !== task.id,
-              )
-              .flatMap((source) =>
-                (source.details.creative?.references ?? [])
+            {renderApprovedReferences
+              ? renderApprovedReferences(
+                  (sourceTaskId, referenceId) =>
+                    change({
+                      action: 'reuseReference',
+                      sourceTaskId,
+                      referenceId,
+                    }),
+                  !canEdit || busy,
+                )
+              : workspace?.tasks
                   .filter(
-                    (reference) =>
-                      Boolean(reference.url) &&
-                      reference.reviews.at(-1)?.decision === 'APPROVED',
+                    (source) =>
+                      source.projectId === task.projectId &&
+                      source.id !== task.id,
                   )
-                  .map((reference) => (
-                    <StyledDeliveryButton
-                      key={reference.id}
-                      disabled={!canEdit || busy}
-                      onClick={() =>
-                        void change({
-                          action: 'reuseReference',
-                          sourceTaskId: source.id,
-                          referenceId: reference.id,
-                        })
-                      }
-                    >
-                      {source.title} · {reference.title}
-                    </StyledDeliveryButton>
-                  )),
-              )}
+                  .flatMap((source) =>
+                    (source.details.creative?.references ?? [])
+                      .filter(
+                        (reference) =>
+                          Boolean(reference.url) &&
+                          reference.reviews.at(-1)?.decision === 'APPROVED',
+                      )
+                      .map((reference) => (
+                        <StyledDeliveryButton
+                          key={reference.id}
+                          disabled={!canEdit || busy}
+                          onClick={() =>
+                            void change({
+                              action: 'reuseReference',
+                              sourceTaskId: source.id,
+                              referenceId: reference.id,
+                            })
+                          }
+                        >
+                          {source.title} · {reference.title}
+                        </StyledDeliveryButton>
+                      )),
+                  )}
           </StyledDeliveryCard>
         </>
       )}
@@ -775,11 +797,37 @@ export const DeliveryCreative = ({
                           : t`Not reviewed`}
                   </StyledDeliveryBadge>
                   <StyledDeliveryRow>
-                    <StyledDeliveryButton onClick={() => void openAsset(asset)}>
+                    <Link
+                      to={creativeReviewDestination(params, {
+                        panel: 'creative',
+                        creativeAsset: asset.id,
+                        creativeSubmission: null,
+                        creativeCompare: null,
+                        creativeFeedback: null,
+                        creativeFeedbackAfter: null,
+                        creativeFeedbackBefore: null,
+                        creativeSubmissionsBefore: null,
+                      })}
+                    >
+                      <Trans>Review asset and precise feedback</Trans>
+                    </Link>
+                    <Link
+                      to={creativeReviewDestination(params, {
+                        panel: 'creative',
+                        creativeAsset: asset.id,
+                        creativeSubmission: null,
+                        creativeCompare: null,
+                        creativeFeedback: null,
+                        creativeFeedbackAfter: null,
+                        creativeFeedbackBefore: null,
+                        creativeSubmissionsBefore: null,
+                      })}
+                    >
                       <Trans>Preview</Trans>
-                    </StyledDeliveryButton>
+                    </Link>
                     <StyledDeliveryButton
-                      onClick={() => void openAsset(asset, true)}
+                      disabled={!permission.ready}
+                      onClick={() => void downloadAsset(asset)}
                     >
                       <Trans>Download</Trans>
                     </StyledDeliveryButton>
@@ -1047,15 +1095,17 @@ export const DeliveryCreative = ({
             </h4>
             <p>
               {document.finalAssetId
-                ? t`A final edit is selected. Submit it from the task's delivery controls.`
-                : t`Upload a final edit in Media review and choose “Use this version”.`}
+                ? document.brief.outputKind === 'IMAGE'
+                  ? t`A final image is selected. Submit it from the task's delivery controls.`
+                  : t`A final edit is selected. Submit it from the task's delivery controls.`
+                : document.brief.outputKind === 'IMAGE'
+                  ? t`Upload a final image in Media review and choose “Use this version”.`
+                  : t`Upload a final edit in Media review and choose “Use this version”.`}
             </p>
             <p>
-              <Trans>
-                The current brief and every shot image and clip must be approved
-                before submission. Final approval stays with the assigned
-                manager.
-              </Trans>
+              {document.brief.outputKind === 'IMAGE'
+                ? t`The current brief and selected final image must be ready before submission. No video clips are required. Final approval stays with the assigned manager.`
+                : t`The current brief and every shot image and clip must be approved before submission. Final approval stays with the assigned manager.`}
             </p>
             {document.revisionCharge > 0 && (
               <small>

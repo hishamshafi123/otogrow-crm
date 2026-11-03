@@ -3,6 +3,10 @@ import {
   type ActivityFilters,
 } from '@/otogrow-activity/otogrow-activity.types';
 import { type OtogrowActivityInput } from '~/generated-metadata/graphql';
+import {
+  ACTIVITY_ANALYSIS_PARAMETERS,
+  ACTIVITY_CURRENT_TASK_PARAMETERS,
+} from '@/otogrow-activity/analysis/activity-analysis-navigation';
 
 export const readActivityFilters = (params: URLSearchParams): ActivityFilters =>
   Object.fromEntries(
@@ -57,6 +61,11 @@ export const activityFilterParams = (
   next.delete('activityCursor');
   next.delete('task');
   next.delete('panel');
+  next.delete('activityEvent');
+  ACTIVITY_ANALYSIS_PARAMETERS.forEach((parameter) => next.delete(parameter));
+  ACTIVITY_CURRENT_TASK_PARAMETERS.forEach((parameter) =>
+    next.delete(parameter),
+  );
   Object.entries(ACTIVITY_FILTER_KEYS).forEach(([key, parameter]) => {
     const value = filters?.[key as keyof ActivityFilters];
     if (value) next.set(parameter, value);

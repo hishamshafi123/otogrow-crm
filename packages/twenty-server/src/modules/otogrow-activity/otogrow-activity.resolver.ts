@@ -10,6 +10,13 @@ import { CustomPermissionGuard } from 'src/engine/guards/custom-permission.guard
 import { RequireAccessTokenGuard } from 'src/engine/guards/require-access-token.guard';
 import { WorkspaceAuthGuard } from 'src/engine/guards/workspace-auth.guard';
 import {
+  OtogrowActivityContextDTO,
+  OtogrowActivityPageDTO,
+  OtogrowActivityPageInput,
+  OtogrowActivityOptionsDTO,
+  OtogrowActivityOptionsInput,
+  OtogrowActivityEventDetailDTO,
+  OtogrowActivityEventInput,
   OtogrowActivityFeedDTO,
   OtogrowActivityFilterInput,
 } from 'src/modules/otogrow-activity/otogrow-activity.dto';
@@ -28,5 +35,44 @@ export class OtogrowActivityResolver {
     @Args('input') input: OtogrowActivityFilterInput,
   ) {
     return this.activity.feed(workspace, memberId, userWorkspaceId, input);
+  }
+
+  @Query(() => OtogrowActivityContextDTO)
+  otogrowActivityContext(
+    @AuthWorkspace() workspace: WorkspaceEntity,
+    @AuthWorkspaceMemberId() memberId: string,
+    @AuthUserWorkspaceId() userWorkspaceId: string,
+  ) {
+    return this.activity.context(workspace, memberId, userWorkspaceId);
+  }
+
+  @Query(() => OtogrowActivityPageDTO)
+  otogrowActivityPage(
+    @AuthWorkspace() workspace: WorkspaceEntity,
+    @AuthWorkspaceMemberId() memberId: string,
+    @AuthUserWorkspaceId() userWorkspaceId: string,
+    @Args('input') input: OtogrowActivityPageInput,
+  ) {
+    return this.activity.page(workspace, memberId, userWorkspaceId, input);
+  }
+
+  @Query(() => OtogrowActivityOptionsDTO)
+  otogrowActivityOptions(
+    @AuthWorkspace() workspace: WorkspaceEntity,
+    @AuthWorkspaceMemberId() memberId: string,
+    @AuthUserWorkspaceId() userWorkspaceId: string,
+    @Args('input') input: OtogrowActivityOptionsInput,
+  ) {
+    return this.activity.options(workspace, memberId, userWorkspaceId, input);
+  }
+
+  @Query(() => OtogrowActivityEventDetailDTO)
+  otogrowActivityEvent(
+    @AuthWorkspace() workspace: WorkspaceEntity,
+    @AuthWorkspaceMemberId() memberId: string,
+    @AuthUserWorkspaceId() userWorkspaceId: string,
+    @Args('input') input: OtogrowActivityEventInput,
+  ) {
+    return this.activity.event(workspace, memberId, userWorkspaceId, input);
   }
 }

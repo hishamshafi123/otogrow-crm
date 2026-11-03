@@ -114,3 +114,57 @@ it('selects yesterday in the ad account timezone across UTC boundaries', () => {
     '2026-10-23',
   );
 });
+it('preserves explicit provider zero separately from missing normalized base fields', async () => {
+  fetchMock.mockResolvedValueOnce(
+    response({ data: [{ ...row, spend: '0', impressions: '0', clicks: '0' }] }),
+  );
+  const explicit = await new DeliveryMetaAdapter().insights(
+    row.account_id,
+    'secret',
+    row.date_start,
+    'account',
+  );
+  expect(explicit[0]).toMatchObject({
+    spend: '0',
+    impressions: '0',
+    clicks: '0',
+    reportedFields: {
+      spend: true,
+      impressions: true,
+      clicks: true,
+      actions: true,
+      action_values: false,
+    },
+  });
+  fetchMock.mockResolvedValueOnce(
+    response({
+      data: [
+        {
+          account_id: row.account_id,
+          date_start: row.date_start,
+          date_stop: row.date_stop,
+        },
+      ],
+    }),
+  );
+  const absent = await new DeliveryMetaAdapter().insights(
+    row.account_id,
+    'secret',
+    row.date_start,
+    'account',
+  );
+  expect(absent[0]).toMatchObject({
+    spend: '0',
+    impressions: '0',
+    clicks: '0',
+    actions: [],
+    action_values: [],
+    reportedFields: {
+      spend: false,
+      impressions: false,
+      clicks: false,
+      actions: false,
+      action_values: false,
+    },
+  });
+});

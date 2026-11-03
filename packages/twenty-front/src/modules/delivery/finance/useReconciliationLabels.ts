@@ -12,7 +12,7 @@ export const useReconciliationLabels = () => {
     category: (value: string) => categories[value] ?? t`Unavailable direction`,
     warning: (value: string) => {
       const warnings: Record<string, string> = {
-        UNASSIGNED_CASH: t`This payment has no client assignment. Confirm the client explicitly when linking it.`,
+        UNASSIGNED_CASH: t`This record has no client assignment. Confirm the client explicitly when linking it.`,
         LEGACY_RECEIPT_MISMATCH: t`A preserved receipt has a different currency or client from its invoice. Correct the original records before adding links.`,
         LEGACY_PAID_WITHOUT_RECEIPT: t`This invoice was marked paid without a linked payment. Review its legacy history before linking more money.`,
         FUTURE_CASH_DATE: t`This payment has a future ledger date. It cannot be linked before that date.`,

@@ -80,7 +80,7 @@ const ReadinessWorkspace = ({
       <StyledDeliveryStack>
         <StyledDeliveryRow>
           <h3>
-            <Trans>Capabilities & connections</Trans>
+            <Trans>Features & connections</Trans>
           </h3>
           {permission.ready && permission.canManageRoles && (
             <StyledDeliveryButton
@@ -117,18 +117,18 @@ const ReadinessWorkspace = ({
           </p>
         ) : !available || !snapshot ? (
           <p role="status">
-            <Trans>Loading capability status…</Trans>
+            <Trans>Loading feature status…</Trans>
           </p>
         ) : (
           <>
             <small>{t`Saved configuration checked at ${new Date(snapshot.observedAt).toLocaleString()}.`}</small>
             <label>
-              <Trans>Show capability status</Trans>
+              <Trans>Show feature status</Trans>
               <select
                 value={filter}
                 onChange={(event) => setFilter(event.target.value)}
               >
-                <option value="ALL">{t`All capabilities`}</option>
+                <option value="ALL">{t`All features`}</option>
                 {Object.entries(labels.statuses).map(([value, label]) => (
                   <option key={value} value={value}>
                     {label} (
@@ -139,7 +139,7 @@ const ReadinessWorkspace = ({
             </label>
             {!visible.length && (
               <p>
-                <Trans>No capabilities match this status.</Trans>
+                <Trans>No features match this status.</Trans>
               </p>
             )}
             <StyledCapabilities>
@@ -148,7 +148,7 @@ const ReadinessWorkspace = ({
                   <StyledCapabilityHeading>
                     <strong>
                       {labels.capabilities[item.capability] ??
-                        t`Unknown capability`}
+                        t`Unknown feature`}
                       {item.accountName ? ` · ${item.accountName}` : ''}
                     </strong>
                     <StyledState>
@@ -166,9 +166,15 @@ const ReadinessWorkspace = ({
                   )}
                   {labels.destinations[item.destination] && (
                     <Link
-                      to={`/delivery?view=${encodeURIComponent(item.destination)}`}
+                      to={
+                        item.destination === 'ads'
+                          ? '/delivery?view=ads&adView=legacy'
+                          : `/delivery?view=${encodeURIComponent(item.destination)}`
+                      }
                     >
-                      {labels.destinations[item.destination]}
+                      {item.capability === 'META'
+                        ? t`Review Meta connection`
+                        : labels.destinations[item.destination]}
                     </Link>
                   )}
                 </li>

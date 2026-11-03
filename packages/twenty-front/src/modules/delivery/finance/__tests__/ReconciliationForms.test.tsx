@@ -2,7 +2,7 @@ import { type ComponentProps, type ReactElement, useState } from 'react';
 import { Request } from 'cross-fetch';
 import { i18n } from '@lingui/core';
 import { I18nProvider } from '@lingui/react';
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { DeliveryDraftGuardProvider } from '@/delivery/drafts/DeliveryDraftGuard';
@@ -24,6 +24,7 @@ const OTHER_PROJECT_ID = '01c2494e-e5e5-4d0b-a139-34fa370171c4';
 const mockSave = jest.fn();
 const mockCancel = jest.fn();
 const mockReload = jest.fn();
+const mockRefreshCalendar = jest.fn();
 const cashFixture = (): AllocationProps['cashes'][number] => ({
   id: CASH_ID,
   revision: 2,
@@ -85,12 +86,20 @@ const entryFixture = (): AllocationProps['entries'][number] => ({
   ],
 });
 const paymentProps = (): PaymentProps => ({
-  date: '2020-10-27',
+  reportingClocks: ['USD', 'AED', 'EUR', 'GBP', 'INR', 'SGD', 'AUD', 'CAD'].map(
+    (currency) => ({
+      currency,
+      timezone: 'UTC',
+      businessDate: '2020-10-27',
+      confirmed: false,
+    }),
+  ),
   currency: 'USD',
   projects: [{ id: PROJECT_ID, name: 'Client Alpha' }],
   busy: false,
   onSave: mockSave,
   onCancel: mockCancel,
+  onRefreshCalendar: mockRefreshCalendar,
 });
 const allocationProps = (
   kind: AllocationProps['kind'] = 'SETTLEMENT',
@@ -109,7 +118,7 @@ const allocationProps = (
 });
 const renderPayment = (props: PaymentProps) => (
   <ReconciliationPaymentForm
-    date={props.date}
+    reportingClocks={props.reportingClocks}
     currency={props.currency}
     projects={props.projects}
     invoice={props.invoice}
@@ -117,6 +126,7 @@ const renderPayment = (props: PaymentProps) => (
     readOnly={props.readOnly}
     onSave={props.onSave}
     onCancel={props.onCancel}
+    onRefreshCalendar={props.onRefreshCalendar}
   />
 );
 const renderAllocation = (props: AllocationProps) => (
@@ -162,8 +172,7 @@ const setup = (content: ReactElement) => {
   render(<RouterProvider router={router} />);
   return { update: (value: ReactElement) => act(() => replaceContent(value)) };
 };
-const fillPayment = async (amount = '12.34') => {
-  const user = userEvent.setup();
+const fillPayment = async (amount = '12.34', user = userEvent.setup()) => {
   await user.type(
     screen.getByRole('textbox', { name: 'Payment title' }),
     'Paid October invoice',
@@ -188,7 +197,9 @@ beforeEach(() => {
   mockSave.mockReset().mockResolvedValue(false);
   mockCancel.mockReset();
   mockReload.mockReset();
+  mockRefreshCalendar.mockReset().mockResolvedValue(undefined);
 });
+afterEach(() => jest.useRealTimers());
 
 describe('actual payment recording', () => {
   it('records exact cents on the actual date with one stable id across failed retries', async () => {
@@ -268,11 +279,14 @@ describe('actual payment recording', () => {
     );
   });
   it('rejects an impossible actual date without replacing it with today', async () => {
-    setup(renderPayment({ ...paymentProps(), date: '2026-02-30' }));
+    setup(renderPayment(paymentProps()));
+    fireEvent.change(screen.getByLabelText('Actual payment date'), {
+      target: { value: '2026-02-30' },
+    });
     await fillPayment();
     expect(
       screen.getByText(
-        'Choose a valid actual payment date no later than today (UTC).',
+        'Choose a valid actual payment date no later than 2020-10-27 (UTC).',
       ),
     ).toBeVisible();
     expect(
@@ -281,11 +295,14 @@ describe('actual payment recording', () => {
     expect(mockSave).not.toHaveBeenCalled();
   });
   it('rejects a future payment date instead of recording expected money as actual cash', async () => {
-    setup(renderPayment({ ...paymentProps(), date: '2999-01-01' }));
+    setup(renderPayment(paymentProps()));
+    fireEvent.change(screen.getByLabelText('Actual payment date'), {
+      target: { value: '2999-01-01' },
+    });
     await fillPayment();
     expect(
       screen.getByText(
-        'Choose a valid actual payment date no later than today (UTC).',
+        'Choose a valid actual payment date no later than 2020-10-27 (UTC).',
       ),
     ).toBeVisible();
     expect(
@@ -304,6 +321,10 @@ describe('actual payment recording', () => {
       screen.getByRole('combobox', { name: 'Currency' }),
       'AED',
     );
+    expect(screen.getByLabelText('Actual payment date')).toHaveValue('');
+    fireEvent.change(screen.getByLabelText('Actual payment date'), {
+      target: { value: '2020-10-27' },
+    });
     await user.click(screen.getByRole('button', { name: 'Record payment' }));
     expect(mockSave.mock.calls[0][0].currency).toBe('AED');
   });
@@ -325,6 +346,7 @@ describe('actual payment recording', () => {
     expect(screen.getByRole('combobox', { name: 'Currency' })).toHaveValue(
       'EUR',
     );
+    expect(screen.getByRole('combobox', { name: 'Currency' })).toBeDisabled();
     expect(
       screen.getByRole('combobox', { name: 'Client project' }),
     ).toHaveValue(PROJECT_ID);
@@ -334,6 +356,202 @@ describe('actual payment recording', () => {
     expect(
       screen.getByText(/No amount or invoice settlement is assumed/),
     ).toBeVisible();
+    expect(mockSave).not.toHaveBeenCalled();
+  });
+  it.each([
+    ['Asia/Qatar', '2026-10-28', '2026-10-27T22:30:00Z'],
+    ['America/Los_Angeles', '2026-10-27', '2026-10-28T02:00:00Z'],
+  ])(
+    'uses the authoritative %s day %s even when the device UTC day differs',
+    async (timezone, businessDate, now) => {
+      jest.useFakeTimers({ now: new Date(now) });
+      const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+      const props = paymentProps();
+      props.reportingClocks = props.reportingClocks.map((clock) =>
+        clock.currency === 'USD'
+          ? { ...clock, timezone, businessDate, confirmed: true }
+          : clock,
+      );
+      setup(renderPayment(props));
+      expect(screen.getByLabelText('Actual payment date')).toHaveValue(
+        businessDate,
+      );
+      expect(screen.getByLabelText('Actual payment date')).toHaveAttribute(
+        'max',
+        businessDate,
+      );
+      expect(
+        screen.getByText(`Payment dates use ${timezone} ledger days.`),
+      ).toBeVisible();
+      await fillPayment('400', user);
+      await user.click(screen.getByRole('button', { name: 'Record payment' }));
+      expect(mockSave).toHaveBeenCalledWith(
+        expect.objectContaining({
+          date: businessDate,
+          amountMicros: '400000000',
+        }),
+      );
+    },
+  );
+  it('discloses the server UTC fallback without claiming a confirmed reporting time zone', () => {
+    setup(renderPayment(paymentProps()));
+    expect(
+      screen.getByText('Payment calendar: UTC · Business date: 2020-10-27'),
+    ).toBeVisible();
+    expect(
+      screen.getByText(
+        'UTC is used until a reporting time zone is confirmed for this currency.',
+      ),
+    ).toBeVisible();
+    expect(screen.getByLabelText('Actual payment date')).toHaveValue(
+      '2020-10-27',
+    );
+  });
+  it('revalidates a chosen date against another currency’s clock without rewriting the draft', async () => {
+    const props = paymentProps();
+    props.reportingClocks = props.reportingClocks.map((clock) =>
+      clock.currency === 'USD'
+        ? {
+            ...clock,
+            timezone: 'Asia/Qatar',
+            businessDate: '2026-10-28',
+            confirmed: true,
+          }
+        : clock.currency === 'EUR'
+          ? {
+              ...clock,
+              timezone: 'America/Los_Angeles',
+              businessDate: '2026-10-27',
+              confirmed: true,
+            }
+          : clock,
+    );
+    setup(renderPayment(props));
+    const user = await fillPayment();
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Currency' }),
+      'EUR',
+    );
+    expect(screen.getByLabelText('Actual payment date')).toHaveValue(
+      '2026-10-28',
+    );
+    expect(screen.getByLabelText('Actual payment date')).toHaveAttribute(
+      'max',
+      '2026-10-27',
+    );
+    expect(
+      screen.getByRole('button', { name: 'Record payment' }),
+    ).toBeDisabled();
+    expect(
+      screen.getByText(
+        'Choose a valid actual payment date no later than 2026-10-27 (America/Los_Angeles).',
+      ),
+    ).toBeVisible();
+    fireEvent.change(screen.getByLabelText('Actual payment date'), {
+      target: { value: '2026-10-27' },
+    });
+    expect(
+      screen.getByRole('button', { name: 'Record payment' }),
+    ).toBeEnabled();
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Currency' }),
+      'USD',
+    );
+    expect(screen.getByLabelText('Actual payment date')).toHaveValue(
+      '2026-10-27',
+    );
+    expect(screen.getByRole('textbox', { name: 'Payment notes' })).toHaveValue(
+      'Bank transfer received',
+    );
+    expect(mockSave).not.toHaveBeenCalled();
+  });
+  it('preserves the entered date when a refreshed clock moves the allowed day backwards', async () => {
+    const props = paymentProps();
+    props.reportingClocks = props.reportingClocks.map((clock) =>
+      clock.currency === 'USD'
+        ? {
+            ...clock,
+            timezone: 'Asia/Qatar',
+            businessDate: '2026-10-28',
+            confirmed: true,
+          }
+        : clock,
+    );
+    const page = setup(renderPayment(props));
+    await fillPayment();
+    const reportingClocks = props.reportingClocks.map((clock) =>
+      clock.currency === 'USD'
+        ? {
+            ...clock,
+            timezone: 'America/Los_Angeles',
+            businessDate: '2026-10-27',
+          }
+        : clock,
+    );
+    page.update(renderPayment({ ...props, reportingClocks }));
+    expect(screen.getByLabelText('Actual payment date')).toHaveValue(
+      '2026-10-28',
+    );
+    expect(screen.getByLabelText('Actual payment date')).toHaveAttribute(
+      'max',
+      '2026-10-27',
+    );
+    expect(
+      screen.getByRole('button', { name: 'Record payment' }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole('textbox', { name: 'Actual payment amount' }),
+    ).toHaveValue('12.34');
+    expect(mockSave).not.toHaveBeenCalled();
+  });
+  it('blocks missing calendar metadata and retains the entered payment through failed refresh and recovery', async () => {
+    const props = { ...paymentProps(), reportingClocks: [] };
+    const page = setup(renderPayment(props));
+    expect(screen.getByLabelText('Actual payment date')).toHaveValue('');
+    const user = await fillPayment('400');
+    fireEvent.change(screen.getByLabelText('Actual payment date'), {
+      target: { value: '2026-10-28' },
+    });
+    expect(
+      screen.getByRole('button', { name: 'Record payment' }),
+    ).toBeDisabled();
+    mockRefreshCalendar.mockRejectedValueOnce(new Error('Offline'));
+    await user.click(
+      screen.getByRole('button', { name: 'Refresh payment calendar' }),
+    );
+    expect(
+      screen.getByText(
+        'The payment calendar could not be refreshed. Your entered date and payment draft are kept.',
+      ),
+    ).toBeVisible();
+    expect(screen.getByLabelText('Actual payment date')).toHaveValue(
+      '2026-10-28',
+    );
+    page.update(
+      renderPayment({
+        ...props,
+        reportingClocks: [
+          {
+            currency: 'USD',
+            timezone: 'Asia/Qatar',
+            businessDate: '2026-10-28',
+            confirmed: true,
+          },
+        ],
+      }),
+    );
+    expect(
+      screen.getByRole('button', { name: 'Record payment' }),
+    ).toBeEnabled();
+    expect(screen.getByLabelText('Actual payment date')).toHaveValue(
+      '2026-10-28',
+    );
+    expect(
+      screen.getByRole('textbox', { name: 'Actual payment amount' }),
+    ).toHaveValue('400');
+    expect(screen.getByRole('textbox', { name: 'Payment notes' })).toHaveValue(
+      'Bank transfer received',
+    );
     expect(mockSave).not.toHaveBeenCalled();
   });
   it('preserves a readable dirty draft after edit revocation and keeps guarded Cancel available', async () => {

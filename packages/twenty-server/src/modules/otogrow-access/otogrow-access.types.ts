@@ -1,6 +1,7 @@
 export const OTOGROW_CAPABILITIES = [
   'workspace.admin',
   'delivery.manage',
+  'delivery.review',
   'phone.use',
   'finance.read',
   'finance.manage',
@@ -40,6 +41,7 @@ export type OtogrowRoleDirectory = {
     roleIds: string[];
     revision: number;
     access: OtogrowAccess;
+    projectMemberships: { id: string; name: string }[];
   }[];
 };
 

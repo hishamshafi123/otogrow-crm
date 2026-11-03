@@ -8,6 +8,10 @@ import {
   type DeliveryWorkspace,
 } from '@/delivery/delivery.types';
 
+jest.mock('@/delivery/creative/atlas/AtlasProductionTools', () => ({
+  AtlasProductionTools: () => <section>Atlas generation tools</section>,
+}));
+
 jest.mock('@/delivery/deliveryStyles', () => ({
   StyledDeliveryStack: 'div',
   StyledDeliveryRow: 'div',
@@ -245,24 +249,48 @@ it('distinguishes a verified empty configuration from loading and failure', () =
   ).not.toBeInTheDocument();
   expect(screen.queryByText(/earlier testing key/)).not.toBeInTheDocument();
 });
-it('keeps Google-only, image/video billing and human-review limits explicit with configured models', () => {
+it('distinguishes Google inspection from Atlas generation and independent human review', () => {
   setup();
   expect(
-    screen.getByText(/Google is the only supported media provider/),
+    screen.getByText(
+      /Selected still images can be inspected with a permitted Google model/,
+    ),
   ).toBeVisible();
   expect(
-    screen.getByText(
-      /Image and video generation are unavailable until billing/,
-    ),
+    screen.getByText(/Use Atlas above for supported image\/video generation/),
   ).toBeVisible();
   expect(
     screen.getByText(/motion and audio require human review/),
   ).toBeVisible();
-  expect(screen.getByRole('heading', { name: 'Media tools' })).toBeVisible();
+  expect(
+    screen.getByRole('heading', { name: 'Google still-image inspection' }),
+  ).toBeVisible();
   expect(screen.getByRole('combobox', { name: 'Model' })).toBeEnabled();
   expect(
     screen.getByRole('button', { name: 'Select a model to continue' }),
   ).toBeDisabled();
+});
+it('preserves configured Atlas models when saving Google inspection access', async () => {
+  const value = structuredClone(task);
+  value.details.creative!.mediaSettings!.modelIds.push(
+    'atlascloud/google/nano-banana-pro/text-to-image',
+  );
+  setup(value);
+  await userEvent.click(
+    screen.getByText('Generation access for this production'),
+  );
+  await userEvent.click(
+    screen.getByRole('button', { name: 'Save generation access' }),
+  );
+  await waitFor(() => expect(mockMutate).toHaveBeenCalledTimes(1));
+  expect(mockMutate.mock.calls[0][0].variables.input).toMatchObject({
+    action: 'configure',
+    modelIds: [
+      ...MODEL_FIXTURE.map((model) => model.id),
+      'atlascloud/google/nano-banana-pro/text-to-image',
+    ],
+    allowUnknownCost: false,
+  });
 });
 it('allows a reviewed still-image inspection request without granting final approval', async () => {
   setup();

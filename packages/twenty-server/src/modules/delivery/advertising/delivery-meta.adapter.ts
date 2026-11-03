@@ -4,24 +4,39 @@ import { type MetaInsightRow } from 'src/modules/delivery/advertising/delivery-m
 const amount = z.string().regex(/^\d+(\.\d+)?$/);
 const actions = z
   .array(z.object({ action_type: z.string().max(200), value: amount }))
-  .max(500)
-  .default([]);
-const rowSchema = z.object({
-  date_start: z.iso.date(),
-  date_stop: z.iso.date(),
-  account_id: z.string(),
-  campaign_id: z.string().optional(),
-  campaign_name: z.string().max(2000).optional(),
-  adset_id: z.string().optional(),
-  adset_name: z.string().max(2000).optional(),
-  ad_id: z.string().optional(),
-  ad_name: z.string().max(2000).optional(),
-  spend: amount.default('0'),
-  impressions: amount.default('0'),
-  clicks: amount.default('0'),
-  actions,
-  action_values: actions,
-});
+  .max(500);
+const rowSchema = z
+  .object({
+    date_start: z.iso.date(),
+    date_stop: z.iso.date(),
+    account_id: z.string(),
+    campaign_id: z.string().optional(),
+    campaign_name: z.string().max(2000).optional(),
+    adset_id: z.string().optional(),
+    adset_name: z.string().max(2000).optional(),
+    ad_id: z.string().optional(),
+    ad_name: z.string().max(2000).optional(),
+    spend: amount.optional(),
+    impressions: amount.optional(),
+    clicks: amount.optional(),
+    actions: actions.optional(),
+    action_values: actions.optional(),
+  })
+  .transform((row) => ({
+    ...row,
+    spend: row.spend ?? '0',
+    impressions: row.impressions ?? '0',
+    clicks: row.clicks ?? '0',
+    actions: row.actions ?? [],
+    action_values: row.action_values ?? [],
+    reportedFields: {
+      spend: row.spend !== undefined,
+      impressions: row.impressions !== undefined,
+      clicks: row.clicks !== undefined,
+      actions: row.actions !== undefined,
+      action_values: row.action_values !== undefined,
+    },
+  }));
 export class MetaReportingError extends Error {
   constructor(
     public readonly reason: 'AUTH' | 'RATE_LIMIT' | 'PROVIDER' | 'RESPONSE',

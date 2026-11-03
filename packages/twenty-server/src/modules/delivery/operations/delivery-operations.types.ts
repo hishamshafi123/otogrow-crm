@@ -39,7 +39,13 @@ export type DeliveryNotice = {
   taskId: string;
   recipientId: string;
   senderId: string;
-  kind: 'ASSIGNMENT' | 'MESSAGE' | 'FULFILMENT' | 'ALERT';
+  kind: 'ASSIGNMENT' | 'REVIEW_ASSIGNMENT' | 'MESSAGE' | 'FULFILMENT' | 'ALERT';
+  reviewAssignment?: {
+    submissionVersion: number;
+    assignmentId: string | null;
+    assignmentRevision: number;
+    recipientId: string;
+  };
   text: string;
   createdAt: string;
   remindAt: string;
@@ -80,6 +86,14 @@ export type DeliveryAlert = {
   resolvedAt: string | null;
 };
 export type DeliveryOperations = {
+  founderEscalationRouting?: {
+    mode: 'RULES';
+    revision: number;
+    changedBy: string;
+    changedAt: string;
+    commandId: string;
+    reason: string;
+  };
   metaReporting?: MetaReporting;
   business?: DeliveryBusiness;
   clients?: DeliveryClients;
@@ -153,7 +167,13 @@ export const operationsCommandSchema = z.discriminatedUnion('action', [
     .strict(),
   z.object({ action: z.literal('acknowledge'), id: identifier }).strict(),
   z.object({ action: z.literal('noticeSeen'), id: identifier }).strict(),
-  z.object({ action: z.literal('seen'), ...task }).strict(),
+  z
+    .object({
+      action: z.literal('seen'),
+      ...task,
+      expectedAssignmentKey: z.string().min(1).max(150).optional(),
+    })
+    .strict(),
   z
     .object({
       action: z.literal('alert'),

@@ -7,6 +7,7 @@ import { z } from 'zod';
 const text = z.string().trim().max(6000);
 export const creativeBriefSchema = z
   .object({
+    outputKind: z.enum(['IMAGE', 'VIDEO']).optional(),
     objective: z.enum(['ADS', 'ORGANIC']),
     audience: text,
     painPoint: text,
@@ -135,6 +136,7 @@ export const newCreativeDocument = (): CreativeDocument => ({
   approvedBriefVersion: null,
   briefHistory: [],
   brief: {
+    outputKind: 'VIDEO',
     objective: 'ADS',
     audience: '',
     painPoint: '',

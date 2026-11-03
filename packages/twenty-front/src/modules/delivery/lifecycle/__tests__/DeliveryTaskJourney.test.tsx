@@ -207,6 +207,69 @@ const document: CreativeDocument = {
   variants: [],
   revisionCharge: 0,
 };
+it('shows the scoped effective reviewer for pending work while preserving primary client-delivery ownership', () => {
+  const current: DeliveryTask = {
+    ...task,
+    review: {
+      submissionVersion: 1,
+      effectiveReviewerId: 'backup',
+      primaryReviewerId: 'manager',
+      assignmentRevision: 2,
+      assignmentMode: 'BACKUP',
+      reviewerState: 'ACTIVE',
+    },
+    details: {
+      ...task.details,
+      state: 'IN_REVIEW',
+      submissions: [
+        {
+          version: 1,
+          description: 'Submitted cut',
+          evidence: [],
+          submittedBy: 'editor',
+          submittedAt: '2026-10-29T00:00:00Z',
+        },
+      ],
+    },
+  };
+  const scoped: DeliveryWorkspace = {
+    ...workspace,
+    actor: { memberId: 'backup', isManager: false, isAdmin: false },
+    members: [
+      ...workspace.members,
+      {
+        id: 'backup',
+        name: 'Scoped reviewer',
+        access: 'MEMBER',
+        roleLabel: 'Reviewer',
+      },
+    ],
+  };
+  const content = (selected: DeliveryTask) => (
+    <I18nProvider i18n={i18n}>
+      <DeliveryTaskJourney
+        task={selected}
+        workspace={scoped}
+        onOpenPanel={jest.fn()}
+      />
+    </I18nProvider>
+  );
+  const view = render(content(current));
+  expect(screen.getByText('Scoped reviewer')).toBeVisible();
+  expect(
+    screen.getByRole('button', { name: 'Review submission' }),
+  ).toBeInTheDocument();
+  view.rerender(
+    content({ ...current, details: { ...current.details, state: 'APPROVED' } }),
+  );
+  expect(screen.getByText('Amna')).toBeVisible();
+  expect(
+    screen.getByRole('button', { name: 'View delivery details' }),
+  ).toBeInTheDocument();
+  expect(
+    screen.queryByRole('button', { name: 'Record client delivery' }),
+  ).not.toBeInTheDocument();
+});
 it('routes an unapproved creative brief to the manager before production', async () => {
   const open = jest.fn();
   render(

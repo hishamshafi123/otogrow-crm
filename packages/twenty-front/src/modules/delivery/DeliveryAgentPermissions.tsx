@@ -31,18 +31,22 @@ const StyledList = styled.div`
 type DeliveryAgentPermissionsProps = {
   configuration: DeliveryAgentConfiguration;
   directory?: OtogrowRoleDirectory;
-  workspace: DeliveryWorkspace;
+  workspace?: Pick<DeliveryWorkspace, 'projects'>;
+  projects?: { id: string; name: string; memberIds?: string[] }[];
   update: (value: Partial<DeliveryAgentConfiguration>) => void;
 };
 export const DeliveryAgentPermissions = ({
   configuration,
   directory,
   workspace,
+  projects,
   update,
 }: DeliveryAgentPermissionsProps) => {
   const { t } = useLingui();
   const roleIds = configuration.roleIds;
   const namedRoles = isDefined(roleIds);
+  const activity = configuration.kind === 'ACTIVITY';
+  const availableProjects = projects ?? workspace?.projects ?? [];
   return (
     <fieldset>
       <legend>
@@ -61,11 +65,19 @@ export const DeliveryAgentPermissions = ({
             {namedRoles ? (
               <>
                 <p>
-                  <Trans>
-                    Choose at least one team role. Current and future members of
-                    any selected role can use this assistant within its allowed
-                    projects.
-                  </Trans>
+                  {activity ? (
+                    <Trans>
+                      Choose at least one additional team role. A person must
+                      also have current administrator access to run this
+                      assistant.
+                    </Trans>
+                  ) : (
+                    <Trans>
+                      Choose at least one team role. Current and future members
+                      of any selected role can use this assistant within its
+                      allowed projects.
+                    </Trans>
+                  )}
                 </p>
                 <StyledList>
                   {directory.roles.map((role) => (
@@ -104,10 +116,14 @@ export const DeliveryAgentPermissions = ({
                     switch to specific team roles.
                   </Trans>
                 </p>
-                {(['ADMIN', 'MANAGER', 'MEMBER'] as const).map((role) => (
+                {(activity
+                  ? (['ADMIN'] as const)
+                  : (['ADMIN', 'MANAGER', 'MEMBER'] as const)
+                ).map((role) => (
                   <label key={role}>
                     <input
                       type="checkbox"
+                      disabled={activity}
                       checked={configuration.roles.includes(role)}
                       onChange={(event) =>
                         update({
@@ -139,11 +155,19 @@ export const DeliveryAgentPermissions = ({
                 <Trans>Preview team access</Trans>
               </summary>
               <p>
-                <Trans>
-                  Admins can configure assistants. Running one requires an
-                  allowed role and project access. Conversation access and
-                  spending limits are checked separately.
-                </Trans>
+                {activity ? (
+                  <Trans>
+                    Company activity requires current administrator access and
+                    the selected role restriction. Project membership cannot
+                    grant access. Spending limits are checked separately.
+                  </Trans>
+                ) : (
+                  <Trans>
+                    Admins can configure assistants. Running one requires an
+                    allowed role and project access. Conversation access and
+                    spending limits are checked separately.
+                  </Trans>
+                )}
               </p>
               <StyledList>
                 <ul aria-label={t`Assistant access by person`}>
@@ -161,16 +185,21 @@ export const DeliveryAgentPermissions = ({
                         roleIds?.includes(role.id) &&
                         member.roleIds.includes(role.id),
                     );
-                    const allowed = namedRoles
-                      ? matching.length > 0
-                      : configuration.roles.includes(
-                          admin ? 'ADMIN' : manager ? 'MANAGER' : 'MEMBER',
-                        );
-                    const projects = workspace.projects.filter(
+                    const allowed =
+                      (!activity || admin) &&
+                      (namedRoles
+                        ? matching.length > 0
+                        : configuration.roles.includes(
+                            admin ? 'ADMIN' : manager ? 'MANAGER' : 'MEMBER',
+                          ));
+                    const permittedProjects = availableProjects.filter(
                       (project) =>
                         configuration.projectIds.includes(project.id) &&
                         (manager ||
-                          project.memberIds.includes(member.memberId)),
+                          (project.memberIds?.includes(member.memberId) ??
+                            member.projectMemberships.some(
+                              (membership) => membership.id === project.id,
+                            ))),
                     );
                     return (
                       <li key={member.memberId} aria-label={member.name}>
@@ -178,11 +207,15 @@ export const DeliveryAgentPermissions = ({
                         <p>
                           {!configuration.enabled
                             ? t`Assistant is disabled`
-                            : !allowed
-                              ? t`No allowed role`
-                              : !projects.length
-                                ? t`No allowed project access`
-                                : t`Can use in: ${projects.map((project) => project.name).join(', ')}`}
+                            : activity && !admin
+                              ? t`Requires current administrator access`
+                              : !allowed
+                                ? t`No allowed role`
+                                : activity
+                                  ? t`Can use for company activity`
+                                  : !permittedProjects.length
+                                    ? t`No allowed project access`
+                                    : t`Can use in: ${permittedProjects.map((project) => project.name).join(', ')}`}
                         </p>
                         {allowed && namedRoles && (
                           <p>{t`Allowed through: ${matching.map((role) => role.name).join(', ')}`}</p>

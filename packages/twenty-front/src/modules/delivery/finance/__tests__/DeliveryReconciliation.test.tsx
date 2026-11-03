@@ -3,7 +3,14 @@ import { type DocumentNode } from 'graphql';
 import { Request } from 'cross-fetch';
 import { i18n } from '@lingui/core';
 import { I18nProvider } from '@lingui/react';
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { type DeliveryFinancePaymentsQuery } from '~/generated-metadata/graphql';
@@ -212,6 +219,14 @@ const snapshotFixture = (): Snapshot => ({
   memberId: MEMBER_ID,
   userWorkspaceId: 'user-workspace',
   currency: null,
+  reportingClocks: ['USD', 'AED', 'EUR', 'GBP', 'INR', 'SGD', 'AUD', 'CAD'].map(
+    (currency) => ({
+      currency,
+      timezone: 'UTC',
+      businessDate: '2026-10-28',
+      confirmed: false,
+    }),
+  ),
   canManage: true,
   rejectedCashCount: 0,
   cash: [cashFixture()],
@@ -530,6 +545,139 @@ describe('payment workspace journeys', () => {
       `financeReceivable=${INVOICE_ID}`,
     );
     expect(mockMutation).toHaveBeenCalledTimes(1);
+  });
+  it('uses all server currency clocks even when payment sources are filtered to one currency', async () => {
+    mockSnapshot.reportingClocks = mockSnapshot.reportingClocks.map((clock) =>
+      clock.currency === 'USD'
+        ? {
+            ...clock,
+            timezone: 'Asia/Qatar',
+            businessDate: '2026-10-28',
+            confirmed: true,
+          }
+        : clock.currency === 'EUR'
+          ? {
+              ...clock,
+              timezone: 'America/Los_Angeles',
+              businessDate: '2026-10-27',
+              confirmed: true,
+            }
+          : clock,
+    );
+    setup('&financeCurrency=USD');
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Record money already moved' }),
+    );
+    expect(screen.getByLabelText('Actual payment date')).toHaveValue(
+      '2026-10-28',
+    );
+    expect(screen.getByLabelText('Actual payment date')).toHaveAttribute(
+      'max',
+      '2026-10-28',
+    );
+    await userEvent.type(
+      screen.getByRole('textbox', { name: 'Payment title' }),
+      'Actual foreign-currency transfer',
+    );
+    await userEvent.type(
+      screen.getByRole('textbox', { name: 'Actual payment amount' }),
+      '200',
+    );
+    await userEvent.type(
+      screen.getByRole('textbox', { name: 'Payment notes' }),
+      'Confirmed on the reporting calendar.',
+    );
+    await userEvent.selectOptions(
+      within(
+        screen.getByRole('form', { name: 'Record actual payment' }),
+      ).getByRole('combobox', { name: 'Currency' }),
+      'EUR',
+    );
+    expect(screen.getByLabelText('Actual payment date')).toHaveValue(
+      '2026-10-28',
+    );
+    expect(screen.getByLabelText('Actual payment date')).toHaveAttribute(
+      'max',
+      '2026-10-27',
+    );
+    expect(
+      screen.getByRole('button', { name: 'Record payment' }),
+    ).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('Actual payment date'), {
+      target: { value: '2026-10-27' },
+    });
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Record payment' }),
+    );
+    await waitFor(() =>
+      expect(mockMutation).toHaveBeenCalledWith(
+        'RecordDeliveryFinancePayment',
+        {
+          variables: {
+            input: expect.objectContaining({
+              currency: 'EUR',
+              date: '2026-10-27',
+              amountMicros: '200000000',
+            }),
+          },
+        },
+      ),
+    );
+  });
+  it('keeps a payment draft when calendar metadata disappears, refresh fails and a later clock returns', async () => {
+    const page = setup('');
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Record money already moved' }),
+    );
+    await userEvent.type(
+      screen.getByRole('textbox', { name: 'Payment title' }),
+      'Keep the actual cash evidence',
+    );
+    await userEvent.type(
+      screen.getByRole('textbox', { name: 'Actual payment amount' }),
+      '400',
+    );
+    await userEvent.type(
+      screen.getByRole('textbox', { name: 'Payment notes' }),
+      'Retain this note while checking the calendar.',
+    );
+    const reportingClocks = mockSnapshot.reportingClocks;
+    mockSnapshot = { ...mockSnapshot, reportingClocks: [] };
+    page.update();
+    expect(
+      screen.getByRole('button', { name: 'Record payment' }),
+    ).toBeDisabled();
+    mockRefetch.mockRejectedValueOnce(new Error('Calendar offline'));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Refresh payment calendar' }),
+    );
+    expect(
+      screen.getByText(
+        'The payment calendar could not be refreshed. Your entered date and payment draft are kept.',
+      ),
+    ).toBeVisible();
+    mockSnapshot = {
+      ...mockSnapshot,
+      reportingClocks: reportingClocks.map((clock) => ({
+        ...clock,
+        businessDate: '2026-10-29',
+      })),
+    };
+    page.update();
+    expect(screen.getByLabelText('Actual payment date')).toHaveValue(
+      '2026-10-28',
+    );
+    expect(screen.getByLabelText('Actual payment date')).toHaveAttribute(
+      'max',
+      '2026-10-29',
+    );
+    expect(screen.getByRole('textbox', { name: 'Payment notes' })).toHaveValue(
+      'Retain this note while checking the calendar.',
+    );
+    expect(
+      screen.getByRole('button', { name: 'Record payment' }),
+    ).toBeEnabled();
+    expect(mockMutation).not.toHaveBeenCalled();
   });
   it('shows financial sources to readers without offering writes', () => {
     mockCanManage = false;

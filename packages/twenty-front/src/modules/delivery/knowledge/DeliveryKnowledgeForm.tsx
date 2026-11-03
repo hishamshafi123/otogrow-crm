@@ -1,8 +1,17 @@
 import { Trans, useLingui } from '@lingui/react/macro';
-import { useCallback, type FormEvent } from 'react';
+import {
+  useCallback,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type FormEvent,
+} from 'react';
 import { useDeliveryDraft } from '@/delivery/drafts/useDeliveryDraft';
 import { DeliveryDraftConflict } from '@/delivery/drafts/DeliveryDraftConflict';
 import { useKnowledgeCategories } from '@/delivery/knowledge/useKnowledgeCategories';
+import { DeliveryTranscriptImport } from '@/delivery/knowledge/transcript/DeliveryTranscriptImport';
+import { DeliveryFathomImport } from '@/delivery/knowledge/fathom/DeliveryFathomImport';
+import { type FathomContext } from '@/delivery/knowledge/fathom/fathom.types';
 import {
   StyledDeliveryButton,
   StyledDeliveryCard,
@@ -18,6 +27,11 @@ type DeliveryKnowledgeFormProps = {
   onSave: (input: DeliveryKnowledgeSaveInput) => Promise<boolean>;
   onClose: () => void;
   onSaved: () => void;
+  latestRevision?: number;
+  readOnly?: boolean;
+  onReload?: () => void;
+  fathomContext?: FathomContext;
+  onAuthorityLost?: () => void;
 };
 export const DeliveryKnowledgeForm = ({
   initial,
@@ -26,14 +40,47 @@ export const DeliveryKnowledgeForm = ({
   onSave,
   onClose,
   onSaved,
+  latestRevision,
+  readOnly = false,
+  onReload,
+  fathomContext,
+  onAuthorityLost,
 }: DeliveryKnowledgeFormProps) => {
   const { t } = useLingui();
+  const [fathomExpiresAt, setFathomExpiresAt] = useState<string | null>(null);
+  const [fathomExpired, setFathomExpired] = useState(false);
   const draft = useDeliveryDraft({
     initialValues: initial,
     revision: initial.revision,
     busy,
   });
   const values = draft.values;
+  const stale =
+    draft.stale ||
+    (latestRevision !== undefined && latestRevision > initial.revision);
+  const sourceIdentity = `${initial.projectId}:${initial.id}:${initial.revision}`;
+  // oxlint-disable-next-line twenty/no-state-useref -- Successful local import returns keyboard focus to the exact evidence field.
+  const transcriptInput = useRef<HTMLTextAreaElement | null>(null);
+  // oxlint-disable-next-line twenty/no-state-useref -- A local file preview may finish after its target draft, permission or notes changed.
+  const importTarget = useRef({
+    sourceIdentity,
+    transcript: values.transcript,
+    enabled: enabled && !stale && !readOnly && !draft.saving,
+  });
+  useLayoutEffect(() => {
+    importTarget.current = {
+      sourceIdentity,
+      transcript: values.transcript,
+      enabled: enabled && !stale && !readOnly && !draft.saving,
+    };
+  }, [
+    sourceIdentity,
+    values.transcript,
+    enabled,
+    stale,
+    readOnly,
+    draft.saving,
+  ]);
   const categories = useKnowledgeCategories();
   const focusCategory = useCallback(
     (form: HTMLFormElement | null) => form?.querySelector('select')?.focus(),
@@ -52,7 +99,11 @@ export const DeliveryKnowledgeForm = ({
   ) => draft.update({ ...values, [field]: value });
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (!enabled || draft.stale) return;
+    if (!enabled || stale || readOnly || draft.saving) return;
+    if (fathomExpiresAt !== null && Date.parse(fathomExpiresAt) <= Date.now()) {
+      setFathomExpired(true);
+      return;
+    }
     draft.setSaving(true);
     try {
       if (await onSave({ ...values, revision: draft.revision })) {
@@ -83,8 +134,11 @@ export const DeliveryKnowledgeForm = ({
               draft; a manager publishes it after review.
             </Trans>
           </p>
-          {draft.stale && (
-            <DeliveryDraftConflict onReload={draft.reload} busy={busy} />
+          {stale && (
+            <DeliveryDraftConflict
+              onReload={onReload ?? draft.reload}
+              busy={busy}
+            />
           )}
           {!enabled && (
             <p role="alert">
@@ -95,7 +149,7 @@ export const DeliveryKnowledgeForm = ({
             </p>
           )}
           <fieldset
-            disabled={!enabled || draft.saving}
+            disabled={!enabled || readOnly || draft.saving}
             style={{ border: 0, padding: 0, minWidth: 0 }}
           >
             <StyledDeliveryStack>
@@ -147,15 +201,85 @@ export const DeliveryKnowledgeForm = ({
               <small>
                 <Trans>
                   Original links are private to managers and the author. Links
-                  are not fetched or inspected. Include a safe reference link in
-                  the reviewed text if the project team should receive it.
+                  are reference-only unless you explicitly import from Fathom
+                  below. Include a safe reference link in the reviewed text if
+                  the project team should receive it.
                 </Trans>
               </small>
+              {isMeeting && (
+                <DeliveryTranscriptImport
+                  sourceIdentity={sourceIdentity}
+                  transcript={values.transcript}
+                  disabled={!enabled || stale || readOnly || draft.saving}
+                  onImport={(text, target) => {
+                    const current = importTarget.current;
+                    if (
+                      !current.enabled ||
+                      current.sourceIdentity !== target.sourceIdentity ||
+                      current.transcript !== target.transcript
+                    )
+                      return false;
+                    update('transcript', text);
+                    transcriptInput.current?.focus();
+                    return true;
+                  }}
+                />
+              )}
+              {isMeeting && fathomContext?.actor.isAdmin && onAuthorityLost && (
+                <DeliveryFathomImport
+                  key={JSON.stringify([fathomContext, sourceIdentity])}
+                  context={fathomContext}
+                  projectId={initial.projectId}
+                  sourceId={initial.id}
+                  sourceIdentity={sourceIdentity}
+                  transcript={values.transcript}
+                  enabled={enabled && !stale && !readOnly && !draft.saving}
+                  onAuthorityLost={onAuthorityLost}
+                  onImport={(preview, target) => {
+                    const current = importTarget.current;
+                    if (
+                      !current.enabled ||
+                      current.sourceIdentity !== target.sourceIdentity ||
+                      current.transcript !== target.transcript
+                    )
+                      return false;
+                    setFathomExpiresAt(preview.expiresAt);
+                    setFathomExpired(false);
+                    draft.update({
+                      ...values,
+                      transcript: preview.transcript,
+                      fathomImportProof: preview.proof,
+                      fathomImportHash: preview.proofHash,
+                    });
+                    transcriptInput.current?.focus();
+                    return true;
+                  }}
+                />
+              )}
+              {values.fathomImportHash && (
+                <p role="status">
+                  <Trans>
+                    Fathom provenance is attached to these notes. Edited notes
+                    remain labelled as human-edited; the original provider
+                    title, date and recording ID are preserved separately.
+                  </Trans>
+                </p>
+              )}
+              {fathomExpired && (
+                <p role="alert">
+                  <Trans>
+                    The Fathom import preview expired before saving. Your notes
+                    are retained. Fetch a new preview, review it, and use it
+                    before saving this import.
+                  </Trans>
+                </p>
+              )}
               <label>
                 {isMeeting
                   ? t`Transcript or meeting notes`
                   : t`Source evidence and notes`}
                 <textarea
+                  ref={transcriptInput}
                   rows={10}
                   maxLength={200000}
                   value={values.transcript}
@@ -190,7 +314,8 @@ export const DeliveryKnowledgeForm = ({
                   type="submit"
                   data-primary="true"
                   disabled={
-                    draft.stale ||
+                    stale ||
+                    !values.title.trim() ||
                     (!values.sourceUrl.trim() && !values.transcript.trim())
                   }
                 >

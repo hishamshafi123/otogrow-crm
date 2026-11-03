@@ -13,6 +13,7 @@ import {
 import { InjectDataSource } from '@nestjs/typeorm';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { DataSource, type EntityManager } from 'typeorm';
+import { type z } from 'zod';
 import { WorkspaceEntity } from 'src/engine/core-modules/workspace/workspace.entity';
 import { DeliveryService } from 'src/modules/delivery/delivery.service';
 import { DeliveryCreativeService } from 'src/modules/delivery/creative/delivery-creative.service';
@@ -25,6 +26,7 @@ import {
 } from 'src/modules/delivery/operations/delivery-operations.types';
 import {
   clientsCommandSchema,
+  engagementSchema,
   clientResponseSchema,
   newDeliveryClients,
   type DeliveryClients,
@@ -210,10 +212,147 @@ export class DeliveryClientsService {
         await this.manager(workspace, memberId, userWorkspaceId, manager);
         return {
           ...clients,
+          workspaceId: workspace.id,
+          memberId,
+          userWorkspaceId,
           links: clients.links.map(
             ({ hash: _hash, codeHash: _codeHash, ...link }) => link,
           ),
         };
+      },
+      transactionManager,
+    );
+  }
+
+  private async saveEngagement(
+    manager: EntityManager,
+    clients: DeliveryClients,
+    workspace: WorkspaceEntity,
+    memberId: string,
+    fields: z.infer<typeof engagementSchema>,
+  ): Promise<ClientEngagement> {
+    const project = await manager
+      .getRepository(DeliveryProjectEntity)
+      .findOneBy({ id: fields.projectId, workspaceId: workspace.id });
+    if (!project?.companyId)
+      throw new BadRequestException(
+        'Choose a project linked to a client company.',
+      );
+    const company: { id: string }[] = await manager.query(
+      `SELECT id FROM ${this.delivery.schema(workspace)}.company WHERE id=$1 AND "deletedAt" IS NULL`,
+      [project.companyId],
+    );
+    if (!company.length) throw new NotFoundException();
+    if (
+      new Set(fields.fields.map((field) => field.id)).size !==
+      fields.fields.length
+    )
+      throw new BadRequestException('Form fields must be unique.');
+    if (fields.advertising && !hasPerformanceMarketingService(fields.services))
+      throw new BadRequestException(
+        'Select the Performance marketing service before configuring advertising responsibilities and client budgets.',
+      );
+    if (fields.advertising)
+      await this.advertisingManager(workspace, fields, manager);
+    const existing = clients.engagements.find((item) => item.id === fields.id);
+    if (fields.id && !existing) throw new NotFoundException();
+    if ((existing?.revision ?? 0) !== fields.revision)
+      throw new ConflictException('Reload the engagement before editing.');
+    if (
+      existing &&
+      (existing.companyId !== project.companyId ||
+        existing.projectId !== project.id)
+    )
+      throw new BadRequestException(
+        'Create a separate engagement when changing the client or project.',
+      );
+    const engagement: ClientEngagement = {
+      ...fields,
+      id: existing?.id ?? randomUUID(),
+      companyId: project.companyId,
+      revision: fields.revision + 1,
+      submissions: existing?.submissions ?? [],
+      assets: existing?.assets ?? [],
+    };
+    await this.recordActivity(manager, workspace.id, memberId, engagement, {
+      action: existing
+        ? 'CLIENT_ENGAGEMENT_UPDATED'
+        : 'CLIENT_ENGAGEMENT_CREATED',
+      summary: existing
+        ? 'Updated a client engagement.'
+        : 'Created a client engagement.',
+      subjectMemberId: engagement.advertising?.marketerId,
+      changes: [
+        {
+          field: 'revision',
+          before: existing ? String(existing.revision) : null,
+          after: String(engagement.revision),
+        },
+        {
+          field: 'billing',
+          before: existing?.billing ?? null,
+          after: engagement.billing,
+        },
+        {
+          field: 'serviceCount',
+          before: existing ? String(existing.services.length) : null,
+          after: String(engagement.services.length),
+        },
+        {
+          field: 'formFieldCount',
+          before: existing ? String(existing.fields.length) : null,
+          after: String(engagement.fields.length),
+        },
+        {
+          field: 'advertisingEnabled',
+          before: existing ? String(Boolean(existing.advertising)) : null,
+          after: String(Boolean(engagement.advertising)),
+        },
+        {
+          field: 'assigneeId',
+          before: existing?.advertising?.marketerId ?? null,
+          after: engagement.advertising?.marketerId ?? null,
+        },
+        {
+          field: 'reviewerId',
+          before: existing?.advertising?.managerId ?? null,
+          after: engagement.advertising?.managerId ?? null,
+        },
+      ].filter((change) => change.before !== change.after),
+    });
+    if (existing) Object.assign(existing, engagement);
+    else clients.engagements.push(engagement);
+    return engagement;
+  }
+
+  async saveSetupEngagement(
+    workspace: WorkspaceEntity,
+    memberId: string,
+    userWorkspaceId: string,
+    input: unknown,
+    transactionManager: EntityManager,
+  ): Promise<ClientEngagement> {
+    const parsed = engagementSchema.safeParse(input);
+    if (!parsed.success)
+      throw new BadRequestException('Check the client form fields.');
+    return this.transact(
+      workspace.id,
+      async (clients, _operations, manager) => {
+        await this.manager(workspace, memberId, userWorkspaceId, manager);
+        const engagement = await this.saveEngagement(
+          manager,
+          clients,
+          workspace,
+          memberId,
+          parsed.data,
+        );
+        clients.audit.push({
+          at: new Date().toISOString(),
+          actorId: memberId,
+          action: 'engagement',
+          targetId: engagement.id,
+        });
+        return engagement;
       },
       transactionManager,
     );
@@ -239,113 +378,13 @@ export class DeliveryClientsService {
         let targetId = '';
         let result: string | null = null;
         if (command.action === 'engagement') {
-          const fields = command.engagement;
-          const project = await manager
-            .getRepository(DeliveryProjectEntity)
-            .findOneBy({ id: fields.projectId, workspaceId: workspace.id });
-          if (!project?.companyId)
-            throw new BadRequestException(
-              'Choose a project linked to a client company.',
-            );
-          const company: { id: string }[] = await manager.query(
-            `SELECT id FROM ${this.delivery.schema(workspace)}.company WHERE id=$1 AND "deletedAt" IS NULL`,
-            [project.companyId],
-          );
-          if (!company.length) throw new NotFoundException();
-          if (
-            new Set(fields.fields.map((field) => field.id)).size !==
-            fields.fields.length
-          )
-            throw new BadRequestException('Form fields must be unique.');
-          if (
-            fields.advertising &&
-            !hasPerformanceMarketingService(fields.services)
-          )
-            throw new BadRequestException(
-              'Select the Performance marketing service before configuring advertising responsibilities and client budgets.',
-            );
-          if (fields.advertising)
-            await this.advertisingManager(workspace, fields, manager);
-          const existing = clients.engagements.find(
-            (item) => item.id === fields.id,
-          );
-          if (fields.id && !existing) throw new NotFoundException();
-          if ((existing?.revision ?? 0) !== fields.revision)
-            throw new ConflictException(
-              'Reload the engagement before editing.',
-            );
-          if (
-            existing &&
-            (existing.companyId !== project.companyId ||
-              existing.projectId !== project.id)
-          )
-            throw new BadRequestException(
-              'Create a separate engagement when changing the client or project.',
-            );
-          const engagement: ClientEngagement = {
-            ...fields,
-            id: existing?.id ?? randomUUID(),
-            companyId: project.companyId,
-            revision: fields.revision + 1,
-            submissions: existing?.submissions ?? [],
-            assets: existing?.assets ?? [],
-          };
-          await this.recordActivity(
+          const engagement = await this.saveEngagement(
             manager,
-            workspace.id,
+            clients,
+            workspace,
             memberId,
-            engagement,
-            {
-              action: existing
-                ? 'CLIENT_ENGAGEMENT_UPDATED'
-                : 'CLIENT_ENGAGEMENT_CREATED',
-              summary: existing
-                ? 'Updated a client engagement.'
-                : 'Created a client engagement.',
-              subjectMemberId: engagement.advertising?.marketerId,
-              changes: [
-                {
-                  field: 'revision',
-                  before: existing ? String(existing.revision) : null,
-                  after: String(engagement.revision),
-                },
-                {
-                  field: 'billing',
-                  before: existing?.billing ?? null,
-                  after: engagement.billing,
-                },
-                {
-                  field: 'serviceCount',
-                  before: existing ? String(existing.services.length) : null,
-                  after: String(engagement.services.length),
-                },
-                {
-                  field: 'formFieldCount',
-                  before: existing ? String(existing.fields.length) : null,
-                  after: String(engagement.fields.length),
-                },
-                {
-                  field: 'advertisingEnabled',
-                  before: existing
-                    ? String(Boolean(existing.advertising))
-                    : null,
-                  after: String(Boolean(engagement.advertising)),
-                },
-                {
-                  field: 'assigneeId',
-                  before: existing?.advertising?.marketerId ?? null,
-                  after: engagement.advertising?.marketerId ?? null,
-                },
-                {
-                  field: 'reviewerId',
-                  before: existing?.advertising?.managerId ?? null,
-                  after: engagement.advertising?.managerId ?? null,
-                },
-              ].filter((change) => change.before !== change.after),
-            },
+            command.engagement,
           );
-          if (existing) Object.assign(existing, engagement);
-          else clients.engagements.push(engagement);
           targetId = engagement.id;
         } else if (
           command.action === 'revoke' ||
@@ -657,10 +696,17 @@ export class DeliveryClientsService {
                   )
                   .map((record) => ({
                     id: record.id,
+                    clientRequestId:
+                      record.kind === 'BUDGET' ? record.clientRequestId : null,
+                    clientRequestRevision:
+                      record.kind === 'BUDGET'
+                        ? record.clientRequestRevision
+                        : null,
                     amount: record.kind === 'BUDGET' ? record.amount : 0,
                     currency: record.kind === 'BUDGET' ? record.currency : '',
                     channel: record.kind === 'BUDGET' ? record.channel : '',
                     period: record.kind === 'BUDGET' ? record.period : '',
+                    reason: record.kind === 'BUDGET' ? record.reason : '',
                     status: record.status,
                     createdAt: record.createdAt,
                   })),
@@ -716,14 +762,24 @@ export class DeliveryClientsService {
           )
             throw new ForbiddenException();
           operations.business ??= newDeliveryBusiness();
-          if (
-            operations.business.records.some(
+          const previousRequest = operations.business.records.find(
               (record) =>
                 record.clientEngagementId === engagement.id &&
                 record.clientRequestId === command.requestId,
+          );
+          if (previousRequest) {
+            if (
+              previousRequest.kind !== 'BUDGET' ||
+              previousRequest.amount !== command.amount ||
+              previousRequest.reason !== command.reason ||
+              (previousRequest.clientRequestRevision !== undefined &&
+                previousRequest.clientRequestRevision !== command.revision)
             )
-          )
+              throw new ConflictException(
+                'This request ID belongs to a different budget request. Check the saved request before submitting again.',
+              );
             return;
+          }
           if (engagement.revision !== command.revision)
             throw new ConflictException(
               'Reload the portal before requesting a budget change.',
@@ -778,6 +834,7 @@ export class DeliveryClientsService {
             reason: command.reason,
             clientEngagementId: engagement.id,
             clientRequestId: command.requestId,
+            clientRequestRevision: command.revision,
             createdBy: 'CLIENT',
             createdAt: now,
             updatedAt: now,

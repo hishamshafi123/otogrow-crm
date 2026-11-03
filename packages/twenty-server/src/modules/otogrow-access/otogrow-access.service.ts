@@ -20,6 +20,8 @@ import {
   PermissionsExceptionCode,
 } from 'src/engine/metadata-modules/permissions/permissions.exception';
 import { DeliveryMemberEntity } from 'src/modules/delivery/entities/delivery-member.entity';
+import { DeliveryProjectEntity } from 'src/modules/delivery/entities/delivery-project.entity';
+import { readDeliverySnapshot } from 'src/modules/delivery/read-delivery-snapshot';
 import { recordOtogrowActivity } from 'src/modules/otogrow-activity/record-otogrow-activity';
 import { OtogrowAccessEventEntity } from 'src/modules/otogrow-access/entities/otogrow-access-event.entity';
 import { OtogrowMemberAccessEntity } from 'src/modules/otogrow-access/entities/otogrow-member-access.entity';
@@ -221,10 +223,17 @@ export class OtogrowAccessService {
     for (const grant of [...grants]) {
       const inherited =
         grant.capability === 'workspace.admin'
-          ? ['delivery.manage', 'finance.read', 'finance.manage']
-          : grant.capability === 'finance.manage'
-            ? ['finance.read']
-            : [];
+          ? [
+              'delivery.manage',
+              'delivery.review',
+              'finance.read',
+              'finance.manage',
+            ]
+          : grant.capability === 'delivery.manage'
+            ? ['delivery.review']
+            : grant.capability === 'finance.manage'
+              ? ['finance.read']
+              : [];
       for (const capability of inherited) {
         if (
           !grants.some(
@@ -321,6 +330,27 @@ export class OtogrowAccessService {
     userWorkspaceId: string,
     manager: EntityManager = this.dataSource.manager,
   ): Promise<OtogrowRoleDirectory> {
+    return manager.queryRunner?.isTransactionActive
+      ? this.readDirectory(workspaceId, memberId, userWorkspaceId, manager)
+      : readDeliverySnapshot(
+          this.dataSource,
+          workspaceId,
+          (transactionManager) =>
+            this.readDirectory(
+              workspaceId,
+              memberId,
+              userWorkspaceId,
+              transactionManager,
+            ),
+        );
+  }
+
+  private async readDirectory(
+    workspaceId: string,
+    memberId: string,
+    userWorkspaceId: string,
+    manager: EntityManager,
+  ): Promise<OtogrowRoleDirectory> {
     const actor = await this.accessForUser(
       workspaceId,
       memberId,
@@ -333,6 +363,16 @@ export class OtogrowAccessService {
       );
     const roles = await this.roles(workspaceId, manager);
     const members = await this.listActiveMembers(workspaceId, manager);
+    const projects = await manager.getRepository(DeliveryProjectEntity).find({
+      where: { workspaceId },
+      select: { id: true, name: true, memberIds: true },
+      order: { name: 'ASC', id: 'ASC' },
+      take: 2001,
+    });
+    if (projects.length > 2000)
+      throw new BadRequestException(
+        'The complete project membership preview exceeds its source limit.',
+      );
     return {
       actor,
       roles,
@@ -342,6 +382,9 @@ export class OtogrowAccessService {
           name: member.name,
           ...(await this.memberRoles(workspaceId, member.memberId, manager)),
           access: await this.resolve(workspaceId, member, roles, manager),
+          projectMemberships: projects
+            .filter((project) => project.memberIds.includes(member.memberId))
+            .map((project) => ({ id: project.id, name: project.name })),
         })),
       ),
     };

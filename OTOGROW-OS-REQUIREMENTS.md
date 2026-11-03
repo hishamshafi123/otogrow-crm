@@ -133,3 +133,6 @@ Proposed behavior to refine in the approved plan:
 ## Current implementation authorization
 
 The user has now requested a complete tracked list of all criticisms and implementation of every improvement to make the current system easier to use. This supersedes the redesign review's earlier planning-approval pause. Plan, implement and verify in manageable batches, using `OTOGROW-OS-IMPROVEMENTS.md` as the source of completion status. Preserve unfinished original roadmap scope, the existing spending limit and external-action boundaries. Do not mark dynamic roles, audit history or AI analysis implemented until their acceptance checks pass.
+
+
+2026-10-29 provider requirement: use Atlas Cloud for image/video generation; offer major supported model families with administrator enable/disable and separate image/video defaults that can be changed. Defaults affect new requests; editors may explicitly override within allowed compatible models. Existing drafts/runs retain their exact model unless deliberately changed. No new spending authorization accompanies this requirement.

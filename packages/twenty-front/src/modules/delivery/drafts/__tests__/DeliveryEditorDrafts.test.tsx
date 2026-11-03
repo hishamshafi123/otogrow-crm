@@ -15,9 +15,11 @@ import { type DeliveryWorkspace } from '@/delivery/delivery.types';
 jest.mock('@/delivery/workflows/useWorkflowAccess', () => ({
   useWorkflowAccess: () => ({
     ready: true,
+    manager: true,
     scope: 'workspace:member',
     canReadFinance: true,
     canManageFinance: true,
+    refetch: mockRefetch,
     matches: (data: BusinessSnapshot | undefined) =>
       data?.workspaceId === 'workspace',
   }),
@@ -141,6 +143,20 @@ const setup = (mode: 'clients' | 'business' | 'content' | 'inbox') => {
   );
   return userEvent.setup();
 };
+const editServicePlan = async () => {
+  const user = setup('clients');
+  await user.selectOptions(
+    screen.getByLabelText('Client service plan'),
+    'engagement',
+  );
+  await user.click(
+    screen.getByRole('button', { name: 'Edit client service plan' }),
+  );
+  await user.clear(screen.getByLabelText('Service plan name'));
+  await user.clear(screen.getByLabelText('Services, separated by commas'));
+  await user.clear(screen.getByLabelText('Client-visible scope'));
+  return user;
+};
 beforeAll(() => {
   Object.assign(globalThis, { Request });
   HTMLDialogElement.prototype.showModal = function () {
@@ -152,9 +168,14 @@ beforeAll(() => {
 });
 beforeEach(() => {
   i18n.loadAndActivate({ locale: 'en', messages: {} });
-  mockMutate.mockReset().mockResolvedValue({ data: {} });
+  mockMutate.mockReset().mockImplementation(async () => ({
+    data: { changeDeliveryClients: mockClients },
+  }));
   mockRefetch.mockReset().mockResolvedValue({});
   mockClients = {
+    workspaceId: 'workspace',
+    memberId: 'admin',
+    userWorkspaceId: 'membership',
     engagements: [
       {
         id: 'engagement',
@@ -192,7 +213,7 @@ beforeEach(() => {
 
 it('protects native business fields on Cancel and navigation, but allows a reverted edit to leave', async () => {
   const user = setup('business');
-  await user.click(screen.getByRole('button', { name: 'New Financial entry' }));
+  await user.click(screen.getByRole('button', { name: 'New financial entry' }));
   await user.type(screen.getByLabelText('Title'), 'Draft receipt');
   await user.click(screen.getByRole('button', { name: 'Cancel' }));
   expect(screen.getByRole('dialog')).toBeVisible();
@@ -208,13 +229,20 @@ it('protects native business fields on Cancel and navigation, but allows a rever
 
 it('protects engagement selection and keeps a dirty editor through a refreshed server revision', async () => {
   const user = setup('clients');
-  await user.selectOptions(screen.getByLabelText('Engagement'), 'engagement');
-  await user.click(screen.getByRole('button', { name: 'Edit engagement' }));
-  await user.type(screen.getByLabelText('Engagement name'), ' revised');
-  await user.selectOptions(screen.getByLabelText('Engagement'), '');
+  await user.selectOptions(
+    screen.getByLabelText('Client service plan'),
+    'engagement',
+  );
+  await user.click(
+    screen.getByRole('button', { name: 'Edit client service plan' }),
+  );
+  await user.type(screen.getByLabelText('Service plan name'), ' revised');
+  await user.selectOptions(screen.getByLabelText('Client service plan'), '');
   await user.click(screen.getByRole('button', { name: 'Keep editing' }));
-  expect(screen.getByLabelText('Engagement')).toHaveValue('engagement');
-  expect(screen.getByLabelText('Engagement name')).toHaveValue(
+  expect(screen.getByLabelText('Client service plan')).toHaveValue(
+    'engagement',
+  );
+  expect(screen.getByLabelText('Service plan name')).toHaveValue(
     'Brand retainer revised',
   );
   mockClients = {
@@ -225,9 +253,9 @@ it('protects engagement selection and keeps a dirty editor through a refreshed s
   };
   await user.click(screen.getByRole('button', { name: 'Refresh test data' }));
   expect(
-    screen.getByRole('button', { name: 'Save engagement' }),
+    screen.getByRole('button', { name: 'Save client service plan' }),
   ).toBeDisabled();
-  expect(screen.getByLabelText('Engagement name')).toHaveValue(
+  expect(screen.getByLabelText('Service plan name')).toHaveValue(
     'Brand retainer revised',
   );
   await user.click(
@@ -236,11 +264,13 @@ it('protects engagement selection and keeps a dirty editor through a refreshed s
   await user.click(
     screen.getByRole('button', { name: 'Discard and continue' }),
   );
-  expect(screen.getByLabelText('Engagement name')).toHaveValue(
+  expect(screen.getByLabelText('Service plan name')).toHaveValue(
     'Updated agreement',
   );
-  await user.type(screen.getByLabelText('Engagement name'), ' ready');
-  await user.click(screen.getByRole('button', { name: 'Save engagement' }));
+  await user.type(screen.getByLabelText('Service plan name'), ' ready');
+  await user.click(
+    screen.getByRole('button', { name: 'Save client service plan' }),
+  );
   expect(mockMutate).toHaveBeenCalledWith(
     expect.objectContaining({
       variables: {
@@ -253,18 +283,25 @@ it('protects engagement selection and keeps a dirty editor through a refreshed s
       },
     }),
   );
-  expect(screen.queryByLabelText('Engagement name')).not.toBeInTheDocument();
+  expect(screen.queryByLabelText('Service plan name')).not.toBeInTheDocument();
 });
 
 it('preserves dynamic onboarding questions and typed edits after a failed save', async () => {
   mockMutate.mockRejectedValueOnce(new Error('Save unavailable'));
   const user = setup('clients');
-  await user.selectOptions(screen.getByLabelText('Engagement'), 'engagement');
-  await user.click(screen.getByRole('button', { name: 'Edit engagement' }));
-  await user.type(screen.getByLabelText('Engagement name'), ' changed');
-  await user.click(screen.getByRole('button', { name: 'Save engagement' }));
+  await user.selectOptions(
+    screen.getByLabelText('Client service plan'),
+    'engagement',
+  );
+  await user.click(
+    screen.getByRole('button', { name: 'Edit client service plan' }),
+  );
+  await user.type(screen.getByLabelText('Service plan name'), ' changed');
+  await user.click(
+    screen.getByRole('button', { name: 'Save client service plan' }),
+  );
   expect(screen.getByRole('alert')).toHaveTextContent('Save unavailable');
-  expect(screen.getByLabelText('Engagement name')).toHaveValue(
+  expect(screen.getByLabelText('Service plan name')).toHaveValue(
     'Brand retainer changed',
   );
   await user.click(screen.getByText(/Onboarding questions/));
@@ -272,7 +309,7 @@ it('preserves dynamic onboarding questions and typed edits after a failed save',
   await user.click(screen.getByRole('button', { name: 'Cancel' }));
   expect(screen.getByRole('dialog')).toBeVisible();
   await user.click(screen.getByRole('button', { name: 'Keep editing' }));
-  expect(screen.getByLabelText('Engagement name')).toHaveValue(
+  expect(screen.getByLabelText('Service plan name')).toHaveValue(
     'Brand retainer changed',
   );
 });
@@ -383,19 +420,26 @@ it('keeps assistant sources and agent choices through failure and blocks closing
 });
 
 it('shows only applicable engagement settings and blocks missing basics before submission', async () => {
-  const user = setup('clients');
-  await user.click(screen.getByRole('button', { name: 'New engagement' }));
+  const user = await editServicePlan();
   expect(
     screen.queryByRole('combobox', { name: 'Advertising project manager' }),
   ).not.toBeInTheDocument();
-  await user.type(screen.getByLabelText('Engagement name'), 'SEO service');
+  await user.type(screen.getByLabelText('Service plan name'), 'SEO service');
   expect(
-    screen.getByRole('button', { name: 'Save engagement' }),
+    screen.getByRole('button', { name: 'Save client service plan' }),
   ).toBeDisabled();
-  expect(screen.getByRole('status')).toHaveTextContent(
-    'Choose a client project',
+  const setupLink = new URL(
+    screen
+      .getByRole('link', { name: 'New client service plan' })
+      .getAttribute('href') ?? '',
+    'https://os.invalid',
   );
-  await user.selectOptions(screen.getByLabelText('Project'), 'project');
+  expect(setupLink.searchParams.get('view')).toBe('onboarding');
+  expect(setupLink.searchParams.get('setupCompany')).toBe('client');
+  expect(setupLink.searchParams.get('setupProject')).toBe('project');
+  expect(setupLink.searchParams.get('clientEngagement')).toBe('engagement');
+  expect(screen.getByLabelText('Project')).toBeDisabled();
+  expect(screen.getByLabelText('Project')).toHaveValue('project');
   await user.type(
     screen.getByLabelText('Services, separated by commas'),
     ' , , ',
@@ -405,20 +449,26 @@ it('shows only applicable engagement settings and blocks missing basics before s
     'Improve site visibility',
   );
   expect(
-    screen.getByRole('button', { name: 'Save engagement' }),
+    screen.getByRole('button', { name: 'Save client service plan' }),
   ).toBeDisabled();
   await user.clear(screen.getByLabelText('Services, separated by commas'));
   await user.type(
     screen.getByLabelText('Services, separated by commas'),
     'SEO',
   );
-  expect(screen.getByRole('button', { name: 'Save engagement' })).toBeEnabled();
-  await user.click(screen.getByRole('button', { name: 'Save engagement' }));
+  expect(
+    screen.getByRole('button', { name: 'Save client service plan' }),
+  ).toBeEnabled();
+  await user.click(
+    screen.getByRole('button', { name: 'Save client service plan' }),
+  );
   expect(mockMutate).toHaveBeenCalledWith(
     expect.objectContaining({
       variables: {
         input: expect.objectContaining({
           engagement: expect.objectContaining({
+            id: 'engagement',
+            revision: 3,
             projectId: 'project',
             services: ['SEO'],
             advertising: null,
@@ -430,10 +480,8 @@ it('shows only applicable engagement settings and blocks missing basics before s
 });
 
 it('retains advertising choices across disclosure toggles and requires different eligible manager and marketer', async () => {
-  const user = setup('clients');
-  await user.click(screen.getByRole('button', { name: 'New engagement' }));
-  await user.selectOptions(screen.getByLabelText('Project'), 'project');
-  await user.type(screen.getByLabelText('Engagement name'), 'Ad management');
+  const user = await editServicePlan();
+  await user.type(screen.getByLabelText('Service plan name'), 'Ad management');
   await user.type(
     screen.getByLabelText('Services, separated by commas'),
     'Performance marketing',
@@ -448,7 +496,7 @@ it('retains advertising choices across disclosure toggles and requires different
     ),
   );
   expect(
-    screen.getByRole('button', { name: 'Save engagement' }),
+    screen.getByRole('button', { name: 'Save client service plan' }),
   ).toBeDisabled();
   await user.selectOptions(
     screen.getByLabelText('Advertising project manager'),
@@ -459,7 +507,7 @@ it('retains advertising choices across disclosure toggles and requires different
     'must be different people',
   );
   expect(
-    screen.getByRole('button', { name: 'Save engagement' }),
+    screen.getByRole('button', { name: 'Save client service plan' }),
   ).toBeDisabled();
   expect(
     screen.queryByRole('option', { name: 'Other project specialist' }),
@@ -480,7 +528,9 @@ it('retains advertising choices across disclosure toggles and requires different
   expect(
     screen.queryByRole('combobox', { name: 'Advertising currency' }),
   ).not.toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Save engagement' })).toBeEnabled();
+  expect(
+    screen.getByRole('button', { name: 'Save client service plan' }),
+  ).toBeEnabled();
   await user.click(
     screen.getByLabelText(
       'Configure the PM, marketer and client budget requests',
@@ -488,7 +538,9 @@ it('retains advertising choices across disclosure toggles and requires different
   );
   expect(screen.getByLabelText('Assigned marketer')).toHaveValue('editor');
   expect(screen.getByLabelText('Advertising currency')).toHaveValue('AED');
-  await user.click(screen.getByRole('button', { name: 'Save engagement' }));
+  await user.click(
+    screen.getByRole('button', { name: 'Save client service plan' }),
+  );
   expect(mockMutate).toHaveBeenCalledWith(
     expect.objectContaining({
       variables: {
@@ -533,9 +585,12 @@ it('guards client-share preparation, retains failed choices and requires reviewi
     },
   ];
   const user = setup('clients');
-  await user.selectOptions(screen.getByLabelText('Engagement'), 'engagement');
+  await user.selectOptions(
+    screen.getByLabelText('Client service plan'),
+    'engagement',
+  );
   await user.selectOptions(screen.getByLabelText('Task'), 'approved-task');
-  await user.selectOptions(screen.getByLabelText('Engagement'), '');
+  await user.selectOptions(screen.getByLabelText('Client service plan'), '');
   await user.click(screen.getByRole('button', { name: 'Keep editing' }));
   expect(screen.getByLabelText('Task')).toHaveValue('approved-task');
   mockMutate.mockRejectedValueOnce(new Error('Share failed'));
@@ -576,14 +631,21 @@ it('keeps onboarding disclosure changes clean and retains collapsed questions in
     { id: 'website', label: 'Website link', required: true },
   ];
   const user = setup('clients');
-  await user.selectOptions(screen.getByLabelText('Engagement'), 'engagement');
-  await user.click(screen.getByRole('button', { name: 'Edit engagement' }));
+  await user.selectOptions(
+    screen.getByLabelText('Client service plan'),
+    'engagement',
+  );
+  await user.click(
+    screen.getByRole('button', { name: 'Edit client service plan' }),
+  );
   await user.click(screen.getByText(/Onboarding questions/));
   expect(screen.getByLabelText('Question')).toBeVisible();
   await user.click(screen.getByText(/Onboarding questions/));
   await user.click(screen.getByRole('button', { name: 'Cancel' }));
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-  await user.click(screen.getByRole('button', { name: 'Edit engagement' }));
+  await user.click(
+    screen.getByRole('button', { name: 'Edit client service plan' }),
+  );
   const questions = screen.getByText(/Onboarding questions/);
   expect(questions).toHaveTextContent('Onboarding questions: 1 · Required: 1');
   await user.click(questions);
@@ -591,14 +653,16 @@ it('keeps onboarding disclosure changes clean and retains collapsed questions in
   await user.click(questions);
   expect(questions).toHaveTextContent('Incomplete question');
   expect(
-    screen.getByRole('button', { name: 'Save engagement' }),
+    screen.getByRole('button', { name: 'Save client service plan' }),
   ).toBeDisabled();
   await user.click(questions);
   await user.type(screen.getByLabelText('Question'), 'Brand website');
   await user.click(questions);
   expect(screen.getByLabelText('Question')).not.toBeVisible();
   expect(questions).not.toHaveTextContent('Incomplete question');
-  await user.click(screen.getByRole('button', { name: 'Save engagement' }));
+  await user.click(
+    screen.getByRole('button', { name: 'Save client service plan' }),
+  );
   expect(mockMutate).toHaveBeenCalledWith(
     expect.objectContaining({
       variables: {
@@ -613,10 +677,11 @@ it('keeps onboarding disclosure changes clean and retains collapsed questions in
 });
 
 it('removes advertising entitlement when Performance marketing is deselected and retains responsibility choices for reconfiguration', async () => {
-  const user = setup('clients');
-  await user.click(screen.getByRole('button', { name: 'New engagement' }));
-  await user.selectOptions(screen.getByLabelText('Project'), 'project');
-  await user.type(screen.getByLabelText('Engagement name'), 'Services changed');
+  const user = await editServicePlan();
+  await user.type(
+    screen.getByLabelText('Service plan name'),
+    'Services changed',
+  );
   await user.click(screen.getByRole('checkbox', { name: 'SEO' }));
   expect(
     screen.getByLabelText(
@@ -676,7 +741,9 @@ it('removes advertising entitlement when Performance marketing is deselected and
       name: 'Performance marketing',
     }),
   );
-  await user.click(screen.getByRole('button', { name: 'Save engagement' }));
+  await user.click(
+    screen.getByRole('button', { name: 'Save client service plan' }),
+  );
   expect(mockMutate).toHaveBeenCalledWith(
     expect.objectContaining({
       variables: {

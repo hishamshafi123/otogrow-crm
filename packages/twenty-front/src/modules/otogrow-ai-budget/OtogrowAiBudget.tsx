@@ -449,9 +449,11 @@ export const OtogrowAiBudget = ({ workspace }: OtogrowAiBudgetProps) => {
                           </StyledAiBudgetActions>
                         </StyledDeliveryRow>
                         <small>
-                          {profile.kind === 'INSPECTION'
-                            ? t`Image inspection`
-                            : t`Text assistance`}{' '}
+                          {profile.kind === 'VIDEO_QA'
+                            ? t`Video and audio inspection`
+                            : profile.kind === 'INSPECTION'
+                              ? t`Image inspection`
+                              : t`Text assistance`}{' '}
                           · {t`Version ${profile.revision}`} ·{' '}
                           {formatActivityTime(profile.verifiedAt)}
                         </small>
@@ -550,7 +552,13 @@ export const OtogrowAiBudget = ({ workspace }: OtogrowAiBudgetProps) => {
                                 ? t`Task assistant`
                                 : spend.sourceKind === 'INBOX_DRAFT'
                                   ? t`Inbox draft`
-                                  : t`Media request`}
+                                  : spend.sourceKind === 'ADVERTISING_DRAFT'
+                                    ? t`Advertising recommendations`
+                                    : spend.sourceKind === 'ACTIVITY_ANALYSIS'
+                                      ? t`Team activity analysis`
+                                      : spend.sourceKind === 'MEDIA'
+                                        ? t`Media request`
+                                        : t`Request source unavailable`}
                             </p>
                             <p>{t`Maximum reserved: USD ${formatAiAmount(spend.reservedUsd)}`}</p>
                             <p>

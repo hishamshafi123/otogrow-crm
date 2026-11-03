@@ -32,7 +32,13 @@ jest.mock(
 );
 let mockActor: DeliveryWorkspace['actor'];
 let mockFinanceReader = false;
+let mockReviewOnly = false;
 let mockPersonalNavigation = false;
+const mockWorkspaceQuery = jest.fn(() => {
+  throw new Error(
+    'The sidebar must use verified access without loading tasks.',
+  );
+});
 jest.mock(
   '@/ui/navigation/navigation-drawer/components/NavigationDrawerAnimatedCollapseWrapper',
   () => ({ NavigationDrawerAnimatedCollapseWrapper: 'div' }),
@@ -49,7 +55,9 @@ jest.mock('@/otogrow-access/useOtogrowAccess', () => ({
         ? ['workspace.admin']
         : mockActor.isManager
           ? ['delivery.manage']
-          : [],
+          : mockReviewOnly
+            ? ['delivery.review']
+            : [],
       grants: [],
       nativeAdministrator: mockActor.isAdmin,
     },
@@ -57,7 +65,7 @@ jest.mock('@/otogrow-access/useOtogrowAccess', () => ({
   }),
 }));
 jest.mock('@apollo/client/react', () => ({
-  useQuery: () => ({ data: { deliveryWorkspace: { actor: mockActor } } }),
+  useQuery: () => mockWorkspaceQuery(),
 }));
 // oxlint-disable twenty/no-navigate-prefer-link -- This control simulates browser history rather than a destination link.
 const BrowserBack = () => {
@@ -79,12 +87,36 @@ const setup = (entry = '/delivery?view=mine') => {
   return userEvent.setup();
 };
 beforeEach(() => {
+  mockWorkspaceQuery.mockClear();
   mockFinanceReader = false;
+  mockReviewOnly = false;
   mockPersonalNavigation = false;
   mockActor = { memberId: 'manager', isAdmin: true, isManager: true };
 });
 
+afterEach(() => {
+  expect(mockWorkspaceQuery).not.toHaveBeenCalled();
+});
+
 describe('Otogrow sidebar navigation', () => {
+  it('keeps contextual onboarding under Clients without adding another destination', () => {
+    setup('/delivery?view=onboarding');
+    const navigation = within(
+      screen.getByRole('navigation', { name: 'Otogrow navigation' }),
+    );
+    expect(navigation.getByRole('link', { name: 'Clients' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(navigation.getByRole('link', { name: 'Clients' })).toHaveAttribute(
+      'href',
+      '/delivery?view=clients',
+    );
+    expect(
+      navigation.queryByRole('link', { name: /onboarding/i }),
+    ).not.toBeInTheDocument();
+    expect(mockWorkspaceQuery).not.toHaveBeenCalled();
+  });
   it('expands the current group and follows browser history', async () => {
     const user = setup();
     const navigation = within(
@@ -230,6 +262,24 @@ it('shows a finance-only business section without team administration', async ()
   ).not.toBeInTheDocument();
 });
 
+it('adds Approvals for a scoped review role without granting planner, workflow administration or finances', () => {
+  mockActor = { memberId: 'reviewer', isAdmin: false, isManager: false };
+  mockReviewOnly = true;
+  setup('/delivery?view=reviews');
+  expect(screen.getByRole('link', { name: 'Approvals' })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+  expect(
+    screen.queryByRole('link', { name: 'Team planner', hidden: true }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole('link', { name: 'Service workflows', hidden: true }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole('link', { name: 'Finance', hidden: true }),
+  ).not.toBeInTheDocument();
+});
 it('shows each pinned destination once and keeps the remaining areas discoverable', () => {
   mockPersonalNavigation = true;
   setup('/delivery?view=home');

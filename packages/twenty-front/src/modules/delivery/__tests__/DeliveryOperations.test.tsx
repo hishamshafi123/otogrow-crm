@@ -1,6 +1,11 @@
 import { useState } from 'react';
 import { Request } from 'cross-fetch';
-import { createMemoryRouter, Link, RouterProvider } from 'react-router-dom';
+import {
+  createMemoryRouter,
+  Link,
+  MemoryRouter,
+  RouterProvider,
+} from 'react-router-dom';
 import { DeliveryDraftGuardProvider } from '@/delivery/drafts/DeliveryDraftGuard';
 import { i18n } from '@lingui/core';
 import { I18nProvider } from '@lingui/react';
@@ -131,6 +136,79 @@ beforeEach(() => {
     .mockResolvedValue({ data: { changeDeliveryOperations: mockData } });
 });
 describe('delivery follow-through', () => {
+  it('opens the exact daily Meta report in the typed workbench without marking the notice seen', () => {
+    const reportId = '5a5adf3e-cbb0-4235-8de7-25d5b5072943';
+    mockData.notices = [
+      {
+        ...message('daily-report', 'manager'),
+        taskId: `meta-report:${reportId}`,
+      },
+    ];
+    i18n.loadAndActivate({ locale: 'en', messages: {} });
+    render(
+      <I18nProvider i18n={i18n}>
+        <MemoryRouter>
+          <DeliveryOperations workspace={workspace} onChanged={mockRefetch} />
+        </MemoryRouter>
+      </I18nProvider>,
+    );
+    expect(
+      screen.getByRole('link', { name: 'Open advertising report' }),
+    ).toHaveAttribute(
+      'href',
+      `/delivery?view=ads&adSource=META&adReport=${reportId}`,
+    );
+    expect(mockMutate).not.toHaveBeenCalled();
+  });
+  it('opens the exact review submission and keeps reviewer notices separate from production read receipts', () => {
+    const taskId = '5a5adf3e-cbb0-4235-8de7-25d5b5072943';
+    mockData.notices = [
+      {
+        ...message('review', 'manager'),
+        taskId,
+        kind: 'REVIEW_ASSIGNMENT',
+        reviewAssignment: {
+          submissionVersion: 3,
+          assignmentId: 'aff8ec4c-566d-4235-8af6-aad3a8007473',
+          assignmentRevision: 2,
+          recipientId: 'manager',
+        },
+      },
+    ];
+    render(
+      <I18nProvider i18n={i18n}>
+        <MemoryRouter
+          initialEntries={[
+            '/delivery?view=operations&search=keep&creativeCompare=1',
+          ]}
+        >
+          <DeliveryOperations
+            workspace={workspace}
+            onChanged={mockRefetch}
+            onOpenTask={jest.fn()}
+          />
+        </MemoryRouter>
+      </I18nProvider>,
+    );
+    const link = screen.getByRole('link', {
+      name: 'Open assigned submission review',
+    });
+    const params = new URL(link.getAttribute('href')!, 'http://localhost')
+      .searchParams;
+    expect(params.get('view')).toBe('reviews');
+    expect(params.get('task')).toBe(taskId);
+    expect(params.get('creativeSubmission')).toBe('3');
+    expect(params.get('search')).toBe('keep');
+    expect(params.has('creativeCompare')).toBe(false);
+    expect(
+      screen.queryByRole('button', { name: 'Mark as read' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Open task' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Acknowledge' })).toBeVisible();
+    expect(mockMutate).not.toHaveBeenCalled();
+  });
   it('leaves messages unread when opening a task and marks only the selected message read', async () => {
     mockData.notices = [message('first'), message('second')];
     const user = setup(
@@ -186,7 +264,7 @@ describe('delivery follow-through', () => {
       actor: { memberId: 'editor', isAdmin: false, isManager: false },
     });
     expect(
-      screen.queryByText('Follow-through settings'),
+      screen.queryByText('Delivery and reminder settings'),
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Save recurring template' }),
@@ -435,4 +513,32 @@ it('guards replacing a recurring draft and ignores scheduler counters while dete
   expect(screen.getByLabelText('Task title')).toHaveValue(
     'Monthly SEO report updated',
   );
+});
+
+it('keeps an internal message when the server response contains no confirmed operation result', async () => {
+  const user = setupGuardedOperations(task);
+  await user.type(
+    screen.getByLabelText('Message'),
+    'Keep this unconfirmed message',
+  );
+  mockMutate.mockResolvedValueOnce({ data: undefined });
+  await user.click(
+    screen.getByRole('button', { name: 'Send internal message' }),
+  );
+  expect(screen.getByLabelText('Message')).toHaveValue(
+    'Keep this unconfirmed message',
+  );
+});
+it('prevents invalid timezone settings before any operation is submitted', async () => {
+  const user = setupGuardedOperations();
+  await user.clear(screen.getByLabelText('Workspace timezone (IANA)'));
+  await user.type(
+    screen.getByLabelText('Workspace timezone (IANA)'),
+    'Not/A_Timezone',
+  );
+  await user.click(
+    screen.getByRole('button', { name: 'Save follow-through settings' }),
+  );
+  expect(screen.getByLabelText('Workspace timezone (IANA)')).toBeInvalid();
+  expect(mockMutate).not.toHaveBeenCalled();
 });

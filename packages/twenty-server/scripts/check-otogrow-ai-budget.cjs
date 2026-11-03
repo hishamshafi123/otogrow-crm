@@ -1,6 +1,9 @@
 const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
 const {
+  checkAtlasMediaBudget,
+} = require('./helpers/check-atlas-media-budget.cjs');
+const {
   connectionSource,
 } = require('../dist/database/typeorm/core/core.datasource');
 const {
@@ -506,6 +509,16 @@ async function main() {
       cursor = next.nextCursor;
     }
     assert.equal(seen.size, (await allRows()).spend.length);
+    await checkAtlasMediaBudget({
+      service,
+      runner,
+      workspace,
+      actor: editor,
+      project,
+      taskId,
+      allRows,
+      denied,
+    });
     const beforeRead = await allRows();
     await snapshot();
     assert.deepEqual(await allRows(), beforeRead);

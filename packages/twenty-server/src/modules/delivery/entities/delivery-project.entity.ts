@@ -9,6 +9,7 @@ import { WorkspaceRelatedEntity } from 'src/engine/workspace-manager/types/works
 
 @Entity({ name: 'deliveryProject', schema: 'core' })
 @Index(['workspaceId'])
+@Index(['workspaceId', 'id'], { unique: true })
 export class DeliveryProjectEntity extends WorkspaceRelatedEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;

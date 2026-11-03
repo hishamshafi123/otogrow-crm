@@ -4,6 +4,8 @@ import { isValidUuid } from 'twenty-shared/utils';
 import { WorkspaceEntity } from 'src/engine/core-modules/workspace/workspace.entity';
 import { DeliveryProjectEntity } from 'src/modules/delivery/entities/delivery-project.entity';
 import { DeliveryAgentRunEntity } from 'src/modules/delivery/entities/delivery-agent-run.entity';
+import { DeliveryAdvertisingDraftRunEntity } from 'src/modules/delivery/advertising/drafts/entities/delivery-advertising-draft-run.entity';
+import { OtogrowActivityAnalysisRunEntity } from 'src/modules/otogrow-activity/analysis/entities/otogrow-activity-analysis-run.entity';
 import { DeliveryAgentEntity } from 'src/modules/delivery/entities/delivery-agent.entity';
 import { OtogrowActivityEventEntity } from 'src/modules/otogrow-activity/entities/otogrow-activity-event.entity';
 import { type OtogrowActivityInput } from 'src/modules/otogrow-activity/otogrow-activity.types';
@@ -127,6 +129,11 @@ const STRUCTURAL_FIELDS = new Set([
   'taskRevision',
   'appliedField',
   'findingCount',
+  'suggestionCount',
+  'includedEventCount',
+  'omittedEventCount',
+  'advertisingSourceKind',
+  'advertisingSourceId',
   'inputTokens',
   'outputTokens',
   'fulfilmentStatus',
@@ -217,6 +224,20 @@ export const recordOtogrowActivity = async (
           .getRepository(DeliveryAgentEntity)
           .findOneBy({ id: input.sourceId, workspaceId: input.workspaceId })
       : null;
+  const advertisingRun =
+    input.sourceType === 'advertising-draft'
+      ? await manager.getRepository(DeliveryAdvertisingDraftRunEntity).findOne({
+          where: { id: input.sourceId, workspaceId: input.workspaceId },
+          select: { id: true, agent: true },
+        })
+      : null;
+  const activityAnalysisRun =
+    input.sourceType === 'activity-analysis'
+      ? await manager.getRepository(OtogrowActivityAnalysisRunEntity).findOne({
+          where: { id: input.sourceId, workspaceId: input.workspaceId },
+          select: { id: true, agent: true },
+        })
+      : null;
   // Retain identity snapshots even if staff or client records are later removed.
   await manager.getRepository(OtogrowActivityEventEntity).insert({
     workspaceId: input.workspaceId,
@@ -245,7 +266,12 @@ export const recordOtogrowActivity = async (
     clientName: clients[0]?.name ?? null,
     taskId: input.taskId ?? null,
     taskName: tasks[0]?.title ?? run?.context.title ?? null,
-    agentName: run?.configuration.name ?? agent?.configuration.name ?? null,
+    agentName:
+      run?.configuration.name ??
+      agent?.configuration.name ??
+      advertisingRun?.agent.name ??
+      activityAnalysisRun?.agent.name ??
+      null,
     sourceType: input.sourceType,
     sourceId: input.sourceId,
     changes: (input.changes ?? []).map((change) => ({

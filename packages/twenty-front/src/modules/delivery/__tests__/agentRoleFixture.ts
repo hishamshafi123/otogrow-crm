@@ -29,6 +29,7 @@ export const agentRoleDirectory: OtogrowRoleDirectory = {
   members: [
     {
       memberId: 'admin',
+      projectMemberships: [],
       name: 'Founder',
       roleIds: [],
       revision: 1,
@@ -36,6 +37,7 @@ export const agentRoleDirectory: OtogrowRoleDirectory = {
     },
     {
       memberId: 'editor',
+      projectMemberships: [],
       name: 'Editor',
       roleIds: ['editor-role', 'seo-role'],
       revision: 1,
@@ -43,6 +45,7 @@ export const agentRoleDirectory: OtogrowRoleDirectory = {
     },
     {
       memberId: 'outside',
+      projectMemberships: [],
       name: 'Outside specialist',
       roleIds: ['editor-role'],
       revision: 1,

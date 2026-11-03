@@ -102,6 +102,10 @@ export const deliveryCommandSchema = z.discriminatedUnion('action', [
   z
     .object({
       action: z.literal('review'),
+      selectedSubmissionVersion: z.number().int().positive().optional(),
+      reviewAssignmentRevision: z.number().int().nonnegative().optional(),
+      creativeVersion: z.number().int().positive().optional(),
+      finalAssetId: id.optional(),
       workflowReview: workflowReviewSchema.optional(),
       taskId: id,
       revision: z.number().int().positive(),

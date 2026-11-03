@@ -36,6 +36,8 @@ import { InjectMessageQueue } from 'src/engine/core-modules/message-queue/decora
 import { MessageQueue } from 'src/engine/core-modules/message-queue/message-queue.constants';
 import { MessageQueueService } from 'src/engine/core-modules/message-queue/services/message-queue.service';
 import { recordOtogrowActivity } from 'src/modules/otogrow-activity/record-otogrow-activity';
+import { ATLAS_MODEL_PREFIX } from 'src/modules/delivery/creative/atlas/delivery-atlas.catalog';
+import { DeliveryVideoQaService } from 'src/modules/delivery/creative/video-qa/delivery-video-qa.service';
 
 const identity = {
   taskId: z.string().uuid(),
@@ -99,6 +101,7 @@ export class DeliveryMediaService {
     private readonly queue: MessageQueueService,
     private readonly assembly: DeliveryAssemblyAdapter,
     private readonly budget: OtogrowAiBudgetService,
+    private readonly videoQa?: DeliveryVideoQaService,
   ) {}
 
   private connection(workspace: WorkspaceEntity, modelId: string) {
@@ -197,12 +200,28 @@ export class DeliveryMediaService {
             throw new ForbiddenException(
               'Only administrators can configure media generation.',
             );
+          const existingAtlasModels = (
+            document.mediaSettings?.modelIds ?? []
+          ).filter((id) => id.startsWith(ATLAS_MODEL_PREFIX));
+          if (
+            command.modelIds.some(
+              (id) =>
+                id.startsWith(ATLAS_MODEL_PREFIX) &&
+                !existingAtlasModels.includes(id),
+            )
+          )
+            throw new BadRequestException(
+              'Use Atlas production access to grant Atlas model permissions.',
+            );
+          const googleModels = command.modelIds.filter(
+            (id) => !id.startsWith(ATLAS_MODEL_PREFIX),
+          );
           if (command.enabled)
-            command.modelIds.forEach((id) => this.connection(workspace, id));
+            googleModels.forEach((id) => this.connection(workspace, id));
           document.mediaSettings = {
             version: (document.mediaSettings?.version ?? 0) + 1,
             enabled: command.enabled,
-            modelIds: command.modelIds,
+            modelIds: [...new Set([...googleModels, ...existingAtlasModels])],
             roles: command.roles,
             dailyRunLimit: command.dailyRunLimit,
             allowUnknownCost: command.allowUnknownCost,
@@ -213,6 +232,10 @@ export class DeliveryMediaService {
           );
           if (!run || !['QUEUED', 'RUNNING'].includes(run.status))
             throw new ConflictException('Run has already ended.');
+          if (run.kind === 'VIDEO_QA')
+            throw new BadRequestException(
+              'Use the video QA cancellation action to preserve its confirmation receipt.',
+            );
           await this.budget.stop(
             manager,
             {
@@ -425,6 +448,25 @@ export class DeliveryMediaService {
     }
   }
 
+  async startVideoQa(
+    workspace: WorkspaceEntity,
+    memberId: string,
+    userWorkspaceId: string,
+    input: unknown,
+  ) {
+    if (!this.videoQa)
+      throw new BadRequestException('Video QA is unavailable.');
+    const receipt = await this.videoQa.start(
+      workspace,
+      memberId,
+      userWorkspaceId,
+      input,
+    );
+    if (receipt.status === 'QUEUED')
+      await this.enqueue(workspace.id, receipt.taskId, receipt.runId);
+    return receipt;
+  }
+
   private async update(
     workspaceId: string,
     taskId: string,
@@ -534,6 +576,21 @@ export class DeliveryMediaService {
     });
     if (!claimed || !initial) return;
     const run = initial.run;
+    if (run.kind === 'VIDEO_QA') {
+      if (!this.videoQa) {
+        await this.update(workspaceId, taskId, runId, (current) => {
+          current.status = 'FAILED';
+          current.error =
+            'Video QA is unavailable. No provider request was dispatched.';
+        });
+        return;
+      }
+      const workspace = await this.dataSource
+        .getRepository(WorkspaceEntity)
+        .findOneByOrFail({ id: workspaceId });
+      await this.videoQa.executeClaimed(workspace, taskId, run);
+      return;
+    }
     try {
       const workspace = await this.dataSource
         .getRepository(WorkspaceEntity)

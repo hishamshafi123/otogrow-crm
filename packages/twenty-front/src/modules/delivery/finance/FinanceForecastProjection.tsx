@@ -132,7 +132,8 @@ export const FinanceForecastTimeline = ({
         {incomplete && (
           <p>
             <Trans>
-              Unresolved items are excluded from this dated scenario.
+              Only eligible dated expectations are included. Review the
+              unresolved items above.
             </Trans>
           </p>
         )}

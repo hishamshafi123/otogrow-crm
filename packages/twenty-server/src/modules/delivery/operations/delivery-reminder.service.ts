@@ -6,6 +6,7 @@ import axios from 'axios';
 import { DataSource, LessThan } from 'typeorm';
 
 import { DeliveryReminderOutboxEntity } from 'src/modules/delivery/entities/delivery-reminder-outbox.entity';
+import { DeliveryFounderEscalationService } from 'src/modules/delivery/founder/escalation/delivery-founder-escalation.service';
 import { DeliveryOperationsService } from 'src/modules/delivery/operations/delivery-operations.service';
 import { DELIVERY_REMINDER_CLAIM_TIMEOUT } from 'src/modules/delivery/operations/delivery-reminder.constants';
 
@@ -17,12 +18,17 @@ export class DeliveryReminderService {
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly operations: DeliveryOperationsService,
     private readonly chat: DeliveryChatService,
+    private readonly founder: DeliveryFounderEscalationService,
   ) {}
 
+  private async reminderOwner(outboxId: string) {
+    if (await this.chat.ownsReminder(outboxId)) return this.chat;
+    if (await this.founder.ownsReminder(outboxId)) return this.founder;
+    return this.operations;
+  }
+
   async execute(outboxId: string, now = new Date()) {
-    const owner = (await this.chat.ownsReminder(outboxId))
-      ? this.chat
-      : this.operations;
+    const owner = await this.reminderOwner(outboxId);
     const payload = await owner.claimReminder(outboxId, now);
     if (!payload) return;
     let status: 'SENT' | 'FAILED' | 'UNCERTAIN';
@@ -65,6 +71,13 @@ export class DeliveryReminderService {
         'Team chat reminder scheduling failed; the next pass will retry.',
       );
     }
+    try {
+      await this.founder.queueDue(now);
+    } catch {
+      this.logger.warn(
+        'Founder alert scheduling failed; the next pass will retry.',
+      );
+    }
     const repository = this.dataSource.getRepository(
       DeliveryReminderOutboxEntity,
     );
@@ -78,9 +91,7 @@ export class DeliveryReminderService {
     });
     for (const entry of interrupted) {
       try {
-        const owner = (await this.chat.ownsReminder(entry.id))
-          ? this.chat
-          : this.operations;
+        const owner = await this.reminderOwner(entry.id);
         await owner.finishReminder(
           entry.id,
           'UNCERTAIN',

@@ -11,11 +11,12 @@ export const assertDeliveryReview = (
   details: DeliveryDetails,
   assigneeId: string,
   actorId: string,
-  isManager: boolean,
+  canReview: boolean,
   feedback: string,
   decision: string,
+  effectiveReviewerId: string | null = details.reviewerId,
 ): void => {
-  if (!isManager || details.reviewerId !== actorId || assigneeId === actorId) {
+  if (!canReview || effectiveReviewerId !== actorId || assigneeId === actorId) {
     throw new ForbiddenException(
       'Only the assigned reviewer can review work submitted by another person.',
     );

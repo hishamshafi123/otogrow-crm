@@ -365,7 +365,7 @@ it('replaces duplicate creation with existing setup task links and handles an en
     screen.getByRole('link', { name: 'Brand onboarding' }),
   ).toHaveAttribute('href', '/delivery?view=planner&task=assets');
   await userEvent.click(
-    screen.getByRole('button', { name: 'Open client engagement' }),
+    screen.getByRole('button', { name: 'Open client service plan' }),
   );
   await waitFor(() =>
     expect(screen.getByRole('status')).toHaveTextContent('could not be loaded'),

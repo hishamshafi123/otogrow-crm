@@ -46,7 +46,8 @@ export class UpgradeCommand extends CommandRunner {
 
   @Option({
     flags: '-d, --dry-run',
-    description: 'Simulate the command without making actual changes',
+    description:
+      'List pending steps without executing commands or changing metadata, caches or upgrade cursors',
     required: false,
   })
   parseDryRun(): boolean {
@@ -157,7 +158,7 @@ export class UpgradeCommand extends CommandRunner {
         );
       }
 
-      const { totalSuccesses, totalFailures } =
+      const { totalSuccesses, totalFailures, plannedSteps, stoppedBefore } =
         await this.upgradeSequenceRunnerService.run({
           sequence,
           options: {
@@ -170,7 +171,9 @@ export class UpgradeCommand extends CommandRunner {
 
       this.logger.log(
         formatUpgradeLog({
-          humanMessage: `Upgrade summary: ${totalSuccesses} workspace(s) succeeded, ${totalFailures} workspace(s) failed`,
+          humanMessage: options.dryRun
+            ? `Upgrade plan: ${plannedSteps?.length ?? 0} pending command(s); no changes made${stoppedBefore ? `; stopped before ${stoppedBefore} because workspace filters are active` : ''}`
+            : `Upgrade summary: ${totalSuccesses} workspace(s) succeeded, ${totalFailures} workspace(s) failed`,
           event: 'summary',
           logFields: {
             totalSuccesses,
@@ -197,7 +200,7 @@ export class UpgradeCommand extends CommandRunner {
       );
       throw error;
     } finally {
-      await this.safeInvalidateUpgradeStatusCache();
+      if (!options.dryRun) await this.safeInvalidateUpgradeStatusCache();
     }
   }
 

@@ -1,6 +1,7 @@
 import { type DeliveryAppliedWorkflow } from 'src/modules/delivery/workflows/delivery-workflows.types';
 import { type CreativeDocument } from 'src/modules/delivery/creative/delivery-creative.types';
 import { type DeliveryTaskPlan } from 'src/modules/delivery/capacity/delivery-capacity.types';
+import { type CreativeSubmissionLearning } from 'src/modules/delivery/creative/learning/delivery-creative-learning.types';
 export const DELIVERY_STATES = [
   'PLANNED',
   'IN_PROGRESS',
@@ -17,6 +18,7 @@ export type DeliverySubmission = {
   version: number;
   creativeVersion?: number;
   finalAssetId?: string;
+  creativeLearning?: CreativeSubmissionLearning;
   description: string;
   evidence: string[];
   submittedBy: string;

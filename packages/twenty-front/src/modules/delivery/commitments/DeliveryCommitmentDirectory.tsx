@@ -1,5 +1,6 @@
 import { useCommitmentScope } from '@/delivery/commitments/useCommitmentScope';
-import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { clientEngagementParams } from '@/delivery/commitments/clientCommitmentParams';
 import { useQuery } from '@apollo/client/react';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { useOtogrowAccess } from '@/otogrow-access/useOtogrowAccess';
@@ -23,7 +24,8 @@ const CommitmentDirectory = () => {
   const ready =
     !permission.loading && !permission.error && Boolean(permission.access);
   const { requestAction } = useDeliveryDraftGuard();
-  const [selectedId, setSelectedId] = useState('');
+  const [params, setParams] = useSearchParams();
+  const selectedId = params.get('clientEngagement') ?? '';
   const query = useQuery<
     DeliveryCommitmentEngagementsQuery,
     { identity: string | null }
@@ -85,15 +87,23 @@ const CommitmentDirectory = () => {
           {data &&
             (data.engagements.length ? (
               <label>
-                <Trans>Client engagement</Trans>
+                <Trans>Client service plan</Trans>
                 <select
                   value={selectedId}
                   onChange={(event) => {
                     const id = event.target.value;
-                    requestAction(() => setSelectedId(id));
+                    requestAction(() =>
+                      setParams(clientEngagementParams(params, id)),
+                    );
                   }}
                 >
-                  <option value="">{t`Choose an engagement`}</option>
+                  <option value="">{t`Choose a client service plan`}</option>
+                  {selectedId && !selected && (
+                    <option
+                      value={selectedId}
+                      disabled
+                    >{t`Selected client service plan unavailable`}</option>
+                  )}
                   {data.engagements.map((item) => (
                     <option key={item.id} value={item.id}>
                       {item.name}
@@ -104,10 +114,29 @@ const CommitmentDirectory = () => {
             ) : (
               <p>
                 <Trans>
-                  No client engagements are available in your assigned projects.
+                  No client service plans are available in your assigned
+                  projects.
                 </Trans>
               </p>
             ))}
+          {data && selectedId && !selected && (
+            <p role="alert">
+              <Trans>
+                This linked client service plan is unavailable in your assigned
+                projects. Choose a client service plan you can currently access.
+              </Trans>{' '}
+              <StyledDeliveryButton
+                type="button"
+                onClick={() =>
+                  requestAction(() =>
+                    setParams(clientEngagementParams(params, null)),
+                  )
+                }
+              >
+                <Trans>Clear service plan selection</Trans>
+              </StyledDeliveryButton>
+            </p>
+          )}
         </StyledDeliveryStack>
       </StyledDeliveryCard>
       {selected && (

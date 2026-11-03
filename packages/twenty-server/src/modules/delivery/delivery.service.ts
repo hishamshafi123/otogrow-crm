@@ -1,4 +1,6 @@
 import { getDeliveryLifecycle } from 'src/modules/delivery/lifecycle/delivery-lifecycle';
+import { freezeCreativeSubmissionLearning } from 'src/modules/delivery/creative/learning/freeze-creative-submission-learning';
+import { assertDeliveryCreativeReview } from 'src/modules/delivery/creative/assert-delivery-creative-review';
 import { recordDeliveryRevision } from 'src/modules/delivery/revisions/record-delivery-revision';
 import { type Fulfilment } from 'src/modules/delivery/operations/delivery-operations.types';
 import {
@@ -39,6 +41,15 @@ import {
 } from 'src/modules/delivery/delivery-policy';
 import { type DeliveryDetails } from 'src/modules/delivery/delivery.types';
 import { recordOtogrowActivity } from 'src/modules/otogrow-activity/record-otogrow-activity';
+import {
+  assertDeliveryReviewAssignmentRevision,
+  deliveryReviewAuthority,
+  readCurrentDeliveryReviewAssignments,
+} from 'src/modules/delivery/reviews/delivery-review-authority';
+import {
+  cancelDeliveryReviewNotices,
+  recordDeliveryReviewNotice,
+} from 'src/modules/delivery/reviews/delivery-review-notices';
 
 const planningActivity = (details: DeliveryDetails) => ({
   workMinutes: isDefined(details.plan?.workMinutes)
@@ -201,11 +212,42 @@ export class DeliveryService {
         const deliveries = new Map(
           deliveryRows.map((row) => [row.delivery.taskId, row]),
         );
+        const reviewAssignments = await readCurrentDeliveryReviewAssignments(
+          manager,
+          workspace.id,
+          tasks.flatMap((task) => {
+            const latest =
+              task.details.submissions[task.details.submissions.length - 1];
+            return latest &&
+              Number.isInteger(latest.version) &&
+              latest.version > 0
+              ? [{ taskId: task.id, submissionVersion: latest.version }]
+              : [];
+          }),
+        );
         return {
+          workspaceId: workspace.id,
+          memberId,
+          userWorkspaceId,
           actor,
           projects,
           tasks: tasks.map((task) => ({
             ...task,
+            review: {
+              submissionVersion:
+                task.details.submissions[task.details.submissions.length - 1]
+                  ?.version ?? null,
+              ...deliveryReviewAuthority({
+                primaryReviewerId: task.details.reviewerId,
+                assigneeId: task.assigneeId,
+                assignment: reviewAssignments.get(task.id),
+                projectMemberIds:
+                  projects.find((project) => project.id === task.projectId)
+                    ?.memberIds ?? [],
+                access: [...memberAccess.values()],
+                actorId: memberId,
+              }),
+            },
             details:
               task.details.creative && !canReadFinance(actor)
                 ? {
@@ -546,14 +588,38 @@ export class DeliveryService {
         Object.assign(details, fields);
         details.events.push(event('UPDATED', title));
       } else if (command.action === 'review') {
+        const latest = details.submissions[details.submissions.length - 1];
+        const assignment = latest
+          ? (
+              await readCurrentDeliveryReviewAssignments(
+                manager,
+                workspace.id,
+                [{ taskId: command.taskId, submissionVersion: latest.version }],
+              )
+            ).get(command.taskId)
+          : undefined;
+        const reviewAuthority = deliveryReviewAuthority({
+          primaryReviewerId: details.reviewerId,
+          assigneeId: task.assigneeId,
+          assignment,
+          projectMemberIds: project.memberIds,
+          access: [{ memberId, capabilities: actor.capabilities }],
+          actorId: memberId,
+        });
+        assertDeliveryReviewAssignmentRevision(
+          reviewAuthority.assignmentRevision,
+          command.reviewAssignmentRevision,
+        );
         assertDeliveryReview(
           details,
           task.assigneeId,
           memberId,
-          actor.isManager,
+          reviewAuthority.canReview,
           command.feedback,
           command.decision,
+          reviewAuthority.effectiveReviewerId,
         );
+        assertDeliveryCreativeReview(details, command);
         const submission = details.submissions[details.submissions.length - 1];
         if (command.decision === 'CHANGES_REQUESTED')
           await recordDeliveryRevision(
@@ -620,6 +686,11 @@ export class DeliveryService {
               ? {
                   creativeVersion: details.creative.version,
                   finalAssetId: details.creative.finalAssetId ?? undefined,
+                  creativeLearning: freezeCreativeSubmissionLearning(
+                    details.creative,
+                    details.draftCopy,
+                    project,
+                  ),
                 }
               : {}),
             description: command.description,
@@ -644,6 +715,34 @@ export class DeliveryService {
         }
       }
       deliveryTask.revision += 1;
+      if (command.action === 'submit' || command.action === 'review')
+        await cancelDeliveryReviewNotices(
+          manager,
+          workspace.id,
+          command.taskId,
+          new Date(),
+        );
+      if (command.action === 'submit') {
+        const latest = details.submissions[details.submissions.length - 1];
+        const authority = deliveryReviewAuthority({
+          primaryReviewerId: details.reviewerId,
+          assigneeId: task.assigneeId,
+          projectMemberIds: project.memberIds,
+          access: await this.access.listAccess(workspace.id, manager),
+          actorId: details.reviewerId,
+        });
+        await recordDeliveryReviewNotice(manager, workspace.id, {
+          taskId: command.taskId,
+          submissionVersion: latest.version,
+          assignmentId: null,
+          assignmentRevision: 0,
+          previousRecipientId: null,
+          recipientId: authority.effectiveReviewerId,
+          eligible: authority.reviewerState === 'ACTIVE',
+          senderId: memberId,
+          now: new Date(),
+        });
+      }
       await taskRepository.save(deliveryTask);
       await syncStoredDeliveryCommitment(
         manager,

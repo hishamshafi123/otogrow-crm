@@ -1,12 +1,16 @@
-import { StyledFinanceNavigation } from '@/delivery/finance/financeStyles';
-import { Link, useSearchParams } from 'react-router-dom';
-import { Trans, useLingui } from '@lingui/react/macro';
+import {
+  StyledFinanceDesktopNavigation,
+  StyledFinanceMobileNavigation,
+} from '@/delivery/finance/financeStyles';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useLingui } from '@lingui/react/macro';
 import { type DeliveryWorkspace } from '@/delivery/delivery.types';
 import { DeliveryBusiness } from '@/delivery/DeliveryBusiness';
 import { DeliveryMonthlyFinance } from '@/delivery/finance/DeliveryMonthlyFinance';
 import { DeliveryReconciliation } from '@/delivery/finance/DeliveryReconciliation';
 import { DeliveryFinanceAiCosts } from '@/delivery/finance/DeliveryFinanceAiCosts';
 import { DeliveryFinanceForecast } from '@/delivery/finance/DeliveryFinanceForecast';
+import { DeliveryFinanceExports } from '@/delivery/finance/export/DeliveryFinanceExports';
 import { StyledDeliveryStack } from '@/delivery/deliveryStyles';
 
 type DeliveryFinanceProps = {
@@ -20,16 +24,20 @@ export const DeliveryFinance = ({
   onOpenTask,
 }: DeliveryFinanceProps) => {
   const { t } = useLingui();
+  const navigate = useNavigate();
   const [params] = useSearchParams();
   const requested = params.get('financeView');
+  const views = [
+    { value: 'cash', label: t`Cash records` },
+    { value: 'forecast', label: t`Cash forecast` },
+    { value: 'payments', label: t`Payments and matching` },
+    { value: 'monthly', label: t`Monthly results` },
+    { value: 'plans', label: t`Monthly cost plans` },
+    { value: 'ai-costs', label: t`AI costs` },
+    { value: 'exports', label: t`Accounting exports` },
+  ] as const;
   const view =
-    requested === 'monthly' ||
-    requested === 'plans' ||
-    requested === 'payments' ||
-    requested === 'ai-costs' ||
-    requested === 'forecast'
-      ? requested
-      : 'cash';
+    views.find((option) => option.value === requested)?.value ?? 'cash';
   const destination = (nextView: string) => {
     const next = new URLSearchParams(params);
     next.set('view', 'finance');
@@ -39,44 +47,37 @@ export const DeliveryFinance = ({
   };
   return (
     <StyledDeliveryStack>
-      <StyledFinanceNavigation aria-label={t`Finance views`}>
-        <Link
-          to={destination('cash')}
-          aria-current={view === 'cash' ? 'page' : undefined}
+      <StyledFinanceDesktopNavigation aria-label={t`Finance views`}>
+        {views.map((option) => (
+          <Link
+            key={option.value}
+            to={destination(option.value)}
+            aria-current={view === option.value ? 'page' : undefined}
+          >
+            {option.label}
+          </Link>
+        ))}
+      </StyledFinanceDesktopNavigation>
+      <StyledFinanceMobileNavigation>
+        {t`Finance view`}
+        <select
+          aria-label={t`Finance view`}
+          value={view}
+          onChange={(event) => {
+            const selected = views.find(
+              (option) => option.value === event.currentTarget.value,
+            );
+            if (selected && selected.value !== view)
+              navigate(destination(selected.value));
+          }}
         >
-          <Trans>Cash records</Trans>
-        </Link>
-        <Link
-          to={destination('forecast')}
-          aria-current={view === 'forecast' ? 'page' : undefined}
-        >
-          <Trans>Cash forecast</Trans>
-        </Link>
-        <Link
-          to={destination('payments')}
-          aria-current={view === 'payments' ? 'page' : undefined}
-        >
-          <Trans>Payments and matching</Trans>
-        </Link>
-        <Link
-          to={destination('monthly')}
-          aria-current={view === 'monthly' ? 'page' : undefined}
-        >
-          <Trans>Monthly results</Trans>
-        </Link>
-        <Link
-          to={destination('plans')}
-          aria-current={view === 'plans' ? 'page' : undefined}
-        >
-          <Trans>Monthly cost plans</Trans>
-        </Link>
-        <Link
-          to={destination('ai-costs')}
-          aria-current={view === 'ai-costs' ? 'page' : undefined}
-        >
-          <Trans>AI costs</Trans>
-        </Link>
-      </StyledFinanceNavigation>
+          {views.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </StyledFinanceMobileNavigation>
       {view === 'cash' ? (
         <DeliveryBusiness
           workspace={workspace}
@@ -93,6 +94,8 @@ export const DeliveryFinance = ({
         <DeliveryReconciliation key={params.toString()} onChanged={onChanged} />
       ) : view === 'ai-costs' ? (
         <DeliveryFinanceAiCosts key={params.toString()} onChanged={onChanged} />
+      ) : view === 'exports' ? (
+        <DeliveryFinanceExports key={params.toString()} onChanged={onChanged} />
       ) : (
         <DeliveryMonthlyFinance
           key={params.toString()}

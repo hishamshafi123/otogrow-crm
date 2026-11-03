@@ -3,6 +3,7 @@ import {
   type DeliveryMediaRun,
 } from '@/delivery/delivery-media.types';
 export type CreativeBrief = {
+  outputKind?: 'IMAGE' | 'VIDEO';
   objective: 'ADS' | 'ORGANIC';
   audience: string;
   painPoint: string;

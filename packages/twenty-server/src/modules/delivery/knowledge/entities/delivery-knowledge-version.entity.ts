@@ -7,6 +7,7 @@ import {
 } from 'typeorm';
 import { WorkspaceRelatedEntity } from 'src/engine/workspace-manager/types/workspace-related-entity';
 import { type DeliveryKnowledgeCategory } from 'src/modules/delivery/knowledge/delivery-knowledge-category';
+import { type FathomProvenance } from 'src/modules/delivery/knowledge/fathom/delivery-fathom.types';
 
 @Entity({ name: 'deliveryKnowledgeVersion', schema: 'core' })
 @Index(['workspaceId', 'sourceId', 'version'], { unique: true })
@@ -21,6 +22,8 @@ export class DeliveryKnowledgeVersionEntity extends WorkspaceRelatedEntity {
   @Column({ type: 'text' }) sourceUrl: string;
   @Column({ type: 'text' }) transcript: string;
   @Column({ type: 'text' }) knowledge: string;
+  @Column({ type: 'jsonb', nullable: true })
+  fathomProvenance: FathomProvenance | null;
   @Column({ type: 'uuid' }) createdBy: string;
   @CreateDateColumn({ type: 'timestamptz' }) createdAt: Date;
 }

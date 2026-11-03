@@ -43,6 +43,7 @@ import {
   microToUsd,
   normalizeUsage,
   priceSaveSchema,
+  assertVideoQaPricing,
   reconcileSchema,
   snapshotSchema,
   usdToMicro,
@@ -52,7 +53,12 @@ import {
   type OtogrowAiSpendQuote,
   type OtogrowAiSpendSource,
   type OtogrowAiUsage,
+  type OtogrowAiMediaReservation,
 } from 'src/modules/otogrow-ai-budget/otogrow-ai-budget.types';
+import {
+  assertOtogrowAiMediaQuoteFresh,
+  validateOtogrowAiMediaReservation,
+} from 'src/modules/otogrow-ai-budget/otogrow-ai-media.policy';
 
 type SpendRequest = {
   workspaceId: string;
@@ -290,6 +296,17 @@ export class OtogrowAiBudgetService {
       throw new BadRequestException(
         `Ask an administrator to verify ${kind.toLowerCase()} pricing and model bounds for ${modelId} before running paid AI.`,
       );
+    if (kind === 'VIDEO_QA') {
+      try {
+        assertVideoQaPricing(profile);
+      } catch (error) {
+        throw new BadRequestException(
+          error instanceof Error
+            ? error.message
+            : 'Verify supported video QA pricing before starting.',
+        );
+      }
+    }
     return profile;
   }
   async quote(
@@ -430,6 +447,357 @@ export class OtogrowAiBudgetService {
     );
     return spend;
   }
+  async quoteMedia(
+    manager: EntityManager,
+    input: OtogrowAiMediaReservation,
+  ): Promise<OtogrowAiSpendQuote> {
+    try {
+      const value = validateOtogrowAiMediaReservation(input);
+      await this.lock(manager, value.workspaceId, true);
+      const context = await this.context(manager, value);
+      await this.assertCapacity(
+        manager,
+        value.workspaceId,
+        context.clientId,
+        value.taskId,
+        usdToMicro(value.limit.maximumCostUsd),
+      );
+      return {
+        maximumCostUsd: microToUsd(usdToMicro(value.limit.maximumCostUsd)),
+        pricingRevision: value.limit.revision,
+        budgetReady: true,
+        blockedReason: null,
+        boundSource: 'ADMIN_MEDIA_LIMIT',
+      };
+    } catch (failure) {
+      return {
+        maximumCostUsd: null,
+        pricingRevision: null,
+        budgetReady: false,
+        blockedReason:
+          failure instanceof BadRequestException ||
+          failure instanceof ConflictException
+            ? failure.message
+            : 'Media budget access could not be verified. Retry before generating.',
+        boundSource: null,
+      };
+    }
+  }
+
+  async reserveMedia(manager: EntityManager, input: OtogrowAiMediaReservation) {
+    const value = validateOtogrowAiMediaReservation(input, new Date(), true);
+    await this.lock(manager, value.workspaceId);
+    const repository = manager.getRepository(OtogrowAiSpendEntity);
+    const prior = await repository.findOneBy({
+      workspaceId: value.workspaceId,
+      sourceKind: 'MEDIA',
+      sourceRunId: value.sourceRunId,
+    });
+    if (prior) {
+      if (
+        prior.price.billingType !== 'ATLAS_MEDIA' ||
+        prior.price.requestHash !== value.requestHash ||
+        prior.price.modelId !== value.modelId ||
+        prior.price.kind !== value.kind ||
+        prior.price.profileId !== value.limit.id ||
+        prior.price.revision !== value.limit.revision ||
+        prior.price.source !== value.limit.source ||
+        prior.price.verifiedAt !== value.limit.verifiedAt ||
+        prior.price.quotedAt !== value.quotedAt ||
+        usdToMicro(prior.price.quotedCostUsd) !==
+          usdToMicro(value.quotedCostUsd) ||
+        prior.price.catalogSchemaRevision !== value.catalogSchemaRevision ||
+        usdToMicro(prior.price.maximumCostUsd) !==
+          usdToMicro(value.limit.maximumCostUsd) ||
+        prior.actorId !== value.actorId ||
+        prior.projectId !== value.projectId ||
+        prior.taskId !== value.taskId
+      )
+        throw new ConflictException(
+          'This media request identity already belongs to different inputs or pricing. Check its existing run.',
+        );
+      return prior;
+    }
+    validateOtogrowAiMediaReservation(value);
+    const context = await this.context(manager, value);
+    const maximum = usdToMicro(value.limit.maximumCostUsd);
+    await this.assertCapacity(
+      manager,
+      value.workspaceId,
+      context.clientId,
+      value.taskId,
+      maximum,
+    );
+    const spend = await repository.save(
+      repository.create({
+        id: v4(),
+        workspaceId: value.workspaceId,
+        actorId: value.actorId,
+        sourceKind: 'MEDIA',
+        sourceRunId: value.sourceRunId,
+        projectId: value.projectId,
+        taskId: value.taskId,
+        ...context,
+        state: 'RESERVED',
+        reservedMicroUsd: maximum.toString(),
+        actualMicroUsd: null,
+        usage: null,
+        attentionReason: null,
+        dispatchedAt: null,
+        settledAt: null,
+        price: {
+          billingType: 'ATLAS_MEDIA',
+          profileId: value.limit.id,
+          revision: value.limit.revision,
+          modelId: value.modelId,
+          kind: value.kind,
+          source: value.limit.source,
+          verifiedAt: value.limit.verifiedAt,
+          boundSource: 'ADMIN_MEDIA_LIMIT',
+          maximumCostUsd: microToUsd(maximum),
+          quotedCostUsd: microToUsd(usdToMicro(value.quotedCostUsd)),
+          quotedAt: value.quotedAt,
+          requestHash: value.requestHash,
+          catalogSchemaRevision: value.catalogSchemaRevision,
+        },
+      }),
+    );
+    await this.event(
+      manager,
+      value.workspaceId,
+      value.actorId,
+      'RESERVED',
+      {},
+      this.financialState(spend),
+      spend.id,
+    );
+    return spend;
+  }
+
+  async authorizeMediaDispatch(
+    manager: EntityManager,
+    source: Source,
+    userWorkspaceId: string,
+    authorize: (manager: EntityManager) => Promise<void>,
+  ) {
+    await this.lock(manager, source.workspaceId);
+    const repository = manager.getRepository(OtogrowAiSpendEntity);
+    const spend = await repository.findOneBy(source);
+    if (
+      source.sourceKind !== 'MEDIA' ||
+      !spend ||
+      spend.price.billingType !== 'ATLAS_MEDIA' ||
+      spend.state !== 'RESERVED'
+    )
+      throw new ConflictException(
+        'This media reservation cannot be dispatched again. Check its existing job.',
+      );
+    assertOtogrowAiMediaQuoteFresh(spend.price.quotedAt);
+    await this.access.accessForUser(
+      source.workspaceId,
+      spend.actorId,
+      userWorkspaceId,
+      manager,
+    );
+    await authorize(manager);
+    const context = await this.context(manager, spend);
+    if (context.clientId !== spend.clientId)
+      throw new ConflictException(
+        'The media task client changed. Check current inputs and budget before creating a new request.',
+      );
+    await this.assertCapacity(
+      manager,
+      source.workspaceId,
+      spend.clientId,
+      spend.taskId,
+      BigInt(spend.reservedMicroUsd),
+      spend.id,
+    );
+    const before = this.financialState(spend);
+    spend.state = 'DISPATCHED';
+    spend.dispatchedAt = new Date();
+    spend.revision++;
+    await repository.save(spend);
+    await this.event(
+      manager,
+      source.workspaceId,
+      spend.actorId,
+      'DISPATCHED',
+      before,
+      this.financialState(spend),
+      spend.id,
+    );
+    return spend;
+  }
+
+  async markMediaUncertain(
+    manager: EntityManager,
+    source: Source,
+    reason: string,
+  ) {
+    await this.lock(manager, source.workspaceId);
+    const repository = manager.getRepository(OtogrowAiSpendEntity);
+    const spend = await repository.findOneBy(source);
+    if (
+      source.sourceKind !== 'MEDIA' ||
+      !spend ||
+      spend.price.billingType !== 'ATLAS_MEDIA'
+    )
+      throw new ConflictException(
+        'The exact media reservation is unavailable.',
+      );
+    if (['SETTLED', 'RELEASED'].includes(spend.state)) return spend;
+    if (spend.state === 'RESERVED')
+      throw new ConflictException(
+        'Undispatched media cannot have provider charges.',
+      );
+    const message =
+      reason.trim().slice(0, 1000) ||
+      'Provider charge is unconfirmed. The full reservation remains held.';
+    if (spend.state === 'UNCERTAIN' && spend.attentionReason === message)
+      return spend;
+    const before = this.financialState(spend);
+    spend.state = 'UNCERTAIN';
+    spend.attentionReason = message;
+    spend.revision++;
+    await repository.save(spend);
+    await this.event(
+      manager,
+      source.workspaceId,
+      null,
+      'UNCERTAIN',
+      before,
+      this.financialState(spend),
+      spend.id,
+    );
+    return spend;
+  }
+
+  async recordMediaPrediction(
+    manager: EntityManager,
+    source: Source,
+    providerPredictionId: string,
+  ) {
+    if (!/^[a-zA-Z0-9_-]{1,200}$/.test(providerPredictionId))
+      throw new BadRequestException(
+        'A confirmed provider prediction identity is required.',
+      );
+    await this.lock(manager, source.workspaceId);
+    const repository = manager.getRepository(OtogrowAiSpendEntity);
+    const spend = await repository.findOneBy(source);
+    if (
+      source.sourceKind !== 'MEDIA' ||
+      !spend ||
+      spend.price.billingType !== 'ATLAS_MEDIA'
+    )
+      throw new ConflictException(
+        'The exact media reservation is unavailable.',
+      );
+    if (['RESERVED', 'RELEASED'].includes(spend.state))
+      throw new ConflictException(
+        'Only a dispatched media request can accept a provider prediction.',
+      );
+    const previous = await manager
+      .getRepository(OtogrowAiSpendEventEntity)
+      .findBy({
+        workspaceId: source.workspaceId,
+        spendId: spend.id,
+        action: 'MEDIA_PREDICTION_ACCEPTED',
+      });
+    if (previous.length) {
+      if (
+        previous.some(
+          (event) => event.after.providerPredictionId !== providerPredictionId,
+        )
+      )
+        throw new ConflictException(
+          'This media reservation already belongs to another prediction.',
+        );
+      return spend;
+    }
+    const before = this.financialState(spend);
+    spend.revision++;
+    await repository.save(spend);
+    await this.event(
+      manager,
+      source.workspaceId,
+      null,
+      'MEDIA_PREDICTION_ACCEPTED',
+      before,
+      {
+        ...this.financialState(spend),
+        providerPredictionId,
+        requestHash: spend.price.requestHash,
+      },
+      spend.id,
+    );
+    return spend;
+  }
+
+  async confirmMediaFailure(
+    manager: EntityManager,
+    source: Source,
+    providerPredictionId: string,
+  ) {
+    if (!/^[a-zA-Z0-9_-]{1,200}$/.test(providerPredictionId))
+      throw new BadRequestException(
+        'A confirmed provider prediction identity is required.',
+      );
+    await this.lock(manager, source.workspaceId);
+    const repository = manager.getRepository(OtogrowAiSpendEntity);
+    const spend = await repository.findOneBy(source);
+    if (
+      source.sourceKind !== 'MEDIA' ||
+      !spend ||
+      spend.price.billingType !== 'ATLAS_MEDIA'
+    )
+      throw new ConflictException(
+        'The exact media reservation is unavailable.',
+      );
+    const accepted = await manager
+      .getRepository(OtogrowAiSpendEventEntity)
+      .findBy({
+        workspaceId: source.workspaceId,
+        spendId: spend.id,
+        action: 'MEDIA_PREDICTION_ACCEPTED',
+      });
+    if (
+      accepted.length !== 1 ||
+      accepted[0].after.providerPredictionId !== providerPredictionId
+    )
+      throw new ConflictException(
+        'Failure evidence does not match the saved provider prediction.',
+      );
+    if (['SETTLED', 'RELEASED'].includes(spend.state)) return spend;
+    if (spend.state === 'RESERVED')
+      throw new ConflictException(
+        'Provider failure cannot settle undispatched media.',
+      );
+    const before = this.financialState(spend);
+    spend.state = 'SETTLED';
+    spend.actualMicroUsd = '0';
+    spend.settledAt = new Date();
+    spend.attentionReason = null;
+    spend.revision++;
+    await repository.save(spend);
+    await this.event(
+      manager,
+      source.workspaceId,
+      null,
+      'SETTLED',
+      before,
+      {
+        ...this.financialState(spend),
+        providerPredictionId,
+        providerStatus: 'FAILED',
+        evidenceSource:
+          'Atlas terminal prediction failure; published failed-job refund policy.',
+      },
+      spend.id,
+    );
+    return spend;
+  }
+
   async dispatch(
     source: Source,
     userWorkspaceId: string,
@@ -442,6 +810,10 @@ export class OtogrowAiBudgetService {
       if (!spend || spend.state !== 'RESERVED')
         throw new ConflictException(
           'Paid AI reservation is unavailable. Create a new run; uncertain runs cannot be retried.',
+        );
+      if (spend.price.billingType === 'ATLAS_MEDIA')
+        throw new BadRequestException(
+          'Use the exact media dispatch protocol for this reservation.',
         );
       await this.access.accessForUser(
         source.workspaceId,
@@ -501,6 +873,14 @@ export class OtogrowAiBudgetService {
       if (!spend)
         throw new ConflictException('The paid AI reservation is missing.');
       if (spend.state === 'RELEASED') return spend;
+      if (spend.price.billingType === 'ATLAS_MEDIA') {
+        if (spend.state === 'SETTLED') return spend;
+        return this.markMediaUncertain(
+          manager,
+          source,
+          'The media output has no attributable confirmed charge. Its full reservation remains held until evidence-based reconciliation.',
+        );
+      }
       if (spend.state === 'SETTLED') {
         const lateUsage = normalizeUsage(spend.price.pricing, rawUsage);
         if (!lateUsage) return spend;
@@ -735,6 +1115,17 @@ export class OtogrowAiBudgetService {
       throw new BadRequestException(
         'Image and clip pricing units are not yet verified by this budget ledger. Paid generation remains blocked.',
       );
+    if (value.kind === 'VIDEO_QA' && value.enabled) {
+      try {
+        assertVideoQaPricing(value);
+      } catch (error) {
+        throw new BadRequestException(
+          error instanceof Error
+            ? error.message
+            : 'Verify the supported video QA tariff and bounds.',
+        );
+      }
+    }
     if (Date.parse(value.verifiedAt) > Date.now())
       throw new BadRequestException(
         'Pricing verification cannot be in the future.',

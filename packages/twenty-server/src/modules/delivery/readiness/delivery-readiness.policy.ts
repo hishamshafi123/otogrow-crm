@@ -44,7 +44,7 @@ export const metaReadiness = (
 
 export const manualReadiness = (): DeliveryReadinessItemDTO[] =>
   [
-    ['EMAIL_OS', 'NOT_IMPLEMENTED', 'EMAIL_BRIDGE', 'inbox'],
+    ['EMAIL_OS', 'AVAILABLE', 'EMAIL_SELECTED_THREADS', 'inbox'],
     ['SLACK_OS', 'NOT_IMPLEMENTED', 'SLACK_BRIDGE', 'inbox'],
     ['WHATSAPP_OS', 'NOT_IMPLEMENTED', 'WHATSAPP_BRIDGE', 'inbox'],
     ['SHOPIFY', 'NOT_IMPLEMENTED', 'SHOPIFY_IMPORT', 'ads'],
@@ -52,12 +52,12 @@ export const manualReadiness = (): DeliveryReadinessItemDTO[] =>
     ['SOCIAL_PUBLISHING', 'MANUAL', 'SOCIAL_MANUAL', 'content'],
     ['COMPETITOR_COLLECTION', 'MANUAL', 'COMPETITOR_MANUAL', 'competitors'],
     ['ACCOUNTING', 'MANUAL', 'ACCOUNTING_EXPORT', 'finance'],
-    ['MEETING_IMPORT', 'NOT_IMPLEMENTED', 'MEETING_LINK_ONLY', 'knowledge'],
+    ['MEETING_IMPORT', 'AVAILABLE', 'MEETING_REVIEWED_IMPORT', 'knowledge'],
     ['BRAND_KNOWLEDGE', 'AVAILABLE', 'KNOWLEDGE_REVIEWED', 'knowledge'],
     ['TASK_ASSISTANTS', 'AVAILABLE', 'ASSISTANTS_BOUNDED', 'agents'],
     ['DYNAMIC_AGENTS', 'NOT_IMPLEMENTED', 'AGENT_TOOLS_MISSING', 'agents'],
     ['CREATIVE_PRODUCTION', 'AVAILABLE', 'CREATIVE_CHECKS', 'creative'],
-    ['SEO_RESULTS', 'MANUAL', 'SEO_MANUAL', 'workflows'],
+    ['SEO_RESULTS', 'MANUAL', 'SEO_MANUAL', 'seo'],
     ['DEVELOPMENT_SYNC', 'MANUAL', 'DEVELOPMENT_MANUAL', 'development'],
   ].map(([capability, status, reason, destination]) => ({
     id: capability,

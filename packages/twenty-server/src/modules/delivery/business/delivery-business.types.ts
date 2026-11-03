@@ -171,6 +171,7 @@ export type BusinessRecord = BusinessFields & {
   revision: number;
   clientEngagementId?: string;
   clientRequestId?: string;
+  clientRequestRevision?: number;
   createdBy: string;
   createdAt: string;
   updatedAt: string;

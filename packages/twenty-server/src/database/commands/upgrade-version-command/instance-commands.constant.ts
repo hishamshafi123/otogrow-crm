@@ -186,6 +186,21 @@ import { AddDeliveryReconciliationFastInstanceCommand } from 'src/database/comma
 import { AddDeliveryAiFinanceFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1793133548966-add-delivery-ai-finance';
 import { AddDeliveryFinancePeriodFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1793136306094-add-delivery-finance-period';
 import { AddDeliveryFinanceForecastFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1793139353868-add-delivery-finance-forecast';
+import { AddDeliveryFinanceExportFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1793175885332-add-delivery-finance-export';
+import { AddDeliveryFounderEscalationFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1793189248531-add-delivery-founder-escalation';
+import { AddDeliveryCreativeReviewFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1793228706459-add-delivery-creative-review';
+import { AddDeliveryReviewQueueFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1793232757126-add-delivery-review-queue';
+import { AddDeliveryAtlasMediaFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1793290192171-add-delivery-atlas-media';
+import { AddDeliveryClientSetupFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1793315781694-add-delivery-client-setup';
+import { AddDeliveryAssistantReadIndexesFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1793320076500-add-delivery-assistant-read-indexes';
+import { AddDeliveryKnowledgeReadIndexFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1793415137847-add-delivery-knowledge-read-index';
+import { AddDeliveryAdvertisingWorkbenchFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1793421162422-add-delivery-advertising-workbench';
+import { AddDeliveryAdvertisingDraftsFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1793491120493-add-delivery-advertising-drafts';
+import { AddOtogrowActivityAnalysisFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1793500218540-add-otogrow-activity-analysis';
+import { AddSeoOutcomeReportsFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1793663177944-add-seo-outcome-reports';
+import { AddVideoQaAndFathomImportsFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1793666115145-add-video-qa-and-fathom-imports';
+import { AddCreativePerformanceLearningFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1793675579721-add-creative-performance-learning';
+import { AddDelegatedGmailInboxFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1793677084748-add-delegated-gmail-inbox';
 
 export const INSTANCE_COMMANDS = [
   AddViewFieldGroupIdIndexOnViewFieldFastInstanceCommand,
@@ -374,4 +389,19 @@ export const INSTANCE_COMMANDS = [
   AddDeliveryAiFinanceFastInstanceCommand,
   AddDeliveryFinancePeriodFastInstanceCommand,
   AddDeliveryFinanceForecastFastInstanceCommand,
+  AddDeliveryFinanceExportFastInstanceCommand,
+  AddDeliveryFounderEscalationFastInstanceCommand,
+  AddDeliveryCreativeReviewFastInstanceCommand,
+  AddDeliveryReviewQueueFastInstanceCommand,
+  AddDeliveryAtlasMediaFastInstanceCommand,
+  AddDeliveryClientSetupFastInstanceCommand,
+  AddDeliveryAssistantReadIndexesFastInstanceCommand,
+  AddDeliveryKnowledgeReadIndexFastInstanceCommand,
+  AddDeliveryAdvertisingWorkbenchFastInstanceCommand,
+  AddDeliveryAdvertisingDraftsFastInstanceCommand,
+  AddOtogrowActivityAnalysisFastInstanceCommand,
+  AddSeoOutcomeReportsFastInstanceCommand,
+  AddVideoQaAndFathomImportsFastInstanceCommand,
+  AddCreativePerformanceLearningFastInstanceCommand,
+  AddDelegatedGmailInboxFastInstanceCommand,
 ];

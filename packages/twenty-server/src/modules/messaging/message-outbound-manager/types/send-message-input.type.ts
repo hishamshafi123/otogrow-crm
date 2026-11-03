@@ -1,6 +1,7 @@
 type EmailAddress = string | string[];
 
 export type SendMessageInput = {
+  headerMessageId?: string;
   body: string;
   subject: string;
   to: EmailAddress;

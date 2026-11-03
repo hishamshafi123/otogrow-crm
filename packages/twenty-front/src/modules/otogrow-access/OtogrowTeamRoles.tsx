@@ -147,13 +147,15 @@ export const OtogrowTeamRoles = ({ onChanged }: OtogrowTeamRolesProps) => {
   const labels: Record<string, string> = {
     'workspace.admin': t`Administer Otogrow OS`,
     'delivery.manage': t`Plan and review all projects`,
+    'delivery.review': t`Review submissions assigned to you`,
     'phone.use': t`Use the phone`,
     'finance.read': t`View and export finances`,
     'finance.manage': t`Record and correct finances`,
   };
   const explanations: Record<string, string> = {
-    'workspace.admin': t`Manage OS settings and roles, and access shared business data. Owner-private conversations and private team chats keep their access limits. Native CRM settings remain separately controlled.`,
+    'workspace.admin': t`Manage OS settings and roles, and access shared business data. Owner-private conversations and private team chats keep their access limits. CRM settings keep their separate permissions.`,
     'delivery.manage': t`Manage work and review delivery across projects. Final work still needs an independent reviewer.`,
+    'delivery.review': t`Review only submissions assigned to you in projects you already belong to. You cannot approve your own work. This grants no planning, production management, client delivery, fulfilment or finance access.`,
     'phone.use': t`Make and receive calls. CRM record permissions still limit access to call records.`,
     'finance.read': t`See and export all company financial entries, salary allocations and cash reports. Does not grant access to project tasks or client conversations.`,
     'finance.manage': t`Includes viewing all finances. Record receipts and expenses, confirm payments and void incorrect entries. Does not grant role administration.`,
@@ -379,13 +381,13 @@ export const OtogrowTeamRoles = ({ onChanged }: OtogrowTeamRolesProps) => {
           <Trans>
             Give each person the roles they need. Their access combines every
             assigned role. Assigned project access remains available without an
-            additional capability.
+            extra permission.
           </Trans>
         </p>
         <small>
           <Trans>
-            These are Otogrow business roles. Native CRM data and settings
-            permissions remain separate.
+            These are Otogrow business roles. CRM data and settings permissions
+            remain separate.
           </Trans>
         </small>
         <StyledActions>
@@ -504,7 +506,7 @@ export const OtogrowTeamRoles = ({ onChanged }: OtogrowTeamRolesProps) => {
                   </label>
                   <StyledChoices disabled={busy}>
                     <legend>
-                      <Trans>Role capabilities</Trans>
+                      <Trans>Role permissions</Trans>
                     </legend>
                     {OTOGROW_CAPABILITIES.map((capability) => (
                       <label key={capability}>
@@ -557,10 +559,11 @@ export const OtogrowTeamRoles = ({ onChanged }: OtogrowTeamRolesProps) => {
                         )
                         .map((role) => role.name || t`This role`),
                       ...nativeGrants
-                        .filter((grant) => grant.capability === capability)
+                        .filter((grant) =>
+                          hasOtogrowCapability([grant.capability], capability),
+                        )
                         .map(
-                          (grant) =>
-                            t`${grant.sourceName} (inherited from native CRM)`,
+                          (grant) => t`${grant.sourceName} (from CRM settings)`,
                         ),
                     ];
                     return (
@@ -581,11 +584,39 @@ export const OtogrowTeamRoles = ({ onChanged }: OtogrowTeamRolesProps) => {
                 </ul>
                 <p>
                   <Trans>
-                    This preview covers OS capabilities. Project membership,
-                    conversation grants, native CRM permissions and independent
+                    This preview covers OS permissions. Project membership,
+                    conversation access, CRM permissions and independent
                     approval still apply.
                   </Trans>
                 </p>
+                <p>
+                  <Trans>
+                    Review-only access requires a current reviewer assignment
+                    and existing project membership. A review role never grants
+                    self-approval or transfers client-delivery ownership.
+                  </Trans>
+                </p>
+                {editor.kind === 'member' && (
+                  <section aria-label={t`Existing project review scope`}>
+                    <strong>
+                      <Trans>Existing project memberships</Trans>
+                    </strong>
+                    <p>
+                      {editor.member.projectMemberships.length
+                        ? editor.member.projectMemberships
+                            .map((project) => project.name)
+                            .join(', ')
+                        : t`No current project memberships`}
+                    </p>
+                    <small>
+                      <Trans>
+                        These memberships define potential project scope. This
+                        person still needs an explicit independent submission
+                        assignment; saving a review role assigns no work.
+                      </Trans>
+                    </small>
+                  </section>
+                )}
               </section>
               {notice && <p role="status">{notice}</p>}
               {errorFeedback}
@@ -625,13 +656,17 @@ export const OtogrowTeamRoles = ({ onChanged }: OtogrowTeamRolesProps) => {
                       </p>
                       <small>
                         {member.access.capabilities
-                          .map((capability) => labels[capability] ?? capability)
+                          .map(
+                            (capability) =>
+                              labels[capability] ??
+                              t`Permission name unavailable`,
+                          )
                           .join(' · ') || t`Assigned projects only`}
                       </small>
                       {member.access.nativeAdministrator && (
                         <p>
                           <Trans>
-                            Administrator access inherited from native CRM
+                            Administrator access comes from CRM settings
                           </Trans>
                         </p>
                       )}

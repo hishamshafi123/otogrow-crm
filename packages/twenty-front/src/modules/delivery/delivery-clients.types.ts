@@ -46,6 +46,9 @@ export type ClientShare = {
   reviews: { id: string; at: string; decision: string; comment: string }[];
 };
 export type ClientsSnapshot = {
+  workspaceId: string;
+  memberId: string;
+  userWorkspaceId: string;
   engagements: ClientEngagement[];
   shares: ClientShare[];
   links: {
@@ -64,6 +67,9 @@ export type ClientPortalData = {
     period: string;
     requests: {
       id: string;
+      clientRequestId?: string | null;
+      clientRequestRevision?: number | null;
+      reason?: string;
       amount: number;
       currency: string;
       channel: string;
@@ -87,6 +93,7 @@ export type ClientPortalData = {
   submissions: {
     id: string;
     at: string;
+    formRevision: number;
     accepted: boolean;
     answers: { label: string; value: string }[];
   }[];

@@ -15,7 +15,7 @@ export type DeliveryMediaRun = {
   id: string;
   requestId: string;
   modelId: string;
-  kind: 'IMAGE' | 'CLIP' | 'ASSEMBLY' | 'INSPECTION';
+  kind: 'IMAGE' | 'CLIP' | 'ASSEMBLY' | 'INSPECTION' | 'VIDEO_QA';
   shotId: string;
   shotVersion: number;
   briefVersion: number;

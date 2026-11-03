@@ -406,17 +406,20 @@ async function main() {
       }),
     );
     await change(editor, { action: 'selectAsset', assetId: finalId });
-    await mutateTask(editor, {
+    const submittedCreativeState = await mutateTask(editor, {
       action: 'submit',
       taskId: task.id,
       revision: (await read()).revision,
       description: 'Final synthetic creative',
       evidence: [],
     });
+    const submittedCreative = submittedCreativeState.tasks.find((item) => item.id === task.id).details.submissions.at(-1);
+    const exactCreativeReview = { selectedSubmissionVersion: submittedCreative.version, creativeVersion: submittedCreative.creativeVersion, finalAssetId: submittedCreative.finalAssetId };
     await assert.rejects(change(editor, { action: 'shot', fields }));
     await assert.rejects(
       mutateTask(editor, {
         action: 'review',
+        ...exactCreativeReview,
         taskId: task.id,
         revision: (await read()).revision,
         decision: 'APPROVED',
@@ -425,6 +428,7 @@ async function main() {
     );
     await mutateTask(admin, {
       action: 'review',
+      ...exactCreativeReview,
       taskId: task.id,
       revision: (await read()).revision,
       decision: 'APPROVED',

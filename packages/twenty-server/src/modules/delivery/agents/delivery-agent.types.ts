@@ -5,14 +5,30 @@ export const deliveryAgentConfigurationSchema = z
   .object({
     name: z.string().trim().min(1).max(100),
     purpose: z.string().trim().min(1).max(1000),
-    kind: z.enum(['BRIEF', 'COPY', 'SEO']),
+    kind: z.enum(['BRIEF', 'COPY', 'SEO', 'ADVERTISING', 'ACTIVITY']),
     enabled: z.boolean(),
     instructions: z.string().trim().min(1).max(8000),
-    requiredInputs: z.array(z.enum(['brief', 'copy', 'requirements'])).max(3),
-    outputFormat: z.enum(['findings', 'findings_and_edits']),
+    requiredInputs: z
+      .array(
+        z.enum([
+          'brief',
+          'copy',
+          'requirements',
+          'report',
+          'activity',
+          'question',
+        ]),
+      )
+      .max(3),
+    outputFormat: z.enum([
+      'findings',
+      'findings_and_edits',
+      'recommendations',
+      'analysis',
+    ]),
     tools: z.array(z.enum(['public_page_check'])).max(1),
     modelId: z.string().max(200).nullable(),
-    projectIds: z.array(z.string().uuid()).min(1).max(100),
+    projectIds: z.array(z.string().uuid()).max(100),
     roles: z
       .array(z.enum(['ADMIN', 'MANAGER', 'MEMBER']))
       .min(1)
@@ -22,7 +38,64 @@ export const deliveryAgentConfigurationSchema = z
     maxOutputTokens: z.number().int().min(256).max(4096),
     humanConfirmation: z.literal(true),
   })
-  .strict();
+  .strict()
+  .superRefine((configuration, context) => {
+    const activity = configuration.kind === 'ACTIVITY';
+    const advertising = configuration.kind === 'ADVERTISING';
+    if (
+      activity
+        ? configuration.projectIds.length !== 0
+        : configuration.projectIds.length === 0
+    )
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          'Activity analysis uses workspace scope; other assistants require at least one project.',
+      });
+    if (
+      activity
+        ? configuration.outputFormat !== 'analysis' ||
+          configuration.tools.length > 0 ||
+          configuration.roles.length !== 1 ||
+          configuration.roles[0] !== 'ADMIN' ||
+          configuration.requiredInputs.length !== 2 ||
+          !configuration.requiredInputs.includes('activity') ||
+          !configuration.requiredInputs.includes('question')
+        : configuration.outputFormat === 'analysis' ||
+          configuration.requiredInputs.some((input) =>
+            ['activity', 'question'].includes(input),
+          )
+    )
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          'Activity analysis requires activity evidence, a question, analysis output, administrator access and no tools.',
+      });
+    if (
+      advertising
+        ? configuration.outputFormat !== 'recommendations' ||
+          configuration.tools.length > 0 ||
+          !configuration.requiredInputs.includes('report') ||
+          configuration.requiredInputs.some(
+            (input) => !['report', 'requirements'].includes(input),
+          )
+        : configuration.outputFormat === 'recommendations' ||
+          configuration.requiredInputs.includes('report')
+    )
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          'Advertising recommendations require report evidence, optional requirements, recommendations output and no tools; task assistants retain their task inputs and output.',
+      });
+    if (
+      new Set(configuration.requiredInputs).size !==
+      configuration.requiredInputs.length
+    )
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Required inputs must be distinct.',
+      });
+  });
 
 export const deliveryAgentInputsSchema = z
   .object({

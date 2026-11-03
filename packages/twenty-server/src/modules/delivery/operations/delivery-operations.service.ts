@@ -3,9 +3,14 @@ import { matchesApprovedDelivery } from 'src/modules/delivery/lifecycle/delivery
 import { recordDeliveryRevision } from 'src/modules/delivery/revisions/record-delivery-revision';
 import { isValidUuid } from 'twenty-shared/utils';
 import { getMetaReportIdentity } from 'src/modules/delivery/advertising/delivery-meta-report-store';
+import { deliveryNoticeDestination } from 'src/modules/delivery/operations/delivery-notice-destination';
 import { getPublishedDeliveryWorkflow } from 'src/modules/delivery/workflows/apply-delivery-workflow';
 import { syncDeliveryCommitment } from 'src/modules/delivery/commitments/record-delivery-commitment';
 import { readDeliveryOperations } from 'src/modules/delivery/read-delivery-snapshot';
+import {
+  acknowledgeCurrentDeliveryReviewNotice,
+  currentDeliveryReviewNotice,
+} from 'src/modules/delivery/reviews/delivery-review-notices';
 import { DeliveryProjectEntity } from 'src/modules/delivery/entities/delivery-project.entity';
 import {
   BadRequestException,
@@ -334,6 +339,83 @@ export class DeliveryOperationsService {
     return notice;
   }
 
+  private seeCurrentAssignment(
+    state: DeliveryOperations,
+    taskId: string,
+    memberId: string,
+    assigneeId: string | null,
+    assignmentAt: string | undefined,
+    expectedAssignmentKey: string | undefined,
+    now: Date,
+  ) {
+    if (assigneeId !== memberId) return false;
+    const assignmentKey = `${memberId}:${assignmentAt ?? 'legacy'}`;
+    if (
+      expectedAssignmentKey !== undefined &&
+      expectedAssignmentKey !== assignmentKey
+    )
+      throw new ConflictException(
+        'This assignment changed. Open its current details before marking it seen.',
+      );
+    state.assignments[taskId] = assignmentKey;
+    for (const notice of state.notices.filter(
+      (item) =>
+        item.taskId === taskId &&
+        item.kind === 'ASSIGNMENT' &&
+        item.recipientId === memberId &&
+        (!assignmentAt || item.createdAt === assignmentAt) &&
+        !item.cancelled,
+    ))
+      notice.seenAt ??= now.toISOString();
+    return true;
+  }
+
+  async seeAssignment(
+    workspace: WorkspaceEntity,
+    memberId: string,
+    userWorkspaceId: string,
+    taskId: string,
+    expectedAssignmentKey: string,
+    now = new Date(),
+  ) {
+    const parsed = operationsCommandSchema.safeParse({
+      action: 'seen',
+      taskId,
+      expectedAssignmentKey,
+    });
+    if (
+      !parsed.success ||
+      parsed.data.action !== 'seen' ||
+      parsed.data.expectedAssignmentKey === undefined
+    )
+      throw new BadRequestException('Check the exact assignment source.');
+    return this.transact(workspace.id, async (state, manager) => {
+      await this.actor(workspace, memberId, userWorkspaceId, manager);
+      const scope = await this.creative.scope(
+        manager,
+        workspace,
+        memberId,
+        userWorkspaceId,
+        taskId,
+      );
+      if (
+        !this.seeCurrentAssignment(
+          state,
+          taskId,
+          memberId,
+          scope.assigneeId,
+          scope.task.details.assignmentAt,
+          expectedAssignmentKey,
+          now,
+        )
+      )
+        throw new ForbiddenException(
+          'This assignment is not addressed to you.',
+        );
+      return true;
+    });
+  }
+
   async command(
     workspace: WorkspaceEntity,
     memberId: string,
@@ -654,13 +736,27 @@ export class DeliveryOperationsService {
           )
             throw new ForbiddenException();
         } else {
-          await this.creative.scope(
+          const scope = await this.creative.scope(
             manager,
             workspace,
             memberId,
             userWorkspaceId,
             notice.taskId,
           );
+          if (notice.kind === 'REVIEW_ASSIGNMENT') {
+            if (command.action === 'noticeSeen')
+              throw new BadRequestException(
+                'Open the exact review before marking its assignment seen.',
+              );
+            await acknowledgeCurrentDeliveryReviewNotice(
+              manager,
+              workspace.id,
+              notice,
+              scope,
+              now,
+            );
+            return;
+          }
         }
         if (command.action === 'acknowledge')
           notice.acknowledgedAt ??= now.toISOString();
@@ -675,19 +771,15 @@ export class DeliveryOperationsService {
         command.taskId,
       );
       if (command.action === 'seen') {
-        if (scope.assigneeId !== memberId) return;
-        state.assignments[command.taskId] =
-          `${memberId}:${scope.task.details.assignmentAt ?? 'legacy'}`;
-        for (const notice of state.notices.filter(
-          (item) =>
-            item.taskId === command.taskId &&
-            item.kind === 'ASSIGNMENT' &&
-            item.recipientId === memberId &&
-            (!scope.task.details.assignmentAt ||
-              item.createdAt === scope.task.details.assignmentAt) &&
-            !item.cancelled,
-        ))
-          notice.seenAt ??= now.toISOString();
+        this.seeCurrentAssignment(
+          state,
+          command.taskId,
+          memberId,
+          scope.assigneeId,
+          scope.task.details.assignmentAt,
+          command.expectedAssignmentKey,
+          now,
+        );
         return;
       }
       if (command.action === 'message') {
@@ -759,7 +851,10 @@ export class DeliveryOperationsService {
             acknowledgedAt: null,
             resolvedAt: null,
           });
-          if (state.founderId)
+          if (
+            state.founderId &&
+            state.founderEscalationRouting?.mode !== 'RULES'
+          )
             this.notice(
               state,
               command.taskId,
@@ -1227,7 +1322,10 @@ export class DeliveryOperationsService {
             null,
             now,
           );
-          if (state.founderId)
+          if (
+            state.founderId &&
+            state.founderEscalationRouting?.mode !== 'RULES'
+          )
             this.notice(
               state,
               task.id,
@@ -1250,6 +1348,71 @@ export class DeliveryOperationsService {
         const outbox = manager.getRepository(DeliveryReminderOutboxEntity);
         let queuedCount = 0;
         for (const notice of state.notices) {
+          if (
+            notice.kind === 'REVIEW_ASSIGNMENT' &&
+            !notice.cancelled &&
+            ['PENDING', 'QUEUED', 'UNCONFIGURED'].includes(notice.sendState)
+          ) {
+            let current = false;
+            try {
+              const userWorkspaceId = await this.active(
+                workspace,
+                notice.recipientId,
+                manager,
+              );
+              if (userWorkspaceId) {
+                const scope = await this.creative.scope(
+                  manager,
+                  workspace,
+                  notice.recipientId,
+                  userWorkspaceId,
+                  notice.taskId,
+                );
+                current = await currentDeliveryReviewNotice(
+                  manager,
+                  workspace.id,
+                  notice,
+                  scope,
+                );
+              }
+            } catch (error) {
+              if (
+                !(error instanceof ForbiddenException) &&
+                !(error instanceof NotFoundException)
+              )
+                throw error;
+            }
+            if (!current) {
+              notice.cancelled = true;
+              notice.sendState = 'SUPPRESSED';
+              notice.error = null;
+              await outbox.update(
+                {
+                  workspaceId: workspace.id,
+                  noticeId: notice.id,
+                  status: 'QUEUED',
+                },
+                { status: 'SUPPRESSED', finishedAt: now, error: null },
+              );
+            }
+          }
+          if (
+            notice.kind === 'ALERT' &&
+            state.founderEscalationRouting?.mode === 'RULES' &&
+            ['PENDING', 'QUEUED', 'UNCONFIGURED'].includes(notice.sendState)
+          ) {
+            notice.cancelled = true;
+            notice.sendState = 'SUPPRESSED';
+            notice.error = null;
+            await outbox.update(
+              {
+                workspaceId: workspace.id,
+                noticeId: notice.id,
+                status: 'QUEUED',
+              },
+              { status: 'SUPPRESSED', finishedAt: now, error: null },
+            );
+          }
           if (
             notice.sendState === 'SENDING' &&
             notice.attemptedAt &&
@@ -1374,6 +1537,8 @@ export class DeliveryOperationsService {
       };
       if (
         !notice ||
+        (notice.kind === 'ALERT' &&
+          state.founderEscalationRouting?.mode === 'RULES') ||
         notice.sendState !== 'QUEUED' ||
         notice.cancelled ||
         notice.seenAt ||
@@ -1412,6 +1577,19 @@ export class DeliveryOperationsService {
               notice.taskId,
             );
         if (
+          notice.kind === 'REVIEW_ASSIGNMENT' &&
+          (!scope ||
+            !(await currentDeliveryReviewNotice(
+              manager,
+              workspace.id,
+              notice,
+              scope,
+            )))
+        ) {
+          notice.cancelled = true;
+          return finish('SUPPRESSED');
+        }
+        if (
           (notice.kind === 'ASSIGNMENT' &&
             (scope?.assigneeId !== notice.recipientId ||
               (scope?.task.details.assignmentAt &&
@@ -1431,9 +1609,7 @@ export class DeliveryOperationsService {
           );
         const base =
           this.config.get('FRONTEND_URL') ?? this.config.get('SERVER_URL');
-        const url = new URL('/delivery', base);
-        if (isMetaReport) url.searchParams.set('view', 'ads');
-        else url.searchParams.set('task', notice.taskId);
+        const url = deliveryNoticeDestination(notice, base);
         const botToken = this.telegram.decryptBotToken(bot);
         entry.status = 'SENDING';
         entry.attemptedAt = now;
@@ -1443,14 +1619,16 @@ export class DeliveryOperationsService {
         return {
           botToken,
           chatId: connection.chatId,
-          text: `Otogrow: ${notice.kind === 'MESSAGE' ? 'An internal task message needs your attention.' : notice.kind === 'ASSIGNMENT' ? 'A task assignment needs your attention.' : 'A delivery check needs your attention.'}\n${url}`,
+          text: `Otogrow: ${isMetaReport ? 'An advertising report needs your attention.' : notice.kind === 'REVIEW_ASSIGNMENT' ? 'A submission review needs your attention.' : notice.kind === 'MESSAGE' ? 'An internal task message needs your attention.' : notice.kind === 'ASSIGNMENT' ? 'A task assignment needs your attention.' : 'A delivery check needs your attention.'}\n${url}`,
         };
       } catch (error) {
         if (
           error instanceof ForbiddenException ||
           error instanceof NotFoundException
-        )
+        ) {
+          if (notice.kind === 'REVIEW_ASSIGNMENT') notice.cancelled = true;
           return finish('SUPPRESSED');
+        }
         throw error;
       }
     });

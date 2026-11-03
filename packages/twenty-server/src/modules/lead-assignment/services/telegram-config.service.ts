@@ -37,55 +37,83 @@ export class TelegramConfigService {
     input: UpsertTelegramConfigInput,
     workspaceId: string,
   ): Promise<TelegramConfigEntity> {
-    const existing = await this.findByWorkspaceId(workspaceId);
+    return this.transact(workspaceId, async (repository) => {
+      const existing = await repository.findOne({
+        where: { workspaceId },
+        withDeleted: true,
+        lock: { mode: 'pessimistic_write' },
+      });
+      const reconnecting = isDefined(existing?.deletedAt);
+      const replacingToken = isNonEmptyString(input.botToken?.trim());
 
-    if (!isDefined(existing) && !isNonEmptyString(input.botToken)) {
-      throw new BadRequestException(
-        'A bot token is required to configure Telegram',
-      );
-    }
+      if ((!isDefined(existing) || reconnecting) && !replacingToken) {
+        throw new BadRequestException(
+          reconnecting
+            ? 'A new bot token is required to reconnect Telegram'
+            : 'A bot token is required to configure Telegram',
+        );
+      }
 
-    const encryptedBotToken = isNonEmptyString(input.botToken)
-      ? this.telegramConfigEncryptionService.encrypt({
-          plaintext: input.botToken as PlaintextString,
-          workspaceId,
-        })
-      : existing?.botToken;
+      const encryptedBotToken = replacingToken
+        ? this.telegramConfigEncryptionService.encrypt({
+            plaintext: input.botToken as PlaintextString,
+            workspaceId,
+          })
+        : existing?.botToken;
 
-    if (!isDefined(encryptedBotToken)) {
-      throw new BadRequestException(
-        'A bot token is required to configure Telegram',
-      );
-    }
+      if (!isDefined(encryptedBotToken)) {
+        throw new BadRequestException(
+          'A bot token is required to configure Telegram',
+        );
+      }
 
-    if (isDefined(existing)) {
-      return this.telegramConfigRepository.save({
-        ...existing,
+      return repository.save({
+        ...(existing ?? { workspaceId }),
         botToken: encryptedBotToken,
         botUsername:
           input.botUsername !== undefined
             ? input.botUsername
-            : existing.botUsername,
-        isActive: input.isActive ?? existing.isActive,
+            : reconnecting
+              ? null
+              : (existing?.botUsername ?? null),
+        isActive:
+          input.isActive ??
+          (reconnecting ? true : (existing?.isActive ?? true)),
+        deletedAt: null,
       });
-    }
-
-    return this.telegramConfigRepository.save({
-      botToken: encryptedBotToken,
-      botUsername: input.botUsername ?? null,
-      isActive: input.isActive ?? true,
-      workspaceId,
     });
   }
 
   async delete(workspaceId: string): Promise<TelegramConfigEntity> {
-    const existing = await this.findByWorkspaceId(workspaceId);
+    return this.transact(workspaceId, async (repository) => {
+      const existing = await repository.findOne({
+        where: { workspaceId },
+        withDeleted: true,
+        lock: { mode: 'pessimistic_write' },
+      });
 
-    if (!isDefined(existing)) {
-      throw new NotFoundException('Telegram is not configured');
-    }
+      if (!isDefined(existing) || isDefined(existing.deletedAt)) {
+        throw new NotFoundException('Telegram is not configured');
+      }
 
-    return this.telegramConfigRepository.softRemove(existing);
+      return repository.softRemove(existing);
+    });
+  }
+
+  private async transact<TResult>(
+    workspaceId: string,
+    change: (repository: Repository<TelegramConfigEntity>) => Promise<TResult>,
+  ): Promise<TResult> {
+    return this.telegramConfigRepository.manager.transaction(
+      async (manager) => {
+        // Share reminder-claim serialization so replacing or disabling a bot cannot race a committed claim.
+        await manager.query(
+          'SELECT pg_advisory_xact_lock(hashtextextended($1,0))',
+          [`delivery:${workspaceId}`],
+        );
+        return change(manager.getRepository(TelegramConfigEntity));
+      },
+    );
   }
 
   decryptBotToken(config: TelegramConfigEntity): PlaintextString {

@@ -11,6 +11,7 @@ import { UpgradeCommandRegistryService } from 'src/engine/core-modules/upgrade/s
 import { UpgradeMigrationService } from 'src/engine/core-modules/upgrade/services/upgrade-migration.service';
 import { UpgradeSequenceReaderService } from 'src/engine/core-modules/upgrade/services/upgrade-sequence-reader.service';
 import { UpgradeStatusService } from 'src/engine/core-modules/upgrade/services/upgrade-status.service';
+import { type UpgradeMigrationStatus } from 'src/engine/core-modules/upgrade/upgrade-migration.entity';
 import { WorkspaceVersionService } from 'src/engine/workspace-manager/workspace-version/services/workspace-version.service';
 
 type RunInstanceCommandsOptions = {
@@ -157,7 +158,13 @@ export class RunInstanceCommandsCommand extends CommandRunner {
         workspaceIds: activeOrSuspendedWorkspaceIds,
       });
 
-    if (!allAtPreviousVersion) {
+    if (
+      !allAtPreviousVersion &&
+      !(await this.hasSupportedInitializationBaseline(
+        activeOrSuspendedWorkspaceIds,
+        lastWorkspaceCommand.name,
+      ))
+    ) {
       throw new Error(
         'Unable to run instance commands. Some workspace(s) have not completed ' +
           `the last workspace command for ${previousVersion} ("${lastWorkspaceCommand.name}").\n` +
@@ -165,6 +172,64 @@ export class RunInstanceCommandsCommand extends CommandRunner {
           'Use --force to bypass this check (not recommended).',
       );
     }
+  }
+
+  private async hasSupportedInitializationBaseline(
+    workspaceIds: string[],
+    previousLastCommandName: string,
+  ): Promise<boolean> {
+    const sequence = this.upgradeSequenceReaderService.getUpgradeSequence();
+    const previousCursor = sequence.findIndex(
+      (step) =>
+        step.kind === 'workspace' && step.name === previousLastCommandName,
+    );
+
+    if (previousCursor < 0) return false;
+
+    // New workspaces inherit a registered initialization baseline, rather than replaying earlier workspace commands.
+    // Only the latest attempt of that actual initial cursor can prove this; ordinary later instance rows cannot.
+    const evidence = await this.dataSource.query<
+      {
+        workspaceId: string;
+        name: string;
+        status: UpgradeMigrationStatus;
+        isInitial: boolean;
+      }[]
+    >(
+      `WITH latest_initial AS (
+        SELECT DISTINCT ON ("workspaceId") "workspaceId",name
+        FROM core."upgradeMigration"
+        WHERE "workspaceId"=ANY($1::uuid[]) AND "isInitial"=true
+        ORDER BY "workspaceId","createdAt" DESC,id DESC
+      )
+      SELECT migration."workspaceId",migration.name,migration.status,migration."isInitial"
+      FROM core."upgradeMigration" migration
+      WHERE migration."workspaceId"=ANY($1::uuid[])
+        AND (migration.name=$2 OR EXISTS (
+          SELECT 1 FROM latest_initial initial
+          WHERE initial."workspaceId"=migration."workspaceId" AND initial.name=migration.name
+        ))
+        AND migration.attempt=(
+          SELECT MAX(attempt) FROM core."upgradeMigration" latest
+          WHERE latest."workspaceId"=migration."workspaceId" AND latest.name=migration.name
+        )`,
+      [workspaceIds, previousLastCommandName],
+    );
+
+    return workspaceIds.every((workspaceId) => {
+      const rows = evidence.filter((row) => row.workspaceId === workspaceId);
+      const previous = rows.find((row) => row.name === previousLastCommandName);
+
+      if (previous) return previous.status === 'completed';
+
+      return rows.some(
+        (row) =>
+          row.isInitial &&
+          row.status === 'completed' &&
+          sequence.findIndex((step) => step.name === row.name) >=
+            previousCursor,
+      );
+    });
   }
 
   private async runLegacyPendingTypeOrmMigrations(): Promise<void> {

@@ -52,7 +52,11 @@ export const DeliveryInboxForm = ({
             })
           ) {
             draft.markSaved();
-            setNotice(t`Saved inside OS. Nothing was sent to the client.`);
+            setNotice(
+              draft.values.kind === 'INBOUND_NOTE'
+                ? t`Incoming note saved. Nothing was sent to the client.`
+                : t`Reply draft saved. Nothing was sent to the client.`,
+            );
           }
         } finally {
           draft.setSaving(false);
@@ -66,14 +70,14 @@ export const DeliveryInboxForm = ({
         <fieldset disabled={draft.saving}>
           <StyledDeliveryStack>
             <label>
-              <Trans>Entry type</Trans>
+              <Trans>What to save</Trans>
               <select
                 value={draft.values.kind}
                 onChange={(event) => update('kind', event.target.value)}
               >
                 <option value="DRAFT">{t`Reply draft — not sent`}</option>
                 {admin && (
-                  <option value="INBOUND_NOTE">{t`Record an inbound note manually`}</option>
+                  <option value="INBOUND_NOTE">{t`Incoming message note`}</option>
                 )}
               </select>
             </label>
@@ -98,7 +102,9 @@ export const DeliveryInboxForm = ({
             <StyledDeliveryButton
               disabled={draft.saving || draft.stale || !draft.dirty}
             >
-              <Trans>Save inside OS</Trans>
+              {draft.values.kind === 'INBOUND_NOTE'
+                ? t`Save incoming note`
+                : t`Save reply draft`}
             </StyledDeliveryButton>
           </StyledDeliveryStack>
         </fieldset>

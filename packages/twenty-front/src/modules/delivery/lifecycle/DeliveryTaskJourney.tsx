@@ -8,8 +8,9 @@ import {
 } from '@/delivery/deliveryStyles';
 import {
   type DeliveryTask,
-  type DeliveryWorkspace,
+  type DeliveryTaskContext,
 } from '@/delivery/delivery.types';
+import { type TaskReviewSnapshot } from '@/delivery/reviews/review.types';
 
 const StyledSteps = styled.ol`
   display: grid;
@@ -34,13 +35,15 @@ const StyledSteps = styled.ol`
 `;
 type DeliveryTaskJourneyProps = {
   task: DeliveryTask;
-  workspace: DeliveryWorkspace;
+  workspace: Pick<DeliveryTaskContext, 'actor' | 'members'>;
   onOpenPanel: (panel: 'task' | 'creative' | 'operations') => void;
+  review?: TaskReviewSnapshot | null;
 };
 export const DeliveryTaskJourney = ({
   task,
   workspace,
   onOpenPanel,
+  review,
 }: DeliveryTaskJourneyProps) => {
   const { t } = useLingui();
   const { details, delivery } = task;
@@ -62,17 +65,36 @@ export const DeliveryTaskJourney = ({
           : details.state === 'PLANNED' || briefNeedsApproval
             ? 0
             : 1;
-  const ownerId =
-    currentStage < 2 && !briefNeedsApproval
+  const verifiedPending =
+    review &&
+    review.taskId === task.id &&
+    review.taskRevision >= task.revision &&
+    review.pending?.submissionVersion === latest?.version
+      ? review.pending
+      : null;
+  const currentReview = review === undefined ? task.review : verifiedPending;
+  const hasCurrentReview =
+    details.state === 'IN_REVIEW' &&
+    (review !== undefined || Boolean(task.review));
+  const ownerId = hasCurrentReview
+    ? currentReview?.effectiveReviewerId
+    : currentStage < 2 && !briefNeedsApproval
       ? task.assigneeId
       : details.reviewerId;
   const owner =
-    workspace.members.find((member) => member.id === ownerId)?.name ??
-    t`Unassigned or former teammate`;
+    details.state === 'IN_REVIEW' && review !== undefined
+      ? (verifiedPending?.effectiveReviewerName ?? t`Review owner unverified`)
+      : (workspace.members.find((member) => member.id === ownerId)?.name ??
+        t`Unassigned or former teammate`);
   const canConfirm =
     workspace.actor.isManager && workspace.actor.memberId !== task.assigneeId;
-  const canReview =
-    canConfirm && workspace.actor.memberId === details.reviewerId;
+  const canReview = hasCurrentReview
+    ? currentReview?.reviewerState === 'ACTIVE' &&
+      currentReview.submissionVersion === latest?.version &&
+      currentReview.effectiveReviewerId === workspace.actor.memberId &&
+      (review === undefined || review?.canReviewSubmission === true) &&
+      workspace.actor.memberId !== task.assigneeId
+    : canConfirm && workspace.actor.memberId === details.reviewerId;
   const panel =
     currentStage >= 3
       ? 'operations'

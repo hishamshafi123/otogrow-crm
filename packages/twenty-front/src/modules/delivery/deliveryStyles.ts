@@ -49,7 +49,7 @@ export const StyledDeliveryCanvas = styled.div`
   input:focus-visible,
   select:focus-visible,
   textarea:focus-visible {
-    outline: 3px solid ${themeCssVariables.color.blue8};
+    outline: 3px solid ${themeCssVariables.color.blue11};
     outline-offset: 3px;
   }
   summary {
@@ -57,7 +57,7 @@ export const StyledDeliveryCanvas = styled.div`
     min-height: 24px;
   }
   summary:focus-visible {
-    outline: 3px solid ${themeCssVariables.color.blue8};
+    outline: 3px solid ${themeCssVariables.color.blue11};
     outline-offset: 3px;
   }
   details[open] > summary {
@@ -126,7 +126,7 @@ export const StyledDeliveryRow = styled.div`
 export const StyledDeliveryGrid = styled.div`
   display: grid;
   gap: 16px;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
 `;
 export const StyledDeliveryCard = styled.section`
   background: ${themeCssVariables.background.primary};

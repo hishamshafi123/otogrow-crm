@@ -104,7 +104,7 @@ const HandoffDirectory = ({ workspace, onCreated }: HandoffDirectoryProps) => {
         await query.refetch();
       } catch {
         setNotice(
-          t`Client setup was created. Refresh the page to load the engagement and its setup tasks.`,
+          t`Client setup was created. Refresh the page to load the service plan and its setup tasks.`,
         );
       }
       return true;
@@ -228,12 +228,12 @@ const HandoffDirectory = ({ workspace, onCreated }: HandoffDirectoryProps) => {
                             onClick={() =>
                               void onCreated(existing.engagementId).catch(() =>
                                 setNotice(
-                                  t`The client engagement could not be loaded. Refresh and try again.`,
+                                  t`The client service plan could not be loaded. Refresh and try again.`,
                                 ),
                               )
                             }
                           >
-                            <Trans>Open client engagement</Trans>
+                            <Trans>Open client service plan</Trans>
                           </StyledDeliveryButton>
                           {existing.setupTaskIds.map((taskId, index) => {
                             const task = workspace.tasks.find(

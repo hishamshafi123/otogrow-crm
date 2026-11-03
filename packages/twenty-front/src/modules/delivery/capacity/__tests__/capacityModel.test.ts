@@ -126,3 +126,37 @@ it('uses seven calendar dates across month and year boundaries and rejects impos
   expect(capacityDates('no date')).toEqual([]);
 });
 export { makeTask };
+
+it('moves only pending review load to the submission-scoped backup and leaves planned work with the primary', () => {
+  const pending: DeliveryTask = {
+    ...makeTask({ state: 'IN_REVIEW' }),
+    review: {
+      submissionVersion: 2,
+      primaryReviewerId: 'reviewer',
+      effectiveReviewerId: 'backup',
+      assignmentRevision: 1,
+      assignmentMode: 'BACKUP',
+      reviewerState: 'ACTIVE',
+    },
+  };
+  expect(capacityLoads([pending], 'reviewer')).toEqual([]);
+  expect(capacityLoads([pending], 'backup')).toMatchObject([
+    { kind: 'REVIEW', workMinutes: 20 },
+  ]);
+  expect(
+    capacityLoads(
+      [{ ...pending, details: { ...pending.details, state: 'PLANNED' } }],
+      'reviewer',
+    ),
+  ).toMatchObject([{ kind: 'REVIEW' }]);
+  const unavailable = {
+    ...pending,
+    review: {
+      ...pending.review!,
+      effectiveReviewerId: null,
+      reviewerState: 'UNAVAILABLE',
+    },
+  };
+  expect(capacityLoads([unavailable], 'reviewer')).toEqual([]);
+  expect(capacityLoads([unavailable], 'backup')).toEqual([]);
+});

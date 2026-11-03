@@ -2,16 +2,19 @@ import { useState } from 'react';
 import {
   useDeliveryDraftGuard,
   useDeliveryDraftStatus,
+  type DeliveryDraftNavigationRetention,
 } from '@/delivery/drafts/DeliveryDraftGuard';
 
 export const useDeliveryDraft = <TValues>({
   initialValues,
   revision,
   busy,
+  retainsNavigation,
 }: {
   initialValues: TValues;
   revision: number;
   busy: boolean;
+  retainsNavigation?: DeliveryDraftNavigationRetention;
 }) => {
   const signature = JSON.stringify(initialValues);
   const [state, setState] = useState({
@@ -36,7 +39,7 @@ export const useDeliveryDraft = <TValues>({
       revision,
     });
   }
-  useDeliveryDraftStatus({ dirty, saving: busy || saving });
+  useDeliveryDraftStatus({ dirty, saving: busy || saving, retainsNavigation });
   return {
     values: state.values,
     revision: state.revision,

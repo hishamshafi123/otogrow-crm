@@ -1,7 +1,7 @@
 import { DeliveryReceivableBalance } from '@/delivery/finance/DeliveryReceivableBalance';
 import { financePaymentDestination } from '@/delivery/finance/finance-payment-destination';
 import { useReconciliationLabels } from '@/delivery/finance/useReconciliationLabels';
-import { DeliveryReadiness } from '@/delivery/readiness/DeliveryReadiness';
+import { useBusinessRecordLabels } from '@/delivery/useBusinessRecordLabels';
 import { DeliveryRevisionCosts } from '@/delivery/revisions/DeliveryRevisionCosts';
 import {
   ConversationPermissions,
@@ -18,8 +18,8 @@ import { DeliveryInboxForm } from '@/delivery/DeliveryInboxForm';
 import { useDeliveryDraftGuard } from '@/delivery/drafts/DeliveryDraftGuard';
 import { DeliveryMeta } from '@/delivery/DeliveryMeta';
 import { type DeliveryAgentsSnapshot } from '@/delivery/delivery-agent.types';
-import { useState, type FormEvent } from 'react';
-import { Link } from 'react-router-dom';
+import { useCallback, useState, type FormEvent } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { styled } from '@linaria/react';
 import { gql } from '@apollo/client';
 import { useMutation, useQuery } from '@apollo/client/react';
@@ -67,7 +67,6 @@ const VIEW_KINDS: Record<string, BusinessKind[]> = {
   content: ['CONTENT'],
   competitors: ['COMPETITOR'],
   development: ['RELEASE'],
-  health: [],
 };
 const formatMoney = (amount: number, currency: string) =>
   new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(
@@ -85,9 +84,10 @@ type DeliveryBusinessProps = {
 };
 export const DeliveryBusiness = (props: DeliveryBusinessProps) => {
   const permission = useWorkflowAccess();
+  const [params] = useSearchParams();
   return (
     <BusinessWorkspace
-      key={permission.scope}
+      key={`${permission.scope}:${params.get('businessRecord') ?? ''}`}
       workspace={props.workspace}
       view={props.view}
       onChanged={props.onChanged}
@@ -106,19 +106,28 @@ const BusinessWorkspace = ({
   permission: ReturnType<typeof useWorkflowAccess>;
 }) => {
   const { t } = useLingui();
+  const recordLabels = useBusinessRecordLabels();
   const query = useQuery<{ deliveryBusiness: BusinessSnapshot }>(GET_BUSINESS, {
     fetchPolicy: 'no-cache',
     skip: !permission.ready,
     pollInterval: 30000,
   });
   const { requestAction } = useDeliveryDraftGuard();
+  const [params, setParams] = useSearchParams();
   const [mutate, mutation] = useMutation(CHANGE_BUSINESS);
   const [error, setError] = useState('');
   const [editing, setEditing] = useState<{
     kind: BusinessKind;
     record?: BusinessRecord;
   } | null>(null);
-  const [selected, setSelected] = useState('');
+  const selected = params.get('businessRecord') ?? '';
+  const selectRecord = (id: string) =>
+    requestAction(() => {
+      const next = new URLSearchParams(params);
+      if (id) next.set('businessRecord', id);
+      else next.delete('businessRecord');
+      setParams(next);
+    });
   const candidate = query.data?.deliveryBusiness;
   const available = !query.error && permission.matches(candidate);
   const [lastVerifiedData, setLastVerifiedData] = useState<BusinessSnapshot>();
@@ -198,7 +207,11 @@ const BusinessWorkspace = ({
   const records = (data?.records ?? []).filter((record) =>
     VIEW_KINDS[view]?.includes(record.kind),
   );
+  const emptyKind = VIEW_KINDS[view]?.[0];
   const item = records.find((record) => record.id === selected);
+  const focusRecord = useCallback((element: HTMLDivElement | null) => {
+    element?.focus();
+  }, []);
   const canDraft =
     item?.kind === 'CONVERSATION' &&
     data?.conversationAccess?.[item.id]?.draft === true;
@@ -298,12 +311,12 @@ const BusinessWorkspace = ({
                           requestAction(() => setEditing({ kind }))
                         }
                       >
-                        {t`New`} {labels[kind]}
+                        {recordLabels.create[kind]}
                       </StyledDeliveryButton>
                     ))}
                   {view === 'finance' && canReadFinance && (
                     <StyledDeliveryButton onClick={exportFinance}>
-                      <Trans>Export CSV</Trans>
+                      <Trans>Download financial CSV</Trans>
                     </StyledDeliveryButton>
                   )}
                 </StyledDeliveryRow>
@@ -327,6 +340,169 @@ const BusinessWorkspace = ({
                   </Trans>
                 </p>
               )}
+              {item && (
+                <StyledDeliveryCard
+                  role="region"
+                  aria-label={t`${labels[item.kind]}: ${item.title}`}
+                  tabIndex={-1}
+                  ref={focusRecord}
+                >
+                  <StyledDeliveryStack>
+                    <StyledDeliveryRow>
+                      <h2>{item.title}</h2>
+                      <StyledDeliveryButton onClick={() => selectRecord('')}>
+                        <Trans>Close details</Trans>
+                      </StyledDeliveryButton>
+                    </StyledDeliveryRow>
+                    <p>
+                      {statusLabel(item)} · {t`Version`} {item.revision}
+                    </p>
+                    {item.kind === 'AD_REPORT' && (
+                      <AdvertisingRecordEvidence
+                        record={item}
+                        insight={data?.advertising?.find(
+                          (insight) => insight.id === item.id,
+                        )}
+                      />
+                    )}
+                    {item.kind === 'FINANCE' &&
+                      item.category === 'RECEIVABLE' &&
+                      item.status !== 'VOID' && (
+                        <DeliveryReceivableBalance
+                          balance={receivableBalances.get(item.id)}
+                          currency={String(item.currency)}
+                        />
+                      )}
+                    {item.kind === 'CONVERSATION' ? (
+                      <>
+                        <StyledDeliveryButton
+                          disabled={mutation.loading}
+                          onClick={() =>
+                            void run({ action: 'seen', id: item.id })
+                          }
+                        >
+                          <Trans>Mark seen</Trans>
+                        </StyledDeliveryButton>
+                        {data?.inbox
+                          .filter((entry) => entry.conversationId === item.id)
+                          .map((entry) => (
+                            <div key={entry.id}>
+                              <small>
+                                {entry.kind === 'DRAFT'
+                                  ? t`Unsent draft`
+                                  : t`Manually recorded inbound note`}{' '}
+                                · {new Date(entry.createdAt).toLocaleString()}
+                              </small>
+                              <p
+                                style={{
+                                  whiteSpace: 'pre-wrap',
+                                  overflowWrap: 'anywhere',
+                                }}
+                              >
+                                {entry.text}
+                              </p>
+                              {entry.sourceIds.length > 0 && (
+                                <small>
+                                  <Trans>AI source notes</Trans>:{' '}
+                                  {entry.sourceIds
+                                    .map(
+                                      (id) =>
+                                        data.inbox
+                                          .find((source) => source.id === id)
+                                          ?.text.slice(0, 80) ??
+                                        t`Source unavailable`,
+                                    )
+                                    .join(' · ')}
+                                </small>
+                              )}
+                            </div>
+                          ))}
+                        {canDraft ? (
+                          <>
+                            {' '}
+                            <InboxAgentForm
+                              key={`agent-${item.id}`}
+                              record={item}
+                              sources={(data?.inbox ?? []).filter(
+                                (entry) =>
+                                  entry.conversationId === item.id &&
+                                  entry.kind === 'INBOUND_NOTE',
+                              )}
+                              busy={mutation.loading}
+                              run={run}
+                            />
+                            <DeliveryInboxForm
+                              key={item.id}
+                              initialText={
+                                (data?.inbox ?? [])
+                                  .filter(
+                                    (entry) =>
+                                      entry.conversationId === item.id &&
+                                      entry.kind === 'DRAFT',
+                                  )
+                                  .slice(-1)[0]?.text ?? ''
+                              }
+                              record={item}
+                              admin={workspace.actor.isAdmin}
+                              busy={mutation.loading}
+                              run={run}
+                            />
+                          </>
+                        ) : (
+                          <p>
+                            <Trans>
+                              You have view-only access to this conversation.
+                            </Trans>
+                          </p>
+                        )}
+                      </>
+                    ) : (
+                      <RecordActions
+                        key={item.id}
+                        record={item}
+                        receivableBalance={receivableBalances.get(item.id)}
+                        canManageFinance={canManageFinance}
+                        workspace={workspace}
+                        busy={mutation.loading}
+                        run={run}
+                      />
+                    )}
+                    {(item.kind === 'CONVERSATION'
+                      ? workspace.actor.isAdmin
+                      : item.kind !== 'FINANCE' &&
+                        ['DRAFT', 'CHANGES_REQUESTED'].includes(
+                          item.status,
+                        )) && (
+                      <StyledDeliveryButton
+                        disabled={editing !== null}
+                        onClick={() =>
+                          requestAction(() =>
+                            setEditing({ kind: item.kind, record: item }),
+                          )
+                        }
+                      >
+                        <Trans>Edit</Trans>
+                      </StyledDeliveryButton>
+                    )}
+                    {item.taskId && (
+                      <StyledDeliveryButton
+                        onClick={() => onOpenTask(item.taskId!)}
+                      >
+                        <Trans>Open assigned task</Trans>
+                      </StyledDeliveryButton>
+                    )}
+                    <details>
+                      <summary>{t`Audit history`}</summary>
+                      {item.history.map((event, index) => (
+                        <p key={index}>
+                          {new Date(event.at).toLocaleString()} ·{' '}
+                          {labels[event.action] ?? event.action} · {event.note}
+                        </p>
+                      ))}
+                    </details>
+                  </StyledDeliveryStack>
+                </StyledDeliveryCard>
+              )}
               {view === 'ads' && (
                 <p>
                   <Trans>
@@ -339,14 +515,41 @@ const BusinessWorkspace = ({
               {view === 'finance' && !canManageFinance && (
                 <p>{t`You have view-only finance access. You can inspect reports and export entries.`}</p>
               )}
+              {view === 'finance' && canReadFinance && (
+                <p>
+                  <Trans>
+                    Raw records include receivables, opening balances and voided
+                    entries. For a reviewed accountant CSV, use
+                  </Trans>{' '}
+                  <Link to="/delivery?view=finance&financeView=exports">
+                    <Trans>Accounting exports</Trans>
+                  </Link>
+                  .
+                </p>
+              )}
               {view === 'finance' && (
                 <p>
                   <Trans>
-                    Cash basis, separated by currency. Record opening cash,
-                    receipts, expenses and allocated salary costs. Receivables
-                    are excluded from cash until payment is confirmed.
-                    Advertising-platform spend stays separate from agency
-                    expenses.
+                    Historical estimates use only entered cash records, by
+                    currency. Missing opening balances, receipts, expenses or
+                    salary make them incomplete; they do not confirm available
+                    cash. Unpaid receivables and advertising-platform spend are
+                    excluded from agency cash.
+                  </Trans>
+                </p>
+              )}
+              {view === 'finance' && (
+                <p>
+                  <Trans>
+                    Date cutoffs use UTC and trailing 30-day comparisons,
+                    independently of the forecast's reviewed balance and
+                    reporting calendar.
+                  </Trans>{' '}
+                  <Link to="/delivery?view=finance&financeView=forecast">
+                    <Trans>Open reviewed cash forecast</Trans>
+                  </Link>{' '}
+                  <Trans>
+                    to confirm starting cash and review dated expectations.
                   </Trans>
                 </p>
               )}
@@ -379,15 +582,24 @@ const BusinessWorkspace = ({
             data?.finance.map((summary) => (
               <StyledDeliveryCard key={summary.currency}>
                 <StyledDeliveryStack>
-                  <h3>{summary.currency}</h3>
+                  <h3>
+                    {summary.currency} ·{' '}
+                    <Trans>Historical cash estimates</Trans>
+                  </h3>
                   <StyledDeliveryGrid>
                     {[
-                      [t`Cash`, summary.cash],
-                      [t`Receivables`, summary.receivables],
-                      [t`Overdue`, summary.overdue],
-                      [t`Receipts · last 30 days`, summary.income30],
-                      [t`Costs · last 30 days`, summary.expense30],
-                      [t`Net cash burn · last 30 days`, summary.netBurn],
+                      [t`Historical recorded balance`, summary.cash],
+                      [t`Recorded receivables`, summary.receivables],
+                      [t`Recorded overdue amount`, summary.overdue],
+                      [
+                        t`Recorded receipts · trailing 30 days`,
+                        summary.income30,
+                      ],
+                      [t`Recorded costs · trailing 30 days`, summary.expense30],
+                      [
+                        t`Estimated net burn · trailing 30 days`,
+                        summary.netBurn,
+                      ],
                     ].map(([label, amount]) => (
                       <div key={String(label)}>
                         <small>{label}</small>
@@ -396,17 +608,17 @@ const BusinessWorkspace = ({
                     ))}
                   </StyledDeliveryGrid>
                   <p>
-                    <Trans>Runway</Trans>:{' '}
+                    <Trans>Historical runway estimate</Trans>:{' '}
                     {summary.runwayMonths === null
-                      ? t`No net cash burn in this period`
-                      : t`${summary.runwayMonths.toFixed(1)} months`}
+                      ? t`Not estimated: no recorded net burn in the trailing 30 days`
+                      : t`${summary.runwayMonths.toFixed(1)} months (30-day burn basis)`}
                   </p>
                   <p>
-                    <Trans>Receipts growth</Trans>:{' '}
+                    <Trans>Recorded receipts change · 30-day comparison</Trans>:{' '}
                     {summary.revenueGrowth === null
                       ? '—'
                       : `${(summary.revenueGrowth * 100).toFixed(1)}%`}{' '}
-                    · <Trans>Spending growth</Trans>:{' '}
+                    · <Trans>Recorded costs change · 30-day comparison</Trans>:{' '}
                     {summary.spendingGrowth === null
                       ? '—'
                       : `${(summary.spendingGrowth * 100).toFixed(1)}%`}
@@ -422,12 +634,12 @@ const BusinessWorkspace = ({
                         )?.name ?? t`Shared / unallocated`}
                       </strong>
                       <p>
-                        {t`Cash contribution`}:{' '}
+                        {t`Recorded cash contribution · trailing 30 days`}:{' '}
                         {formatMoney(
                           project.cashContribution,
                           summary.currency,
                         )}{' '}
-                        · {t`Cash contribution margin`}:{' '}
+                        · {t`Recorded cash contribution margin`}:{' '}
                         {project.margin === null
                           ? '—'
                           : `${(project.margin * 100).toFixed(1)}%`}
@@ -437,46 +649,6 @@ const BusinessWorkspace = ({
                 </StyledDeliveryStack>
               </StyledDeliveryCard>
             ))}
-          {view === 'health' && (
-            <>
-              <StyledDeliveryGrid>
-                {[
-                  [
-                    t`Late work`,
-                    workspace.tasks.filter(
-                      (task) =>
-                        task.dueAt !== null &&
-                        Date.parse(task.dueAt) < Date.now() &&
-                        task.details.state !== 'APPROVED',
-                    ).length,
-                  ],
-                  [
-                    t`Blocked work`,
-                    workspace.tasks.filter(
-                      (task) => task.details.state === 'BLOCKED',
-                    ).length,
-                  ],
-                  [
-                    t`Work awaiting review`,
-                    workspace.tasks.filter(
-                      (task) => task.details.state === 'IN_REVIEW',
-                    ).length,
-                  ],
-                  [
-                    t`Business reviews`,
-                    data?.records.filter((record) => record.status === 'REVIEW')
-                      .length ?? 0,
-                  ],
-                ].map(([label, count]) => (
-                  <StyledDeliveryCard key={String(label)}>
-                    <small>{label}</small>
-                    <h2>{count}</h2>
-                  </StyledDeliveryCard>
-                ))}
-              </StyledDeliveryGrid>
-              <DeliveryReadiness />
-            </>
-          )}
           {editing &&
             (editing.kind !== 'FINANCE' || !available || canManageFinance) && (
               <BusinessForm
@@ -537,35 +709,12 @@ const BusinessWorkspace = ({
                       ?.name ?? t`Company-wide`}
                   </small>
                   {record.kind === 'AD_REPORT' && (
-                    <>
-                      <p>
-                        {formatMoney(
-                          Number(record.spend),
-                          String(record.currency),
-                        )}{' '}
-                        · {t`Ad-attributed revenue`}:{' '}
-                        {formatMoney(
-                          Number(record.attributedRevenue),
-                          String(record.currency),
-                        )}
-                      </p>
-                      <p>
-                        {t`Shopify observed revenue`}:{' '}
-                        {record.shopifyRevenue === null
-                          ? t`Not supplied`
-                          : formatMoney(
-                              Number(record.shopifyRevenue),
-                              String(record.currency),
-                            )}
-                      </p>
-                      <AdvertisingMetrics
-                        insight={data?.advertising?.find(
-                          (insight) => insight.id === record.id,
-                        )}
-                        currency={String(record.currency)}
-                      />
-                      <p>{String(record.recommendation)}</p>
-                    </>
+                    <AdvertisingRecordEvidence
+                      record={record}
+                      insight={data?.advertising?.find(
+                        (insight) => insight.id === record.id,
+                      )}
+                    />
                   )}
                   {['FINANCE', 'BUDGET'].includes(record.kind) && (
                     <h3>
@@ -597,7 +746,7 @@ const BusinessWorkspace = ({
                     <small>
                       {record.private
                         ? t`Private to owner`
-                        : t`Explicit staff access`}{' '}
+                        : t`Restricted team access`}{' '}
                       ·{' '}
                       {data?.inbox.filter(
                         (entry) =>
@@ -607,177 +756,35 @@ const BusinessWorkspace = ({
                       {t`unread entries`}
                     </small>
                   )}
-                  <StyledDeliveryButton
-                    onClick={() => requestAction(() => setSelected(record.id))}
-                  >
+                  <StyledDeliveryButton onClick={() => selectRecord(record.id)}>
                     <Trans>Open details</Trans>
                   </StyledDeliveryButton>
                 </StyledDeliveryStack>
               </StyledDeliveryCard>
             ))}
           </StyledDeliveryGrid>
-          {view !== 'health' && !records.length && (
+          {!records.length && (
             <p>
               {view === 'ads' ? (
                 <Trans>No manual reports or budget requests yet.</Trans>
-              ) : view === 'finance' ? (
-                <Trans>
-                  No financial entries yet. Add an opening balance, receipt,
-                  expense or receivable.
-                </Trans>
+              ) : emptyKind ? (
+                recordLabels.empty[emptyKind]
               ) : (
-                <Trans>
-                  No records yet. Add the first item to start this workflow.
-                </Trans>
+                t`No work items in this view.`
               )}
             </p>
           )}
-          {item && (
+          {selected && !item && (
             <StyledDeliveryCard>
-              <StyledDeliveryStack>
-                <StyledDeliveryRow>
-                  <h2>{item.title}</h2>
-                  <StyledDeliveryButton
-                    onClick={() => requestAction(() => setSelected(''))}
-                  >
-                    <Trans>Close details</Trans>
-                  </StyledDeliveryButton>
-                </StyledDeliveryRow>
-                <p>
-                  {statusLabel(item)} · {t`Version`} {item.revision}
-                </p>
-                {item.kind === 'FINANCE' &&
-                  item.category === 'RECEIVABLE' &&
-                  item.status !== 'VOID' && (
-                    <DeliveryReceivableBalance
-                      balance={receivableBalances.get(item.id)}
-                      currency={String(item.currency)}
-                    />
-                  )}
-                {item.kind === 'CONVERSATION' ? (
-                  <>
-                    <StyledDeliveryButton
-                      disabled={mutation.loading}
-                      onClick={() => void run({ action: 'seen', id: item.id })}
-                    >
-                      <Trans>Mark seen</Trans>
-                    </StyledDeliveryButton>
-                    {data?.inbox
-                      .filter((entry) => entry.conversationId === item.id)
-                      .map((entry) => (
-                        <div key={entry.id}>
-                          <small>
-                            {entry.kind === 'DRAFT'
-                              ? t`Unsent draft`
-                              : t`Manually recorded inbound note`}{' '}
-                            · {new Date(entry.createdAt).toLocaleString()}
-                          </small>
-                          <p
-                            style={{
-                              whiteSpace: 'pre-wrap',
-                              overflowWrap: 'anywhere',
-                            }}
-                          >
-                            {entry.text}
-                          </p>
-                          {entry.sourceIds.length > 0 && (
-                            <small>
-                              <Trans>AI source notes</Trans>:{' '}
-                              {entry.sourceIds
-                                .map(
-                                  (id) =>
-                                    data.inbox
-                                      .find((source) => source.id === id)
-                                      ?.text.slice(0, 80) ??
-                                    t`Source unavailable`,
-                                )
-                                .join(' · ')}
-                            </small>
-                          )}
-                        </div>
-                      ))}
-                    {canDraft ? (
-                      <>
-                        {' '}
-                        <InboxAgentForm
-                          key={`agent-${item.id}`}
-                          record={item}
-                          sources={(data?.inbox ?? []).filter(
-                            (entry) =>
-                              entry.conversationId === item.id &&
-                              entry.kind === 'INBOUND_NOTE',
-                          )}
-                          busy={mutation.loading}
-                          run={run}
-                        />
-                        <DeliveryInboxForm
-                          key={item.id}
-                          initialText={
-                            (data?.inbox ?? [])
-                              .filter(
-                                (entry) =>
-                                  entry.conversationId === item.id &&
-                                  entry.kind === 'DRAFT',
-                              )
-                              .slice(-1)[0]?.text ?? ''
-                          }
-                          record={item}
-                          admin={workspace.actor.isAdmin}
-                          busy={mutation.loading}
-                          run={run}
-                        />
-                      </>
-                    ) : (
-                      <p>
-                        <Trans>
-                          You have view-only access to this conversation.
-                        </Trans>
-                      </p>
-                    )}
-                  </>
-                ) : (
-                  <RecordActions
-                    key={item.id}
-                    record={item}
-                    receivableBalance={receivableBalances.get(item.id)}
-                    canManageFinance={canManageFinance}
-                    workspace={workspace}
-                    busy={mutation.loading}
-                    run={run}
-                  />
-                )}
-                {(item.kind === 'CONVERSATION'
-                  ? workspace.actor.isAdmin
-                  : item.kind !== 'FINANCE' &&
-                    ['DRAFT', 'CHANGES_REQUESTED'].includes(item.status)) && (
-                  <StyledDeliveryButton
-                    disabled={editing !== null}
-                    onClick={() =>
-                      requestAction(() =>
-                        setEditing({ kind: item.kind, record: item }),
-                      )
-                    }
-                  >
-                    <Trans>Edit</Trans>
-                  </StyledDeliveryButton>
-                )}
-                {item.taskId && (
-                  <StyledDeliveryButton
-                    onClick={() => onOpenTask(item.taskId!)}
-                  >
-                    <Trans>Open assigned task</Trans>
-                  </StyledDeliveryButton>
-                )}
-                <details>
-                  <summary>{t`Audit history`}</summary>
-                  {item.history.map((event, index) => (
-                    <p key={index}>
-                      {new Date(event.at).toLocaleString()} ·{' '}
-                      {labels[event.action] ?? event.action} · {event.note}
-                    </p>
-                  ))}
-                </details>
-              </StyledDeliveryStack>
+              <p role="alert">
+                <Trans>
+                  This item is no longer available in this view or you do not
+                  have access to it.
+                </Trans>
+              </p>
+              <StyledDeliveryButton onClick={() => selectRecord('')}>
+                <Trans>Close unavailable item</Trans>
+              </StyledDeliveryButton>
             </StyledDeliveryCard>
           )}
         </StyledDeliveryStack>
@@ -1196,6 +1203,7 @@ const BusinessForm = ({
 }: BusinessFormProps) => {
   const { t } = useLingui();
   const reconciliationLabels = useReconciliationLabels();
+  const recordLabels = useBusinessRecordLabels();
   const financeCategoryLabels: Record<string, string> = {
     ...reconciliationLabels.categories,
     OPENING_BALANCE: t`Opening cash balance`,
@@ -1488,7 +1496,9 @@ const BusinessForm = ({
         )}
         <fieldset disabled={busy || saving}>
           <StyledDeliveryStack>
-            <h3>{initial ? t`Edit record` : t`New record`}</h3>
+            <h3>
+              {initial ? recordLabels.edit[kind] : recordLabels.create[kind]}
+            </h3>
             <label>
               <Trans>Title</Trans>
               <input
@@ -1696,7 +1706,7 @@ const BusinessForm = ({
                 type="submit"
                 data-primary="true"
               >
-                <Trans>Save record</Trans>
+                {recordLabels.save[kind]}
               </StyledDeliveryButton>
               <StyledDeliveryButton type="button" onClick={onCancel}>
                 <Trans>Cancel</Trans>
@@ -1713,6 +1723,38 @@ type AdvertisingMetricsProps = {
   insight?: AdvertisingInsight;
   currency: string;
 };
+type AdvertisingRecordEvidenceProps = {
+  record: BusinessRecord;
+  insight: AdvertisingInsight | undefined;
+};
+const AdvertisingRecordEvidence = ({
+  record,
+  insight,
+}: AdvertisingRecordEvidenceProps) => {
+  const { t } = useLingui();
+  return (
+    <>
+      <p>
+        {t`Recorded ad spend`}:{' '}
+        {formatMoney(Number(record.spend), String(record.currency))} ·{' '}
+        {t`Ad-attributed revenue`}:{' '}
+        {formatMoney(Number(record.attributedRevenue), String(record.currency))}
+      </p>
+      <p>
+        {t`Shopify observed revenue`}:{' '}
+        {record.shopifyRevenue === null
+          ? t`Not supplied`
+          : formatMoney(Number(record.shopifyRevenue), String(record.currency))}
+      </p>
+      <AdvertisingMetrics
+        insight={insight}
+        currency={String(record.currency)}
+      />
+      <p>{String(record.recommendation)}</p>
+    </>
+  );
+};
+
 const AdvertisingMetrics = ({ insight, currency }: AdvertisingMetricsProps) => {
   const { t } = useLingui();
   if (!insight) return null;

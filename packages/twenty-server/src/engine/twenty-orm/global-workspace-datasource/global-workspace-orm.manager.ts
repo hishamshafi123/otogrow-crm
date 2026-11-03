@@ -193,13 +193,14 @@ export class GlobalWorkspaceOrmManager {
     const resolvedAuthContext = authContext ?? getWorkspaceAuthContext();
     const context = options?.lite
       ? await this.loadLiteWorkspaceContext(resolvedAuthContext)
-      : await this.loadWorkspaceContext(resolvedAuthContext);
+      : await this.loadWorkspaceContext(resolvedAuthContext, options);
 
     return withWorkspaceContext(context, fn);
   }
 
   private async loadWorkspaceContext(
     authContext: WorkspaceAuthContext,
+    options?: ExecuteInWorkspaceContextOptions,
   ): Promise<ORMWorkspaceContext> {
     const workspaceId = authContext.workspace.id;
 
@@ -225,15 +226,15 @@ export class GlobalWorkspaceOrmManager {
       'flatRowLevelPermissionPredicateGroupMaps',
     ]);
 
-    const entityMetadatas = featureFlagsMap[
-      FeatureFlagKey.IS_ORM_V2_READ_PATH_ENABLED
-    ]
-      ? []
-      : (
-          await this.workspaceCacheService.getOrRecompute(workspaceId, [
-            'ORMEntityMetadatas',
-          ])
-        ).ORMEntityMetadatas;
+    const entityMetadatas =
+      options?.skipEntityMetadatas ||
+      featureFlagsMap[FeatureFlagKey.IS_ORM_V2_READ_PATH_ENABLED]
+        ? []
+        : (
+            await this.workspaceCacheService.getOrRecompute(workspaceId, [
+              'ORMEntityMetadatas',
+            ])
+          ).ORMEntityMetadatas;
 
     const { idByNameSingular: objectIdByNameSingular } =
       buildObjectIdByNameMaps(flatObjectMetadataMaps);

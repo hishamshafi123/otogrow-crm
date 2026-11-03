@@ -82,6 +82,7 @@ beforeEach(() => {
     members: [
       {
         memberId: 'founder',
+        projectMemberships: [],
         name: 'Founder',
         roleIds: [],
         revision: 0,
@@ -89,6 +90,7 @@ beforeEach(() => {
       },
       {
         memberId: 'amna',
+        projectMemberships: [{ id: 'project-alpha', name: 'Alpha client' }],
         name: 'Amna',
         roleIds: ['marketing'],
         revision: 1,
@@ -105,6 +107,28 @@ beforeEach(() => {
   mockRefetch.mockReset().mockImplementation(async () => ({
     data: { otogrowRoleDirectory: mockDirectory },
   }));
+});
+it('shows existing project scope for a conditional review role without implying a submission assignment', async () => {
+  mockDirectory.roles[0].capabilities = ['delivery.review'];
+  setup();
+  await userEvent.click(
+    screen.getByRole('button', { name: 'Edit roles for Amna' }),
+  );
+  const preview = within(
+    screen.getByRole('region', { name: 'Combined access preview' }),
+  );
+  expect(
+    preview.getByText('Review submissions assigned to you:').parentElement,
+  ).toHaveTextContent('Allowed');
+  expect(
+    preview.getByText('Plan and review all projects:').parentElement,
+  ).toHaveTextContent('Not granted');
+  const scope = screen.getByRole('region', {
+    name: 'Existing project review scope',
+  });
+  expect(scope).toHaveTextContent('Alpha client');
+  expect(scope).toHaveTextContent('saving a review role assigns no work');
+  expect(mockMutation).not.toHaveBeenCalled();
 });
 it('previews multiple-role access with its source and saves only after confirmation', async () => {
   setup();
@@ -206,7 +230,7 @@ it('shows native grants separately and does not imply phone access from administ
     screen.getByRole('button', { name: 'Edit roles for Amna' }),
   );
   expect(
-    screen.getByText(/CRM Administrator \(inherited from native CRM\)/),
+    screen.getByText(/CRM Administrator \(from CRM settings\)/),
   ).toBeInTheDocument();
   await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
   await userEvent.click(screen.getByRole('button', { name: 'Roles' }));
@@ -295,4 +319,13 @@ it('explains finance editing inheritance without granting phone or administratio
     preview.getByText('Administer Otogrow OS:').parentElement,
   ).toHaveTextContent('Not granted');
   expect(screen.getByText(/salary allocations/)).toBeInTheDocument();
+});
+it('uses a neutral permission label when the directory contains an unknown permission', () => {
+  Object.assign(mockDirectory.members[0].access, {
+    capabilities: ['future.permission'],
+  });
+  setup();
+  expect(screen.getByText('Permission name unavailable')).toBeVisible();
+  expect(screen.queryByText('future.permission')).not.toBeInTheDocument();
+  expect(mockMutation).not.toHaveBeenCalled();
 });

@@ -2,7 +2,10 @@ import { Trans, useLingui } from '@lingui/react/macro';
 import { Link } from 'react-router-dom';
 import { isValidUuid } from 'twenty-shared/utils';
 import { type DeliveryWorkspace } from '@/delivery/delivery.types';
-import { StyledDeliveryBadge } from '@/delivery/deliveryStyles';
+import {
+  StyledDeliveryBadge,
+  StyledDeliveryButton,
+} from '@/delivery/deliveryStyles';
 import {
   StyledActivityActions,
   StyledActivityChanges,
@@ -10,11 +13,18 @@ import {
 } from '@/otogrow-activity/activityStyles';
 import { type OtogrowActivityEvent } from '@/otogrow-activity/otogrow-activity.types';
 import { useActivityLabels } from '@/otogrow-activity/useActivityLabels';
+import { advertisingReportDestination } from '@/delivery/advertising/advertising-report-destination';
+import {
+  activityAnalysisClose,
+  activityAnalysisDestination,
+  activityCurrentTaskClose,
+} from '@/otogrow-activity/analysis/activity-analysis-navigation';
 
 type ActivityEventProps = {
   event: OtogrowActivityEvent;
-  workspace: DeliveryWorkspace;
+  workspace?: DeliveryWorkspace;
   params: URLSearchParams;
+  onOpenExact?: (id: string) => void;
 };
 
 export const formatActivityTime = (value: string) => {
@@ -28,23 +38,65 @@ export const ActivityEvent = ({
   event,
   workspace,
   params,
+  onOpenExact,
 }: ActivityEventProps) => {
   const { t } = useLingui();
   const { label, valueLabel } = useActivityLabels();
   const financeMonth = event.changes.find(
     (change) => change.field === 'financeMonth',
   )?.after;
-  const availableTask = workspace.tasks.some(
-    (task) => task.id === event.taskId,
-  );
-  const taskParams = new URLSearchParams(params);
+  const availableTask =
+    event.taskId != null &&
+    (isValidUuid(event.taskId) ||
+      workspace?.tasks.some((task) => task.id === event.taskId));
+  const taskParams = workspace
+    ? new URLSearchParams(params)
+    : new URLSearchParams({ view: 'planner' });
+  for (const parameter of [
+    'creativeSubmission',
+    'creativeAsset',
+    'creativeCompare',
+    'creativeFeedback',
+    'creativeFeedbackAfter',
+    'creativeFeedbackBefore',
+    'creativeSubmissionsBefore',
+  ])
+    taskParams.delete(parameter);
   if (event.taskId) taskParams.set('task', event.taskId);
   if (event.sourceType === 'creative') taskParams.set('panel', 'creative');
-  else if (event.sourceType === 'agent-run') taskParams.set('panel', 'agents');
+  else if (event.sourceType === 'creative-review') {
+    taskParams.set('panel', 'task');
+    taskParams.set('creativeFeedback', event.sourceId);
+    const submissionVersion = event.changes.find(
+      (change) => change.field === 'submissionVersion',
+    )?.after;
+    const assetId = event.changes.find(
+      (change) => change.field === 'assetId',
+    )?.after;
+    if (submissionVersion && /^[1-9]\d*$/.test(submissionVersion)) {
+      taskParams.set('creativeSubmission', submissionVersion);
+      taskParams.delete('creativeAsset');
+    } else if (assetId && isValidUuid(assetId)) {
+      taskParams.set('panel', 'creative');
+      taskParams.set('creativeAsset', assetId);
+      taskParams.delete('creativeSubmission');
+    }
+    taskParams.delete('creativeCompare');
+    taskParams.delete('creativeCompareAsset');
+  } else if (event.sourceType === 'agent-run')
+    taskParams.set('panel', 'agents');
   else if (event.sourceType === 'delivery')
     taskParams.set('panel', 'operations');
   else taskParams.delete('panel');
   const businessSources: Record<string, { to: string; name: string }> = {
+    'creative-learning': {
+      to: `/delivery?view=creative&creativeView=learning&learningProject=${event.projectId ?? ''}&learningLink=${event.sourceId}`,
+      name: t`Open creative performance evidence`,
+    },
+    'seo-report': {
+      to: `/delivery?view=seo&seoProject=${event.projectId ?? ''}&seoReport=${event.sourceId}`,
+      name: t`Open SEO report`,
+    },
     capacity: { to: '/delivery?view=planner', name: t`Open team capacity` },
     'brand-knowledge': {
       to: `/delivery?view=knowledge&project=${event.projectId}&source=${event.sourceId}`,
@@ -58,16 +110,27 @@ export const ActivityEvent = ({
       to: '/delivery?view=workflows',
       name: t`Open service workflows`,
     },
-    'meta-connection': { to: '/delivery?view=ads', name: t`Open advertising` },
+    'meta-connection': {
+      to: '/delivery?view=ads&adView=legacy',
+      name: t`Open advertising connections`,
+    },
     'meta-report': {
-      to: isValidUuid(event.sourceId)
-        ? `/delivery?view=ads&metaArchive=ALL&metaReport=${event.sourceId}`
-        : '/delivery?view=ads',
+      to:
+        advertisingReportDestination('META', event.sourceId) ??
+        '/delivery?view=ads',
       name: t`Open advertising report`,
     },
     conversation: { to: '/delivery?view=inbox', name: t`Open inbox` },
-    'ad-report': { to: '/delivery?view=ads', name: t`Open advertising` },
-    budget: { to: '/delivery?view=ads', name: t`Open advertising` },
+    'ad-report': {
+      to:
+        advertisingReportDestination('MANUAL', event.sourceId) ??
+        '/delivery?view=ads',
+      name: t`Open advertising report`,
+    },
+    budget: {
+      to: '/delivery?view=ads&adView=legacy',
+      name: t`Open advertising budgets`,
+    },
     finance: { to: '/delivery?view=finance', name: t`Open finance` },
     'finance-payment': {
       to: `/delivery?view=finance&financeView=payments&financeCash=${encodeURIComponent(event.sourceId)}`,
@@ -88,6 +151,14 @@ export const ActivityEvent = ({
     'finance-forecast': {
       to: '/delivery?view=finance&financeView=forecast',
       name: t`Open cash forecast`,
+    },
+    'finance-export': {
+      to: '/delivery?view=finance&financeView=exports',
+      name: t`Open accounting exports`,
+    },
+    'founder-alert': {
+      to: `/delivery?view=health&founderPanel=alerts&founderRule=${encodeURIComponent(event.sourceId)}`,
+      name: t`Open founder alert rules`,
     },
     content: { to: '/delivery?view=content', name: t`Open content` },
     competitor: {
@@ -110,44 +181,88 @@ export const ActivityEvent = ({
       name: t`Open delivery settings`,
     },
   };
-  const sourceLink = [
-    'AI_BUDGET_CONFIGURED',
-    'AI_PRICE_CONFIGURED',
-    'AI_SPEND_RECONCILED',
-  ].includes(event.action)
+  const advertisingKind = event.changes.find(
+    (change) => change.field === 'advertisingSourceKind',
+  )?.after;
+  const advertisingId = event.changes.find(
+    (change) => change.field === 'advertisingSourceId',
+  )?.after;
+  const advertisingDraftDestination =
+    event.sourceType === 'advertising-draft' &&
+    isValidUuid(event.sourceId) &&
+    (advertisingKind === 'META' || advertisingKind === 'MANUAL')
+      ? advertisingReportDestination(advertisingKind, advertisingId)
+      : null;
+  const analysisDestination =
+    event.sourceType === 'activity-analysis' && isValidUuid(event.sourceId)
+      ? activityAnalysisDestination(params, {
+          ...activityAnalysisClose,
+          ...activityCurrentTaskClose,
+          view: 'activity',
+          activityAnalysis: 'history',
+          activityAnalysisRun: event.sourceId,
+          activityEvent: null,
+          task: null,
+          panel: null,
+        })
+      : null;
+  const sourceLink = analysisDestination
     ? {
-        to: '/delivery?view=agents&agentView=spending',
-        name: t`Open AI spending`,
+        to: `${analysisDestination.pathname}${analysisDestination.search}`,
+        name: t`Open saved work analysis`,
       }
-    : ['task', 'agent-run', 'delivery', 'creative'].includes(
-          event.sourceType,
-        ) && availableTask
+    : [
+          'AI_BUDGET_CONFIGURED',
+          'AI_PRICE_CONFIGURED',
+          'AI_SPEND_RECONCILED',
+        ].includes(event.action)
       ? {
-          to: `/delivery?${taskParams}`,
-          name:
-            event.sourceType === 'agent-run'
-              ? t`Open task's assistant runs`
-              : t`Open task`,
+          to: '/delivery?view=agents&agentView=spending',
+          name: t`Open AI spending`,
         }
-      : event.sourceType === 'roles'
-        ? { to: '/delivery?view=team', name: t`Open people and roles` }
-        : event.sourceType === 'project' &&
-            workspace.projects.some((project) => project.id === event.sourceId)
-          ? { to: '/delivery?view=team', name: t`Open project setup` }
-          : event.sourceType === 'agent' && isValidUuid(event.sourceId)
-            ? { to: '/delivery?view=agents', name: t`Open assistants` }
-            : ['recurrence', 'settings'].includes(event.sourceType) &&
-                isValidUuid(event.sourceId)
-              ? {
-                  to: '/delivery?view=operations',
-                  name:
-                    event.sourceType === 'recurrence'
-                      ? t`Open recurring work`
-                      : t`Open delivery settings`,
-                }
-              : isValidUuid(event.sourceId)
-                ? (businessSources[event.sourceType] ?? null)
-                : null;
+      : [
+            'task',
+            'agent-run',
+            'delivery',
+            'creative',
+            'creative-review',
+          ].includes(event.sourceType) && availableTask
+        ? {
+            to: `/delivery?${taskParams}`,
+            name:
+              event.sourceType === 'creative-review'
+                ? t`Open creative feedback`
+                : event.sourceType === 'agent-run'
+                  ? t`Open task's assistant runs`
+                  : t`Open task`,
+          }
+        : advertisingDraftDestination
+          ? {
+              to: `${advertisingDraftDestination}&adDraftRun=${event.sourceId}`,
+              name: t`Open advertising suggestions`,
+            }
+          : event.sourceType === 'roles'
+            ? { to: '/delivery?view=team', name: t`Open people and roles` }
+            : event.sourceType === 'project' &&
+                (isValidUuid(event.sourceId) ||
+                  workspace?.projects.some(
+                    (project) => project.id === event.sourceId,
+                  ))
+              ? { to: '/delivery?view=team', name: t`Open project setup` }
+              : event.sourceType === 'agent' && isValidUuid(event.sourceId)
+                ? { to: '/delivery?view=agents', name: t`Open assistants` }
+                : ['recurrence', 'settings'].includes(event.sourceType) &&
+                    isValidUuid(event.sourceId)
+                  ? {
+                      to: '/delivery?view=operations',
+                      name:
+                        event.sourceType === 'recurrence'
+                          ? t`Open recurring work`
+                          : t`Open delivery settings`,
+                    }
+                  : isValidUuid(event.sourceId)
+                    ? (businessSources[event.sourceType] ?? null)
+                    : null;
   const changeValue = (value: string | null | undefined) =>
     value === null || value === undefined || value === ''
       ? t`Not set`
@@ -182,6 +297,22 @@ export const ActivityEvent = ({
             : ''}
         </p>
         {event.summary && <p>{event.summary}</p>}
+        {event.detailsTruncated === true && (
+          <p>
+            <Trans>
+              Preview shortened. Open the exact event to read the complete
+              recorded details.
+            </Trans>{' '}
+            {onOpenExact && isValidUuid(event.id) && (
+              <StyledDeliveryButton
+                type="button"
+                onClick={() => onOpenExact(event.id)}
+              >
+                <Trans>Open exact event</Trans>
+              </StyledDeliveryButton>
+            )}
+          </p>
+        )}
         <small>
           {[
             label(event.category),

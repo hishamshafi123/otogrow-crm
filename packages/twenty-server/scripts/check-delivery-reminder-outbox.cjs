@@ -153,7 +153,7 @@ async function main() {
     { get: () => 'http://localhost:3001' },
     queue,
   );
-  const reminders = new DeliveryReminderService(scoped[0], operations, noChat);
+  const reminders = new DeliveryReminderService(scoped[0], operations, noChat, noChat);
   let workspace;
   const command = (member, input, now) =>
     operations.command(
@@ -324,7 +324,7 @@ async function main() {
     assert.equal(sends, 0);
     assert.equal(queued.length, 0);
     queueUnavailable = false;
-    await new DeliveryReminderService(scoped[0], operations, noChat).recover(
+    await new DeliveryReminderService(scoped[0], operations, noChat, noChat).recover(
       first.due,
     );
     assert(
@@ -433,6 +433,7 @@ async function main() {
           throw new Error('Fixture database receipt failure');
         },
       },
+      noChat,
       noChat,
     );
     await assert.rejects(

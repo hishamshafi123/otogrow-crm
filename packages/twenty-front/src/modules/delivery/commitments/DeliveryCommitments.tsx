@@ -1,9 +1,11 @@
 import { commitmentLastDay } from '@/delivery/commitments/commitmentDates';
 import { useCommitmentScope } from '@/delivery/commitments/useCommitmentScope';
-import { useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useMutation, useQuery } from '@apollo/client/react';
 import { Trans, useLingui } from '@lingui/react/macro';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
+import { commitmentPeriodParams } from '@/delivery/commitments/clientCommitmentParams';
+import { useFinanceExportRequestGuard } from '@/delivery/finance/export/useFinanceExportRequestGuard';
 import { useOtogrowAccess } from '@/otogrow-access/useOtogrowAccess';
 import {
   useDeliveryDraftGuard,
@@ -53,9 +55,10 @@ import {
 type DeliveryCommitmentsProps = { engagementId: string; billing: string };
 export const DeliveryCommitments = (props: DeliveryCommitmentsProps) => {
   const scope = useCommitmentScope();
+  const [params] = useSearchParams();
   return (
     <CommitmentWorkspace
-      key={`${scope}:${props.engagementId}`}
+      key={`${scope}:${props.engagementId}:${params.toString()}`}
       engagementId={props.engagementId}
       billing={props.billing}
     />
@@ -72,9 +75,12 @@ const CommitmentWorkspace = ({
   const ready =
     !permission.loading && !permission.error && Boolean(permission.access);
   const { requestAction } = useDeliveryDraftGuard();
-  const [periodId, setPeriodId] = useState<string | null>(null);
-  const [allocationCursor, setAllocationCursor] = useState<string | null>(null);
-  const [historyCursor, setHistoryCursor] = useState<string | null>(null);
+  const [params, setParams] = useSearchParams();
+  const linkedPeriodId = params.get('commitmentPeriod') || null;
+  // oxlint-disable-next-line twenty/no-state-useref -- Remembering an imperative focus operation keeps background refresh from stealing focus without rendering state.
+  const focusedLinkedPeriod = useRef<string | null>(null);
+  const allocationCursor = params.get('commitmentAllocationsAfter') || null;
+  const historyCursor = params.get('commitmentHistoryBefore') || null;
   const [taskSearch, setTaskSearch] = useState('');
   const [parentSearch, setParentSearch] = useState('');
   const [editor, setEditor] = useState<{
@@ -82,6 +88,7 @@ const CommitmentWorkspace = ({
     key: string;
     snapshot: CommitmentSnapshot;
   } | null>(null);
+  const periodId = linkedPeriodId ?? editor?.snapshot.selectedPeriodId ?? null;
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   useDeliveryDraftStatus({ dirty: false, saving });
@@ -138,6 +145,15 @@ const CommitmentWorkspace = ({
       (capability) =>
         capability === 'delivery.manage' || capability === 'workspace.admin',
     ) === true;
+  const startRequest = useFinanceExportRequestGuard(
+    `${permission.scopeKey}:${engagementId}:${linkedPeriodId ?? ''}`,
+    canManage,
+  );
+  const selectPeriod = (nextPeriodId: string | null) => {
+    const next = commitmentPeriodParams(params, nextPeriodId);
+    next.set('clientEngagement', engagementId);
+    setParams(next);
+  };
   const [savePeriod] = useMutation<
     SaveDeliveryCommitmentPeriodMutation,
     SaveDeliveryCommitmentPeriodMutationVariables
@@ -161,7 +177,6 @@ const CommitmentWorkspace = ({
   const openEditor = (selection: CommitmentEditorSelection) =>
     requestAction(() => {
       if (!data) return;
-      setPeriodId(data.selectedPeriodId ?? null);
       setEditor({ selection, key: crypto.randomUUID(), snapshot: data });
       setError('');
     });
@@ -169,12 +184,21 @@ const CommitmentWorkspace = ({
     requestAction(() => {
       setEditor(null);
       setError('');
-      if (history) setHistoryCursor(cursor);
-      else setAllocationCursor(cursor);
+      const next = new URLSearchParams(params);
+      next.set('clientEngagement', engagementId);
+      if (data?.selectedPeriodId)
+        next.set('commitmentPeriod', data.selectedPeriodId);
+      const key = history
+        ? 'commitmentHistoryBefore'
+        : 'commitmentAllocationsAfter';
+      if (cursor) next.set(key, cursor);
+      else next.delete(key);
+      setParams(next);
     });
   const save = async (command: CommitmentCommand) => {
     const currentAccess = permission.access;
     if (!canManage || saving || !currentAccess) return false;
+    const current = startRequest();
     setSaving(true);
     setError('');
     let result: CommitmentSnapshot | undefined;
@@ -194,6 +218,10 @@ const CommitmentWorkspace = ({
       else
         result = (await setPeriodState({ variables: { input: command.input } }))
           .data?.setDeliveryCommitmentPeriodState;
+      if (!current()) {
+        setSaving(false);
+        return false;
+      }
       if (
         !result ||
         result.workspaceId !== currentAccess.workspaceId ||
@@ -205,6 +233,10 @@ const CommitmentWorkspace = ({
           t`The result could not be verified. Refresh before retrying.`,
         );
     } catch (failure) {
+      if (!current()) {
+        setSaving(false);
+        return false;
+      }
       setError(
         failure instanceof Error
           ? failure.message
@@ -213,16 +245,27 @@ const CommitmentWorkspace = ({
       setSaving(false);
       return false;
     }
+    const destinationPeriodId = result.selectedPeriodId ?? null;
     setEditor(null);
-    setPeriodId(result.selectedPeriodId ?? null);
-    setAllocationCursor(null);
-    setHistoryCursor(null);
+    if (
+      params.get('clientEngagement') !== engagementId ||
+      linkedPeriodId !== destinationPeriodId ||
+      allocationCursor ||
+      historyCursor
+    ) {
+      setSaving(false);
+      requestAction(() => {
+        if (current()) selectPeriod(destinationPeriodId);
+      });
+      return true;
+    }
     try {
       await query.refetch({
-        input: { engagementId, periodId: result.selectedPeriodId, limit: 30 },
+        input: { engagementId, periodId: destinationPeriodId, limit: 30 },
         identity: permission.scopeKey,
       });
     } catch {
+      if (!current()) return true;
       setError(
         t`The change was saved, but the page could not refresh. Refresh before making another change.`,
       );
@@ -233,6 +276,23 @@ const CommitmentWorkspace = ({
   };
   const period = data?.periods.find(
     (item) => item.id === data.selectedPeriodId,
+  );
+  const verifiedLinkedPeriod =
+    linkedPeriodId && period?.id === linkedPeriodId
+      ? `${permission.scopeKey}:${engagementId}:${linkedPeriodId}`
+      : null;
+  const focusLinkedPeriod = useCallback(
+    (element: HTMLSelectElement | null) => {
+      if (
+        !element ||
+        !verifiedLinkedPeriod ||
+        focusedLinkedPeriod.current === verifiedLinkedPeriod
+      )
+        return;
+      focusedLinkedPeriod.current = verifiedLinkedPeriod;
+      element.focus();
+    },
+    [verifiedLinkedPeriod],
   );
   return (
     <StyledDeliveryCard>
@@ -300,6 +360,16 @@ const CommitmentWorkspace = ({
             </Trans>
           </p>
         )}
+        {ready &&
+          linkedPeriodId &&
+          (query.error || (!query.loading && !data)) && (
+            <StyledDeliveryButton
+              type="button"
+              onClick={() => requestAction(() => selectPeriod(null))}
+            >
+              <Trans>Choose another commitment period</Trans>
+            </StyledDeliveryButton>
+          )}
         {query.loading && (
           <p role="status">
             <Trans>Loading commitments…</Trans>
@@ -390,16 +460,13 @@ const CommitmentWorkspace = ({
               <label>
                 <Trans>Commitment period</Trans>
                 <select
+                  ref={focusLinkedPeriod}
                   value={data.selectedPeriodId ?? ''}
                   disabled={saving}
                   onChange={(event) => {
                     const next = event.target.value;
                     requestAction(() => {
-                      setPeriodId(next);
-                      setAllocationCursor(null);
-                      setHistoryCursor(null);
-                      setEditor(null);
-                      setError('');
+                      selectPeriod(next);
                     });
                   }}
                 >

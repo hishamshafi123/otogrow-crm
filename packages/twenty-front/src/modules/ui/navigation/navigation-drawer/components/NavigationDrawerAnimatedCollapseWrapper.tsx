@@ -5,6 +5,7 @@ import {
   type AnimationControls,
   motion,
   type TargetAndTransition,
+  useReducedMotion,
 } from 'framer-motion';
 import { useContext } from 'react';
 import { ThemeContext } from 'twenty-ui/theme-constants';
@@ -20,6 +21,7 @@ export const NavigationDrawerAnimatedCollapseWrapper = ({
   children: React.ReactNode;
 }) => {
   const { theme } = useContext(ThemeContext);
+  const shouldReduceMotion = useReducedMotion();
   const isSettingsPage = useIsSettingsPage();
   const isNavigationDrawerExpanded = useIsNavigationDrawerContentExpanded();
 
@@ -47,7 +49,7 @@ export const NavigationDrawerAnimatedCollapseWrapper = ({
       initial={false}
       animate={animate}
       transition={{
-        duration: theme.animation.duration.normal,
+        duration: shouldReduceMotion ? 0 : theme.animation.duration.normal,
       }}
     >
       {children}

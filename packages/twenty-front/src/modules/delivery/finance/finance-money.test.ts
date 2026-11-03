@@ -2,9 +2,47 @@ import {
   financeAmountMicrosToDecimal,
   financeAllocationRemainder,
   formatFinanceAmountMicros,
+  formatFinanceRecordedMargin,
   isFinanceAmountMicrosWithinLimit,
   parseFinanceAmountMicros,
 } from '@/delivery/finance/finance-money';
+
+describe('formatFinanceRecordedMargin', () => {
+  it.each([
+    ['100000000', '75000000', '75.00%'],
+    ['100000000', '-25000000', '-25.00%'],
+    ['1000000', '0', '0.00%'],
+    ['3', '1', '33.33%'],
+    ['32', '1', '3.13%'],
+    ['32', '-1', '-3.13%'],
+    ['1000000', '-1', '0.00%'],
+    ['9007199254740993000000', '7205759403792794400000', '80.00%'],
+    ['1', '-9223372036854775807', '-922,337,203,685,477,580,700.00%'],
+  ])('displays revenue %s and result %s as %s', (revenue, result, expected) => {
+    expect(formatFinanceRecordedMargin(revenue, result, 'en-US')).toBe(
+      expected,
+    );
+  });
+
+  it.each([
+    ['0', '0'],
+    ['0', '-100'],
+    ['-1', '1'],
+    ['', '1'],
+    ['100', ''],
+    ['1e6', '1'],
+    ['100', '1.5'],
+  ])(
+    'does not invent a margin for revenue %s and result %s',
+    (revenue, result) => {
+      expect(formatFinanceRecordedMargin(revenue, result, 'en-US')).toBeNull();
+    },
+  );
+
+  it('preserves localized percent placement without converting money to Number', () => {
+    expect(formatFinanceRecordedMargin('8', '1', 'de-DE')).toBe('12,50\u00a0%');
+  });
+});
 
 describe('isFinanceAmountMicrosWithinLimit', () => {
   it.each(['0', '1', '9007199254740993', '9223372036854775807'])(

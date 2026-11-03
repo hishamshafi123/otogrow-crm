@@ -42,6 +42,7 @@ it('combines multiple roles without duplicate shortcuts or authority from a role
     'knowledge',
     'ads',
     'content',
+    'seo',
     'operations',
     'chat',
   ]);

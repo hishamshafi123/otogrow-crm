@@ -3,7 +3,7 @@ import { Request } from 'cross-fetch';
 import { type DocumentNode } from 'graphql';
 import { i18n } from '@lingui/core';
 import { I18nProvider } from '@lingui/react';
-import { render, screen, within, waitFor } from '@testing-library/react';
+import { act, render, screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, Link, RouterProvider } from 'react-router-dom';
 import { DeliveryCommitments } from '@/delivery/commitments/DeliveryCommitments';
@@ -79,6 +79,9 @@ jest.mock('@apollo/client/react', () => ({
           ],
         },
         deliveryClients: {
+          workspaceId: 'workspace',
+          memberId: 'manager',
+          userWorkspaceId: 'user-workspace',
           engagements: [
             {
               id: 'engagement',
@@ -264,7 +267,11 @@ const Harness = ({
     </>
   );
 };
-const setup = (staffClients = false, managerClients = false) => {
+const setup = (
+  staffClients = false,
+  managerClients = false,
+  entry = '/delivery',
+) => {
   const router = createMemoryRouter(
     [
       {
@@ -280,14 +287,14 @@ const setup = (staffClients = false, managerClients = false) => {
       },
       { path: '/other', element: <p>Other view opened</p> },
     ],
-    { initialEntries: ['/delivery'] },
+    { initialEntries: [entry] },
   );
   render(
     <I18nProvider i18n={i18n}>
       <RouterProvider router={router} />
     </I18nProvider>,
   );
-  return userEvent.setup();
+  return Object.assign(userEvent.setup(), { router });
 };
 beforeAll(() => {
   Object.assign(globalThis, { Request });
@@ -329,6 +336,238 @@ beforeEach(() => {
   }));
 });
 
+it('opens an exact manager engagement and period directly from a founder source link', () => {
+  setup(
+    false,
+    true,
+    '/delivery?view=clients&clientEngagement=engagement&commitmentPeriod=period&task=task&search=launch',
+  );
+  expect(screen.getByLabelText('Client service plan')).toHaveValue(
+    'engagement',
+  );
+  expect(screen.getByLabelText('Commitment period')).toHaveValue('period');
+  expect(screen.getByLabelText('Commitment period')).toHaveFocus();
+  expect(screen.getByRole('heading', { name: 'Brand retainer' })).toBeVisible();
+  expect(mockQueries).toHaveBeenCalledWith(
+    'DeliveryCommitments',
+    expect.objectContaining({
+      variables: expect.objectContaining({
+        input: expect.objectContaining({
+          engagementId: 'engagement',
+          periodId: 'period',
+        }),
+      }),
+    }),
+  );
+});
+
+it('focuses a verified linked period once without taking focus again after refresh or outage recovery', async () => {
+  const user = setup(
+    false,
+    false,
+    '/delivery?clientEngagement=engagement&commitmentPeriod=period',
+  );
+  expect(screen.getByLabelText('Commitment period')).toHaveFocus();
+  const refresh = screen.getByRole('button', { name: 'Refresh test data' });
+  mockFeed = { ...mockFeed };
+  await user.click(refresh);
+  expect(refresh).toHaveFocus();
+  mockError = new Error('Temporary outage');
+  await user.click(refresh);
+  expect(screen.queryByLabelText('Commitment period')).not.toBeInTheDocument();
+  mockError = undefined;
+  await user.click(refresh);
+  expect(screen.getByLabelText('Commitment period')).toHaveValue('period');
+  expect(refresh).toHaveFocus();
+});
+
+it('does not focus ordinary unlinked browsing or an unverified linked response', async () => {
+  const user = setup();
+  expect(screen.getByLabelText('Commitment period')).not.toHaveFocus();
+  mockFeed = { ...mockFeed, workspaceId: 'prior-workspace' };
+  await act(() =>
+    user.router.navigate(
+      '/delivery?clientEngagement=engagement&commitmentPeriod=period',
+    ),
+  );
+  expect(screen.queryByLabelText('Commitment period')).not.toBeInTheDocument();
+  const refresh = screen.getByRole('button', { name: 'Refresh test data' });
+  mockFeed = initialFeed();
+  await user.click(refresh);
+  expect(screen.getByLabelText('Commitment period')).toHaveFocus();
+});
+
+it('opens assigned staff commitments without exposing the linked commercial agreement', () => {
+  mockAccess.capabilities = [];
+  mockFeed.canManage = false;
+  setup(
+    true,
+    false,
+    '/delivery?view=clients&clientEngagement=engagement&commitmentPeriod=period',
+  );
+  expect(screen.getByLabelText('Client service plan')).toHaveValue(
+    'engagement',
+  );
+  expect(screen.getByLabelText('Commitment period')).toHaveValue('period');
+  expect(screen.getByText('Original ads')).toBeVisible();
+  expect(screen.queryByText('Create brand videos')).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole('button', { name: 'Edit client service plan' }),
+  ).not.toBeInTheDocument();
+});
+
+it('preserves source filters and exact selections through period changes and browser back and forward', async () => {
+  const original = initialFeed();
+  const next = {
+    ...original,
+    selectedPeriodId: 'next-period',
+    lines: [],
+    allocations: [],
+    history: [],
+  };
+  const user = setup(
+    false,
+    true,
+    '/delivery?view=clients&clientEngagement=engagement&commitmentPeriod=period&task=task&search=launch',
+  );
+  mockFeed = next;
+  await user.selectOptions(
+    screen.getByLabelText('Commitment period'),
+    'next-period',
+  );
+  const selected = new URLSearchParams(user.router.state.location.search);
+  expect(selected.get('clientEngagement')).toBe('engagement');
+  expect(selected.get('commitmentPeriod')).toBe('next-period');
+  expect(selected.get('task')).toBe('task');
+  expect(selected.get('search')).toBe('launch');
+  mockFeed = original;
+  await act(async () => user.router.navigate(-1));
+  expect(screen.getByLabelText('Commitment period')).toHaveValue('period');
+  mockFeed = next;
+  await act(async () => user.router.navigate(1));
+  expect(screen.getByLabelText('Commitment period')).toHaveValue('next-period');
+});
+
+it('keeps an unavailable engagement explicit until the user clears or replaces the source link', async () => {
+  const user = setup(
+    false,
+    true,
+    '/delivery?view=clients&clientEngagement=missing-engagement&commitmentPeriod=missing-period&task=task&search=launch',
+  );
+  expect(screen.getByRole('alert')).toHaveTextContent(
+    'This linked client service plan is unavailable',
+  );
+  expect(
+    screen.queryByRole('heading', { name: 'Delivery commitments' }),
+  ).not.toBeInTheDocument();
+  expect(screen.getByLabelText('Client service plan')).toHaveValue(
+    'missing-engagement',
+  );
+  await user.click(
+    screen.getByRole('button', { name: 'Clear service plan selection' }),
+  );
+  const cleared = new URLSearchParams(user.router.state.location.search);
+  expect(cleared.has('clientEngagement')).toBe(false);
+  expect(cleared.has('commitmentPeriod')).toBe(false);
+  expect(cleared.get('task')).toBe('task');
+  expect(cleared.get('search')).toBe('launch');
+  await user.selectOptions(
+    screen.getByLabelText('Client service plan'),
+    'engagement',
+  );
+  expect(
+    new URLSearchParams(user.router.state.location.search).get(
+      'clientEngagement',
+    ),
+  ).toBe('engagement');
+  expect(mockMutate).not.toHaveBeenCalled();
+});
+
+it('requires deliberate recovery from an unavailable explicit period instead of showing another promise', async () => {
+  mockError = new Error('Selected period is unavailable');
+  const user = setup(
+    false,
+    false,
+    '/delivery?view=clients&clientEngagement=engagement&commitmentPeriod=missing-period&commitmentHistoryBefore=old-cursor&task=task',
+  );
+  expect(screen.queryByText('Original ads')).not.toBeInTheDocument();
+  expect(
+    screen.getByRole('button', { name: 'Choose another commitment period' }),
+  ).toBeVisible();
+  mockError = undefined;
+  await user.click(
+    screen.getByRole('button', { name: 'Choose another commitment period' }),
+  );
+  const recovered = new URLSearchParams(user.router.state.location.search);
+  expect(recovered.has('commitmentPeriod')).toBe(false);
+  expect(recovered.has('commitmentHistoryBefore')).toBe(false);
+  expect(recovered.get('clientEngagement')).toBe('engagement');
+  expect(recovered.get('task')).toBe('task');
+  expect(screen.getByText('Original ads')).toBeVisible();
+});
+
+it('protects a dirty commitment before changing the linked URL and discards it only when requested', async () => {
+  const user = setup(
+    false,
+    false,
+    '/delivery?view=clients&clientEngagement=engagement&commitmentPeriod=period&task=task',
+  );
+  await user.click(screen.getByRole('button', { name: 'Edit Original ads' }));
+  await user.type(screen.getByLabelText('Promised item name'), ' draft');
+  await user.selectOptions(
+    screen.getByLabelText('Commitment period'),
+    'next-period',
+  );
+  expect(
+    new URLSearchParams(user.router.state.location.search).get(
+      'commitmentPeriod',
+    ),
+  ).toBe('period');
+  await user.click(screen.getByRole('button', { name: 'Keep editing' }));
+  expect(screen.getByLabelText('Promised item name')).toHaveValue(
+    'Original ads draft',
+  );
+  await user.selectOptions(
+    screen.getByLabelText('Commitment period'),
+    'next-period',
+  );
+  mockFeed = {
+    ...initialFeed(),
+    selectedPeriodId: 'next-period',
+    lines: [],
+    allocations: [],
+    history: [],
+  };
+  await user.click(
+    screen.getByRole('button', { name: 'Discard and continue' }),
+  );
+  expect(
+    new URLSearchParams(user.router.state.location.search).get(
+      'commitmentPeriod',
+    ),
+  ).toBe('next-period');
+  expect(screen.queryByLabelText('Promised item name')).not.toBeInTheDocument();
+  expect(screen.getByLabelText('Commitment period')).toHaveValue('next-period');
+});
+
+it('hides commercial client details when a retained response belongs to a prior workspace', async () => {
+  const user = setup(
+    false,
+    true,
+    '/delivery?view=clients&clientEngagement=engagement&commitmentPeriod=period',
+  );
+  expect(screen.getByRole('heading', { name: 'Brand retainer' })).toBeVisible();
+  mockAccess = { ...mockAccess, workspaceId: 'another-workspace' };
+  await user.click(screen.getByRole('button', { name: 'Refresh test data' }));
+  expect(
+    screen.queryByRole('heading', { name: 'Brand retainer' }),
+  ).not.toBeInTheDocument();
+  expect(screen.queryByText('Create brand videos')).not.toBeInTheDocument();
+  expect(
+    screen.getByText(/Client details are hidden until your current access/),
+  ).toBeVisible();
+});
+
 it('separates unique videos from variations and shows why an approved task is not fulfilled', async () => {
   const user = setup();
   const rows = within(
@@ -359,9 +598,9 @@ it('keeps staff read-only and isolates the directory from commercial client data
     'DeliveryClients',
     expect.objectContaining({ skip: true }),
   );
-  expect(screen.queryByText('New engagement')).not.toBeInTheDocument();
+  expect(screen.queryByText('New client service plan')).not.toBeInTheDocument();
   await user.selectOptions(
-    screen.getByLabelText('Client engagement'),
+    screen.getByLabelText('Client service plan'),
     'engagement',
   );
   expect(screen.getByText('Original ads')).toBeVisible();
@@ -631,10 +870,9 @@ it('hides the staff directory during fresh permission failure even when prior da
   expect(
     screen.queryByRole('option', { name: 'Brand retainer' }),
   ).not.toBeInTheDocument();
-  expect(mockQueries).toHaveBeenCalledWith(
-    'DeliveryCommitmentEngagements',
-    expect.objectContaining({ skip: true }),
-  );
+  expect(
+    screen.getByRole('button', { name: 'Check client access again' }),
+  ).toBeVisible();
 });
 
 it('allows an open-ended one-time package and preserves its null end date', async () => {
@@ -704,7 +942,11 @@ it('requires a reason to reopen a closed period and keeps its plan read-only unt
 
 it('distinguishes a saved change from refresh failure without offering a duplicate submit', async () => {
   mockRefetch.mockRejectedValueOnce(new Error('Refresh unavailable'));
-  const user = setup();
+  const user = setup(
+    false,
+    false,
+    '/delivery?clientEngagement=engagement&commitmentPeriod=period',
+  );
   await user.click(screen.getByRole('button', { name: 'Edit Original ads' }));
   await user.type(
     screen.getByLabelText('Reason for this change'),
@@ -726,20 +968,27 @@ it('distinguishes a saved change from refresh failure without offering a duplica
 
 it('keeps one editing context when moving from commitment changes to the engagement agreement', async () => {
   const user = setup(false, true);
-  await user.selectOptions(screen.getByLabelText('Engagement'), 'engagement');
+  await user.selectOptions(
+    screen.getByLabelText('Client service plan'),
+    'engagement',
+  );
   await user.click(screen.getByRole('button', { name: 'Edit Original ads' }));
   await user.type(screen.getByLabelText('Promised item name'), ' draft');
-  await user.click(screen.getByRole('button', { name: 'Edit engagement' }));
+  await user.click(
+    screen.getByRole('button', { name: 'Edit client service plan' }),
+  );
   await user.click(screen.getByRole('button', { name: 'Keep editing' }));
   expect(screen.getByLabelText('Promised item name')).toHaveValue(
     'Original ads draft',
   );
-  expect(screen.queryByLabelText('Engagement name')).not.toBeInTheDocument();
-  await user.click(screen.getByRole('button', { name: 'Edit engagement' }));
+  expect(screen.queryByLabelText('Service plan name')).not.toBeInTheDocument();
+  await user.click(
+    screen.getByRole('button', { name: 'Edit client service plan' }),
+  );
   await user.click(
     screen.getByRole('button', { name: 'Discard and continue' }),
   );
-  expect(screen.getByLabelText('Engagement name')).toHaveValue(
+  expect(screen.getByLabelText('Service plan name')).toHaveValue(
     'Brand retainer',
   );
   expect(screen.queryByLabelText('Promised item name')).not.toBeInTheDocument();

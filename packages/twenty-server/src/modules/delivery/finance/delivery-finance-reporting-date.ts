@@ -1,6 +1,7 @@
 import { type EntityManager } from 'typeorm';
 import { DeliveryFinanceForecastAnchorEntity } from 'src/modules/delivery/finance/entities/delivery-finance-forecast-anchor.entity';
 import { financeForecastBusinessDate } from 'src/modules/delivery/finance/delivery-finance-forecast.policy';
+import { deliveryCurrencySchema } from 'src/modules/delivery/business/delivery-business.types';
 
 type FinanceReportingClock = {
   timezone: string;
@@ -41,3 +42,9 @@ export const financeReportingClock = (
   clocks: FinanceReportingClocks,
   currency: string,
 ) => clocks.byCurrency.get(currency) ?? clocks.fallback;
+
+export const projectFinanceReportingClocks = (clocks: FinanceReportingClocks) =>
+  deliveryCurrencySchema.options.map((currency) => ({
+    currency,
+    ...financeReportingClock(clocks, currency),
+  }));

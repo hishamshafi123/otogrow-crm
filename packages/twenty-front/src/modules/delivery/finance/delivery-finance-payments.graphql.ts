@@ -8,6 +8,12 @@ export const GET_DELIVERY_FINANCE_PAYMENTS = gql`
       userWorkspaceId
       canManage
       currency
+      reportingClocks {
+        currency
+        timezone
+        businessDate
+        confirmed
+      }
       rejectedCashCount
       cashTotal
       receivableTotal

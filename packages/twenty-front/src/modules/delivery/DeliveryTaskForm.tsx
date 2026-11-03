@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ClientSetupLink } from '@/delivery/onboarding/ClientSetupLink';
 import {
   useDeliveryDraftGuard,
   useDeliveryDraftStatus,
@@ -7,7 +8,7 @@ import { useLingui, Trans } from '@lingui/react/macro';
 import {
   type DeliveryCommandRunner,
   type DeliveryTask,
-  type DeliveryWorkspace,
+  type DeliveryTaskContext,
 } from '@/delivery/delivery.types';
 import {
   StyledDeliveryButton,
@@ -16,11 +17,13 @@ import {
 } from '@/delivery/deliveryStyles';
 
 type DeliveryTaskFormProps = {
-  workspace: DeliveryWorkspace;
+  workspace: DeliveryTaskContext;
   task?: DeliveryTask;
   run: DeliveryCommandRunner;
   onSaved: () => void;
   busy: boolean;
+  submitDisabled?: boolean;
+  saveFailureMessage?: string;
 };
 export const DeliveryTaskForm = ({
   workspace,
@@ -28,6 +31,8 @@ export const DeliveryTaskForm = ({
   run,
   onSaved,
   busy,
+  submitDisabled = false,
+  saveFailureMessage,
 }: DeliveryTaskFormProps) => {
   const { t } = useLingui();
   const [projectId, setProjectId] = useState(
@@ -80,7 +85,7 @@ export const DeliveryTaskForm = ({
     setTitle(task.title);
     setBrief(task.details.brief);
     setService(task.details.service);
-    setAssigneeId(task.assigneeId);
+    setAssigneeId(task.assigneeId ?? '');
     setReviewerId(task.details.reviewerId);
     setPriority(task.details.priority);
     setScheduledDate(task.details.scheduledDate ?? '');
@@ -95,7 +100,7 @@ export const DeliveryTaskForm = ({
         title: task.title,
         brief: task.details.brief,
         service: task.details.service,
-        assigneeId: task.assigneeId,
+        assigneeId: task.assigneeId ?? '',
         reviewerId: task.details.reviewerId,
         priority: task.details.priority,
         scheduledDate: task.details.scheduledDate ?? '',
@@ -120,7 +125,7 @@ export const DeliveryTaskForm = ({
     <form
       onSubmit={async (event) => {
         event.preventDefault();
-        if (busy || saving || stale || !ready) return;
+        if (busy || saving || stale || !ready || submitDisabled) return;
         setSaving(true);
         setSaveError('');
         const fields = {
@@ -212,6 +217,7 @@ export const DeliveryTaskForm = ({
                 <label>
                   <Trans>Project</Trans>
                   <select
+                    aria-label={t`Project`}
                     required
                     value={projectId}
                     onChange={(event) => {
@@ -233,6 +239,7 @@ export const DeliveryTaskForm = ({
               <label>
                 <Trans>Assignee</Trans>
                 <select
+                  aria-label={t`Assignee`}
                   required
                   value={assigneeId}
                   onChange={(event) => {
@@ -253,6 +260,7 @@ export const DeliveryTaskForm = ({
               <label>
                 <Trans>Reviewer</Trans>
                 <select
+                  aria-label={t`Reviewer`}
                   required
                   value={
                     reviewers.some((member) => member.id === reviewerId)
@@ -281,6 +289,7 @@ export const DeliveryTaskForm = ({
               <label>
                 <Trans>Priority</Trans>
                 <select
+                  aria-label={t`Priority`}
                   value={priority}
                   onChange={(event) =>
                     setPriority(event.target.value as 'LOW' | 'NORMAL' | 'HIGH')
@@ -346,7 +355,7 @@ export const DeliveryTaskForm = ({
                 </label>
               </StyledDeliveryGrid>
             </details>
-            {saveError && <p role="alert">{saveError}</p>}
+            {saveError && <p role="alert">{saveFailureMessage ?? saveError}</p>}
             {!ready && (
               <p>
                 <Trans>
@@ -355,12 +364,19 @@ export const DeliveryTaskForm = ({
                 </Trans>
               </p>
             )}
+            {!task &&
+              workspace.actor.isManager &&
+              !workspace.projects.length && (
+                <ClientSetupLink>
+                  <Trans>Set up a client project and service plan first</Trans>
+                </ClientSetupLink>
+              )}
             <StyledDeliveryButton
               data-primary="true"
               type="submit"
-              disabled={busy || saving || !!stale || !ready}
+              disabled={busy || saving || !!stale || !ready || submitDisabled}
             >
-              {task ? t`Save changes` : t`Create task`}
+              {task ? t`Save task` : t`Create task`}
             </StyledDeliveryButton>
           </StyledDeliveryStack>
         </fieldset>

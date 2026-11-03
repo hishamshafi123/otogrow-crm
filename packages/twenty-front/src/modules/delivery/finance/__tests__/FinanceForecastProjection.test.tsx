@@ -162,6 +162,8 @@ it('keeps exact negative and sub-cent daily closes and explains daily net timing
   expect(within(day).getByText('Payments: $0.000001')).toBeVisible();
   expect(within(day).getByText('Closing cash: -$0.000001')).toBeVisible();
   expect(
-    screen.getByText('Unresolved items are excluded from this dated scenario.'),
+    screen.getByText(
+      'Only eligible dated expectations are included. Review the unresolved items above.',
+    ),
   ).toBeVisible();
 });

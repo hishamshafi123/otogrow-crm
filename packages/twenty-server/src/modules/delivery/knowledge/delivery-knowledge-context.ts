@@ -1,3 +1,4 @@
+import { fathomKnowledgeAnchorSql } from 'src/modules/delivery/knowledge/fathom/fathom-knowledge-anchor';
 import { ConflictException } from '@nestjs/common';
 import { type EntityManager } from 'typeorm';
 
@@ -29,7 +30,7 @@ export const readDeliveryKnowledgeContext = async (
   );
   const [metadata]: { fingerprint: string; totalSources: number }[] =
     await manager.query(
-      `SELECT md5(COALESCE(string_agg(id::text || ':' || "publishedVersion"::text, '|' ORDER BY id), '')) AS fingerprint, count(*)::int AS "totalSources" FROM core."deliveryKnowledgeSource" WHERE "workspaceId"=$1 AND "projectId"=$2 AND "publishedVersion" IS NOT NULL`,
+      `SELECT md5(COALESCE(string_agg(s.id::text || ':' || s."publishedVersion"::text, '|' ORDER BY s.id), '')) AS fingerprint, count(*)::int AS "totalSources" FROM core."deliveryKnowledgeSource" s JOIN core."deliveryKnowledgeVersion" v ON v."workspaceId"=s."workspaceId" AND v."sourceId"=s.id AND v.version=s."publishedVersion" WHERE s."workspaceId"=$1 AND s."projectId"=$2 AND ${fathomKnowledgeAnchorSql('s', 'v')}`,
       [workspaceId, projectId],
     );
   const rows: {
@@ -40,7 +41,7 @@ export const readDeliveryKnowledgeContext = async (
     meetingDate: string;
     knowledge: string;
   }[] = await manager.query(
-    `SELECT s.id AS "sourceId", v.version, v.title, v.category, v."meetingDate"::text AS "meetingDate", v.knowledge FROM core."deliveryKnowledgeSource" s JOIN core."deliveryKnowledgeVersion" v ON v."workspaceId"=s."workspaceId" AND v."sourceId"=s.id AND v.version=s."publishedVersion" WHERE s."workspaceId"=$1 AND s."projectId"=$2 ORDER BY v."meetingDate" DESC, s.id LIMIT 20`,
+    `SELECT s.id AS "sourceId", v.version, v.title, v.category, v."meetingDate"::text AS "meetingDate", v.knowledge FROM core."deliveryKnowledgeSource" s JOIN core."deliveryKnowledgeVersion" v ON v."workspaceId"=s."workspaceId" AND v."sourceId"=s.id AND v.version=s."publishedVersion" WHERE s."workspaceId"=$1 AND s."projectId"=$2 AND ${fathomKnowledgeAnchorSql('s', 'v')} ORDER BY v."meetingDate" DESC, s.id LIMIT 20`,
     [workspaceId, projectId],
   );
   let remaining = 20000;

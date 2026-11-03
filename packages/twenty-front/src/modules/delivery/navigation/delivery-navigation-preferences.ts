@@ -46,7 +46,7 @@ export const getDeliveryNavigationDefaults = (
       ? ['creative', 'knowledge']
       : []),
     ...(hasRole('marketing') ? ['ads', 'content'] : []),
-    ...(hasRole('seo-specialist') ? ['operations', 'knowledge'] : []),
+    ...(hasRole('seo-specialist') ? ['seo', 'operations', 'knowledge'] : []),
     ...(hasRole('developer') ? ['development'] : []),
     'chat',
   ];

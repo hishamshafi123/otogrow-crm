@@ -41,6 +41,10 @@ const DIRECTORY_FIELDS = gql`
       name
       roleIds
       revision
+      projectMemberships {
+        id
+        name
+      }
       access {
         ...OtogrowAccessFields
       }

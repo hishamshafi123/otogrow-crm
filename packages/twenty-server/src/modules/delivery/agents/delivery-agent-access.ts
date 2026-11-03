@@ -11,6 +11,7 @@ export const canUseDeliveryAgent = (
   configuration: DeliveryAgentConfiguration,
   actor: DeliveryAgentActor,
 ) => {
+  if (configuration.kind === 'ACTIVITY' && !actor.isAdmin) return false;
   if (isDefined(configuration.roleIds))
     return configuration.roleIds.some((roleId) =>
       actor.roleIds.includes(roleId),

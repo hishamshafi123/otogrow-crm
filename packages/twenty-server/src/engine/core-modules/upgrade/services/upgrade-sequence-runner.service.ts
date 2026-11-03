@@ -27,6 +27,13 @@ import { assertUnreachable, isDefined } from 'twenty-shared/utils';
 export type UpgradeSequenceRunnerReport = {
   totalSuccesses: number;
   totalFailures: number;
+  plannedSteps?: {
+    kind: UpgradeStep['kind'];
+    name: string;
+    version: string;
+    workspaceId: string | null;
+  }[];
+  stoppedBefore?: string;
 };
 
 @Injectable()
@@ -51,6 +58,9 @@ export class UpgradeSequenceRunnerService {
     sequence: UpgradeStep[];
     options: ParsedUpgradeCommandOptions;
   }): Promise<UpgradeSequenceRunnerReport> {
+    // Preview must never enter executors, including metadata/context refreshes.
+    if (options.dryRun) return this.plan({ sequence, options });
+
     if (sequence.length === 0) {
       return { totalSuccesses: 0, totalFailures: 0 };
     }
@@ -71,6 +81,147 @@ export class UpgradeSequenceRunnerService {
         );
       }
     }
+  }
+
+  private async plan({
+    sequence,
+    options,
+  }: {
+    sequence: UpgradeStep[];
+    options: ParsedUpgradeCommandOptions;
+  }): Promise<UpgradeSequenceRunnerReport> {
+    const report: UpgradeSequenceRunnerReport = {
+      totalSuccesses: 0,
+      totalFailures: 0,
+      plannedSteps: [],
+    };
+    if (sequence.length === 0) return report;
+    const allProvisionedWorkspaceIds =
+      await this.workspaceVersionService.getProvisionedWorkspaceIds();
+    const startCursor = await this.resolveStartCursor({
+      sequence,
+      allProvisionedWorkspaceIds,
+    });
+    const workspaceCursors = new Map(
+      await this.fetchWorkspaceCursors(allProvisionedWorkspaceIds),
+    );
+    const workspaceIds = this.deriveWorkspaceIdsToProcess({
+      allProvisionedWorkspaceIds,
+      options,
+    });
+    const filtered =
+      Boolean(options.workspaceIds?.length) ||
+      isDefined(options.startFromWorkspaceId) ||
+      isDefined(options.workspaceCountLimit);
+    const stop = (step: UpgradeStep) => {
+      report.stoppedBefore = step.name;
+      this.logger.log(
+        formatUpgradeLog({
+          humanMessage: `Plan stops before instance command "${step.name}": workspace filters require an unfiltered upgrade. No changes were made.`,
+          event: 'sequence.plan.stopped',
+          logFields: {
+            before: step.name,
+            reason: 'workspace-filter-active',
+            dryRun: true,
+          },
+        }),
+      );
+      return report;
+    };
+    const include = (step: UpgradeStep, workspaceId: string | null) => {
+      const planned = {
+        kind: step.kind,
+        name: step.name,
+        version: step.version,
+        workspaceId,
+      };
+      report.plannedSteps?.push(planned);
+      this.logger.log(
+        formatUpgradeLog({
+          humanMessage: `Planned ${step.kind}: ${step.name}${workspaceId ? ` for workspace ${workspaceId}` : ''} (not executed)`,
+          event: 'sequence.plan.step',
+          logFields: { ...planned, dryRun: true },
+        }),
+      );
+    };
+    for (const step of sequence.slice(0, startCursor)) {
+      if (
+        step.kind !== 'fast-instance' ||
+        step.version !== TWENTY_CURRENT_VERSION
+      )
+        continue;
+      if (
+        await this.upgradeMigrationService.isLastAttemptCompleted({
+          name: step.name,
+          workspaceId: null,
+        })
+      )
+        continue;
+      if (filtered) return stop(step);
+      include(step, null);
+    }
+    let cursor = startCursor;
+    while (cursor < sequence.length) {
+      const step = sequence[cursor];
+      if (step.kind !== 'workspace') {
+        if (filtered) return stop(step);
+        const previousStep = cursor > 0 ? sequence[cursor - 1] : undefined;
+        if (previousStep?.kind === 'workspace')
+          this.enforceWorkspacesCompletedPreviousWorkspaceSegment({
+            sequence,
+            previousWorkspaceStep: previousStep,
+            workspaceCursors,
+          });
+        if (
+          !(await this.upgradeMigrationService.isLastAttemptCompleted({
+            name: step.name,
+            workspaceId: null,
+          }))
+        )
+          include(step, null);
+        cursor++;
+        continue;
+      }
+      const segment =
+        this.upgradeSequenceReaderService.collectWorkspaceCommandsStartingFrom({
+          sequence,
+          fromWorkspaceCommand: step,
+        });
+      for (const workspaceId of workspaceIds) {
+        const workspaceCursor = workspaceCursors.get(workspaceId);
+        if (!workspaceCursor)
+          throw new Error(
+            `No upgrade migration found for workspace ${workspaceId}.`,
+          );
+        const pending =
+          this.upgradeSequenceReaderService.getPendingWorkspaceCommands({
+            workspaceCommands: segment,
+            workspaceCursor,
+          });
+        for (const command of pending) include(command, workspaceId);
+        const last = pending[pending.length - 1];
+        // Later barriers are conditional on these planned steps succeeding, never on a ledger write.
+        if (last)
+          workspaceCursors.set(workspaceId, {
+            ...workspaceCursor,
+            name: last.name,
+            status: 'completed',
+          });
+      }
+      cursor += segment.length;
+    }
+    this.logger.log(
+      formatUpgradeLog({
+        humanMessage:
+          'Plan only: later steps assume earlier steps succeed. Commands, metadata, caches and upgrade cursors were not changed.',
+        event: 'sequence.plan.complete',
+        logFields: {
+          plannedStepCount: report.plannedSteps?.length ?? 0,
+          dryRun: true,
+        },
+      }),
+    );
+    return report;
   }
 
   private async runInner({

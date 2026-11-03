@@ -118,13 +118,17 @@ it('preserves an unsent inbox edit during a refreshed conversation and uses the 
   expect(screen.getByRole('alert')).toHaveTextContent(
     'Your draft is preserved',
   );
-  expect(screen.getByRole('button', { name: 'Save inside OS' })).toBeDisabled();
+  expect(
+    screen.getByRole('button', { name: 'Save reply draft' }),
+  ).toBeDisabled();
   await userEvent.click(
     screen.getByRole('button', { name: 'Reload latest version' }),
   );
   expect(screen.getByLabelText('Message')).toHaveValue('New assistant reply');
   await userEvent.type(screen.getByLabelText('Message'), ' checked');
-  await userEvent.click(screen.getByRole('button', { name: 'Save inside OS' }));
+  await userEvent.click(
+    screen.getByRole('button', { name: 'Save reply draft' }),
+  );
   expect(run).toHaveBeenCalledWith(
     expect.objectContaining({
       revision: 4,
@@ -148,16 +152,24 @@ it('restores a clean inbox when a change is undone and retains input after a fai
     ),
   );
   await userEvent.selectOptions(
-    screen.getByLabelText('Entry type'),
+    screen.getByLabelText('What to save'),
     'INBOUND_NOTE',
   );
-  expect(screen.getByRole('button', { name: 'Save inside OS' })).toBeEnabled();
-  await userEvent.selectOptions(screen.getByLabelText('Entry type'), 'DRAFT');
-  expect(screen.getByRole('button', { name: 'Save inside OS' })).toBeDisabled();
+  expect(
+    screen.getByRole('button', { name: 'Save incoming note' }),
+  ).toBeEnabled();
+  await userEvent.selectOptions(screen.getByLabelText('What to save'), 'DRAFT');
+  expect(
+    screen.getByRole('button', { name: 'Save reply draft' }),
+  ).toBeDisabled();
   await userEvent.type(screen.getByLabelText('Message'), ' edited');
-  await userEvent.click(screen.getByRole('button', { name: 'Save inside OS' }));
+  await userEvent.click(
+    screen.getByRole('button', { name: 'Save reply draft' }),
+  );
   expect(screen.getByLabelText('Message')).toHaveValue('Reply edited');
-  expect(screen.getByRole('button', { name: 'Save inside OS' })).toBeEnabled();
+  expect(
+    screen.getByRole('button', { name: 'Save reply draft' }),
+  ).toBeEnabled();
   expect(screen.queryByRole('status')).not.toBeInTheDocument();
 });
 

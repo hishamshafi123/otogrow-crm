@@ -114,7 +114,7 @@ it('shows distinct operational meanings and real destinations without inferring 
   setup();
   const list = screen.getByRole('list');
   expect(within(list).getByText('Paused')).toBeVisible();
-  expect(within(list).getByText('Not implemented')).toBeVisible();
+  expect(within(list).getByText('Not available yet')).toBeVisible();
   expect(within(list).getByText('Manual workflow')).toBeVisible();
   expect(within(list).getByText('Available')).toBeVisible();
   expect(within(list).queryByText('Connected')).not.toBeInTheDocument();
@@ -123,17 +123,51 @@ it('shows distinct operational meanings and real destinations without inferring 
     'href',
     '/delivery?view=inbox',
   );
+  expect(
+    screen.getByRole('link', { name: 'Review Meta connection' }),
+  ).toHaveAttribute('href', '/delivery?view=ads&adView=legacy');
+});
+it('describes available Gmail, meeting import and SEO reporting without inventing live connection evidence', () => {
+  mockSnapshot.items = [
+    item('email', 'EMAIL_OS', 'AVAILABLE', 'EMAIL_SELECTED_THREADS', 'inbox'),
+    item(
+      'meeting',
+      'MEETING_IMPORT',
+      'AVAILABLE',
+      'MEETING_REVIEWED_IMPORT',
+      'knowledge',
+    ),
+    item('seo', 'SEO_RESULTS', 'MANUAL', 'SEO_MANUAL', 'seo'),
+  ];
+  setup();
+  expect(
+    screen.getByText(/Selected Gmail threads support shared reading/),
+  ).toBeVisible();
+  expect(
+    screen.getByText(
+      /configure Fathom and preview its transcript before importing/,
+    ),
+  ).toBeVisible();
+  expect(
+    screen.getByText(
+      /weekly or monthly measured results with an independent reviewer/,
+    ),
+  ).toBeVisible();
+  expect(screen.queryByText('Connected')).not.toBeInTheDocument();
+  expect(
+    screen.getByRole('link', { name: 'Open SEO results' }),
+  ).toHaveAttribute('href', '/delivery?view=seo');
 });
 it('restores the status filter from a URL and retains it through browser history', async () => {
   const router = setup('/delivery?view=health&readinessStatus=MANUAL');
   expect(
-    screen.getByRole('combobox', { name: 'Show capability status' }),
+    screen.getByRole('combobox', { name: 'Show feature status' }),
   ).toHaveValue('MANUAL');
   expect(
     screen.queryByText('Gmail / email in the OS inbox'),
   ).not.toBeInTheDocument();
   await userEvent.selectOptions(
-    screen.getByRole('combobox', { name: 'Show capability status' }),
+    screen.getByRole('combobox', { name: 'Show feature status' }),
     'PAUSED',
   );
   expect(router.state.location.search).toContain('readinessStatus=PAUSED');
@@ -141,7 +175,7 @@ it('restores the status filter from a URL and retains it through browser history
     await router.navigate(-1);
   });
   expect(
-    screen.getByRole('combobox', { name: 'Show capability status' }),
+    screen.getByRole('combobox', { name: 'Show feature status' }),
   ).toHaveValue('MANUAL');
   await act(async () => {
     await router.navigate(1);
@@ -151,21 +185,21 @@ it('restores the status filter from a URL and retains it through browser history
 it('removes the filter for All and handles an unsupported URL status without inventing results', async () => {
   const router = setup('/delivery?view=health&readinessStatus=toString');
   expect(
-    screen.getByRole('combobox', { name: 'Show capability status' }),
+    screen.getByRole('combobox', { name: 'Show feature status' }),
   ).toHaveValue('ALL');
   await userEvent.selectOptions(
-    screen.getByRole('combobox', { name: 'Show capability status' }),
+    screen.getByRole('combobox', { name: 'Show feature status' }),
     'PAUSED',
   );
   await userEvent.selectOptions(
-    screen.getByRole('combobox', { name: 'Show capability status' }),
+    screen.getByRole('combobox', { name: 'Show feature status' }),
     'ALL',
   );
   expect(router.state.location.search).toBe('?view=health');
 });
 it('offers an empty-state explanation when a valid filter has no entries', () => {
   setup('/delivery?view=health&readinessStatus=CONNECTED');
-  expect(screen.getByText('No capabilities match this status.')).toBeVisible();
+  expect(screen.getByText('No features match this status.')).toBeVisible();
 });
 it('hides prior status on an error and offers an explicit retry', async () => {
   mockError = new Error('Network failure');
@@ -186,7 +220,7 @@ it('does not expose a foreign member snapshot', () => {
   setup();
   expect(screen.queryByRole('list')).not.toBeInTheDocument();
   expect(screen.getByRole('status')).toHaveTextContent(
-    'Loading capability status',
+    'Loading feature status',
   );
 });
 it('withholds workspace checks from a non-admin even if cached data is present', () => {
@@ -220,7 +254,12 @@ it('does not fabricate a label, explanation or navigation for an unknown contrac
     ),
   ];
   setup();
-  expect(screen.getByText('Unknown capability')).toBeVisible();
+  expect(screen.getByText('Unknown feature')).toBeVisible();
   expect(screen.getByText('Status unavailable')).toBeVisible();
+  expect(
+    screen.getByText(
+      'No verified explanation is available. Ask an administrator to inspect setup.',
+    ),
+  ).toBeVisible();
   expect(screen.queryByRole('link')).not.toBeInTheDocument();
 });

@@ -29,7 +29,7 @@ type DeliveryCreativeBriefFormProps = CreativeDraftFormProps & {
 };
 type BriefTextField = Exclude<
   keyof CreativeBrief,
-  'objective' | 'duration' | 'brandAssets'
+  'objective' | 'duration' | 'brandAssets' | 'outputKind'
 >;
 
 export const DeliveryCreativeBriefForm = ({
@@ -105,6 +105,22 @@ export const DeliveryCreativeBriefForm = ({
           <StyledDeliveryStack>
             <StyledDeliveryGrid>
               <label>
+                <Trans>Final deliverable</Trans>
+                <select
+                  value={draft.values.outputKind ?? 'VIDEO'}
+                  onChange={(event) =>
+                    draft.update({
+                      ...draft.values,
+                      outputKind:
+                        event.target.value === 'IMAGE' ? 'IMAGE' : 'VIDEO',
+                    })
+                  }
+                >
+                  <option value="VIDEO">{t`Video`}</option>
+                  <option value="IMAGE">{t`Still image / static ad`}</option>
+                </select>
+              </label>
+              <label>
                 <Trans>Objective</Trans>
                 <select
                   value={draft.values.objective}
@@ -119,24 +135,30 @@ export const DeliveryCreativeBriefForm = ({
                   <option value="ORGANIC">{t`Organic brand content`}</option>
                 </select>
               </label>
-              <label>
-                <Trans>Duration in seconds</Trans>
-                <input
-                  required
-                  type="number"
-                  min={1}
-                  max={300}
-                  value={draft.values.duration}
-                  onChange={(event) =>
-                    draft.update({
-                      ...draft.values,
-                      duration: Number(event.target.value),
-                    })
-                  }
-                />
-              </label>
-              {(Object.entries(labels) as [BriefTextField, string][]).map(
-                ([field, label]) => (
+              {draft.values.outputKind !== 'IMAGE' && (
+                <label>
+                  <Trans>Duration in seconds</Trans>
+                  <input
+                    required
+                    type="number"
+                    min={1}
+                    max={300}
+                    value={draft.values.duration}
+                    onChange={(event) =>
+                      draft.update({
+                        ...draft.values,
+                        duration: Number(event.target.value),
+                      })
+                    }
+                  />
+                </label>
+              )}
+              {(Object.entries(labels) as [BriefTextField, string][])
+                .filter(
+                  ([field]) =>
+                    draft.values.outputKind !== 'IMAGE' || field !== 'music',
+                )
+                .map(([field, label]) => (
                   <label key={field}>
                     {label}
                     <textarea
@@ -151,8 +173,7 @@ export const DeliveryCreativeBriefForm = ({
                       }
                     />
                   </label>
-                ),
-              )}
+                ))}
             </StyledDeliveryGrid>
             <label>
               <Trans>Brand assets</Trans>

@@ -1,10 +1,11 @@
 import { useCallback, useState, type FormEvent } from 'react';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { styled } from '@linaria/react';
-import { isValidUrl } from 'twenty-shared/utils';
+import { getValidTimeZoneOrUndefined, isValidUrl } from 'twenty-shared/utils';
 import {
   type DeliveryFinancePaymentInput,
   type DeliveryFinanceQuery,
+  type DeliveryFinancePaymentsQuery,
 } from '~/generated-metadata/graphql';
 import { useDeliveryNativeDraft } from '@/delivery/drafts/useDeliveryNativeDraft';
 import { useDeliveryDraftGuard } from '@/delivery/drafts/DeliveryDraftGuard';
@@ -22,7 +23,7 @@ import {
 } from '@/delivery/deliveryStyles';
 
 type ReconciliationPaymentFormProps = {
-  date: string;
+  reportingClocks: DeliveryFinancePaymentsQuery['deliveryFinancePayments']['reportingClocks'];
   currency: string;
   projects: DeliveryFinanceQuery['deliveryFinance']['projects'];
   invoice?: {
@@ -35,6 +36,28 @@ type ReconciliationPaymentFormProps = {
   readOnly?: boolean;
   onSave: (input: DeliveryFinancePaymentInput) => Promise<boolean>;
   onCancel: () => void;
+  onRefreshCalendar: () => Promise<unknown>;
+};
+const isLedgerDate = (value: string) => {
+  const parsedDate = new Date(`${value}T00:00:00.000Z`);
+  return (
+    /^(?!0000)\d{4}-\d{2}-\d{2}$/.test(value) &&
+    !Number.isNaN(parsedDate.getTime()) &&
+    parsedDate.toISOString().slice(0, 10) === value
+  );
+};
+const paymentCalendar = (
+  clocks: ReconciliationPaymentFormProps['reportingClocks'],
+  currency: string,
+) => {
+  const selected = clocks.filter((clock) => clock.currency === currency);
+  const clock = selected.length === 1 ? selected[0] : null;
+  return clock &&
+    isLedgerDate(clock.businessDate) &&
+    getValidTimeZoneOrUndefined(clock.timezone) &&
+    (clock.confirmed || clock.timezone === 'UTC')
+    ? clock
+    : null;
 };
 const StyledPaymentFields = styled.div`
   display: grid;
@@ -46,7 +69,7 @@ const StyledPaymentFields = styled.div`
 `;
 
 export const ReconciliationPaymentForm = ({
-  date,
+  reportingClocks,
   currency,
   projects,
   invoice,
@@ -54,6 +77,7 @@ export const ReconciliationPaymentForm = ({
   readOnly = false,
   onSave,
   onCancel,
+  onRefreshCalendar,
 }: ReconciliationPaymentFormProps) => {
   const { t, i18n } = useLingui();
   const financeLabels = useFinanceLabels();
@@ -65,13 +89,17 @@ export const ReconciliationPaymentForm = ({
     category: 'INCOME',
     currency: invoice?.currency ?? currency,
     amount: '',
-    date,
+    date:
+      paymentCalendar(reportingClocks, invoice?.currency ?? currency)
+        ?.businessDate ?? '',
     projectId: invoice?.projectId ?? '',
     note: '',
     evidenceUrl: '',
   }));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [refreshingCalendar, setRefreshingCalendar] = useState(false);
+  const [calendarError, setCalendarError] = useState('');
   const draft = useDeliveryNativeDraft({
     extraValues: values,
     busy: busy || saving,
@@ -91,13 +119,11 @@ export const ReconciliationPaymentForm = ({
     BigInt(amountMicros) > 0n &&
     BigInt(amountMicros) <= 1000000000000000n &&
     BigInt(amountMicros) % 10000n === 0n;
-  const today = new Date().toISOString().slice(0, 10);
-  const parsedDate = new Date(`${values.date}T00:00:00.000Z`);
+  const calendar = paymentCalendar(reportingClocks, values.currency);
   const dateValid =
-    /^(?!0000)\d{4}-\d{2}-\d{2}$/.test(values.date) &&
-    !Number.isNaN(parsedDate.getTime()) &&
-    parsedDate.toISOString().slice(0, 10) === values.date &&
-    values.date <= today;
+    calendar !== null &&
+    isLedgerDate(values.date) &&
+    values.date <= calendar.businessDate;
   const evidenceUrl = values.evidenceUrl.trim();
   const requirements = [
     ...(!values.title.trim() ? [t`Give this payment a title.`] : []),
@@ -112,8 +138,10 @@ export const ReconciliationPaymentForm = ({
           t`Enter the actual positive payment amount with no more than two decimal places, within the supported cash limit.`,
         ]
       : []),
-    ...(!dateValid
-      ? [t`Choose a valid actual payment date no later than today (UTC).`]
+    ...(calendar && !dateValid
+      ? [
+          t`Choose a valid actual payment date no later than ${calendar.businessDate} (${calendar.timezone}).`,
+        ]
       : []),
     ...(values.projectId &&
     !projects.some((project) => project.id === values.projectId)
@@ -132,7 +160,10 @@ export const ReconciliationPaymentForm = ({
     if (
       busy ||
       saving ||
+      refreshingCalendar ||
       readOnly ||
+      !calendar ||
+      !dateValid ||
       !draft.dirty ||
       requirements.length ||
       !amountValid ||
@@ -164,6 +195,19 @@ export const ReconciliationPaymentForm = ({
       setSaving(false);
     }
   };
+  const refreshCalendar = async () => {
+    setRefreshingCalendar(true);
+    setCalendarError('');
+    try {
+      await onRefreshCalendar();
+    } catch {
+      setCalendarError(
+        t`The payment calendar could not be refreshed. Your entered date and payment draft are kept.`,
+      );
+    } finally {
+      setRefreshingCalendar(false);
+    }
+  };
   return (
     <form
       ref={attachForm}
@@ -189,6 +233,37 @@ export const ReconciliationPaymentForm = ({
           </p>
         )}
         {error && <p role="alert">{error}</p>}
+        {calendarError && <p role="alert">{calendarError}</p>}
+        {calendar ? (
+          <p role="status">
+            {t`Payment calendar: ${calendar.timezone} · Business date: ${calendar.businessDate}`}
+            {!calendar.confirmed && (
+              <>
+                <br />
+                <small>
+                  <Trans>
+                    UTC is used until a reporting time zone is confirmed for
+                    this currency.
+                  </Trans>
+                </small>
+              </>
+            )}
+          </p>
+        ) : (
+          <p role="alert">
+            <Trans>
+              The payment calendar is unavailable. Your entered date and draft
+              are kept; refresh before recording a payment.
+            </Trans>{' '}
+            <StyledDeliveryButton
+              type="button"
+              disabled={busy || saving || refreshingCalendar}
+              onClick={() => void refreshCalendar()}
+            >
+              <Trans>Refresh payment calendar</Trans>
+            </StyledDeliveryButton>
+          </p>
+        )}
         {readOnly && (
           <p role="status">
             <Trans>
@@ -232,6 +307,7 @@ export const ReconciliationPaymentForm = ({
                 <Trans>Currency</Trans>
                 <select
                   name="currency"
+                  disabled={Boolean(invoice)}
                   value={values.currency}
                   onChange={(event) =>
                     setValues({ ...values, currency: event.target.value })
@@ -277,7 +353,7 @@ export const ReconciliationPaymentForm = ({
                 <input
                   name="date"
                   type="date"
-                  max={today}
+                  max={calendar?.businessDate}
                   aria-label={t`Actual payment date`}
                   aria-describedby={`payment-date-${id}`}
                   required
@@ -287,7 +363,9 @@ export const ReconciliationPaymentForm = ({
                   }
                 />
                 <small id={`payment-date-${id}`}>
-                  <Trans>Payment dates use UTC ledger days.</Trans>
+                  {calendar
+                    ? t`Payment dates use ${calendar.timezone} ledger days.`
+                    : t`Refresh the payment calendar to check this date.`}
                 </small>
               </label>
               <label>
@@ -355,7 +433,10 @@ export const ReconciliationPaymentForm = ({
             disabled={
               busy ||
               saving ||
+              refreshingCalendar ||
               readOnly ||
+              !calendar ||
+              !dateValid ||
               !draft.dirty ||
               requirements.length > 0
             }

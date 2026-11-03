@@ -3,6 +3,8 @@ import { useRef } from 'react';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { Link, useSearchParams } from 'react-router-dom';
 import { type DeliveryWorkspace } from '@/delivery/delivery.types';
+import { ActivityWorkspace } from '@/otogrow-activity/ActivityWorkspace';
+import { useDeliveryDraftGuard } from '@/delivery/drafts/DeliveryDraftGuard';
 import {
   StyledDeliveryButton,
   StyledDeliveryCard,
@@ -30,9 +32,15 @@ import {
   type OtogrowActivityQueryVariables,
 } from '~/generated-metadata/graphql';
 
-type OtogrowActivityProps = { workspace: DeliveryWorkspace };
+type OtogrowActivityProps = { workspace?: DeliveryWorkspace };
 
-export const OtogrowActivity = ({ workspace }: OtogrowActivityProps) => {
+export const OtogrowActivity = ({ workspace }: OtogrowActivityProps = {}) =>
+  workspace ? <LegacyActivity workspace={workspace} /> : <ActivityWorkspace />;
+
+type LegacyActivityProps = { workspace: DeliveryWorkspace };
+
+const LegacyActivity = ({ workspace }: LegacyActivityProps) => {
+  const { requestNavigation } = useDeliveryDraftGuard();
   const { t } = useLingui();
   const permission = useOtogrowAccess();
   const [params, setParams] = useSearchParams();
@@ -48,9 +56,7 @@ export const OtogrowActivity = ({ workspace }: OtogrowActivityProps) => {
   const cursor = params.get('activityCursor');
   const validDates = activityDateRange(filters) !== null;
   const canView =
-    workspace.actor.isAdmin &&
-    permission.canManageRoles &&
-    workspace.actor.memberId === permission.access?.memberId;
+    !permission.loading && !permission.error && permission.canManageRoles;
   const query = useQuery<
     OtogrowActivityQuery,
     OtogrowActivityQueryVariables & { identity: string | null }
@@ -73,9 +79,13 @@ export const OtogrowActivity = ({ workspace }: OtogrowActivityProps) => {
       ? candidate
       : undefined;
   const filtered = Object.values(filters).some(Boolean);
-  const clear = () => {
-    setParams(activityFilterParams(params));
-    focusResults();
+  const clear = (commitReset?: () => void) => {
+    const next = activityFilterParams(params);
+    requestNavigation({ pathname: '/delivery', search: `?${next}` }, () => {
+      commitReset?.();
+      setParams(next);
+      focusResults();
+    });
   };
   const olderParams = new URLSearchParams(params);
   if (feed?.nextCursor) olderParams.set('activityCursor', feed.nextCursor);
@@ -169,7 +179,7 @@ export const OtogrowActivity = ({ workspace }: OtogrowActivityProps) => {
                 <StyledDeliveryButton onClick={() => void query.refetch()}>
                   <Trans>Try again</Trans>
                 </StyledDeliveryButton>
-                <StyledDeliveryButton onClick={clear}>
+                <StyledDeliveryButton onClick={() => clear()}>
                   <Trans>Reset activity view</Trans>
                 </StyledDeliveryButton>
               </StyledActivityActions>
@@ -193,7 +203,7 @@ export const OtogrowActivity = ({ workspace }: OtogrowActivityProps) => {
               </p>
               {(filtered || cursor) && (
                 <StyledActivityActions>
-                  <StyledDeliveryButton onClick={clear}>
+                  <StyledDeliveryButton onClick={() => clear()}>
                     <Trans>Show latest activity</Trans>
                   </StyledDeliveryButton>
                 </StyledActivityActions>

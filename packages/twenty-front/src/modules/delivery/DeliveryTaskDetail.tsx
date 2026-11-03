@@ -2,8 +2,18 @@ import { DeliveryTaskWorkflow } from '@/delivery/workflows/DeliveryTaskWorkflow'
 import { DeliveryTaskPlan } from '@/delivery/capacity/DeliveryTaskPlan';
 import { DeliveryRevisions } from '@/delivery/revisions/DeliveryRevisions';
 import { useTaskWorkflow } from '@/delivery/workflows/useTaskWorkflow';
+import {
+  useTaskReview,
+  type TaskReviewController,
+} from '@/delivery/reviews/useTaskReview';
+import { DeliveryTaskReview } from '@/delivery/reviews/DeliveryTaskReview';
+import { ReviewBatchProgress } from '@/delivery/reviews/ReviewBatchProgress';
+import { useReviewLabels } from '@/delivery/reviews/useReviewLabels';
 import { WorkflowDefinitionView } from '@/delivery/workflows/WorkflowDefinitionView';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { DeliveryCreativeReview } from '@/delivery/creative/review/DeliveryCreativeReview';
+import { creativeReviewDestination } from '@/delivery/creative/review/creative-review-navigation';
 import { Trans, useLingui } from '@lingui/react/macro';
 import {
   useDeliveryDraftGuard,
@@ -13,7 +23,7 @@ import { DeliveryTaskForm } from '@/delivery/DeliveryTaskForm';
 import {
   type DeliveryCommandRunner,
   type DeliveryTask,
-  type DeliveryWorkspace,
+  type DeliveryTaskContext,
 } from '@/delivery/delivery.types';
 import {
   StyledDeliveryBadge,
@@ -26,14 +36,34 @@ import {
 
 type DeliveryTaskDetailProps = {
   task: DeliveryTask;
-  workspace: DeliveryWorkspace;
+  workspace: DeliveryTaskContext;
   run: DeliveryCommandRunner;
   busy: boolean;
   celebrateApproval: boolean;
   stateLabel: (state: string) => string;
   onChanged?: () => Promise<unknown>;
+  reviewController?: TaskReviewController;
+  onCelebrationShown?: () => void;
 };
-export const DeliveryTaskDetail = ({
+export const DeliveryTaskDetail = (props: DeliveryTaskDetailProps) => {
+  const [params] = useSearchParams();
+  return (
+    <TaskDetailWorkspace
+      key={`${props.task.id}:${params}`}
+      task={props.task}
+      workspace={props.workspace}
+      run={props.run}
+      busy={props.busy}
+      stateLabel={props.stateLabel}
+      celebrateApproval={props.celebrateApproval}
+      onChanged={props.onChanged}
+      reviewController={props.reviewController}
+      onCelebrationShown={props.onCelebrationShown}
+    />
+  );
+};
+type TaskDetailWorkspaceProps = DeliveryTaskDetailProps;
+const TaskDetailWorkspace = ({
   task,
   workspace,
   run,
@@ -41,14 +71,64 @@ export const DeliveryTaskDetail = ({
   stateLabel,
   celebrateApproval,
   onChanged,
-}: DeliveryTaskDetailProps) => {
+  reviewController,
+  onCelebrationShown,
+}: TaskDetailWorkspaceProps) => {
   const { t } = useLingui();
+  const reviewLabels = useReviewLabels();
+  const [params] = useSearchParams();
+  const [creativeCanReviewFinal, setCreativeCanReviewFinal] = useState(false);
   const workflow = useTaskWorkflow({
     taskId: task.id,
     taskRevision: task.revision,
     onChanged,
   });
   const latestSubmission = task.details.submissions.at(-1);
+  const standaloneReview = useTaskReview({
+    taskId: task.id,
+    taskRevision: task.revision,
+    enabled: !reviewController,
+    onChanged,
+  });
+  const taskReview = reviewController ?? standaloneReview;
+  const creativeReview = Boolean(
+    task.details.creative ||
+    task.details.submissions.some(
+      (submission) =>
+        submission.creativeVersion !== undefined ||
+        submission.finalAssetId !== undefined,
+    ),
+  );
+  const selectedLatest =
+    !params.has('creativeSubmission') ||
+    params.get('creativeSubmission') === String(latestSubmission?.version);
+  const selectedSubmission = params.has('creativeSubmission')
+    ? task.details.submissions.find(
+        (submission) =>
+          String(submission.version) === params.get('creativeSubmission'),
+      )
+    : latestSubmission;
+  const exactCreativeIdentity = Boolean(
+    latestSubmission?.creativeVersion &&
+    latestSubmission.finalAssetId &&
+    task.details.creative?.version === latestSubmission.creativeVersion &&
+    task.details.creative.finalAssetId === latestSubmission.finalAssetId &&
+    task.details.creative.assets.some(
+      (asset) =>
+        asset.id === latestSubmission.finalAssetId &&
+        asset.storageState === 'READY',
+    ),
+  );
+  const reviewIdentity = {
+    selectedSubmissionVersion: latestSubmission?.version,
+    reviewAssignmentRevision: taskReview.data?.assignment?.revision ?? 0,
+    ...(latestSubmission?.creativeVersion
+      ? { creativeVersion: latestSubmission.creativeVersion }
+      : {}),
+    ...(latestSubmission?.finalAssetId
+      ? { finalAssetId: latestSubmission.finalAssetId }
+      : {}),
+  };
   const [workflowReview, setWorkflowReview] = useState({
     version: latestSubmission?.version ?? 0,
     checkedIds: [] as string[],
@@ -111,18 +191,27 @@ export const DeliveryTaskDetail = ({
     });
   };
   const [celebrated, setCelebrated] = useState(celebrateApproval);
+  useEffect(() => {
+    if (!celebrateApproval || !onCelebrationShown) return;
+    setCelebrated(true);
+    onCelebrationShown();
+  }, [celebrateApproval, onCelebrationShown]);
   const { details } = task;
   const canProduce =
     workspace.actor.memberId === task.assigneeId &&
     !['IN_REVIEW', 'APPROVED'].includes(details.state);
   const canReview =
-    workspace.actor.isManager &&
-    workspace.actor.memberId === details.reviewerId &&
+    selectedLatest &&
+    Boolean(latestSubmission) &&
+    taskReview.data?.canReviewSubmission === true &&
+    taskReview.data.pending?.submissionVersion === latestSubmission?.version &&
     workspace.actor.memberId !== task.assigneeId &&
     details.state === 'IN_REVIEW';
-  const memberName = (id: string) =>
-    workspace.members.find((member) => member.id === id)?.name ??
-    t`Former teammate`;
+  const memberName = (id: string | null) =>
+    id === null
+      ? t`Unassigned`
+      : (workspace.members.find((member) => member.id === id)?.name ??
+        t`Former teammate`);
   const change = async (input: Record<string, unknown>) => {
     if (busy || saving) return false;
     setSaving(true);
@@ -132,6 +221,146 @@ export const DeliveryTaskDetail = ({
       setSaving(false);
     }
   };
+  const reviewControls = canReview && (
+    <StyledDeliveryCard>
+      <StyledDeliveryStack>
+        <h3>
+          <Trans>Review this submission</Trans>
+        </h3>
+        {latestSubmission?.workflow && (
+          <details>
+            <summary>
+              <Trans>Submitted service requirements</Trans> ·{' '}
+              {latestSubmission.workflow.definition.name} ·{' '}
+              <Trans>Version</Trans> {latestSubmission.workflow.version}
+            </summary>
+            <WorkflowDefinitionView
+              definition={latestSubmission.workflow.definition}
+              workflow={latestSubmission.workflow}
+            />
+          </details>
+        )}
+        {reviewChecks.map((item) => (
+          <label key={item.id}>
+            <input
+              type="checkbox"
+              disabled={busy || saving}
+              checked={workflowReview.checkedIds.includes(item.id)}
+              onChange={(event) =>
+                setWorkflowReview({
+                  ...workflowReview,
+                  checkedIds: event.target.checked
+                    ? [...workflowReview.checkedIds, item.id]
+                    : workflowReview.checkedIds.filter((id) => id !== item.id),
+                })
+              }
+            />
+            {item.label}
+            {item.required && (
+              <>
+                {' '}
+                · <Trans>Required for approval</Trans>
+              </>
+            )}
+          </label>
+        ))}
+        {!reviewComplete && (
+          <p role="status">
+            <Trans>
+              Confirm all required review checks for this submitted version
+              before approving.
+            </Trans>
+          </p>
+        )}
+        {workflowReview.version !== (latestSubmission?.version ?? 0) && (
+          <StyledDeliveryButton
+            onClick={() =>
+              requestAction(() =>
+                setWorkflowReview({
+                  version: latestSubmission?.version ?? 0,
+                  checkedIds: [],
+                }),
+              )
+            }
+          >
+            <Trans>Reload submission checks</Trans>
+          </StyledDeliveryButton>
+        )}
+        <label>
+          <Trans>Feedback</Trans>
+          <textarea
+            disabled={busy || saving}
+            value={feedback}
+            onChange={(event) => setFeedback(event.target.value)}
+          />
+        </label>
+        {creativeReview && !exactCreativeIdentity && (
+          <p role="status">
+            <Trans>
+              Approval requires the latest frozen asset to be ready and match
+              current production. Request changes to replace missing legacy
+              media; no current asset is substituted.
+            </Trans>
+          </p>
+        )}
+        <StyledDeliveryRow>
+          <StyledDeliveryButton
+            disabled={busy || saving || !feedback.trim()}
+            onClick={async () => {
+              if (
+                await change({
+                  action: 'review',
+                  ...reviewIdentity,
+                  decision: 'CHANGES_REQUESTED',
+                  feedback,
+                })
+              ) {
+                setFeedback('');
+                setWorkflowReview({
+                  version: latestSubmission?.version ?? 0,
+                  checkedIds: [],
+                });
+              }
+            }}
+          >
+            <Trans>Request changes</Trans>
+          </StyledDeliveryButton>
+          <StyledDeliveryButton
+            data-primary="true"
+            disabled={
+              busy ||
+              saving ||
+              !reviewComplete ||
+              !workflow.data ||
+              taskReview.data?.canApprove !== true ||
+              (creativeReview &&
+                (!exactCreativeIdentity || !creativeCanReviewFinal))
+            }
+            onClick={async () => {
+              if (
+                await change({
+                  action: 'review',
+                  ...reviewIdentity,
+                  decision: 'APPROVED',
+                  feedback,
+                  workflowReview: { checkedIds: workflowReview.checkedIds },
+                })
+              ) {
+                setFeedback('');
+                setWorkflowReview({
+                  version: latestSubmission?.version ?? 0,
+                  checkedIds: [],
+                });
+                setCelebrated(true);
+              }
+            }}
+          >
+            <Trans>Approve submission</Trans>
+          </StyledDeliveryButton>
+        </StyledDeliveryRow>
+      </StyledDeliveryStack>
+    </StyledDeliveryCard>
+  );
   if (editing)
     return (
       <StyledDeliveryStack>
@@ -170,6 +399,80 @@ export const DeliveryTaskDetail = ({
           )}
       </StyledDeliveryRow>
       <h2>{task.title}</h2>
+      {!creativeReview && latestSubmission && taskReview.data && (
+        <section aria-label={t`Exact submitted work`}>
+          {selectedSubmission ? (
+            <>
+              <h3>{t`Submission ${selectedSubmission.version}`}</h3>
+              <small>
+                {memberName(selectedSubmission.submittedBy)} ·{' '}
+                {reviewLabels.submittedAt(
+                  selectedSubmission.submittedAt,
+                  taskReview.data?.observedAt,
+                )}
+              </small>
+              <p>{selectedSubmission.description}</p>
+              {selectedSubmission.evidence.map((url) => (
+                <a key={url} href={url} target="_blank" rel="noreferrer">
+                  {url}
+                </a>
+              ))}
+            </>
+          ) : (
+            <p role="alert">
+              <Trans>
+                This exact submitted version is unavailable. Review the latest
+                submission explicitly.
+              </Trans>
+            </p>
+          )}
+        </section>
+      )}
+      <ReviewBatchProgress
+        controller={taskReview}
+        taskId={task.id}
+        latestSubmissionVersion={latestSubmission?.version}
+      />
+      {latestSubmission && (
+        <DeliveryTaskReview
+          controller={taskReview}
+          submissionVersion={
+            selectedLatest
+              ? latestSubmission.version
+              : Number(params.get('creativeSubmission')) || undefined
+          }
+        />
+      )}
+      {creativeReview && (
+        <DeliveryCreativeReview
+          taskId={task.id}
+          taskRevision={task.revision}
+          targetKind="SUBMISSION"
+          enabled={taskReview.available}
+          onFinalReviewReady={setCreativeCanReviewFinal}
+        />
+      )}
+      {!selectedLatest && (
+        <p role="status">
+          <Trans>
+            Earlier submissions remain reviewable. Final decisions require the
+            latest exact submission.
+          </Trans>{' '}
+          <Link
+            to={creativeReviewDestination(params, {
+              creativeSubmission: null,
+              creativeCompare: null,
+              creativeFeedback: null,
+              creativeFeedbackAfter: null,
+              creativeFeedbackBefore: null,
+              reviewAssignmentBefore: null,
+            })}
+          >
+            <Trans>Review latest submission</Trans>
+          </Link>
+        </p>
+      )}
+      {reviewControls}
       {details.draftCopy && (
         <StyledDeliveryCard>
           <h3>
@@ -185,7 +488,8 @@ export const DeliveryTaskDetail = ({
       )}
       <p>
         <Trans>Assigned to</Trans> {memberName(task.assigneeId)} ·{' '}
-        <Trans>Reviewed by</Trans> {memberName(details.reviewerId)}
+        <Trans>Primary manager for client delivery</Trans>{' '}
+        {memberName(details.reviewerId)}
       </p>
       {celebrated && (
         <StyledDeliveryCelebration role="status">
@@ -208,11 +512,12 @@ export const DeliveryTaskDetail = ({
           <p style={{ whiteSpace: 'pre-wrap' }}>
             {details.brief || t`No production notes yet.`}
           </p>
-          {details.evidence.map((url) => (
-            <a key={url} href={url} target="_blank" rel="noreferrer">
-              {url}
-            </a>
-          ))}
+          {(!latestSubmission || taskReview.data) &&
+            details.evidence.map((url) => (
+              <a key={url} href={url} target="_blank" rel="noreferrer">
+                {url}
+              </a>
+            ))}
         </StyledDeliveryStack>
       </StyledDeliveryCard>
       {details.blocker && (
@@ -376,182 +681,92 @@ export const DeliveryTaskDetail = ({
           </StyledDeliveryStack>
         </StyledDeliveryCard>
       )}
-      {canReview && (
-        <StyledDeliveryCard>
-          <StyledDeliveryStack>
-            <h3>
-              <Trans>Review this submission</Trans>
-            </h3>
-            {latestSubmission?.workflow && (
-              <details>
-                <summary>
-                  <Trans>Submitted service requirements</Trans> ·{' '}
-                  {latestSubmission.workflow.definition.name} ·{' '}
-                  <Trans>Version</Trans> {latestSubmission.workflow.version}
-                </summary>
-                <WorkflowDefinitionView
-                  definition={latestSubmission.workflow.definition}
-                  workflow={latestSubmission.workflow}
-                />
-              </details>
-            )}
-            {reviewChecks.map((item) => (
-              <label key={item.id}>
-                <input
-                  type="checkbox"
-                  disabled={busy || saving}
-                  checked={workflowReview.checkedIds.includes(item.id)}
-                  onChange={(event) =>
-                    setWorkflowReview({
-                      ...workflowReview,
-                      checkedIds: event.target.checked
-                        ? [...workflowReview.checkedIds, item.id]
-                        : workflowReview.checkedIds.filter(
-                            (id) => id !== item.id,
-                          ),
-                    })
-                  }
-                />
-                {item.label}
-                {item.required && (
-                  <>
-                    {' '}
-                    · <Trans>Required for approval</Trans>
-                  </>
-                )}
-              </label>
-            ))}
-            {!reviewComplete && (
-              <p role="status">
-                <Trans>
-                  Confirm all required review checks for this submitted version
-                  before approving.
-                </Trans>
-              </p>
-            )}
-            {workflowReview.version !== (latestSubmission?.version ?? 0) && (
-              <StyledDeliveryButton
-                onClick={() =>
-                  requestAction(() =>
-                    setWorkflowReview({
-                      version: latestSubmission?.version ?? 0,
-                      checkedIds: [],
-                    }),
-                  )
-                }
-              >
-                <Trans>Reload submission checks</Trans>
-              </StyledDeliveryButton>
-            )}
-            <label>
-              <Trans>Feedback</Trans>
-              <textarea
-                disabled={busy || saving}
-                value={feedback}
-                onChange={(event) => setFeedback(event.target.value)}
-              />
-            </label>
-            <StyledDeliveryRow>
-              <StyledDeliveryButton
-                disabled={busy || saving || !feedback.trim()}
-                onClick={async () => {
-                  if (
-                    await change({
-                      action: 'review',
-                      decision: 'CHANGES_REQUESTED',
-                      feedback,
-                    })
-                  ) {
-                    setFeedback('');
-                    setWorkflowReview({
-                      version: latestSubmission?.version ?? 0,
-                      checkedIds: [],
-                    });
-                  }
-                }}
-              >
-                <Trans>Request changes</Trans>
-              </StyledDeliveryButton>
-              <StyledDeliveryButton
-                data-primary="true"
-                disabled={busy || saving || !reviewComplete || !workflow.data}
-                onClick={async () => {
-                  if (
-                    await change({
-                      action: 'review',
-                      decision: 'APPROVED',
-                      feedback,
-                      workflowReview: { checkedIds: workflowReview.checkedIds },
-                    })
-                  ) {
-                    setFeedback('');
-                    setWorkflowReview({
-                      version: latestSubmission?.version ?? 0,
-                      checkedIds: [],
-                    });
-                    setCelebrated(true);
-                  }
-                }}
-              >
-                <Trans>Approve submission</Trans>
-              </StyledDeliveryButton>
-            </StyledDeliveryRow>
-          </StyledDeliveryStack>
-        </StyledDeliveryCard>
-      )}
       <DeliveryRevisions task={task} />
-      <h3>
-        <Trans>Submission history</Trans>
-      </h3>
-      {!details.submissions.length && (
-        <small>
-          <Trans>No submissions yet. Completed work will appear here.</Trans>
-        </small>
-      )}
-      {[...details.submissions].reverse().map((submission) => (
-        <StyledDeliveryCard key={submission.version}>
-          <StyledDeliveryStack>
-            <strong>
-              <Trans>Version</Trans> {submission.version} ·{' '}
-              {submission.decision
-                ? stateLabel(submission.decision)
-                : t`Awaiting review`}
-            </strong>
+      {(!latestSubmission || taskReview.data) && (
+        <section aria-label={t`Submission history`}>
+          <h3>
+            <Trans>Submission history</Trans>
+          </h3>
+          {!details.submissions.length && (
             <small>
-              {memberName(submission.submittedBy)} ·{' '}
-              {new Date(submission.submittedAt).toLocaleString()}
+              <Trans>
+                No submissions yet. Completed work will appear here.
+              </Trans>
             </small>
-            <p>{submission.description}</p>
-            {submission.evidence.map((url) => (
-              <a key={url} href={url} target="_blank" rel="noreferrer">
-                {url}
-              </a>
-            ))}
-            {submission.workflow && (
-              <details>
-                <summary>
-                  <Trans>Service requirements used</Trans> ·{' '}
-                  {submission.workflow.definition.name} · <Trans>Version</Trans>{' '}
-                  {submission.workflow.version}
-                </summary>
-                <WorkflowDefinitionView
-                  definition={submission.workflow.definition}
-                  workflow={submission.workflow}
-                  reviewedIds={submission.workflowReview?.checkedIds}
-                />
-              </details>
-            )}
-            {submission.feedback && (
-              <p>
+          )}
+          {[...details.submissions].reverse().map((submission) => (
+            <StyledDeliveryCard key={submission.version}>
+              <StyledDeliveryStack>
                 <strong>
-                  <Trans>Reviewer feedback:</Trans>
-                </strong>{' '}
-                {submission.feedback}
-              </p>
-            )}
-          </StyledDeliveryStack>
-        </StyledDeliveryCard>
-      ))}
+                  <Trans>Version</Trans> {submission.version} ·{' '}
+                  {submission.decision
+                    ? stateLabel(submission.decision)
+                    : t`Awaiting review`}
+                </strong>
+                <small>
+                  {memberName(submission.submittedBy)} ·{' '}
+                  {reviewLabels.submittedAt(
+                    submission.submittedAt,
+                    taskReview.data?.observedAt,
+                  )}
+                </small>
+                {submission.decision && (
+                  <small>
+                    <Trans>Reviewed by</Trans>{' '}
+                    {workspace.members.find(
+                      (member) => member.id === submission.reviewedBy,
+                    )?.name ?? t`Recorded reviewer unavailable`}
+                  </small>
+                )}
+                <p>{submission.description}</p>
+                {
+                  <Link
+                    to={creativeReviewDestination(params, {
+                      panel: 'task',
+                      creativeSubmission: submission.version,
+                      creativeAsset: null,
+                      creativeCompare: null,
+                      creativeFeedback: null,
+                      creativeFeedbackAfter: null,
+                      creativeFeedbackBefore: null,
+                      reviewAssignmentBefore: null,
+                    })}
+                  >
+                    <Trans>Review this exact submission</Trans>
+                  </Link>
+                }
+                {submission.evidence.map((url) => (
+                  <a key={url} href={url} target="_blank" rel="noreferrer">
+                    {url}
+                  </a>
+                ))}
+                {submission.workflow && (
+                  <details>
+                    <summary>
+                      <Trans>Service requirements used</Trans> ·{' '}
+                      {submission.workflow.definition.name} ·{' '}
+                      <Trans>Version</Trans> {submission.workflow.version}
+                    </summary>
+                    <WorkflowDefinitionView
+                      definition={submission.workflow.definition}
+                      workflow={submission.workflow}
+                      reviewedIds={submission.workflowReview?.checkedIds}
+                    />
+                  </details>
+                )}
+                {submission.feedback && (
+                  <p>
+                    <strong>
+                      <Trans>Reviewer feedback:</Trans>
+                    </strong>{' '}
+                    {submission.feedback}
+                  </p>
+                )}
+              </StyledDeliveryStack>
+            </StyledDeliveryCard>
+          ))}
+        </section>
+      )}
       <h3>
         <Trans>Activity and discussion</Trans>
       </h3>

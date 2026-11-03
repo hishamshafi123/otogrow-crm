@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useWorkflowAccess } from '@/delivery/workflows/useWorkflowAccess';
+import { hasOtogrowCapability } from '@/otogrow-access/otogrow-access.types';
 import { type DeliveryWorkspace } from '@/delivery/delivery.types';
 import { useLingui } from '@lingui/react/macro';
 import {
@@ -35,6 +36,12 @@ export const useDeliveryNavigation = (actor: DeliveryWorkspace['actor']) => {
       (permission.access?.capabilities.includes('workspace.admin') === true ||
         permission.access?.capabilities.includes('delivery.manage') === true),
     canReadFinance: verified && permission.canReadFinance,
+    canReview:
+      verified &&
+      hasOtogrowCapability(
+        permission.access?.capabilities ?? [],
+        'delivery.review',
+      ),
   };
   const [lastVerified, setLastVerified] = useState(current);
   if (
@@ -42,6 +49,7 @@ export const useDeliveryNavigation = (actor: DeliveryWorkspace['actor']) => {
     (verified &&
       (lastVerified.isAdmin !== current.isAdmin ||
         lastVerified.isManager !== current.isManager ||
+        lastVerified.canReview !== current.canReview ||
         lastVerified.canReadFinance !== current.canReadFinance))
   )
     setLastVerified(current);
@@ -52,7 +60,7 @@ export const useDeliveryNavigation = (actor: DeliveryWorkspace['actor']) => {
     lastVerified.identity === current.identity
       ? lastVerified
       : current;
-  const { isAdmin, isManager, canReadFinance } = navigation;
+  const { isAdmin, isManager, canReadFinance, canReview } = navigation;
   return [
     {
       id: 'today',
@@ -86,12 +94,20 @@ export const useDeliveryNavigation = (actor: DeliveryWorkspace['actor']) => {
                 description: t`Plan assignments and review the team's workload.`,
                 Icon: IconCalendar,
               },
+            ]
+          : []),
+        ...(canReview
+          ? [
               {
                 view: 'reviews',
                 label: t`Approvals`,
-                description: t`Review submissions and give clear feedback.`,
+                description: t`Review waiting submissions and see who is responsible.`,
                 Icon: IconCheck,
               },
+            ]
+          : []),
+        ...(isManager
+          ? [
               {
                 view: 'workflows',
                 label: t`Service workflows`,
@@ -176,6 +192,12 @@ export const useDeliveryNavigation = (actor: DeliveryWorkspace['actor']) => {
           label: t`Advertising`,
           description: t`Performance reports, recommendations and budget requests.`,
           Icon: IconChartBar,
+        },
+        {
+          view: 'seo',
+          label: t`SEO results`,
+          description: t`Review completed SEO work and measured client results.`,
+          Icon: IconSearch,
         },
         {
           view: 'content',

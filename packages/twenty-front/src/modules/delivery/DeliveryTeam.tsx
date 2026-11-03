@@ -1,4 +1,5 @@
 import { useDeliveryDraftGuard } from '@/delivery/drafts/DeliveryDraftGuard';
+import { ClientSetupLink } from '@/delivery/onboarding/ClientSetupLink';
 import { useDeliveryNativeDraft } from '@/delivery/drafts/useDeliveryNativeDraft';
 import { DeliveryDraftConflict } from '@/delivery/drafts/DeliveryDraftConflict';
 import { OtogrowTeamRoles } from '@/otogrow-access/OtogrowTeamRoles';
@@ -38,6 +39,9 @@ export const DeliveryTeam = ({
         plan and review all projects.
       </Trans>
     </p>
+    <ClientSetupLink>
+      <Trans>Set up client work with a project and service plan</Trans>
+    </ClientSetupLink>
     <DeliveryProjectForm
       workspace={workspace}
       run={run}

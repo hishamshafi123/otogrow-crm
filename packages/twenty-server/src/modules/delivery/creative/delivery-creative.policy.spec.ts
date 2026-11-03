@@ -4,6 +4,8 @@ import {
 } from 'src/modules/delivery/creative/delivery-creative.types';
 import {
   assertCreativeSubmission,
+  assertCreativeAssetMime,
+  invalidateCreativeBrief,
   invalidateCreativeAssembly,
   isCreativeAssetCurrent,
 } from 'src/modules/delivery/creative/delivery-creative.policy';
@@ -51,6 +53,51 @@ const production = () => {
   return document;
 };
 describe('creative final submission', () => {
+  it('submits a still image without a fabricated video shot or clip', () => {
+    const document = production();
+    document.brief.outputKind = 'IMAGE';
+    document.shots = [];
+    document.assets = [{ ...asset('FINAL'), mimeType: 'image/png' }];
+    expect(() => assertCreativeSubmission(document)).not.toThrow();
+    expect(() =>
+      assertCreativeAssetMime(document, document.assets[0]),
+    ).not.toThrow();
+  });
+  it('retains an earlier video storyboard without blocking the final still image', () => {
+    const document = production();
+    document.brief.outputKind = 'IMAGE';
+    document.assets[2].mimeType = 'image/png';
+    document.shots[0].clipId = null;
+    document.assets = document.assets.filter((item) => item.kind !== 'CLIP');
+    expect(() => assertCreativeSubmission(document)).not.toThrow();
+    document.assets[0].reviews = [];
+    expect(() => assertCreativeSubmission(document)).not.toThrow();
+  });
+  it.each(['IMAGE', 'VIDEO', undefined] as const)(
+    'enforces the declared or legacy %s final media type',
+    (outputKind) => {
+      const document = production();
+      document.brief.outputKind = outputKind;
+      document.assets[2].mimeType =
+        outputKind === 'IMAGE' ? 'video/mp4' : 'image/png';
+      expect(() => assertCreativeSubmission(document)).toThrow(
+        outputKind === 'IMAGE' ? 'still image' : 'video',
+      );
+      expect(() =>
+        assertCreativeAssetMime(document, document.assets[2]),
+      ).toThrow();
+    },
+  );
+  it('keeps image final files subject to current brief and production approval', () => {
+    const document = production();
+    document.brief.outputKind = 'IMAGE';
+    document.assets[2].mimeType = 'image/png';
+    document.shots = [];
+    invalidateCreativeBrief(document);
+    expect(() => assertCreativeSubmission(document)).toThrow(
+      'current creative brief',
+    );
+  });
   it('allows current approved intermediate work with a final candidate', () => {
     expect(() => assertCreativeSubmission(production())).not.toThrow();
   });

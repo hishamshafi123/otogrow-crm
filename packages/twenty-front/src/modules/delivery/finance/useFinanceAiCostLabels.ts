@@ -24,6 +24,8 @@ export const useFinanceAiCostLabels = () => {
   const sourceKinds: Record<string, string> = {
     TASK_AGENT: t`Task assistant`,
     INBOX_DRAFT: t`Inbox draft`,
+    ADVERTISING_DRAFT: t`Advertising recommendations`,
+    ACTIVITY_ANALYSIS: t`Team activity analysis`,
     MEDIA: t`Creative production`,
   };
   const warnings: Record<string, string> = {

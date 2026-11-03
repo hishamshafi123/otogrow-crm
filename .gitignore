@@ -73,3 +73,5 @@ screenshots/
 
 # local brand tooling
 /.venv-brand/
+
+/packages/twenty-server/artifacts/phase3-media-acceptance/

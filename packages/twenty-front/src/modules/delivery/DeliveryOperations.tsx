@@ -1,4 +1,8 @@
 import { DeliveryGuardedForm } from '@/delivery/drafts/DeliveryGuardedForm';
+import { ReviewAssignmentLink } from '@/delivery/reviews/ReviewAssignmentLink';
+import { isValidUuid, getValidTimeZoneOrUndefined } from 'twenty-shared/utils';
+import { Link } from 'react-router-dom';
+import { advertisingReportDestination } from '@/delivery/advertising/advertising-report-destination';
 import {
   useDeliveryDraftGuard,
   useDeliveryDraftStatus,
@@ -6,7 +10,11 @@ import {
 import { gql } from '@apollo/client';
 import { useMutation, useQuery } from '@apollo/client/react';
 import { Trans, useLingui } from '@lingui/react/macro';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
+import { CombinedGraphQLErrors } from '@apollo/client/errors';
+import { useFinanceExportRequestGuard } from '@/delivery/finance/export/useFinanceExportRequestGuard';
+import { RecurringTemplateForm } from '@/delivery/operations/forms/RecurringTemplateForm';
+import { type OperationSaveResult } from '@/delivery/operations/forms/recurring-template-values';
 import {
   type DeliveryTask,
   type DeliveryWorkspace,
@@ -64,39 +72,62 @@ export const DeliveryOperations = ({
   const data = query.data?.deliveryOperations;
   const actor = workspace.actor;
   const manager = actor.isManager;
-  const run = async (input: Record<string, unknown>) => {
+  // oxlint-disable-next-line twenty/no-state-useref -- Same-turn clicks must share one in-flight operation.
+  const pending = useRef(false);
+  const beginOperation = useFinanceExportRequestGuard(
+    `${actor.memberId}:${actor.isAdmin}:${actor.isManager}`,
+    true,
+  );
+  const runDetailed = async (
+    input: Record<string, unknown>,
+  ): Promise<OperationSaveResult> => {
+    if (pending.current) return { kind: 'UNKNOWN' };
+    pending.current = true;
+    const current = beginOperation();
     setError('');
     setChanging(true);
-    let result;
     try {
-      result = await mutate({ variables: { input } });
+      const result = (await mutate({ variables: { input } })).data
+        ?.changeDeliveryOperations;
+      if (!current() || !result) return { kind: 'UNKNOWN' };
+      query.client.writeQuery({
+        query: GET_OPERATIONS,
+        data: { deliveryOperations: result },
+      });
+      if (result.link) setLink(result.link);
+      try {
+        await onChanged();
+      } catch {
+        if (current())
+          setError(
+            t`The operation was saved, but this page could not refresh. Refresh before making another change.`,
+          );
+      }
+      return { kind: 'SAVED' };
     } catch (failure) {
-      setError(
+      if (!current()) return { kind: 'UNKNOWN' };
+      const message =
         failure instanceof Error
           ? failure.message
-          : t`Could not save this operation.`,
-      );
+          : t`Could not save this operation.`;
+      setError(message);
+      if (
+        CombinedGraphQLErrors.is(failure) &&
+        failure.errors.some((entry) =>
+          ['BAD_USER_INPUT', 'CONFLICT'].includes(
+            String(entry.extensions?.code),
+          ),
+        )
+      )
+        return { kind: 'REJECTED', message };
+      return { kind: 'UNKNOWN' };
+    } finally {
+      pending.current = false;
       setChanging(false);
-      return false;
     }
-    try {
-      if (result.data) {
-        query.client.writeQuery({
-          query: GET_OPERATIONS,
-          data: { deliveryOperations: result.data.changeDeliveryOperations },
-        });
-        if (result.data.changeDeliveryOperations.link)
-          setLink(result.data.changeDeliveryOperations.link);
-      }
-      await onChanged();
-    } catch {
-      setError(
-        t`The operation was saved, but this page could not refresh. Refresh before making another change.`,
-      );
-    }
-    setChanging(false);
-    return true;
   };
+  const run = async (input: Record<string, unknown>) =>
+    (await runDetailed(input)).kind === 'SAVED';
   const taskId = task?.id;
   const labels: Record<string, string> = {
     DAILY: t`Daily`,
@@ -141,17 +172,6 @@ export const DeliveryOperations = ({
     );
   const formTemplate =
     data.templates.find((template) => template.id === editing?.id) ?? editing;
-  const templateSnapshot = JSON.stringify(
-    formTemplate
-      ? {
-          ...formTemplate,
-          skipped: undefined,
-          error: undefined,
-          lastDate: undefined,
-          lastTaskId: undefined,
-        }
-      : null,
-  );
   const fulfilment = data.fulfilments.find((item) => item.taskId === taskId);
   const currentDelivery =
     task?.details.state === 'APPROVED' &&
@@ -429,21 +449,45 @@ export const DeliveryOperations = ({
               </small>
               {notice.error && <p>{notice.error}</p>}
               <StyledDeliveryRow>
+                {notice.kind === 'REVIEW_ASSIGNMENT' &&
+                  isValidUuid(notice.taskId) &&
+                  notice.reviewAssignment &&
+                  Number.isSafeInteger(
+                    notice.reviewAssignment.submissionVersion,
+                  ) &&
+                  notice.reviewAssignment.submissionVersion > 0 && (
+                    <ReviewAssignmentLink
+                      taskId={notice.taskId}
+                      submissionVersion={
+                        notice.reviewAssignment.submissionVersion
+                      }
+                    />
+                  )}
                 {notice.taskId.startsWith('meta-report:') && (
-                  <a href="/delivery?view=ads">
-                    <Trans>Open advertising reports</Trans>
-                  </a>
-                )}
-                {onOpenTask && !notice.taskId.startsWith('meta-report:') && (
-                  <StyledDeliveryButton
-                    onClick={() =>
-                      requestAction(() => onOpenTask(notice.taskId))
+                  <Link
+                    to={
+                      advertisingReportDestination(
+                        'META',
+                        notice.taskId.slice('meta-report:'.length),
+                      ) ?? '/delivery?view=ads'
                     }
                   >
-                    <Trans>Open task</Trans>
-                  </StyledDeliveryButton>
+                    <Trans>Open advertising report</Trans>
+                  </Link>
                 )}
+                {onOpenTask &&
+                  notice.kind !== 'REVIEW_ASSIGNMENT' &&
+                  !notice.taskId.startsWith('meta-report:') && (
+                    <StyledDeliveryButton
+                      onClick={() =>
+                        requestAction(() => onOpenTask(notice.taskId))
+                      }
+                    >
+                      <Trans>Open task</Trans>
+                    </StyledDeliveryButton>
+                  )}
                 {notice.recipientId === actor.memberId &&
+                  notice.kind !== 'REVIEW_ASSIGNMENT' &&
                   !notice.seenAt &&
                   !notice.acknowledgedAt && (
                     <StyledDeliveryButton
@@ -564,259 +608,26 @@ export const DeliveryOperations = ({
                     ? t`Edit recurring template`
                     : t`New recurring template`}
                 </h3>
-                <DeliveryGuardedForm
-                  revision={0}
-                  snapshot={templateSnapshot}
-                  busy={busy}
+                <RecurringTemplateForm
                   key={editing?.id ?? 'new'}
-                  onSave={async (form) => {
-                    const checklist = field(form, 'checklist')
-                      .split('\n')
-                      .map((text) => text.trim())
-                      .filter(Boolean)
-                      .map((text) => ({
-                        id: crypto.randomUUID(),
-                        text,
-                        done: false,
-                      }));
-                    if (
-                      await run({
-                        action: 'template',
-                        template: {
-                          ...(editing ? { id: editing.id } : {}),
-                          projectId: field(form, 'projectId'),
-                          workflow: workflowPinFromForm(
-                            form,
-                            formTemplate?.workflow,
-                          ),
-                          frequency: field(form, 'frequency'),
-                          weekdays: form.getAll('weekdays').map(Number),
-                          monthDay: Number(field(form, 'monthDay')),
-                          time: field(form, 'time'),
-                          startDate: field(form, 'startDate'),
-                          endDate: field(form, 'endDate') || null,
-                          dueHours: Number(field(form, 'dueHours')),
-                          paused: form.has('paused'),
-                          fields: {
-                            title: field(form, 'title'),
-                            service: field(form, 'service'),
-                            brief: field(form, 'brief'),
-                            assigneeId: field(form, 'assigneeId'),
-                            reviewerId: field(form, 'reviewerId'),
-                            priority: 'NORMAL',
-                            scheduledDate: null,
-                            dueAt: null,
-                            evidence: [],
-                            checklist,
-                          },
-                        },
-                      })
-                    ) {
-                      setEditing(null);
-                      return true;
+                  workspace={workspace}
+                  template={formTemplate ?? null}
+                  timezone={data.timezone}
+                  busy={busy}
+                  onSave={(template) =>
+                    runDetailed({ action: 'template', template })
+                  }
+                  onCancel={() => setEditing(null)}
+                  onInspect={async () => {
+                    try {
+                      return Boolean(
+                        (await query.refetch()).data?.deliveryOperations,
+                      );
+                    } catch {
+                      return false;
                     }
-                    return false;
                   }}
-                >
-                  <StyledDeliveryStack>
-                    <StyledDeliveryGrid>
-                      <label>
-                        <Trans>Task title</Trans>
-                        <input
-                          name="title"
-                          required
-                          maxLength={200}
-                          defaultValue={formTemplate?.fields.title}
-                        />
-                      </label>
-                      <label>
-                        <Trans>Project</Trans>
-                        <select
-                          name="projectId"
-                          required
-                          defaultValue={formTemplate?.projectId}
-                        >
-                          {workspace.projects.map((project) => (
-                            <option key={project.id} value={project.id}>
-                              {project.name}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <label>
-                        <Trans>Service</Trans>
-                        <input
-                          name="service"
-                          maxLength={100}
-                          defaultValue={formTemplate?.fields.service}
-                          placeholder={t`SEO, advertising, design…`}
-                        />
-                      </label>
-                      <label>
-                        <Trans>Assignee</Trans>
-                        <select
-                          name="assigneeId"
-                          required
-                          defaultValue={formTemplate?.fields.assigneeId}
-                        >
-                          {memberOptions}
-                        </select>
-                      </label>
-                      <label>
-                        <Trans>Reviewer</Trans>
-                        <select
-                          name="reviewerId"
-                          required
-                          defaultValue={
-                            formTemplate?.fields.reviewerId ?? actor.memberId
-                          }
-                        >
-                          {workspace.members
-                            .filter((member) =>
-                              ['ADMIN', 'MANAGER'].includes(member.access),
-                            )
-                            .map((member) => (
-                              <option key={member.id} value={member.id}>
-                                {member.name}
-                              </option>
-                            ))}
-                        </select>
-                      </label>
-                      <label>
-                        <Trans>Frequency</Trans>
-                        <select
-                          name="frequency"
-                          defaultValue={formTemplate?.frequency ?? 'WEEKLY'}
-                        >
-                          <option value="DAILY">{t`Daily`}</option>
-                          <option value="WEEKLY">{t`Weekly`}</option>
-                          <option value="MONTHLY">{t`Monthly`}</option>
-                        </select>
-                      </label>
-                      <label>
-                        <Trans>Local scheduled time</Trans>
-                        <input
-                          type="time"
-                          name="time"
-                          required
-                          defaultValue={formTemplate?.time ?? '09:00'}
-                        />
-                      </label>
-                      <label>
-                        <Trans>Monthly day (clamped to month end)</Trans>
-                        <input
-                          type="number"
-                          name="monthDay"
-                          min={1}
-                          max={31}
-                          required
-                          defaultValue={formTemplate?.monthDay ?? 1}
-                        />
-                      </label>
-                      <label>
-                        <Trans>Start date</Trans>
-                        <input
-                          type="date"
-                          name="startDate"
-                          required
-                          defaultValue={
-                            formTemplate?.startDate ??
-                            new Date().toISOString().slice(0, 10)
-                          }
-                        />
-                      </label>
-                      <label>
-                        <Trans>End date (optional)</Trans>
-                        <input
-                          type="date"
-                          name="endDate"
-                          defaultValue={formTemplate?.endDate ?? ''}
-                        />
-                      </label>
-                      <label>
-                        <Trans>Deadline hours after creation</Trans>
-                        <input
-                          type="number"
-                          name="dueHours"
-                          min={1}
-                          max={744}
-                          required
-                          defaultValue={formTemplate?.dueHours ?? 24}
-                        />
-                      </label>
-                    </StyledDeliveryGrid>
-                    <fieldset>
-                      <legend>
-                        <Trans>Weekly days</Trans>
-                      </legend>
-                      <StyledDeliveryRow>
-                        {[
-                          t`Sunday`,
-                          t`Monday`,
-                          t`Tuesday`,
-                          t`Wednesday`,
-                          t`Thursday`,
-                          t`Friday`,
-                          t`Saturday`,
-                        ].map((day, index) => (
-                          <label key={day}>
-                            <input
-                              type="checkbox"
-                              name="weekdays"
-                              value={index}
-                              defaultChecked={(
-                                formTemplate?.weekdays ?? [1]
-                              ).includes(index)}
-                            />
-                            {day}
-                          </label>
-                        ))}
-                      </StyledDeliveryRow>
-                    </fieldset>
-                    <label>
-                      <Trans>Brief, instructions and required evidence</Trans>
-                      <textarea
-                        name="brief"
-                        maxLength={20000}
-                        defaultValue={formTemplate?.fields.brief}
-                      />
-                    </label>
-                    <WorkflowPinField initial={formTemplate?.workflow} />
-                    <label>
-                      <Trans>Checklist (one item per line)</Trans>
-                      <textarea
-                        name="checklist"
-                        defaultValue={formTemplate?.fields.checklist
-                          .map((item) => item.text)
-                          .join('\n')}
-                      />
-                    </label>
-                    <label>
-                      <input
-                        type="checkbox"
-                        name="paused"
-                        defaultChecked={formTemplate?.paused ?? false}
-                      />
-                      <Trans>Keep this template paused</Trans>
-                    </label>
-                    <StyledDeliveryRow>
-                      <StyledDeliveryButton
-                        type="submit"
-                        disabled={busy || !workspace.projects.length}
-                      >
-                        <Trans>Save recurring template</Trans>
-                      </StyledDeliveryButton>
-                      {editing && (
-                        <StyledDeliveryButton
-                          type="button"
-                          onClick={() => requestAction(() => setEditing(null))}
-                        >
-                          <Trans>Cancel edit</Trans>
-                        </StyledDeliveryButton>
-                      )}
-                    </StyledDeliveryRow>
-                  </StyledDeliveryStack>
-                </DeliveryGuardedForm>
+                />
               </StyledDeliveryCard>
             </>
           )}
@@ -947,7 +758,7 @@ export const DeliveryOperations = ({
           {actor.isAdmin && (
             <StyledDeliveryCard>
               <h3>
-                <Trans>Follow-through settings</Trans>
+                <Trans>Delivery and reminder settings</Trans>
               </h3>
               <DeliveryGuardedForm
                 revision={0}
@@ -958,15 +769,21 @@ export const DeliveryOperations = ({
                   telegramEnabled: data.telegramEnabled,
                   founderId: data.founderId,
                 })}
-                onSave={(form) =>
-                  run({
+                onSave={(form) => {
+                  if (!getValidTimeZoneOrUndefined(field(form, 'timezone'))) {
+                    setError(
+                      t`Choose a valid reporting time zone, for example Asia/Qatar.`,
+                    );
+                    return Promise.resolve(false);
+                  }
+                  return run({
                     action: 'settings',
                     timezone: field(form, 'timezone'),
                     enabled: form.has('enabled'),
                     telegramEnabled: form.has('telegramEnabled'),
                     founderId: field(form, 'founderId') || null,
-                  })
-                }
+                  });
+                }}
               >
                 <StyledDeliveryStack>
                   <label>
@@ -975,7 +792,15 @@ export const DeliveryOperations = ({
                       name="timezone"
                       required
                       defaultValue={data.timezone}
+                      maxLength={100}
                       placeholder="Asia/Dubai"
+                      onChange={(event) =>
+                        event.currentTarget.setCustomValidity(
+                          getValidTimeZoneOrUndefined(event.currentTarget.value)
+                            ? ''
+                            : t`Choose a valid reporting time zone, for example Asia/Qatar.`,
+                        )
+                      }
                     />
                   </label>
                   <label>
@@ -1033,7 +858,3 @@ export const DeliveryOperations = ({
     </StyledDeliveryStack>
   );
 };
-import {
-  WorkflowPinField,
-  workflowPinFromForm,
-} from '@/delivery/workflows/WorkflowPinField';

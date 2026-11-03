@@ -45,7 +45,11 @@ export const capacityLoads = (
           !isDefined(plan.workMinutes) || !isDefined(plan.revisionMinutes),
         unknownWait: !isDefined(plan.waitMinutes),
       });
-    if (task.details.reviewerId === memberId)
+    const reviewOwnerId =
+      task.details.state === 'IN_REVIEW' && task.review
+        ? task.review.effectiveReviewerId
+        : task.details.reviewerId;
+    if (reviewOwnerId === memberId)
       loads.push({
         task,
         kind: 'REVIEW',

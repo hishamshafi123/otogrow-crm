@@ -1,11 +1,12 @@
 jest.mock('@/delivery/readiness/DeliveryReadiness', () => ({
   DeliveryReadiness: () => <section aria-label="Capability readiness" />,
 }));
+import { type ReactNode } from 'react';
 import { i18n } from '@lingui/core';
 import { I18nProvider } from '@lingui/react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 jest.mock('@/delivery/revisions/DeliveryRevisionCosts', () => ({
   DeliveryRevisionCosts: () => null,
 }));
@@ -65,8 +66,22 @@ const workspace: DeliveryWorkspace = {
   members: [],
   companies: [],
 };
-const setup = (view: string, value = workspace) => {
+const BusinessLocation = () => {
+  const location = useLocation();
+  return <output aria-label="Business location">{location.search}</output>;
+};
+const setup = (
+  view: string,
+  value = workspace,
+  entry = `/delivery?view=${view}`,
+) => {
   i18n.loadAndActivate({ locale: 'en', messages: {} });
+  const Wrapper = ({ children }: { children: ReactNode }) => (
+    <MemoryRouter initialEntries={[entry]}>
+      {children}
+      <BusinessLocation />
+    </MemoryRouter>
+  );
   return render(
     <I18nProvider i18n={i18n}>
       <DeliveryBusiness
@@ -76,7 +91,7 @@ const setup = (view: string, value = workspace) => {
         onOpenTask={jest.fn()}
       />
     </I18nProvider>,
-    { wrapper: MemoryRouter },
+    { wrapper: Wrapper },
   );
 };
 beforeEach(() => {
@@ -106,8 +121,11 @@ beforeEach(() => {
 it('preserves currency and decimal cents when entering a receipt', async () => {
   setup('finance');
   await userEvent.click(
-    screen.getByRole('button', { name: 'New Financial entry' }),
+    screen.getByRole('button', { name: 'New financial entry' }),
   );
+  expect(
+    screen.getByRole('heading', { name: 'New financial entry' }),
+  ).toBeVisible();
   await userEvent.type(screen.getByLabelText('Title'), 'Receipt');
   await userEvent.selectOptions(screen.getByLabelText('Currency'), 'AED');
   await userEvent.selectOptions(
@@ -119,7 +137,9 @@ it('preserves currency and decimal cents when entering a receipt', async () => {
     screen.getByLabelText('Transaction date *'),
     '2026-10-24',
   );
-  await userEvent.click(screen.getByRole('button', { name: 'Save record' }));
+  await userEvent.click(
+    screen.getByRole('button', { name: 'Save financial entry' }),
+  );
   await waitFor(() => expect(mockMutate).toHaveBeenCalled());
   expect(mockMutate.mock.calls[0][0].variables.input.record).toMatchObject({
     kind: 'FINANCE',
@@ -133,7 +153,7 @@ it('preserves currency and decimal cents when entering a receipt', async () => {
 it('shows plain-language cash categories while preserving their stored values', async () => {
   setup('finance');
   await userEvent.click(
-    screen.getByRole('button', { name: 'New Financial entry' }),
+    screen.getByRole('button', { name: 'New financial entry' }),
   );
   const category = screen.getByRole('combobox', { name: 'Entry category *' });
   for (const [label, value] of [
@@ -164,10 +184,13 @@ it('does not show financial editing or exports to an employee', () => {
     actor: { memberId: 'employee', isAdmin: false, isManager: false },
   });
   expect(
-    screen.queryByRole('button', { name: 'Export CSV' }),
+    screen.queryByRole('button', { name: 'Download financial CSV' }),
   ).not.toBeInTheDocument();
   expect(
-    screen.queryByRole('button', { name: 'New Financial entry' }),
+    screen.queryByRole('link', { name: 'Accounting exports' }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole('button', { name: 'New financial entry' }),
   ).not.toBeInTheDocument();
 });
 it('shows a read-only conversation without draft or model execution controls', async () => {
@@ -198,7 +221,7 @@ it('shows a read-only conversation without draft or model execution controls', a
     screen.getByText('You have view-only access to this conversation.'),
   ).toBeInTheDocument();
   expect(
-    screen.queryByRole('button', { name: 'Save inside OS' }),
+    screen.queryByRole('button', { name: 'Save reply draft' }),
   ).not.toBeInTheDocument();
   expect(
     screen.queryByRole('button', { name: 'Generate unsent reply draft' }),
@@ -228,13 +251,95 @@ it('does not offer self-approval of a release', async () => {
     screen.getByRole('button', { name: 'Open assigned task' }),
   ).toBeInTheDocument();
 });
-it('uses the typed capability readiness view on the company overview', () => {
-  mockData.connections = [{ channel: 'META', status: 'CONNECTED' }];
-  setup('health');
+
+it('distinguishes historical cash estimates from reviewed forecasts and accountant exports', () => {
+  mockData.finance = [
+    {
+      currency: 'USD',
+      cash: 120000,
+      income30: 30000,
+      expense30: 50000,
+      netBurn: 20000,
+      runwayMonths: 6,
+      revenueGrowth: 0.5,
+      spendingGrowth: 0.25,
+      receivables: 40000,
+      overdue: 10000,
+      projects: [
+        {
+          projectId: null,
+          revenue: 30000,
+          costs: 50000,
+          cashContribution: -20000,
+          margin: -2 / 3,
+        },
+      ],
+    },
+  ];
+  setup('finance');
   expect(
-    screen.getByRole('region', { name: 'Capability readiness' }),
+    screen.getByRole('heading', { name: 'USD · Historical cash estimates' }),
   ).toBeVisible();
-  expect(screen.queryByText('Connected')).not.toBeInTheDocument();
+  for (const label of [
+    'Historical recorded balance',
+    'Recorded receivables',
+    'Recorded overdue amount',
+    'Recorded receipts · trailing 30 days',
+    'Recorded costs · trailing 30 days',
+    'Estimated net burn · trailing 30 days',
+  ])
+    expect(screen.getByText(label)).toBeVisible();
+  expect(screen.getByText(/Historical runway estimate:/)).toHaveTextContent(
+    '6.0 months (30-day burn basis)',
+  );
+  expect(
+    screen.getByText(/Recorded cash contribution · trailing 30 days:/),
+  ).toHaveTextContent('Recorded cash contribution margin: -66.7%');
+  expect(
+    screen.getByText(/Date cutoffs use UTC and trailing 30-day comparisons/),
+  ).toBeVisible();
+  expect(
+    screen.getByText(/Missing opening balances, receipts, expenses or salary/),
+  ).toHaveTextContent('they do not confirm available cash');
+  expect(
+    screen.getByRole('link', { name: 'Open reviewed cash forecast' }),
+  ).toHaveAttribute('href', '/delivery?view=finance&financeView=forecast');
+  expect(
+    screen.getByRole('link', { name: 'Accounting exports' }),
+  ).toHaveAttribute('href', '/delivery?view=finance&financeView=exports');
+  expect(
+    screen.getByRole('button', { name: 'Download financial CSV' }),
+  ).toBeVisible();
+});
+
+it('does not present a zero recorded balance or absent trailing burn as confirmed cash or unlimited runway', () => {
+  mockData.finance = [
+    {
+      currency: 'AED',
+      cash: 0,
+      income30: 0,
+      expense30: 0,
+      netBurn: 0,
+      runwayMonths: null,
+      revenueGrowth: null,
+      spendingGrowth: null,
+      receivables: 0,
+      overdue: 0,
+      projects: [],
+    },
+  ];
+  setup('finance');
+  expect(
+    screen.getByRole('heading', { name: 'AED · Historical cash estimates' }),
+  ).toBeVisible();
+  expect(screen.getByText(/Historical runway estimate:/)).toHaveTextContent(
+    'Not estimated: no recorded net burn in the trailing 30 days',
+  );
+  expect(screen.getByText(/Missing opening balances/)).toHaveTextContent(
+    'incomplete',
+  );
+  expect(screen.queryByText('Cash', { exact: true })).not.toBeInTheDocument();
+  expect(screen.queryByText('Runway', { exact: true })).not.toBeInTheDocument();
 });
 
 it('lets a finance reader view and export without editing', async () => {
@@ -261,10 +366,18 @@ it('lets a finance reader view and export without editing', async () => {
     actor: { memberId: 'reader', isAdmin: false, isManager: false },
   });
   expect(
-    screen.getByRole('button', { name: 'Export CSV' }),
+    screen.getByRole('button', { name: 'Download financial CSV' }),
   ).toBeInTheDocument();
   expect(
-    screen.queryByRole('button', { name: 'New Financial entry' }),
+    screen.getByText(
+      /Raw records include receivables, opening balances and voided entries/,
+    ),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole('link', { name: 'Accounting exports' }),
+  ).toHaveAttribute('href', '/delivery?view=finance&financeView=exports');
+  expect(
+    screen.queryByRole('button', { name: 'New financial entry' }),
   ).not.toBeInTheDocument();
   await userEvent.click(screen.getByRole('button', { name: 'Open details' }));
   expect(
@@ -424,7 +537,7 @@ it('lets a finance editor allocate to a project without delivery management', as
     actor: { memberId: 'accountant', isAdmin: false, isManager: false },
   });
   await userEvent.click(
-    screen.getByRole('button', { name: 'New Financial entry' }),
+    screen.getByRole('button', { name: 'New financial entry' }),
   );
   expect(
     screen.getByRole('option', { name: 'Accounting allocation project' }),
@@ -454,7 +567,7 @@ it.each(['identity', 'access', 'error'])(
       screen.queryByText('Private salary allocation'),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: 'Export CSV' }),
+      screen.queryByRole('button', { name: 'Download financial CSV' }),
     ).not.toBeInTheDocument();
   },
 );
@@ -462,7 +575,7 @@ it.each(['identity', 'access', 'error'])(
 it('keeps an unsaved finance entry through a failed refresh while hiding stale records', async () => {
   const rendered = setup('finance');
   await userEvent.click(
-    screen.getByRole('button', { name: 'New Financial entry' }),
+    screen.getByRole('button', { name: 'New financial entry' }),
   );
   await userEvent.type(screen.getByLabelText('Title'), 'Unsaved allocation');
   const page = () => (
@@ -479,7 +592,7 @@ it('keeps an unsaved finance entry through a failed refresh while hiding stale r
   rendered.rerender(page());
   expect(screen.getByRole('alert')).toHaveTextContent('unsaved edits are kept');
   expect(
-    screen.queryByRole('button', { name: 'Export CSV' }),
+    screen.queryByRole('button', { name: 'Download financial CSV' }),
   ).not.toBeInTheDocument();
   mockQueryError = undefined;
   rendered.rerender(page());
@@ -511,7 +624,9 @@ it('uses current server conversation permissions for reply controls and hides th
   };
   const rendered = setup('inbox', value);
   await userEvent.click(screen.getByRole('button', { name: 'Open details' }));
-  expect(screen.getByRole('button', { name: 'Save inside OS' })).toBeVisible();
+  expect(
+    screen.getByRole('button', { name: 'Save reply draft' }),
+  ).toBeVisible();
   mockData = {
     ...mockData,
     conversationAccess: { conversation: { draft: false } },
@@ -527,7 +642,7 @@ it('uses current server conversation permissions for reply controls and hides th
     </I18nProvider>,
   );
   expect(
-    screen.queryByRole('button', { name: 'Save inside OS' }),
+    screen.queryByRole('button', { name: 'Save reply draft' }),
   ).not.toBeInTheDocument();
   expect(
     screen.getByText('You have view-only access to this conversation.'),
@@ -536,10 +651,12 @@ it('uses current server conversation permissions for reply controls and hides th
 it('blocks conversation access changes when the current role directory is unavailable', async () => {
   setup('inbox');
   await userEvent.click(
-    screen.getByRole('button', { name: 'New Conversation' }),
+    screen.getByRole('button', { name: 'New conversation' }),
   );
   await userEvent.type(screen.getByLabelText('Title'), 'Draft conversation');
-  expect(screen.getByRole('button', { name: 'Save record' })).toBeDisabled();
+  expect(
+    screen.getByRole('button', { name: 'Save conversation' }),
+  ).toBeDisabled();
   expect(screen.getByLabelText('Title')).toHaveValue('Draft conversation');
   expect(screen.getByText('Checking current roles and people…')).toBeVisible();
 });
@@ -567,6 +684,7 @@ it('preserves unsaved role sharing while hiding stale access previews after a fa
     members: [
       {
         memberId: 'admin',
+        projectMemberships: [],
         name: 'Founder',
         roleIds: [],
         revision: 1,
@@ -576,7 +694,7 @@ it('preserves unsaved role sharing while hiding stale access previews after a fa
   };
   const rendered = setup('inbox');
   await userEvent.click(
-    screen.getByRole('button', { name: 'New Conversation' }),
+    screen.getByRole('button', { name: 'New conversation' }),
   );
   await userEvent.type(
     screen.getByLabelText('Title'),
@@ -600,7 +718,9 @@ it('preserves unsaved role sharing while hiding stale access previews after a fa
   );
   mockDirectoryError = new Error('Directory unavailable');
   rendered.rerender(page);
-  expect(screen.getByRole('button', { name: 'Save record' })).toBeDisabled();
+  expect(
+    screen.getByRole('button', { name: 'Save conversation' }),
+  ).toBeDisabled();
   expect(
     screen.queryByRole('list', { name: 'Effective conversation access' }),
   ).not.toBeInTheDocument();
@@ -621,4 +741,96 @@ it('preserves unsaved role sharing while hiding stale access previews after a fa
   );
   expect(screen.getByLabelText('Editor: prepare replies')).toBeChecked();
   expect(screen.getByLabelText('Conversation owner')).toHaveValue('admin');
+});
+
+it('opens an exact permitted advertising record and preserves other query context when closing it', async () => {
+  mockData.records = [
+    {
+      id: 'report',
+      revision: 2,
+      kind: 'AD_REPORT',
+      projectId: null,
+      title: 'Campaign needs review',
+      currency: 'USD',
+      spend: 1000,
+      attributedRevenue: 2000,
+      shopifyRevenue: null,
+      recommendation: 'Recorded campaign recommendation',
+      status: 'REVIEW',
+      createdBy: 'marketer',
+      taskId: null,
+      history: [],
+    },
+  ];
+  setup(
+    'ads',
+    workspace,
+    '/delivery?view=ads&businessRecord=report&project=client&founderDomain=CAMPAIGNS',
+  );
+  expect(
+    screen.getByRole('heading', { level: 2, name: 'Campaign needs review' }),
+  ).toBeVisible();
+  expect(
+    screen.getByRole('region', {
+      name: 'Advertising report: Campaign needs review',
+    }),
+  ).toHaveFocus();
+  expect(
+    within(
+      screen.getByRole('region', {
+        name: 'Advertising report: Campaign needs review',
+      }),
+    ).getByText(/Ad-attributed revenue/),
+  ).toHaveTextContent('$20.00');
+  await userEvent.click(screen.getByRole('button', { name: 'Close details' }));
+  expect(
+    screen.queryByRole('heading', { level: 2, name: 'Campaign needs review' }),
+  ).not.toBeInTheDocument();
+  expect(screen.getByLabelText('Business location')).toHaveTextContent(
+    'project=client',
+  );
+  expect(screen.getByLabelText('Business location')).toHaveTextContent(
+    'founderDomain=CAMPAIGNS',
+  );
+  expect(screen.getByLabelText('Business location')).not.toHaveTextContent(
+    'businessRecord=',
+  );
+});
+it('explains an unavailable explicit record without opening another visible record', async () => {
+  mockData.records = [
+    {
+      id: 'other',
+      revision: 1,
+      kind: 'AD_REPORT',
+      projectId: null,
+      title: 'Other campaign',
+      currency: 'USD',
+      spend: 1000,
+      attributedRevenue: 2000,
+      shopifyRevenue: null,
+      recommendation: 'Recorded campaign recommendation',
+      status: 'REVIEW',
+      createdBy: 'marketer',
+      taskId: null,
+      history: [],
+    },
+  ];
+  setup(
+    'ads',
+    workspace,
+    '/delivery?view=ads&businessRecord=unavailable&project=client',
+  );
+  expect(screen.getByRole('alert')).toHaveTextContent(
+    'This item is no longer available in this view',
+  );
+  expect(
+    screen.queryByRole('heading', { level: 2, name: 'Other campaign' }),
+  ).not.toBeInTheDocument();
+  await userEvent.click(
+    screen.getByRole('button', { name: 'Close unavailable item' }),
+  );
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  expect(screen.getByLabelText('Business location')).toHaveTextContent(
+    'project=client',
+  );
 });

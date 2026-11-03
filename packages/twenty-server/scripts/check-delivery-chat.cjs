@@ -209,7 +209,10 @@ async function main() {
         throw new Error('Wrong finish owner');
       },
     };
-    const reminders = new DeliveryReminderService(scoped, legacy, chat);
+    const reminders = new DeliveryReminderService(scoped, legacy, chat, {
+      ownsReminder: async () => false,
+      queueDue: async () => {},
+    });
     await reminders.execute((await outbox(second)).id, due);
     await reminders.execute((await outbox(second)).id, due);
     assert.equal(sends, 1);

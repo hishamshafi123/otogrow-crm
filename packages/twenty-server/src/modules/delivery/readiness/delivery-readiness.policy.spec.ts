@@ -201,12 +201,10 @@ describe('Manual and unavailable capability readiness', () => {
     ])
       expect(byCapability[capability].status).toBe('MANUAL');
     for (const capability of [
-      'EMAIL_OS',
       'SLACK_OS',
       'WHATSAPP_OS',
       'SHOPIFY',
       'OTHER_AD_CHANNELS',
-      'MEETING_IMPORT',
       'DYNAMIC_AGENTS',
     ])
       expect(byCapability[capability].status).toBe('NOT_IMPLEMENTED');
@@ -221,6 +219,8 @@ describe('Manual and unavailable capability readiness', () => {
         .map((item) => item.capability),
     ).toEqual(
       expect.arrayContaining([
+        'EMAIL_OS',
+        'MEETING_IMPORT',
         'BRAND_KNOWLEDGE',
         'TASK_ASSISTANTS',
         'CREATIVE_PRODUCTION',
@@ -239,6 +239,6 @@ describe('Manual and unavailable capability readiness', () => {
 
     expect(
       manualReadiness().find((item) => item.capability === 'EMAIL_OS')?.status,
-    ).toBe('NOT_IMPLEMENTED');
+    ).toBe('AVAILABLE');
   });
 });

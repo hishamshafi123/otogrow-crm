@@ -143,6 +143,13 @@ export class AppModule {
       .apply(McpMethodGuardMiddleware)
       .forRoutes({ path: ApiPath.Mcp, method: RequestMethod.ALL });
 
+    consumer
+      .apply(RestCoreMiddleware, WorkspaceAuthContextMiddleware)
+      .forRoutes({
+        path: `${ApiPath.DeliveryCreative}/*path`,
+        method: RequestMethod.ALL,
+      });
+
     for (const method of MIGRATED_REST_METHODS) {
       consumer
         .apply(RestCoreMiddleware, WorkspaceAuthContextMiddleware)

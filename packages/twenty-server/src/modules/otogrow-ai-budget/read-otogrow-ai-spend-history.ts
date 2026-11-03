@@ -38,6 +38,7 @@ const FINANCIAL_ACTIONS = new Set([
   ...FINANCIAL_STATES,
   'MANUALLY_RECONCILED',
   'LATE_PROVIDER_USAGE',
+  'MEDIA_PREDICTION_ACCEPTED',
 ]);
 
 export const parseOtogrowAiSpendHistoryInput = (

@@ -23,6 +23,13 @@ export const metaConfigurationSchema = z
     { message: 'Refresh days cannot exceed catch-up days.' },
   );
 export type MetaInsightRow = {
+  reportedFields?: {
+    spend: boolean;
+    impressions: boolean;
+    clicks: boolean;
+    actions: boolean;
+    action_values: boolean;
+  };
   date_start: string;
   date_stop: string;
   account_id: string;

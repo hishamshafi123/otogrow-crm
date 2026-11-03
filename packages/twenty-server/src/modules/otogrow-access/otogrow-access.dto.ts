@@ -28,6 +28,12 @@ export class OtogrowRoleDTO {
   @Field(() => Int) revision: number;
 }
 
+@ObjectType('OtogrowProjectMembership')
+export class OtogrowProjectMembershipDTO {
+  @Field(() => ID) id: string;
+  @Field() name: string;
+}
+
 @ObjectType('OtogrowRoleMember')
 export class OtogrowRoleMemberDTO {
   @Field(() => ID) memberId: string;
@@ -35,6 +41,8 @@ export class OtogrowRoleMemberDTO {
   @Field(() => [ID]) roleIds: string[];
   @Field(() => Int) revision: number;
   @Field(() => OtogrowAccessDTO) access: OtogrowAccessDTO;
+  @Field(() => [OtogrowProjectMembershipDTO])
+  projectMemberships: OtogrowProjectMembershipDTO[];
 }
 
 @ObjectType('OtogrowRoleDirectory')

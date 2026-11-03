@@ -91,6 +91,48 @@ export const formatFinanceAmountMicros = (
   }
 };
 
+export const formatFinanceRecordedMargin = (
+  revenueMicros: string,
+  resultMicros: string,
+  locale?: string,
+): string | null => {
+  if (
+    !isNonEmptyString(revenueMicros) ||
+    !UNSIGNED_MICROS.test(revenueMicros) ||
+    !isNonEmptyString(resultMicros) ||
+    !SIGNED_MICROS.test(resultMicros)
+  )
+    return null;
+  const revenue = BigInt(revenueMicros);
+  if (revenue === 0n) return null;
+  const result = BigInt(resultMicros);
+  const absoluteResult = result < 0n ? -result : result;
+  const roundedHundredths = (absoluteResult * 10_000n + revenue / 2n) / revenue;
+  const negative = result < 0n && roundedHundredths !== 0n;
+  const whole = new Intl.NumberFormat(locale, {
+    maximumFractionDigits: 0,
+  }).format(roundedHundredths / 100n);
+  const fraction = new Intl.NumberFormat(locale, {
+    useGrouping: false,
+    minimumIntegerDigits: 2,
+    maximumFractionDigits: 0,
+  }).format(roundedHundredths % 100n);
+  return new Intl.NumberFormat(locale, {
+    style: 'percent',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+    .formatToParts(negative ? -0 : 0)
+    .map((part) =>
+      part.type === 'integer'
+        ? whole
+        : part.type === 'fraction'
+          ? fraction
+          : part.value,
+    )
+    .join('');
+};
+
 export type FinanceAllocationRemainder = {
   allocatedMicros: string;
   remainingMicros: string;

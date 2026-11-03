@@ -105,14 +105,14 @@ it('preserves legacy access until explicitly switching, then requires a selected
     </I18nProvider>,
   );
   const user = userEvent.setup();
-  await user.click(screen.getByRole('button', { name: 'Save agent' }));
+  await user.click(screen.getByRole('button', { name: 'Save assistant' }));
   expect(save.mock.calls[0][0].configuration.roleIds).toBeUndefined();
   await user.click(
     screen.getByRole('button', { name: 'Choose specific team roles' }),
   );
-  expect(screen.getByRole('button', { name: 'Save agent' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Save assistant' })).toBeDisabled();
   await user.click(screen.getByLabelText('Production team'));
-  await user.click(screen.getByRole('button', { name: 'Save agent' }));
+  await user.click(screen.getByRole('button', { name: 'Save assistant' }));
   expect(save.mock.calls[1][0].configuration.roleIds).toEqual(['editor-role']);
 });
 it('blocks saving when team access cannot be verified and retains role choices on recovery', async () => {
@@ -138,10 +138,55 @@ it('blocks saving when team access cannot be verified and retains role choices o
   const user = userEvent.setup();
   await user.click(screen.getByLabelText('SEO team'));
   rerender(view(false));
-  expect(screen.getByRole('button', { name: 'Save agent' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Save assistant' })).toBeDisabled();
   expect(screen.queryByLabelText('Production team')).not.toBeInTheDocument();
   rerender(view(true));
   expect(screen.getByLabelText('Production team')).toBeChecked();
   expect(screen.getByLabelText('SEO team')).toBeChecked();
   expect(save).not.toHaveBeenCalled();
+});
+
+it('shows activity access as administrator and named-role intersection without project membership', async () => {
+  const directory = {
+    ...agentRoleDirectory,
+    members: agentRoleDirectory.members.map((member) =>
+      member.memberId === 'admin'
+        ? { ...member, roleIds: ['editor-role'] }
+        : member,
+    ),
+  };
+  render(
+    <I18nProvider i18n={i18n}>
+      <DeliveryAgentPermissions
+        configuration={{
+          ...configuration,
+          kind: 'ACTIVITY',
+          projectIds: [],
+          roles: ['ADMIN'],
+          roleIds: ['editor-role'],
+          requiredInputs: ['activity', 'question'],
+          outputFormat: 'analysis',
+          tools: [],
+        }}
+        directory={directory}
+        projects={[]}
+        update={jest.fn()}
+      />
+    </I18nProvider>,
+  );
+  await userEvent.click(screen.getByText('Preview team access'));
+  expect(
+    within(screen.getByRole('listitem', { name: 'Founder' })).getByText(
+      'Can use for company activity',
+    ),
+  ).toBeVisible();
+  for (const name of ['Editor', 'Outside specialist'])
+    expect(
+      within(screen.getByRole('listitem', { name })).getByText(
+        'Requires current administrator access',
+      ),
+    ).toBeVisible();
+  expect(
+    screen.queryByText('No allowed project access'),
+  ).not.toBeInTheDocument();
 });

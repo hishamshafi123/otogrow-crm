@@ -13,6 +13,17 @@ export const canManageFinance = (actor: BusinessActor) =>
 export const canReadFinance = (actor: BusinessActor) =>
   canManageFinance(actor) ||
   actor.capabilities?.includes('finance.read') === true;
+export const canReadManualAdvertisingReport = (
+  record: { projectId: string | null; status: string; createdBy: string },
+  actor: BusinessActor,
+  projectIds: Set<string>,
+) =>
+  actor.isManager ||
+  Boolean(
+    record.projectId &&
+    projectIds.has(record.projectId) &&
+    (record.status === 'APPROVED' || record.createdBy === actor.memberId),
+  );
 export const canReadBusinessRecord = (
   record: BusinessRecord,
   actor: BusinessActor,
@@ -30,10 +41,10 @@ export const canReadBusinessRecord = (
           (record.roleGrants ?? []).some(
             (grant) => actor.roleIds?.includes(grant.roleId) && grant.read,
           );
+  if (record.kind === 'AD_REPORT')
+    return canReadManualAdvertisingReport(record, actor, projectIds);
   if (actor.isManager) return true;
   if (!record.projectId || !projectIds.has(record.projectId)) return false;
-  if (record.kind === 'AD_REPORT' && !['APPROVED'].includes(record.status))
-    return record.createdBy === actor.memberId;
   return true;
 };
 export const canDraftConversation = (

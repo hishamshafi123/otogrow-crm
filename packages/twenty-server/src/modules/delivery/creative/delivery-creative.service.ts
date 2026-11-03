@@ -25,12 +25,15 @@ import {
   type CreativeDocument,
 } from 'src/modules/delivery/creative/delivery-creative.types';
 import {
+  assertCreativeAssetMime,
   invalidateCreativeAssembly,
   isCreativeAssetApproved,
   isCreativeAssetCurrent,
 } from 'src/modules/delivery/creative/delivery-creative.policy';
 import { recordOtogrowActivity } from 'src/modules/otogrow-activity/record-otogrow-activity';
 import { type OtogrowActivityInput } from 'src/modules/otogrow-activity/otogrow-activity.types';
+import { readDeliverySnapshot } from 'src/modules/delivery/read-delivery-snapshot';
+import { creativeDocumentProjection } from 'src/modules/delivery/creative/reads/delivery-creative-reads.service';
 
 type CreativeActivity = Pick<OtogrowActivityInput, 'action' | 'summary'> &
   Partial<
@@ -169,15 +172,26 @@ export class DeliveryCreativeService {
     memberId: string,
     userWorkspaceId: string,
     taskId: string,
+    transactionManager?: EntityManager,
   ) {
-    const { task } = await this.scope(
-      this.dataSource.manager,
-      workspace,
-      memberId,
-      userWorkspaceId,
-      taskId,
+    return readDeliverySnapshot(
+      this.dataSource,
+      workspace.id,
+      async (manager) => {
+        const { task, actor } = await this.scope(
+          manager,
+          workspace,
+          memberId,
+          userWorkspaceId,
+          taskId,
+        );
+        return {
+          document: creativeDocumentProjection(task.details.creative, actor),
+          revision: task.revision,
+        };
+      },
+      transactionManager,
     );
-    return { document: task.details.creative ?? null, revision: task.revision };
   }
 
   async modify(
@@ -822,8 +836,13 @@ export class DeliveryCreativeService {
       validate: (
         document: CreativeDocument,
         scope: Awaited<ReturnType<DeliveryCreativeService['scope']>>,
-      ) => void;
-      complete: (document: CreativeDocument) => void;
+        manager: EntityManager,
+      ) => Promise<void> | void;
+      complete: (
+        document: CreativeDocument,
+        scope: Awaited<ReturnType<DeliveryCreativeService['scope']>>,
+        manager: EntityManager,
+      ) => Promise<void> | void;
     },
   ) {
     const reserved = await this.modify(
@@ -832,8 +851,8 @@ export class DeliveryCreativeService {
       userWorkspaceId,
       taskId,
       revision,
-      async (document, scope) => {
-        lifecycle?.validate(document, scope);
+      async (document, scope, manager) => {
+        await lifecycle?.validate(document, scope, manager);
         if (document.assets.length >= 200)
           throw new BadRequestException('Maximum 200 assets per production.');
         const shot = metadata.shotId
@@ -853,21 +872,7 @@ export class DeliveryCreativeService {
           throw new BadRequestException(
             'Approve and select the source image first.',
           );
-        if (
-          metadata.kind === 'IMAGE' &&
-          !metadata.mimeType.startsWith('image/')
-        )
-          throw new BadRequestException('An image is required.');
-        if (
-          ['CLIP', 'BASE', 'HOOK', 'CTA', 'FINAL'].includes(metadata.kind) &&
-          !metadata.mimeType.startsWith('video/')
-        )
-          throw new BadRequestException('A video is required.');
-        if (
-          metadata.kind === 'AUDIO' &&
-          !metadata.mimeType.startsWith('audio/')
-        )
-          throw new BadRequestException('An audio file is required.');
+        assertCreativeAssetMime(document, metadata);
         document.assets.push({
           ...metadata,
           storageState: 'PENDING',
@@ -905,13 +910,13 @@ export class DeliveryCreativeService {
         userWorkspaceId,
         taskId,
         reserved.revision,
-        (document, scope) => {
-          lifecycle?.validate(document, scope);
+        async (document, scope, manager) => {
+          await lifecycle?.validate(document, scope, manager);
           const asset = document.assets.find((item) => item.id === metadata.id);
           if (!asset || asset.storageState !== 'PENDING')
             throw new ConflictException('Upload is no longer pending.');
           asset.storageState = 'READY';
-          lifecycle?.complete(document);
+          await lifecycle?.complete(document, scope, manager);
         },
         'Completed creative upload',
         false,

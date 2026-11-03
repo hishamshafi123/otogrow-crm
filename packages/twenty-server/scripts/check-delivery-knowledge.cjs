@@ -505,6 +505,7 @@ const {
     console.log(
       'PASS categories/visible-version filtering/search, legacy category preservation, meeting draft/publication/version history, raw-note privacy, scope, stale edits, bounded input, agent freshness/withdrawal, read-only snapshots and transactional audit rollback. No provider calls.',
     );
+    await require('./helpers/check-delivery-fathom-knowledge.cjs').checkDeliveryFathomKnowledge({ runner, source, delivery, workspace, founder, editor });
   } finally {
     await runner.rollbackTransaction();
     await runner.release();

@@ -73,13 +73,48 @@ export const priceSaveSchema = z
       .transform((value) => value ?? undefined),
     revision: z.number().int().min(0),
     modelId: z.string().trim().min(1).max(200),
-    kind: z.enum(['TEXT', 'INSPECTION', 'IMAGE', 'CLIP']),
+    kind: z.enum(['TEXT', 'INSPECTION', 'VIDEO_QA', 'IMAGE', 'CLIP']),
     source: z.string().trim().min(3).max(1000),
     verifiedAt: z.string().datetime(),
     enabled: z.boolean(),
     pricing: pricingSchema,
   })
   .strict();
+export const assertVideoQaPricing = (value: {
+  modelId: string;
+  source: string;
+  pricing: OtogrowAiPricing;
+}) => {
+  const pricing = value.pricing;
+  let officialSource = false;
+  try {
+    const source = new URL(value.source);
+    officialSource =
+      source.protocol === 'https:' &&
+      ((source.hostname === 'aistudio.google.com' &&
+        source.pathname === '/docs/pricing') ||
+        (source.hostname === 'ai.google.dev' &&
+          source.pathname === '/gemini-api/docs/pricing'));
+  } catch {
+    officialSource = false;
+  }
+  if (
+    value.modelId !== 'google/gemini-3.5-flash-lite' ||
+    !officialSource ||
+    pricing.maxInputTokens < 1048576 ||
+    pricing.maxOutputTokens < 8192 ||
+    pricing.maxReasoningTokens < 8192 ||
+    !pricing.outputIncludesReasoning ||
+    usdToMicro(pricing.inputUsdPerMillionTokens) === BigInt(0) ||
+    usdToMicro(pricing.outputUsdPerMillionTokens) === BigInt(0) ||
+    usdToMicro(pricing.outputUsdPerMillionTokens) !==
+      usdToMicro(pricing.reasoningUsdPerMillionTokens) ||
+    pricing.longContextThresholdTokens !== null
+  )
+    throw new Error(
+      'Video QA requires the direct supported Gemini model, official equal-modality Standard tariff evidence, full1048576 input-token bound, at least8192 output/thinking tokens and included thinking at the same output rate. Other media billing paths are unsupported.',
+    );
+};
 export const reconcileSchema = z
   .object({
     spendId: z.string().uuid(),

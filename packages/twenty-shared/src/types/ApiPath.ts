@@ -8,6 +8,7 @@ export enum ApiPath {
   Auth = 'auth',
   ClientConfig = 'client-config',
   Cloudflare = 'cloudflare',
+  DeliveryCreative = 'delivery-creative',
   Emailing = 'emailing',
   File = 'file',
   FileUpload = 'file-upload',

@@ -39,6 +39,7 @@ const directory: OtogrowRoleDirectory = {
   members: [
     {
       memberId: 'founder',
+      projectMemberships: [],
       name: 'Founder',
       roleIds: [],
       revision: 1,
@@ -46,6 +47,7 @@ const directory: OtogrowRoleDirectory = {
     },
     {
       memberId: 'amna',
+      projectMemberships: [],
       name: 'Amna',
       roleIds: ['editor', 'marketing'],
       revision: 1,
@@ -53,6 +55,7 @@ const directory: OtogrowRoleDirectory = {
     },
     {
       memberId: 'designer',
+      projectMemberships: [],
       name: 'Designer',
       roleIds: [],
       revision: 1,

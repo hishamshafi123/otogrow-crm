@@ -1,49 +1,42 @@
 #!/usr/bin/env bash
-# Daily backup for the Otogrow CRM production stack.
-# Dumps Postgres from the db container and tars the local file-storage volume,
-# then rotates anything older than BACKUP_RETENTION_DAYS.
-#
-# Install on the VPS (as the deploy user):
-#   chmod +x /opt/otogrow/repo/deploy/backup.sh
-#   crontab -e
-#   0 3 * * * /opt/otogrow/repo/deploy/backup.sh >> /var/log/otogrow-backup.log 2>&1
 set -euo pipefail
+umask 077
 
 DEPLOY_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-COMPOSE="docker compose -f ${DEPLOY_DIR}/docker-compose.yml --env-file ${DEPLOY_DIR}/.env"
+COMPOSE=(docker compose -f "${DEPLOY_DIR}/docker-compose.yml" --env-file "${DEPLOY_DIR}/.env")
 
 # shellcheck source=/dev/null
 source "${DEPLOY_DIR}/.env"
-
+: "${PG_DATABASE_USER:?PG_DATABASE_USER is required}"
+: "${PG_DATABASE_NAME:?PG_DATABASE_NAME is required}"
 BACKUP_DIR="${BACKUP_DIR:-/opt/otogrow/backups}"
 RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-14}"
-TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
-
+if [[ ! "${RETENTION_DAYS}" =~ ^[1-9][0-9]*$ ]]; then
+  echo 'BACKUP_RETENTION_DAYS must be a positive number of days.' >&2
+  exit 64
+fi
 mkdir -p "${BACKUP_DIR}"
+PENDING_DIR="$(mktemp -d "${BACKUP_DIR}/.otogrow-backup.XXXXXX")"
+trap 'rm -rf -- "${PENDING_DIR}"' EXIT
+TIMESTAMP="$(date -u +%Y%m%dT%H%M%SZ)-${PENDING_DIR##*.}"
+DATABASE_FILE="otogrow-db-${TIMESTAMP}.sql.gz"
+STORAGE_FILE="otogrow-storage-${TIMESTAMP}.tar.gz"
 
-echo "[$(date -Is)] starting backup ${TIMESTAMP}"
-
-# 1. Postgres dump (plain SQL, gzip-compressed)
+echo "Starting backup ${TIMESTAMP}"
 "${COMPOSE[@]}" exec -T db \
   pg_dump -U "${PG_DATABASE_USER}" -d "${PG_DATABASE_NAME}" --no-owner --no-privileges \
-  | gzip > "${BACKUP_DIR}/otogrow-db-${TIMESTAMP}.sql.gz"
-
-# 2. Local file storage (STORAGE_TYPE=local lives in the app-storage volume,
-#    mounted in the app container)
+  | gzip > "${PENDING_DIR}/${DATABASE_FILE}"
+gzip -t "${PENDING_DIR}/${DATABASE_FILE}"
 "${COMPOSE[@]}" exec -T app \
   tar czf - -C /app/packages/twenty-server/.local-storage . \
-  > "${BACKUP_DIR}/otogrow-storage-${TIMESTAMP}.tar.gz"
+  > "${PENDING_DIR}/${STORAGE_FILE}"
+tar tzf "${PENDING_DIR}/${STORAGE_FILE}" > /dev/null
 
-# 3. Local rotation
-find "${BACKUP_DIR}" -name 'otogrow-*.gz' -mtime "+${RETENTION_DAYS}" -delete
-
-echo "[$(date -Is)] backup done: $(ls -lh "${BACKUP_DIR}"/*"${TIMESTAMP}"* | awk '{print $9, $5}')"
-
-# ---------------------------------------------------------------------------
-# OPTIONAL offsite copy (recommended once the VPS is stable):
-#   1. Install rclone on the VPS and run `rclone config` to add a remote
-#      (S3, B2, Drive, ...).
-#   2. Uncomment the lines below, replacing REMOTE:otogrow-backups.
-# rclone copy "${BACKUP_DIR}" REMOTE:otogrow-backups \
-#   --include 'otogrow-*' --max-age 25h --log-level INFO
-# ---------------------------------------------------------------------------
+# A ready marker distinguishes a complete pair from an interrupted final move.
+mv "${PENDING_DIR}/${DATABASE_FILE}" "${BACKUP_DIR}/${DATABASE_FILE}"
+mv "${PENDING_DIR}/${STORAGE_FILE}" "${BACKUP_DIR}/${STORAGE_FILE}"
+printf '%s\n%s\n' "${DATABASE_FILE}" "${STORAGE_FILE}" > "${PENDING_DIR}/complete"
+mv "${PENDING_DIR}/complete" "${BACKUP_DIR}/otogrow-${TIMESTAMP}.complete"
+find "${BACKUP_DIR}" -maxdepth 1 -type f -name 'otogrow-*.gz' -mtime "+${RETENTION_DAYS}" -delete
+find "${BACKUP_DIR}" -maxdepth 1 -type f -name 'otogrow-*.complete' -mtime "+${RETENTION_DAYS}" -delete
+echo "Backup complete: ${BACKUP_DIR}/${DATABASE_FILE} and ${BACKUP_DIR}/${STORAGE_FILE}"

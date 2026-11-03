@@ -1,7 +1,23 @@
+import { DeliveryCreativeLearningPage } from '@/delivery/creative/learning/DeliveryCreativeLearningPage';
+import { DeliveryInboxPage } from '@/delivery/inbox/workspace/DeliveryInboxPage';
+import { DeliveryAdvertisingPage } from '@/delivery/advertising/workbench/DeliveryAdvertisingPage';
+import { DeliveryCreativeProductionPage } from '@/delivery/creative/production/DeliveryCreativeProductionPage';
+import { DeliverySeoResultsPage } from '@/delivery/seo-results/DeliverySeoResultsPage';
 import { DeliveryCapacity } from '@/delivery/capacity/DeliveryCapacity';
-import { DeliveryKnowledge } from '@/delivery/knowledge/DeliveryKnowledge';
+import { DeliveryTasksPage } from '@/delivery/tasks/DeliveryTasksPage';
+import { AtlasMediaPage } from '@/delivery/creative/atlas/AtlasMediaPage';
+import { DeliveryClientSetupPage } from '@/delivery/onboarding/DeliveryClientSetupPage';
+import { DeliveryAssistantsPage } from '@/delivery/assistants/DeliveryAssistantsPage';
+import { DeliveryAssignedReviewsToday } from '@/delivery/reviews/DeliveryAssignedReviewsToday';
+import { useTaskReview } from '@/delivery/reviews/useTaskReview';
+import {
+  DeliveryKnowledge,
+  DeliveryKnowledgePage,
+} from '@/delivery/knowledge/DeliveryKnowledge';
 import { DeliveryTaskJourney } from '@/delivery/lifecycle/DeliveryTaskJourney';
 import { DeliveryChat } from '@/delivery/chat/DeliveryChat';
+import { DeliveryChatPage } from '@/delivery/operations-pages/DeliveryChatPage';
+import { DeliveryCompanyOverviewPage } from '@/delivery/operations-pages/DeliveryCompanyOverviewPage';
 import { DeliveryBatches } from '@/delivery/batches/DeliveryBatches';
 import { DeliveryWorkflowCatalog } from '@/delivery/workflows/DeliveryWorkflowCatalog';
 import { DeliveryMyWorkTask } from '@/delivery/DeliveryMyWorkTask';
@@ -10,10 +26,15 @@ import {
   useDeliveryDraftGuard,
 } from '@/delivery/drafts/DeliveryDraftGuard';
 import { useWorkflowAccess } from '@/delivery/workflows/useWorkflowAccess';
+import { isOtogrowAccessDenied } from '@/otogrow-access/isOtogrowAccessDenied';
+import { deliveryTaskSelection } from '@/delivery/delivery-task-navigation';
 import { DeliveryBusiness } from '@/delivery/DeliveryBusiness';
 import { DeliveryFinance } from '@/delivery/finance/DeliveryFinance';
+import { DeliveryFounderExceptions } from '@/delivery/founder/DeliveryFounderExceptions';
+import { DeliveryReadiness } from '@/delivery/readiness/DeliveryReadiness';
 import { DeliveryMyWorkQueue } from '@/delivery/DeliveryMyWorkQueue';
 import { OtogrowActivity } from '@/otogrow-activity/OtogrowActivity';
+import { OtogrowActivityPage } from '@/otogrow-activity/OtogrowActivityPage';
 import { DeliveryClients } from '@/delivery/DeliveryClients';
 import { DeliveryOperations } from '@/delivery/DeliveryOperations';
 import { DeliveryCreative } from '@/delivery/DeliveryCreative';
@@ -21,9 +42,9 @@ import { themeCssVariables } from 'twenty-ui/theme-constants';
 import { gql } from '@apollo/client';
 import { useMutation, useQuery } from '@apollo/client/react';
 import { Trans, useLingui } from '@lingui/react/macro';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { styled } from '@linaria/react';
-import { Navigate, useSearchParams } from 'react-router-dom';
+import { Navigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useDeliveryNavigationPreferences } from '@/delivery/navigation/useDeliveryNavigationPreferences';
 import { DeliveryNavigationPreferences } from '@/delivery/navigation/DeliveryNavigationPreferences';
 import { getDeliveryEntryView } from '@/delivery/navigation/delivery-navigation-preferences';
@@ -82,18 +103,85 @@ const StyledWorkspaceAccessBoundary = styled.fieldset`
 
 export const DeliveryWorkspacePage = () => {
   const permission = useWorkflowAccess();
+  const [params] = useSearchParams();
+  const view = params.get('view');
+  const [legacyBoundary, setLegacyBoundary] = useState({
+    denied: false,
+    revision: 0,
+  });
+  const revokeLegacyRead = useCallback(() => {
+    setLegacyBoundary((current) =>
+      current.denied
+        ? current
+        : { denied: true, revision: current.revision + 1 },
+    );
+  }, []);
+  const confirmLegacyRead = useCallback(() => {
+    setLegacyBoundary((current) =>
+      current.denied ? { ...current, denied: false } : current,
+    );
+  }, []);
   return (
-    <DeliveryDraftGuardProvider key={permission.scope}>
-      <DeliveryWorkspaceContent />
+    <DeliveryDraftGuardProvider
+      key={`${permission.scope}:${legacyBoundary.revision}`}
+    >
+      {view === 'ads' &&
+      params.get('adView') !== 'legacy' &&
+      !params.has('metaReport') &&
+      !params.has('businessRecord') ? (
+        <DeliveryAdvertisingPage />
+      ) : view === 'inbox' &&
+        params.get('inboxView') !== 'legacy' &&
+        !params.has('businessRecord') ? (
+        <DeliveryInboxPage />
+      ) : view === 'onboarding' ? (
+        <DeliveryClientSetupPage />
+      ) : view === 'creative' && params.get('creativeView') === 'learning' ? (
+        <DeliveryCreativeLearningPage />
+      ) : view === 'creative' && params.get('creativeView') !== 'legacy' ? (
+        <DeliveryCreativeProductionPage />
+      ) : view === 'seo' ? (
+        <DeliverySeoResultsPage />
+      ) : view === 'knowledge' ? (
+        <DeliveryKnowledgePage />
+      ) : view === 'chat' && !params.has('task') ? (
+        <DeliveryChatPage />
+      ) : view === 'health' && !params.has('task') ? (
+        <DeliveryCompanyOverviewPage />
+      ) : view === 'activity' && !params.has('task') ? (
+        <OtogrowActivityPage />
+      ) : view === 'agents' && params.get('agentView') === 'media' ? (
+        <AtlasMediaPage />
+      ) : view === 'agents' && params.get('agentView') !== 'spending' ? (
+        <DeliveryAssistantsPage />
+      ) : !view || ['home', 'mine', 'planner', 'reviews'].includes(view) ? (
+        <DeliveryTasksPage />
+      ) : (
+        <LegacyDeliveryWorkspacePage
+          requiresFreshWorkspace={legacyBoundary.denied}
+          onWorkspaceDenied={revokeLegacyRead}
+          onWorkspaceVerified={confirmLegacyRead}
+        />
+      )}
     </DeliveryDraftGuardProvider>
   );
 };
 
-const DeliveryWorkspaceContent = () => {
+type LegacyDeliveryWorkspacePageProps = {
+  requiresFreshWorkspace: boolean;
+  onWorkspaceDenied: () => void;
+  onWorkspaceVerified: () => void;
+};
+const LegacyDeliveryWorkspacePage = ({
+  requiresFreshWorkspace,
+  onWorkspaceDenied,
+  onWorkspaceVerified,
+}: LegacyDeliveryWorkspacePageProps) => {
   const permission = useWorkflowAccess();
   const { requestAction } = useDeliveryDraftGuard();
   const { t } = useLingui();
   const [params, setParams] = useSearchParams();
+  const location = useLocation();
   const explicitView = params.get('view') ?? 'home';
   const query = useQuery<{ deliveryWorkspace: DeliveryWorkspace }>(
     GET_DELIVERY_WORKSPACE,
@@ -145,9 +233,9 @@ const DeliveryWorkspaceContent = () => {
     setParams(nextParams, { replace });
   };
   const openTask = (id: string, panel = 'task') => {
-    updateParams({ task: id, panel: panel === 'task' ? null : panel });
+    updateParams(deliveryTaskSelection(id, panel));
   };
-  const closeTask = () => updateParams({ task: null, panel: null });
+  const closeTask = () => updateParams(deliveryTaskSelection(null));
   const setSelectedPanel = (panel: string) =>
     updateParams({ panel: panel === 'task' ? null : panel }, true);
   const [markSeen] = useMutation(gql`
@@ -175,10 +263,28 @@ const DeliveryWorkspaceContent = () => {
   );
   const workspaceVerified = Boolean(
     !query.error &&
+    (!requiresFreshWorkspace || !query.loading) &&
     permission.ready &&
     candidateWorkspace &&
-    permission.access?.memberId === candidateWorkspace.actor.memberId,
+    typeof candidateWorkspace.workspaceId === 'string' &&
+    typeof candidateWorkspace.memberId === 'string' &&
+    typeof candidateWorkspace.userWorkspaceId === 'string' &&
+    candidateWorkspace.workspaceId === permission.access?.workspaceId &&
+    candidateWorkspace.memberId === permission.access?.memberId &&
+    candidateWorkspace.userWorkspaceId === permission.access?.userWorkspaceId &&
+    candidateWorkspace.memberId === candidateWorkspace.actor.memberId,
   );
+  const workspaceDenied = isOtogrowAccessDenied(query.error);
+  useEffect(() => {
+    if (workspaceDenied) onWorkspaceDenied();
+    else if (workspaceVerified && !query.loading) onWorkspaceVerified();
+  }, [
+    workspaceDenied,
+    workspaceVerified,
+    query.loading,
+    onWorkspaceDenied,
+    onWorkspaceVerified,
+  ]);
   const [lastVerifiedWorkspace, setLastVerifiedWorkspace] =
     useState<DeliveryWorkspace>();
   if (workspaceVerified && permittedWorkspace !== lastVerifiedWorkspace)
@@ -188,6 +294,11 @@ const DeliveryWorkspaceContent = () => {
     : lastVerifiedWorkspace;
   const selectedTask = workspace?.tasks.find((task) => task.id === selectedId);
   const [creating, setCreating] = useState(false);
+  if (creating && permission.ready && !permission.manager) setCreating(false);
+  const focusRecovery = useCallback(
+    (button: HTMLButtonElement | null) => button?.focus(),
+    [],
+  );
   const navigationGroups = useDeliveryNavigation(
     workspace?.actor ?? { memberId: '', isAdmin: false, isManager: false },
   );
@@ -213,13 +324,26 @@ const DeliveryWorkspaceContent = () => {
   useEffect(() => {
     if (!selectedId || !canSeeAssignment) return;
     void markSeen({
-      variables: { input: { action: 'seen', taskId: selectedId } },
+      variables: {
+        input: {
+          action: 'seen',
+          taskId: selectedId,
+          expectedAssignmentKey: `${selectedTask?.assigneeId}:${selectedTask?.details.assignmentAt ?? 'legacy'}`,
+        },
+      },
     }).catch(() =>
       setError(
         t`Could not mark this assignment as seen. Acknowledge it in Delivery & reminders.`,
       ),
     );
-  }, [selectedId, canSeeAssignment, markSeen, t]);
+  }, [
+    selectedId,
+    canSeeAssignment,
+    selectedTask?.assigneeId,
+    selectedTask?.details.assignmentAt,
+    markSeen,
+    t,
+  ]);
   const stateLabels: Record<string, string> = {
     PLANNED: t`Planned`,
     IN_PROGRESS: t`In progress`,
@@ -233,6 +357,14 @@ const DeliveryWorkspaceContent = () => {
     PROGRESS: t`Progress updated`,
   };
   const stateLabel = (state: string) => stateLabels[state] ?? state;
+  const refreshReviewQueues = () =>
+    query.client.refetchQueries({
+      include: 'active',
+      onQueryUpdated: (observableQuery) =>
+        observableQuery.queryName === 'DeliveryReviewQueue'
+          ? observableQuery.refetch()
+          : false,
+    });
   const run = async (input: Record<string, unknown>): Promise<boolean> => {
     if (!workspaceVerified) return false;
     if (
@@ -248,6 +380,15 @@ const DeliveryWorkspaceContent = () => {
           query: GET_DELIVERY_WORKSPACE,
           data: { deliveryWorkspace: result.data.changeDeliveryWorkspace },
         });
+      if (result.data && input.action === 'review') {
+        try {
+          await refreshReviewQueues();
+        } catch {
+          setError(
+            t`The review decision was saved, but approval summaries could not refresh. Refresh approvals before continuing.`,
+          );
+        }
+      }
       return true;
     } catch (failure) {
       setError(
@@ -293,6 +434,16 @@ const DeliveryWorkspaceContent = () => {
       setRefreshing(false);
     }
   };
+  const taskReview = useTaskReview({
+    taskId: selectedTask?.id ?? '',
+    taskRevision: selectedTask?.revision ?? 0,
+    enabled: Boolean(
+      workspaceVerified && selectedTask && currentPage && !creating,
+    ),
+    onChanged: async () => {
+      await Promise.all([query.refetch(), refreshReviewQueues()]);
+    },
+  });
   if (!workspace)
     return (
       <PageContainer>
@@ -302,7 +453,9 @@ const DeliveryWorkspaceContent = () => {
               <h1>
                 <Trans>Otogrow workspace</Trans>
               </h1>
-              {query.error || permission.error ? (
+              {query.error ||
+              permission.error ||
+              (permission.ready && candidateWorkspace && !workspaceVerified) ? (
                 <>
                   <p role="alert">
                     <Trans>Your workspace access could not be verified.</Trans>
@@ -498,10 +651,13 @@ const DeliveryWorkspaceContent = () => {
       </StyledDeliveryTaskButton>
     );
   };
+  const drawerOpen = Boolean(
+    selectedTask || (creating && workspace.actor.isManager),
+  );
   return (
     <PageContainer>
       <PageBody>
-        {!workspaceVerified && (
+        {!workspaceVerified && !drawerOpen && (
           <StyledDeliveryStack>
             <p role="status">
               <Trans>
@@ -633,6 +789,7 @@ const DeliveryWorkspaceContent = () => {
               {view === 'home' && (
                 <>
                   <StyledDeliveryGrid>
+                    <DeliveryAssignedReviewsToday />
                     <StyledDeliveryCard>
                       <StyledDeliveryStack>
                         <small>
@@ -676,7 +833,7 @@ const DeliveryWorkspaceContent = () => {
                     <StyledDeliveryCard>
                       <StyledDeliveryStack>
                         <small>
-                          <Trans>Awaiting review</Trans>
+                          <Trans>Production submissions awaiting review</Trans>
                         </small>
                         <h1>{reviewCount}</h1>
                         <StyledDeliveryButton
@@ -814,7 +971,6 @@ const DeliveryWorkspaceContent = () => {
                 'content',
                 'competitors',
                 'development',
-                'health',
               ].includes(view) && (
                 <DeliveryBusiness
                   key={view}
@@ -823,6 +979,23 @@ const DeliveryWorkspaceContent = () => {
                   onChanged={() => query.refetch()}
                   onOpenTask={(id) => openTask(id)}
                 />
+              )}
+              {view === 'health' && workspace.actor.isAdmin && (
+                <>
+                  <DeliveryFounderExceptions />
+                  <details
+                    open={
+                      params.has('readinessStatus') ||
+                      location.hash === '#company-readiness'
+                    }
+                    id="company-readiness"
+                  >
+                    <summary>
+                      <Trans>Connection readiness</Trans>
+                    </summary>
+                    <DeliveryReadiness />
+                  </details>
+                </>
               )}
               {view === 'finance' && (
                 <DeliveryFinance
@@ -846,7 +1019,7 @@ const DeliveryWorkspaceContent = () => {
                   onTaskChanged={() => query.refetch()}
                 />
               )}
-              {['mine', 'planner', 'reviews', 'creative'].includes(view) && (
+              {['mine', 'planner', 'creative'].includes(view) && (
                 <>
                   {view === 'planner' && (
                     <DeliveryCapacity
@@ -1087,123 +1260,157 @@ const DeliveryWorkspaceContent = () => {
                   )}
                 </>
               )}
-              {(selectedTask || (creating && workspace.actor.isManager)) && (
-                <StyledDeliveryDrawer
-                  aria-label={creating ? t`Create task` : selectedTask?.title}
-                  ref={(dialog) => {
-                    if (dialog && !dialog.open) dialog.showModal();
-                  }}
-                  onCancel={(event) => {
-                    event.preventDefault();
-                    requestAction(() => {
-                      closeTask();
-                      setCreating(false);
-                    });
-                  }}
-                >
-                  <StyledDeliveryCanvas>
-                    <StyledDeliveryStack>
-                      <StyledDeliveryRow>
-                        <h2>{creating ? t`New task` : t`Task details`}</h2>
-                        <StyledDeliveryButton
-                          onClick={() =>
-                            requestAction(() => {
-                              closeTask();
-                              setCreating(false);
-                            })
-                          }
-                        >
-                          <Trans>Close</Trans>
-                        </StyledDeliveryButton>
-                      </StyledDeliveryRow>
-                      {error && <p role="alert">{error}</p>}
-                      {creating && workspace.actor.isManager ? (
-                        <DeliveryTaskForm
-                          workspace={workspace}
-                          run={run}
-                          busy={mutation.loading}
-                          onSaved={() => setCreating(false)}
-                        />
-                      ) : (
-                        selectedTask && (
-                          <>
-                            <DeliveryTaskJourney
-                              task={selectedTask}
-                              workspace={workspace}
-                              onOpenPanel={setSelectedPanel}
-                            />
-                            <StyledDeliveryRow>
-                              {[
-                                {
-                                  id: 'task',
-                                  label: t`Task and final approval`,
-                                },
-                                {
-                                  id: 'creative',
-                                  label: t`Creative production`,
-                                },
-                                { id: 'agents', label: t`Text assistants` },
-                                {
-                                  id: 'operations',
-                                  label: t`Delivery and messages`,
-                                },
-                              ].map((panel) => (
-                                <StyledDeliveryButton
-                                  key={panel.id}
-                                  aria-pressed={selectedPanel === panel.id}
-                                  onClick={() => setSelectedPanel(panel.id)}
-                                >
-                                  {panel.label}
-                                </StyledDeliveryButton>
-                              ))}
-                            </StyledDeliveryRow>
-                            {selectedPanel === 'task' && (
-                              <DeliveryTaskDetail
-                                key={selectedTask.id}
-                                task={selectedTask}
-                                onChanged={() => query.refetch()}
-                                workspace={workspace}
-                                run={run}
-                                busy={mutation.loading}
-                                stateLabel={stateLabel}
-                                celebrateApproval={approvalCelebration}
-                              />
-                            )}
-                            {selectedPanel === 'creative' && (
-                              <DeliveryCreative
-                                key={selectedTask.id}
-                                task={selectedTask}
-                                workspace={workspace}
-                                onChanged={() => query.refetch()}
-                                onOpenTask={() => setSelectedPanel('task')}
-                              />
-                            )}
-                            {selectedPanel === 'operations' && (
-                              <DeliveryOperations
-                                key={selectedTask.id}
-                                task={selectedTask}
-                                workspace={workspace}
-                                onChanged={() => query.refetch()}
-                              />
-                            )}
-                            {selectedPanel === 'agents' && (
-                              <DeliveryAgents
-                                key={`agents-${selectedTask.id}`}
-                                task={selectedTask}
-                                workspace={workspace}
-                                onTaskChanged={() => query.refetch()}
-                              />
-                            )}
-                          </>
-                        )
-                      )}
-                    </StyledDeliveryStack>
-                  </StyledDeliveryCanvas>
-                </StyledDeliveryDrawer>
-              )}
             </StyledDeliveryStack>
           </StyledDeliveryCanvas>
         </StyledWorkspaceAccessBoundary>
+        {drawerOpen && (
+          <StyledDeliveryDrawer
+            aria-label={
+              creating
+                ? t`Create task`
+                : workspaceVerified
+                  ? selectedTask?.title
+                  : t`Task details`
+            }
+            ref={(dialog) => {
+              if (dialog && !dialog.open) dialog.showModal();
+            }}
+            onCancel={(event) => {
+              event.preventDefault();
+              requestAction(() => {
+                closeTask();
+                setCreating(false);
+              });
+            }}
+          >
+            <StyledDeliveryCanvas>
+              <StyledDeliveryStack>
+                <StyledDeliveryRow>
+                  <h2>{creating ? t`New task` : t`Task details`}</h2>
+                  <StyledDeliveryButton
+                    onClick={() =>
+                      requestAction(() => {
+                        closeTask();
+                        setCreating(false);
+                      })
+                    }
+                  >
+                    <Trans>Close</Trans>
+                  </StyledDeliveryButton>
+                </StyledDeliveryRow>
+                {!workspaceVerified && (
+                  <>
+                    <p role="status">
+                      <Trans>
+                        Current workspace access could not be verified. Saved
+                        information is hidden and your draft is kept.
+                      </Trans>
+                    </p>
+                    <StyledDeliveryButton
+                      ref={focusRecovery}
+                      onClick={() => {
+                        void query.refetch().catch(() => undefined);
+                        void permission.refetch().catch(() => undefined);
+                      }}
+                    >
+                      <Trans>Retry workspace access</Trans>
+                    </StyledDeliveryButton>
+                  </>
+                )}
+                <StyledWorkspaceAccessBoundary
+                  hidden={!workspaceVerified}
+                  disabled={!workspaceVerified || mutation.loading}
+                  inert={!workspaceVerified || undefined}
+                  aria-hidden={!workspaceVerified || undefined}
+                >
+                  {error && <p role="alert">{error}</p>}
+                  {creating && workspace.actor.isManager ? (
+                    <DeliveryTaskForm
+                      workspace={workspace}
+                      run={run}
+                      busy={mutation.loading}
+                      onSaved={() => setCreating(false)}
+                    />
+                  ) : (
+                    selectedTask && (
+                      <>
+                        <DeliveryTaskJourney
+                          task={selectedTask}
+                          workspace={workspace}
+                          review={taskReview.data}
+                          onOpenPanel={setSelectedPanel}
+                        />
+                        <StyledDeliveryRow>
+                          {[
+                            {
+                              id: 'task',
+                              label: t`Task and final approval`,
+                            },
+                            {
+                              id: 'creative',
+                              label: t`Creative production`,
+                            },
+                            { id: 'agents', label: t`Text assistants` },
+                            {
+                              id: 'operations',
+                              label: t`Delivery and messages`,
+                            },
+                          ].map((panel) => (
+                            <StyledDeliveryButton
+                              key={panel.id}
+                              aria-pressed={selectedPanel === panel.id}
+                              onClick={() => setSelectedPanel(panel.id)}
+                            >
+                              {panel.label}
+                            </StyledDeliveryButton>
+                          ))}
+                        </StyledDeliveryRow>
+                        {selectedPanel === 'task' && (
+                          <DeliveryTaskDetail
+                            key={selectedTask.id}
+                            task={selectedTask}
+                            reviewController={taskReview}
+                            onChanged={() => query.refetch()}
+                            workspace={workspace}
+                            run={run}
+                            busy={mutation.loading}
+                            stateLabel={stateLabel}
+                            celebrateApproval={approvalCelebration}
+                          />
+                        )}
+                        {selectedPanel === 'creative' && (
+                          <DeliveryCreative
+                            key={selectedTask.id}
+                            task={selectedTask}
+                            workspace={workspace}
+                            onChanged={() => query.refetch()}
+                            onOpenTask={() => setSelectedPanel('task')}
+                          />
+                        )}
+                        {selectedPanel === 'operations' && (
+                          <DeliveryOperations
+                            key={selectedTask.id}
+                            task={selectedTask}
+                            workspace={workspace}
+                            onChanged={() => query.refetch()}
+                          />
+                        )}
+                        {selectedPanel === 'agents' && (
+                          <DeliveryAgents
+                            key={`agents-${selectedTask.id}`}
+                            task={selectedTask}
+                            workspace={workspace}
+                            onTaskChanged={() => query.refetch()}
+                          />
+                        )}
+                      </>
+                    )
+                  )}
+                </StyledWorkspaceAccessBoundary>
+              </StyledDeliveryStack>
+            </StyledDeliveryCanvas>
+          </StyledDeliveryDrawer>
+        )}
       </PageBody>
     </PageContainer>
   );

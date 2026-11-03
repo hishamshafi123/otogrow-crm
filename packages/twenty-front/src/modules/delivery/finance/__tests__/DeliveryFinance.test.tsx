@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Request } from 'cross-fetch';
 import { i18n } from '@lingui/core';
 import { I18nProvider } from '@lingui/react';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {
   createMemoryRouter,
@@ -67,6 +67,22 @@ const MockForecastWorkspace = () => {
     </>
   );
 };
+const MockExportsWorkspace = () => {
+  const [reason, setReason] = useState('');
+  useDeliveryDraftStatus({ dirty: reason !== '', saving: false });
+  return (
+    <>
+      <p>Accounting export workspace</p>
+      <label>
+        Export review reason
+        <input
+          value={reason}
+          onChange={(event) => setReason(event.target.value)}
+        />
+      </label>
+    </>
+  );
+};
 
 jest.mock('@/delivery/deliveryStyles', () => ({
   StyledDeliveryStack: 'div',
@@ -74,6 +90,8 @@ jest.mock('@/delivery/deliveryStyles', () => ({
 }));
 jest.mock('@/delivery/finance/financeStyles', () => ({
   StyledFinanceNavigation: 'nav',
+  StyledFinanceDesktopNavigation: 'nav',
+  StyledFinanceMobileNavigation: 'label',
 }));
 jest.mock('@/delivery/DeliveryBusiness', () => ({
   DeliveryBusiness: () => <p>Cash records workspace</p>,
@@ -86,6 +104,9 @@ jest.mock('@/delivery/finance/DeliveryFinanceAiCosts', () => ({
 }));
 jest.mock('@/delivery/finance/DeliveryFinanceForecast', () => ({
   DeliveryFinanceForecast: () => <MockForecastWorkspace />,
+}));
+jest.mock('@/delivery/finance/export/DeliveryFinanceExports', () => ({
+  DeliveryFinanceExports: () => <MockExportsWorkspace />,
 }));
 jest.mock('@/delivery/finance/DeliveryMonthlyFinance', () => ({
   DeliveryMonthlyFinance: ({ view }: { view: string }) => (
@@ -138,27 +159,193 @@ beforeEach(() => {
 });
 
 it.each([
-  ['', 'Cash records', 'Cash records workspace'],
+  ['', 'Cash records', 'Cash records workspace', 'cash'],
   [
     '&financeView=payments',
     'Payments and matching',
     'Payment matching workspace',
+    'payments',
   ],
-  ['&financeView=monthly', 'Monthly results', 'Monthly results workspace'],
-  ['&financeView=plans', 'Monthly cost plans', 'Cost plan workspace'],
-  ['&financeView=ai-costs', 'AI costs', 'AI-cost workspace'],
-  ['&financeView=forecast', 'Cash forecast', 'Cash forecast workspace'],
-  ['&financeView=unknown', 'Cash records', 'Cash records workspace'],
-])('shows the requested finance workspace for %s', (query, label, content) => {
-  setup(query);
-  expect(
-    screen.getByRole('navigation', { name: 'Finance views' }),
-  ).toBeVisible();
-  expect(screen.getByRole('link', { name: label })).toHaveAttribute(
-    'aria-current',
-    'page',
+  [
+    '&financeView=monthly',
+    'Monthly results',
+    'Monthly results workspace',
+    'monthly',
+  ],
+  ['&financeView=plans', 'Monthly cost plans', 'Cost plan workspace', 'plans'],
+  ['&financeView=ai-costs', 'AI costs', 'AI-cost workspace', 'ai-costs'],
+  [
+    '&financeView=exports',
+    'Accounting exports',
+    'Accounting export workspace',
+    'exports',
+  ],
+  [
+    '&financeView=forecast',
+    'Cash forecast',
+    'Cash forecast workspace',
+    'forecast',
+  ],
+  ['&financeView=unknown', 'Cash records', 'Cash records workspace', 'cash'],
+])(
+  'shows the requested finance workspace for %s',
+  (query, label, content, value) => {
+    setup(query);
+    expect(
+      screen.getByRole('navigation', { name: 'Finance views' }),
+    ).toBeVisible();
+    expect(screen.getByRole('link', { name: label })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(screen.getByText(content)).toBeVisible();
+    expect(screen.getByRole('combobox', { name: 'Finance view' })).toHaveValue(
+      value,
+    );
+  },
+);
+
+it.each([
+  ['cash', 'Cash records workspace'],
+  ['forecast', 'Cash forecast workspace'],
+  ['payments', 'Payment matching workspace'],
+  ['monthly', 'Monthly results workspace'],
+  ['plans', 'Cost plan workspace'],
+  ['ai-costs', 'AI-cost workspace'],
+  ['exports', 'Accounting export workspace'],
+])(
+  'routes the native selector to %s while preserving source and filter context',
+  async (value, content) => {
+    const router = setup(
+      '&financeView=payments&financeCurrency=AED&financeCash=receipt&financeMatchEntry=entry&financeMonth=2098-11&financeForecastDays=90',
+    );
+    await userEvent.selectOptions(
+      screen.getByRole('combobox', { name: 'Finance view' }),
+      value,
+    );
+    expect(screen.getByText(content)).toBeVisible();
+    expect(screen.getByRole('combobox', { name: 'Finance view' })).toHaveValue(
+      value,
+    );
+    const params = new URLSearchParams(router.state.location.search);
+    expect(params.get('financeView')).toBe(value === 'cash' ? null : value);
+    expect(params.get('view')).toBe('finance');
+    expect(params.get('financeCurrency')).toBe('AED');
+    expect(params.get('financeCash')).toBe('receipt');
+    expect(params.get('financeMatchEntry')).toBe('entry');
+    expect(params.get('financeMonth')).toBe('2098-11');
+    expect(params.get('financeForecastDays')).toBe('90');
+  },
+);
+
+it('follows browser history and direct URL fallback without separate selector state', async () => {
+  const router = setup('&financeView=monthly&financeCurrency=USD');
+  await userEvent.selectOptions(
+    screen.getByRole('combobox', { name: 'Finance view' }),
+    'ai-costs',
   );
-  expect(screen.getByText(content)).toBeVisible();
+  await act(async () => {
+    await router.navigate(-1);
+  });
+  expect(screen.getByRole('combobox', { name: 'Finance view' })).toHaveValue(
+    'monthly',
+  );
+  expect(screen.getByText('Monthly results workspace')).toBeVisible();
+  await act(async () => {
+    await router.navigate(1);
+  });
+  expect(screen.getByRole('combobox', { name: 'Finance view' })).toHaveValue(
+    'ai-costs',
+  );
+  await act(async () => {
+    await router.navigate(
+      '/delivery?view=finance&financeView=unknown&financeCurrency=EUR',
+    );
+  });
+  expect(screen.getByRole('combobox', { name: 'Finance view' })).toHaveValue(
+    'cash',
+  );
+  expect(screen.getByText('Cash records workspace')).toBeVisible();
+});
+it('guards an export review while switching the seventh Finance destination and clears only discarded state', async () => {
+  setup(
+    '&financeView=exports&financeExportProfile=profile&financeCurrency=USD',
+  );
+  await userEvent.type(
+    screen.getByRole('textbox', { name: 'Export review reason' }),
+    'Review duplicate handoff',
+  );
+  await userEvent.selectOptions(
+    screen.getByRole('combobox', { name: 'Finance view' }),
+    'forecast',
+  );
+  await userEvent.click(screen.getByRole('button', { name: 'Keep editing' }));
+  expect(screen.getByRole('combobox', { name: 'Finance view' })).toHaveValue(
+    'exports',
+  );
+  expect(
+    screen.getByRole('textbox', { name: 'Export review reason' }),
+  ).toHaveValue('Review duplicate handoff');
+  await userEvent.selectOptions(
+    screen.getByRole('combobox', { name: 'Finance view' }),
+    'forecast',
+  );
+  await userEvent.click(
+    screen.getByRole('button', { name: 'Discard and continue' }),
+  );
+  expect(screen.getByText('Cash forecast workspace')).toBeVisible();
+  await userEvent.click(
+    screen.getByRole('link', { name: 'Accounting exports' }),
+  );
+  expect(
+    screen.getByRole('textbox', { name: 'Export review reason' }),
+  ).toHaveValue('');
+});
+
+it('keeps URL selection and a dirty payment draft on Keep editing, then discards before selector navigation', async () => {
+  const router = setup(
+    '&financeView=payments&financeCurrency=USD&financeCash=receipt',
+  );
+  await userEvent.type(
+    screen.getByRole('textbox', { name: 'Payment amount' }),
+    '123.45',
+  );
+  await userEvent.selectOptions(
+    screen.getByRole('combobox', { name: 'Finance view' }),
+    'forecast',
+  );
+  expect(screen.getByRole('dialog')).toBeVisible();
+  await userEvent.click(screen.getByRole('button', { name: 'Keep editing' }));
+  expect(screen.getByRole('combobox', { name: 'Finance view' })).toHaveValue(
+    'payments',
+  );
+  expect(screen.getByRole('textbox', { name: 'Payment amount' })).toHaveValue(
+    '123.45',
+  );
+  expect(
+    new URLSearchParams(router.state.location.search).get('financeView'),
+  ).toBe('payments');
+  await userEvent.selectOptions(
+    screen.getByRole('combobox', { name: 'Finance view' }),
+    'forecast',
+  );
+  await userEvent.click(
+    screen.getByRole('button', { name: 'Discard and continue' }),
+  );
+  expect(screen.getByRole('combobox', { name: 'Finance view' })).toHaveValue(
+    'forecast',
+  );
+  expect(screen.getByText('Cash forecast workspace')).toBeVisible();
+  await userEvent.selectOptions(
+    screen.getByRole('combobox', { name: 'Finance view' }),
+    'payments',
+  );
+  expect(screen.getByRole('textbox', { name: 'Payment amount' })).toHaveValue(
+    '',
+  );
+  expect(
+    new URLSearchParams(router.state.location.search).get('financeCash'),
+  ).toBe('receipt');
 });
 
 it('keeps source and filter context while switching finance views', async () => {

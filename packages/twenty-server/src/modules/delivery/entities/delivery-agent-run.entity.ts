@@ -18,6 +18,9 @@ import {
 @Entity({ name: 'deliveryAgentRun', schema: 'core' })
 @Index(['workspaceId', 'initiatorId', 'requestId'], { unique: true })
 @Index(['status', 'createdAt'])
+@Index(['workspaceId', 'createdAt', 'id'])
+@Index(['workspaceId', 'taskId', 'createdAt', 'id'])
+@Index(['workspaceId', 'initiatorId', 'createdAt', 'id'])
 export class DeliveryAgentRunEntity extends WorkspaceRelatedEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;

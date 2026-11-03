@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { NetworkStatus } from '@apollo/client';
 import { useMutation, useQuery } from '@apollo/client/react';
 import { useLingui } from '@lingui/react/macro';
+import { fastDeepEqual } from 'twenty-shared/utils';
 import { useDeliveryDraft } from '@/delivery/drafts/useDeliveryDraft';
 import { useDeliveryDraftGuard } from '@/delivery/drafts/DeliveryDraftGuard';
 import { useWorkflowAccess } from '@/delivery/workflows/useWorkflowAccess';
@@ -45,15 +47,42 @@ export const useTaskWorkflow = ({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const currentAuthorization = access.ready
+    ? JSON.stringify({
+        capabilities: [...(access.access?.capabilities ?? [])].sort(),
+        roleIds: [...(access.access?.roleIds ?? [])].sort(),
+        grants: access.access?.grants ?? [],
+      })
+    : null;
+  const [authorizationEvidence, setAuthorizationEvidence] = useState({
+    scope: access.scope,
+    signature: currentAuthorization ?? '',
+  });
+  if (
+    currentAuthorization !== null &&
+    (authorizationEvidence.scope !== access.scope ||
+      authorizationEvidence.signature !== currentAuthorization)
+  )
+    setAuthorizationEvidence({
+      scope: access.scope,
+      signature: currentAuthorization,
+    });
+  const authorization =
+    currentAuthorization ??
+    (authorizationEvidence.scope === access.scope
+      ? authorizationEvidence.signature
+      : '');
+  const source = `${access.scope}:${authorization}:${taskId}:${taskRevision}:${historyCursor ?? ''}`;
   const query = useQuery<DeliveryTaskWorkflowQuery>(GET_TASK_WORKFLOW, {
     variables: {
       input: { taskId, historyCursor },
       identity: access.scope,
       taskRevision,
+      authorization,
     },
     skip: !access.ready,
     fetchPolicy: 'no-cache',
-    notifyOnNetworkStatusChange: false,
+    notifyOnNetworkStatusChange: true,
     pollInterval: 30000,
   });
   const candidate = query.data?.deliveryTaskWorkflow;
@@ -61,17 +90,44 @@ export const useTaskWorkflow = ({
     saved && (!candidate || saved.taskRevision > candidate.taskRevision)
       ? saved
       : candidate;
-  const data =
-    !query.loading &&
+  const trusted =
     !query.error &&
     access.matches(current) &&
     current?.taskId === taskId &&
-    current.taskRevision >= taskRevision
-      ? current
-      : undefined;
+    current.taskRevision >= taskRevision;
+  const fresh = trusted && !query.loading ? current : undefined;
   // Keep the editor snapshot in memory while read errors hide its contents.
-  const [lastData, setLastData] = useState<TaskWorkflow>();
-  if (data && data !== lastData) setLastData(data);
+  const [lastRead, setLastRead] = useState<{
+    scope: string;
+    source: string;
+    data: TaskWorkflow;
+  }>();
+  if (
+    fresh &&
+    (lastRead?.source !== source || !fastDeepEqual(fresh, lastRead.data))
+  )
+    setLastRead({ scope: access.scope, source, data: fresh });
+  const refreshing =
+    query.loading &&
+    [NetworkStatus.poll, NetworkStatus.refetch].includes(query.networkStatus);
+  const [verifiedSource, setVerifiedSource] = useState<string | null>(null);
+  const canRetain =
+    !query.error &&
+    lastRead?.source === source &&
+    access.matches(lastRead.data) &&
+    (!current || trusted);
+  if (fresh && verifiedSource !== source) setVerifiedSource(source);
+  else if (
+    verifiedSource !== null &&
+    (!canRetain || (query.loading && !refreshing))
+  )
+    setVerifiedSource(null);
+  const data =
+    fresh ??
+    (refreshing && verifiedSource === source && canRetain
+      ? lastRead?.data
+      : undefined);
+  const lastData = lastRead?.scope === access.scope ? lastRead.data : undefined;
   const draft = useDeliveryDraft({
     initialValues: answers(data ?? lastData),
     revision: data?.taskRevision ?? lastData?.taskRevision ?? 0,

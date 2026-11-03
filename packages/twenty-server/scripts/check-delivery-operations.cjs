@@ -108,7 +108,7 @@ const {
         },
       },
     );
-    const reminders = new DeliveryReminderService(scoped, operations, noChat);
+    const reminders = new DeliveryReminderService(scoped, operations, noChat, noChat);
     const dispatchAndDrain = async (targetWorkspace, time) => {
       await operations.dispatchWorkspace(targetWorkspace, time);
       while (queuedReminders.length)

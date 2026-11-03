@@ -518,6 +518,35 @@ async function main() {
       const east = await tests.forecast({ currency: 'GBP' });
       assert.equal(east.businessDate, '2026-10-29');
       assert.equal(east.timezone, 'Asia/Qatar');
+      const paymentCalendars = (
+        await services.payments.snapshot(
+          ...tests.argumentsFor(people.reader),
+          { currency: 'GBP' },
+        )
+      ).reportingClocks;
+      assert.equal(paymentCalendars.length, 8);
+      assert.equal(
+        new Set(paymentCalendars.map((clock) => clock.currency)).size,
+        8,
+      );
+      assert.deepEqual(
+        paymentCalendars.find((clock) => clock.currency === 'GBP'),
+        {
+          currency: 'GBP',
+          timezone: 'Asia/Qatar',
+          businessDate: '2026-10-29',
+          confirmed: true,
+        },
+      );
+      assert.deepEqual(
+        paymentCalendars.find((clock) => clock.currency === 'SGD'),
+        {
+          currency: 'SGD',
+          timezone: 'UTC',
+          businessDate: '2026-10-28',
+          confirmed: false,
+        },
+      );
       const clockInvoice = await tests.saveCash({
         currency: 'GBP',
         amount: 10000,

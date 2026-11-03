@@ -7,6 +7,9 @@ export const toMailComposerOptions = (
 ) => {
   return {
     from,
+    ...(sendMessageInput.headerMessageId
+      ? { messageId: sendMessageInput.headerMessageId }
+      : {}),
     to: sendMessageInput.to,
     cc: sendMessageInput.cc,
     bcc: sendMessageInput.bcc,

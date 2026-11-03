@@ -1,0 +1,67 @@
+export const OPERATIONAL_PAGE_QUERIES = {
+  inbox: [
+    'DeliveryInboxContext',
+    'DeliveryInboxConversations',
+    'DeliveryInboxConversation',
+    'DeliveryInboxGmailAccounts',
+    'DeliveryInboxGmailThreads',
+    'DeliveryInboxMessages',
+    'DeliveryInboxReply',
+    'DeliveryInboxReplyState',
+    'DeliveryInboxReplies',
+    'DeliveryInboxRequest',
+  ],
+  creative: [
+    'DeliveryCreativeAdLinks',
+    'DeliveryCreativeAdLinkState',
+    'DeliveryCreativeAdLink',
+    'DeliveryCreativeAdLinkChoices',
+    'DeliveryCreativeLessons',
+    'AdvertisingSource',
+    'DeliveryCreativeContext',
+    'DeliveryCreativeProjects',
+    'DeliveryCreativeTasks',
+    'DeliveryCreativeDetail',
+    'DeliveryCreativeState',
+    'DeliveryCreativeReferences',
+    'DeliveryMediaModels',
+    'DeliveryAtlasProduction',
+    'DeliveryAtlasRun',
+    'DeliveryAtlasRuns',
+    'DeliveryCreativeReview',
+    'DeliveryCreativeFeedbackHistory',
+  ],
+  seo: [
+    'DeliverySeoProjects',
+    'DeliverySeoReports',
+    'DeliverySeoReport',
+    'DeliverySeoReportState',
+    'DeliverySeoChoices',
+  ],
+  chat: ['DeliveryChat'],
+  health: [
+    'DeliveryFounderExceptions',
+    'DeliveryReadiness',
+    'DeliveryFounderEscalations',
+    'PreviewDeliveryFounderEscalationRule',
+  ],
+  activity: [
+    'OtogrowActivity',
+    'OtogrowActivityPage',
+    'OtogrowActivityContext',
+    'OtogrowActivityOptions',
+    'OtogrowActivityEvent',
+    'OtogrowActivityCurrentTask',
+    'OtogrowActivityAnalysisRuns',
+    'OtogrowActivityAnalysisRun',
+    'OtogrowActivityAnalysisRunState',
+    'DeliveryAssistantCatalog',
+  ],
+} as const;
+
+export type DeliveryOperationalView = keyof typeof OPERATIONAL_PAGE_QUERIES;
+
+export const isOperationalPageQuery = (
+  view: DeliveryOperationalView,
+  queryName: string | undefined,
+) => OPERATIONAL_PAGE_QUERIES[view].some((name) => name === queryName);

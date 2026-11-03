@@ -34,6 +34,22 @@ jest.mock('@/delivery/workflows/useTaskWorkflow', () => ({
 jest.mock('@/delivery/workflows/DeliveryTaskWorkflow', () => ({
   DeliveryTaskWorkflow: () => null,
 }));
+jest.mock('@/delivery/reviews/DeliveryTaskReview', () => ({
+  DeliveryTaskReview: () => null,
+}));
+jest.mock('@/delivery/revisions/DeliveryRevisions', () => ({
+  DeliveryRevisions: () => null,
+}));
+jest.mock('@/delivery/reviews/useTaskReview', () => ({
+  useTaskReview: () => ({
+    data: {
+      canReviewSubmission: true,
+      canApprove: true,
+      pending: { submissionVersion: 1 },
+      assignment: null,
+    },
+  }),
+}));
 
 jest.mock('@/delivery/deliveryStyles', () => ({
   StyledDeliveryStack: 'div',
@@ -130,6 +146,18 @@ const Harness = ({
               details: {
                 ...currentTask.details,
                 state: mode === 'detail' ? 'IN_REVIEW' : 'PLANNED',
+                submissions:
+                  mode === 'detail'
+                    ? [
+                        {
+                          version: 1,
+                          description: 'Submitted work',
+                          evidence: [],
+                          submittedBy: 'editor',
+                          submittedAt: '2026-10-29T00:00:00Z',
+                        },
+                      ]
+                    : currentTask.details.submissions,
               },
             }}
             workspace={workspace}
@@ -255,13 +283,13 @@ describe('task draft protection', () => {
     run.mockResolvedValueOnce(false);
     const { user } = setup();
     await user.type(screen.getByLabelText('Title'), ' revised');
-    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+    await user.click(screen.getByRole('button', { name: 'Save task' }));
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Your edits are still here',
     );
     expect(screen.getByLabelText('Title')).toHaveValue('Brand video revised');
     expect(unload()).toBe(true);
-    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+    await user.click(screen.getByRole('button', { name: 'Save task' }));
     expect(run).toHaveBeenLastCalledWith(
       expect.objectContaining({ action: 'edit', revision: 3 }),
     );
@@ -281,7 +309,7 @@ describe('task draft protection', () => {
     );
     const { user } = setup();
     await user.type(screen.getByLabelText('Title'), ' new');
-    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+    await user.click(screen.getByRole('button', { name: 'Save task' }));
     expect(screen.getByLabelText('Title')).toBeDisabled();
     await user.click(screen.getByRole('button', { name: 'Close task' }));
     expect(screen.getByRole('dialog')).toHaveTextContent(
@@ -308,7 +336,7 @@ describe('task draft protection', () => {
     );
     const { user } = setup();
     await user.type(screen.getByLabelText('Title'), ' saved');
-    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+    await user.click(screen.getByRole('button', { name: 'Save task' }));
     await user.click(screen.getByRole('link', { name: 'Other view' }));
     expect(
       screen.getByRole('button', { name: 'Discard and continue' }),
@@ -328,7 +356,7 @@ describe('task draft protection', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Your draft is preserved',
     );
-    expect(screen.getByRole('button', { name: 'Save changes' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save task' })).toBeDisabled();
     expect(screen.getByLabelText('Title')).toHaveValue(
       'Brand video personal draft',
     );
@@ -348,7 +376,7 @@ describe('task draft protection', () => {
     expect(screen.getByLabelText('Title')).toHaveValue('Updated by Amna');
     await waitFor(() => expect(unload()).toBe(false));
     await user.type(screen.getByLabelText('Title'), ' ready');
-    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+    await user.click(screen.getByRole('button', { name: 'Save task' }));
     expect(run).toHaveBeenCalledWith(expect.objectContaining({ revision: 4 }));
   });
 
@@ -421,7 +449,7 @@ it('preserves collapsed task supporting details through saving without treating 
     'Check product details',
   );
   await user.click(supportingDetails);
-  await user.click(screen.getByRole('button', { name: 'Save changes' }));
+  await user.click(screen.getByRole('button', { name: 'Save task' }));
   expect(run).toHaveBeenCalledWith(
     expect.objectContaining({
       action: 'edit',

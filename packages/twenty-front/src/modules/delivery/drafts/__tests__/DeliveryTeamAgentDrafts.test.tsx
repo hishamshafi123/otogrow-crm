@@ -112,9 +112,9 @@ it('guards a starter replacement and Cancel, preserves a failed configuration, a
   await user.click(screen.getByLabelText('Brand'));
   await user.click(screen.getByLabelText('Production team'));
   save.mockResolvedValueOnce(false);
-  await user.click(screen.getByRole('button', { name: 'Save agent' }));
+  await user.click(screen.getByRole('button', { name: 'Save assistant' }));
   expect(screen.getByLabelText('Name')).toHaveValue('Specific brief checker');
-  await user.click(screen.getByRole('button', { name: 'Save agent' }));
+  await user.click(screen.getByRole('button', { name: 'Save assistant' }));
   expect(screen.getByText('Agent editor closed')).toBeInTheDocument();
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   await user.click(screen.getByRole('link', { name: 'Other view' }));

@@ -380,7 +380,7 @@ it('resets the cursor when filtering uncertain charges and preserves the URL', a
   expect(router.state.location.search).toContain('spendingCursor=older');
 });
 
-it('does not advertise unsupported media pricing or guess model prices', async () => {
+it('offers verified inspection pricing without enabling it by default or guessing prices', async () => {
   const { user } = setup('&spendingView=prices');
   await user.click(screen.getByRole('button', { name: 'Add pricing' }));
   const form = screen.getByRole('form', { name: 'Model pricing' });
@@ -393,7 +393,14 @@ it('does not advertise unsupported media pricing or guess model prices', async (
     within(form)
       .getAllByRole('option')
       .map((option) => option.textContent),
-  ).toEqual(['Text assistance', 'Image inspection']);
+  ).toEqual([
+    'Text assistance',
+    'Image inspection',
+    'Video and audio inspection',
+  ]);
+  expect(
+    within(form).queryByRole('option', { name: 'Video generation' }),
+  ).not.toBeInTheDocument();
   await user.type(within(form).getByLabelText(/Model ID/), 'test-model');
   await user.click(within(form).getByRole('button', { name: 'Cancel' }));
   await user.click(screen.getByRole('button', { name: 'Keep editing' }));

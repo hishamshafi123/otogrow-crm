@@ -43,6 +43,12 @@ export type OperationsSnapshot = {
     recipientId: string;
     senderId: string;
     kind: string;
+    reviewAssignment?: {
+      submissionVersion: number;
+      assignmentId: string | null;
+      assignmentRevision: number;
+      recipientId: string;
+    };
     text: string;
     createdAt: string;
     remindAt: string;

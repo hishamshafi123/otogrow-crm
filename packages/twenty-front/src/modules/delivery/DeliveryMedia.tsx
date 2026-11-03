@@ -1,15 +1,18 @@
+import { isCreativeSourceUnavailable } from '@/delivery/creative/production/creative-production-errors';
+import {
+  type CreativeProductionActor,
+  type CreativeProductionTask,
+} from '@/delivery/creative/production/creative-production.types';
 import { useDeliveryDraft } from '@/delivery/drafts/useDeliveryDraft';
 import { DeliveryDraftConflict } from '@/delivery/drafts/DeliveryDraftConflict';
 import { DeliveryGuardedForm } from '@/delivery/drafts/DeliveryGuardedForm';
-import { useState } from 'react';
+import { useLayoutEffect, useState } from 'react';
 import { gql } from '@apollo/client';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { isDefined } from 'twenty-shared/utils';
-import {
-  type DeliveryTask,
-  type DeliveryWorkspace,
-} from '@/delivery/delivery.types';
+import { AtlasProductionTools } from '@/delivery/creative/atlas/AtlasProductionTools';
+import { type DeliveryWorkspace } from '@/delivery/delivery.types';
 import {
   StyledDeliveryButton,
   StyledDeliveryCard,
@@ -29,16 +32,21 @@ const CHANGE_MEDIA = gql`
   }
 `;
 type DeliveryMediaProps = {
-  task: DeliveryTask;
-  workspace: DeliveryWorkspace;
+  task: CreativeProductionTask;
+  workspace?: DeliveryWorkspace;
+  actor?: CreativeProductionActor;
+  onAuthorityLost?: () => void;
   onChanged: () => Promise<unknown>;
 };
 export const DeliveryMedia = ({
   task,
   workspace,
+  actor: currentActor,
+  onAuthorityLost,
   onChanged,
 }: DeliveryMediaProps) => {
   const { t } = useLingui();
+  const actor = currentActor ?? workspace?.actor;
   const query = useQuery<{
     deliveryMediaModels: { id: string; kind: string; cost: null }[];
   }>(GET_MODELS, {
@@ -46,6 +54,9 @@ export const DeliveryMedia = ({
     fetchPolicy: 'network-only',
     notifyOnNetworkStatusChange: true,
   });
+  useLayoutEffect(() => {
+    if (isCreativeSourceUnavailable(query.error)) onAuthorityLost?.();
+  }, [query.error, onAuthorityLost]);
   const [mutate, mutation] = useMutation(CHANGE_MEDIA);
   const [error, setError] = useState('');
   const [changing, setChanging] = useState(false);
@@ -78,9 +89,9 @@ export const DeliveryMedia = ({
     ? models.find((item) => item.id === modelId)
     : undefined;
   const shot = document.shots.find((item) => item.id === shotId);
-  const role = workspace.actor.isAdmin
+  const role = actor?.isAdmin
     ? 'ADMIN'
-    : workspace.actor.isManager
+    : actor?.isManager
       ? 'MANAGER'
       : 'MEMBER';
   const enabled = settings?.enabled === true && settings.roles.includes(role);
@@ -116,6 +127,7 @@ export const DeliveryMedia = ({
         },
       });
     } catch (failure) {
+      if (isCreativeSourceUnavailable(failure)) onAuthorityLost?.();
       setError(
         failure instanceof Error
           ? failure.message
@@ -143,9 +155,14 @@ export const DeliveryMedia = ({
   };
   return (
     <StyledDeliveryStack>
+      <AtlasProductionTools
+        taskId={task.id}
+        taskRevision={task.revision}
+        onChanged={onChanged}
+      />
       <StyledDeliveryRow>
         <h4>
-          <Trans>Media tools</Trans>
+          <Trans>Google still-image inspection</Trans>
         </h4>
         <StyledDeliveryButton
           disabled={refreshing || query.loading}
@@ -157,11 +174,11 @@ export const DeliveryMedia = ({
       {error && <p role="alert">{error}</p>}
       <p>
         <Trans>
-          Google is the only supported media provider. Selected still images can
-          be inspected with an allowed model; motion and audio require human
-          review. Image and video generation are unavailable until billing for
-          these model outputs is supported. You can upload assets created in
-          your existing tools.
+          Selected still images can be inspected with a permitted Google model.
+          These findings do not approve media; motion and audio require human
+          review. Use Atlas above for supported image/video generation, or keep
+          uploading assets created in your existing tools. Legacy Google
+          generation remains unavailable here.
         </Trans>
       </p>
       {query.error ? (
@@ -192,7 +209,7 @@ export const DeliveryMedia = ({
           </Trans>
         </p>
       ) : null}
-      {workspace.actor.isAdmin && hasVerifiedModelSnapshot && (
+      {actor?.isAdmin && hasVerifiedModelSnapshot && (
         <details>
           <summary>{t`Generation access for this production`}</summary>
           <DeliveryGuardedForm
@@ -204,9 +221,17 @@ export const DeliveryMedia = ({
                 {
                   action: 'configure',
                   enabled: data.get('enabled') === 'on',
-                  modelIds: data.getAll('modelIds'),
+                  modelIds: [
+                    ...new Set([
+                      ...data.getAll('modelIds'),
+                      ...(settings?.modelIds.filter((id) =>
+                        id.startsWith('atlascloud/'),
+                      ) ?? []),
+                    ]),
+                  ],
                   roles: data.getAll('roles'),
                   dailyRunLimit: Number(data.get('dailyRunLimit')),
+                  allowUnknownCost: false,
                 },
                 revision,
               )
@@ -238,7 +263,9 @@ export const DeliveryMedia = ({
                         {item.kind === 'IMAGE'
                           ? t`Image`
                           : item.kind === 'INSPECTION'
-                            ? t`Image quality review`
+                            ? item.id === 'google/gemini-3.5-flash-lite'
+                              ? t`Image and video quality review`
+                              : t`Image quality review`
                             : t`Video`}
                       </option>
                     ))}
@@ -473,6 +500,7 @@ export const DeliveryMedia = ({
         </fieldset>
       </StyledDeliveryCard>
       {(document.mediaRuns ?? [])
+        .filter((run) => run.kind !== 'VIDEO_QA')
         .slice()
         .reverse()
         .map((run) => (

@@ -29,6 +29,7 @@ import { DeliveryFinanceAllocationEntity } from 'src/modules/delivery/finance/en
 import { DeliveryFinanceEventEntity } from 'src/modules/delivery/finance/entities/delivery-finance-event.entity';
 import {
   financeReportingClock,
+  projectFinanceReportingClocks,
   readFinanceReportingClocks,
   type FinanceReportingClocks,
 } from 'src/modules/delivery/finance/delivery-finance-reporting-date';
@@ -599,6 +600,7 @@ export class DeliveryFinanceReconciliationService {
         userWorkspaceId,
         currency: query.currency,
         canManage,
+        reportingClocks: projectFinanceReportingClocks(state.reportingClocks),
         cash: cash.rows,
         receivables: receivables.rows,
         entries: await Promise.all(

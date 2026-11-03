@@ -91,6 +91,81 @@ const event: OtogrowActivityEvent = {
   sourceId: 'task',
   changes: [{ field: 'state', before: 'IN_REVIEW', after: 'APPROVED' }],
 };
+
+it.each(['META', 'MANUAL'])(
+  'opens the exact %s report suggestion run without inventing a task',
+  async (kind) => {
+    const reportId = '550e8400-e29b-41d4-a716-446655440000';
+    const runId = '550e8400-e29b-41d4-a716-446655440001';
+    mockFeed.events = [
+      {
+        ...event,
+        actorType: 'AGENT',
+        agentName: 'Advertising strategy assistant',
+        taskId: null,
+        taskName: null,
+        sourceType: 'advertising-draft',
+        sourceId: runId,
+        action: 'ADVERTISING_DRAFT_COMPLETED',
+        category: 'ADVERTISING',
+        outcome: 'SUCCEEDED',
+        summary:
+          'Generated proposed recommendations; human review is required.',
+        changes: [
+          { field: 'advertisingSourceKind', before: null, after: kind },
+          { field: 'advertisingSourceId', before: null, after: reportId },
+        ],
+      },
+    ];
+    setup();
+    expect(
+      within(screen.getByRole('list', { name: 'Activity events' })).getByText(
+        'Advertising suggestions ready for review',
+      ),
+    ).toBeVisible();
+    await userEvent.click(screen.getByText('View event details'));
+    expect(
+      screen.getByRole('link', { name: 'Open advertising suggestions' }),
+    ).toHaveAttribute(
+      'href',
+      `/delivery?view=ads&adSource=${kind}&adReport=${reportId}&adDraftRun=${runId}`,
+    );
+    expect(
+      screen.queryByRole('link', { name: 'Open task' }),
+    ).not.toBeInTheDocument();
+  },
+);
+
+it.each([
+  [
+    'OTHER',
+    '550e8400-e29b-41d4-a716-446655440000',
+    '550e8400-e29b-41d4-a716-446655440001',
+  ],
+  ['META', 'invalid-report', '550e8400-e29b-41d4-a716-446655440001'],
+  ['META', '550e8400-e29b-41d4-a716-446655440000', 'invalid&adMode=review'],
+])(
+  'does not offer an unverified suggestion destination: %s',
+  async (kind, reportId, runId) => {
+    mockFeed.events = [
+      {
+        ...event,
+        sourceType: 'advertising-draft',
+        sourceId: runId,
+        taskId: null,
+        changes: [
+          { field: 'advertisingSourceKind', before: null, after: kind },
+          { field: 'advertisingSourceId', before: null, after: reportId },
+        ],
+      },
+    ];
+    setup();
+    await userEvent.click(screen.getByText('View event details'));
+    expect(
+      screen.queryByRole('link', { name: 'Open advertising suggestions' }),
+    ).not.toBeInTheDocument();
+  },
+);
 const workspace: DeliveryWorkspace = {
   actor: { memberId: 'admin', isAdmin: true, isManager: true },
   projects: [
@@ -201,6 +276,104 @@ beforeEach(() => {
     clients: [{ id: 'client', name: 'Otogrow' }],
   };
 });
+
+it.each([
+  ['CREATIVE_FEEDBACK_CREATED', 'Creative feedback added'],
+  ['CREATIVE_FEEDBACK_REPLIED', 'Creative feedback replied to'],
+  ['CREATIVE_FEEDBACK_ADDRESSED', 'Creative feedback marked addressed'],
+  ['CREATIVE_FEEDBACK_RESOLVED', 'Creative feedback verified and resolved'],
+  ['CREATIVE_FEEDBACK_REOPENED', 'Creative feedback reopened'],
+])(
+  'labels %s and links the exact submitted feedback without stale selections',
+  (action, label) => {
+    const feedbackId = 'f4dfc587-b9ae-4884-b0ea-0414850a207d';
+    mockFeed.events = [
+      {
+        ...event,
+        action,
+        sourceType: 'creative-review',
+        sourceId: feedbackId,
+        changes: [
+          { field: 'submissionVersion', before: null, after: '2' },
+          {
+            field: 'assetId',
+            before: null,
+            after: '5aa5f0b6-ac9e-40a2-9a6c-cbb8de2b5ef8',
+          },
+        ],
+      },
+    ];
+    setup(
+      '/delivery?view=activity&creativeSubmission=1&creativeCompare=3&creativeAsset=old&creativeFeedback=old',
+    );
+    expect(screen.getByText(label)).toBeVisible();
+    const link = screen.getByRole('link', { name: 'Open creative feedback' });
+    const target = new URL(
+      link.getAttribute('href') ?? '',
+      'https://example.test',
+    );
+    expect(target.searchParams.get('task')).toBe('task');
+    expect(target.searchParams.get('panel')).toBe('task');
+    expect(target.searchParams.get('creativeSubmission')).toBe('2');
+    expect(target.searchParams.get('creativeFeedback')).toBe(feedbackId);
+    expect(target.searchParams.has('creativeCompare')).toBe(false);
+    expect(target.searchParams.has('creativeAsset')).toBe(false);
+  },
+);
+
+it('links production feedback to the exact asset review while preserving activity filters', () => {
+  const assetId = '5aa5f0b6-ac9e-40a2-9a6c-cbb8de2b5ef8';
+  mockFeed.events = [
+    {
+      ...event,
+      action: 'CREATIVE_FEEDBACK_CREATED',
+      sourceType: 'creative-review',
+      sourceId: 'f4dfc587-b9ae-4884-b0ea-0414850a207d',
+      changes: [
+        { field: 'assetId', before: null, after: assetId },
+        { field: 'submissionVersion', before: null, after: null },
+      ],
+    },
+  ];
+  setup('/delivery?view=activity&creativeSubmission=9');
+  const target = new URL(
+    screen
+      .getByRole('link', { name: 'Open creative feedback' })
+      .getAttribute('href') ?? '',
+    'https://example.test',
+  );
+  expect(target.searchParams.get('view')).toBe('activity');
+  expect(target.searchParams.get('panel')).toBe('creative');
+  expect(target.searchParams.get('creativeAsset')).toBe(assetId);
+  expect(target.searchParams.has('creativeSubmission')).toBe(false);
+});
+
+it.each([
+  ['FOUNDER_ESCALATION_RULE_SAVED', 'Founder alert rule saved paused'],
+  ['FOUNDER_ESCALATION_RULE_ENABLED', 'Founder alert rule enabled'],
+  ['FOUNDER_ESCALATION_RULE_PAUSED', 'Founder alert rule paused'],
+  ['FOUNDER_ESCALATION_ACKNOWLEDGED', 'Founder issue acknowledged'],
+])('labels %s and opens its exact founder rule', (action, label) => {
+  const ruleId = '550e8400-e29b-41d4-a716-446655440000';
+  mockFeed.events = [
+    {
+      ...event,
+      action,
+      taskId: null,
+      taskName: null,
+      sourceType: 'founder-alert',
+      sourceId: ruleId,
+    },
+  ];
+  setup();
+  expect(screen.getByText(label)).toBeVisible();
+  expect(
+    screen.getByRole('link', { name: 'Open founder alert rules' }),
+  ).toHaveAttribute(
+    'href',
+    `/delivery?view=health&founderPanel=alerts&founderRule=${ruleId}`,
+  );
+});
 it('shows factual event context, coverage limits and readable before/after details with a permitted task link', async () => {
   setup();
   expect(screen.getByText(/Recorded activity since/)).toHaveTextContent(
@@ -272,6 +445,11 @@ it('keeps draft dates and blocks an invalid range before changing the view', asy
   );
   expect(screen.getByLabelText('From date (UTC)')).toHaveValue('2026-10-26');
   expect(currentParams().toString()).toBe('view=activity');
+  await userEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+  expect(currentParams().toString()).toBe('view=activity');
+  expect(screen.getByLabelText('From date (UTC)')).toHaveValue('');
+  expect(screen.getByLabelText('Through date (UTC)')).toHaveValue('');
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 });
 it('loads older cursor pages without losing filters and returns to the latest page', async () => {
   setup('/delivery?view=activity&activityPerson=amna');
@@ -473,14 +651,36 @@ it('identifies named work and the assistant separately from its human initiator'
 });
 it.each([
   ['FINANCE_PAID', 'finance', 'Open finance', '/delivery?view=finance'],
-  ['FINANCE_FORECAST_ANCHOR_REVIEWED', 'finance-forecast', 'Open cash forecast', '/delivery?view=finance&financeView=forecast'],
+  [
+    'FINANCE_FORECAST_ANCHOR_REVIEWED',
+    'finance-forecast',
+    'Open cash forecast',
+    '/delivery?view=finance&financeView=forecast',
+  ],
   [
     'CLIENT_SHARE_REVIEWED',
     'client-share',
     'Open clients',
     '/delivery?view=clients',
   ],
-  ['AD_REPORT_APPROVED', 'ad-report', 'Open advertising', '/delivery?view=ads'],
+  [
+    'AD_REPORT_APPROVED',
+    'ad-report',
+    'Open advertising report',
+    '/delivery?view=ads&adSource=MANUAL&adReport=550e8400-e29b-41d4-a716-446655440000',
+  ],
+  [
+    'META_CONNECTION_CONFIGURED',
+    'meta-connection',
+    'Open advertising connections',
+    '/delivery?view=ads&adView=legacy',
+  ],
+  [
+    'AD_BUDGET_REQUESTED',
+    'budget',
+    'Open advertising budgets',
+    '/delivery?view=ads&adView=legacy',
+  ],
   [
     'DELIVERY_ALERT_ACKNOWLEDGED',
     'alert',
@@ -504,6 +704,34 @@ it.each([
     expect(screen.getByRole('link', { name })).toHaveAttribute('href', target);
   },
 );
+it.each([
+  ['FINANCE_EXPORT_PROFILE_SAVED', 'Export profile saved'],
+  ['FINANCE_EXPORT_BATCH_CREATED', 'Immutable batch created'],
+  ['FINANCE_EXPORT_IMPORT_CONFIRMED', 'Manual import recorded'],
+  ['FINANCE_EXPORT_IMPORT_REVERSED', 'Manual import confirmation reversed'],
+])(
+  'labels %s and links to accounting exports without guessing a source kind',
+  async (action, label) => {
+    mockFeed.events = [
+      {
+        ...event,
+        action,
+        category: 'BUSINESS',
+        sourceType: 'finance-export',
+        sourceId: '550e8400-e29b-41d4-a716-446655440000',
+        taskId: null,
+        taskName: null,
+      },
+    ];
+    setup();
+    expect(screen.getByText(label, { selector: 'strong' })).toBeInTheDocument();
+    await userEvent.click(screen.getByText('View event details'));
+    expect(
+      screen.getByRole('link', { name: 'Open accounting exports' }),
+    ).toHaveAttribute('href', '/delivery?view=finance&financeView=exports');
+  },
+);
+
 it('links a monthly review event to its recorded service month', async () => {
   mockFeed.events = [
     {
@@ -587,7 +815,7 @@ it('links a creative event to its task stage and a Meta event to its exact repor
     screen.getByRole('link', { name: 'Open advertising report' }),
   ).toHaveAttribute(
     'href',
-    '/delivery?view=ads&metaArchive=ALL&metaReport=550e8400-e29b-41d4-a716-446655440000',
+    '/delivery?view=ads&adSource=META&adReport=550e8400-e29b-41d4-a716-446655440000',
   );
   await userEvent.click(screen.getByText('More filters'));
   expect(
@@ -596,4 +824,70 @@ it('links a creative event to its task stage and a Meta event to its exact repor
   expect(screen.getByRole('option', { name: 'Advertising' })).toHaveValue(
     'ADVERTISING',
   );
+});
+
+it('opens an exact recorded work analysis, preserves filters and clears obsolete preparation requests', async () => {
+  const runId = '550e8400-e29b-41d4-a716-446655440010';
+  mockFeed.events = [
+    {
+      ...event,
+      sourceType: 'activity-analysis',
+      sourceId: runId,
+      action: 'ACTIVITY_ANALYSIS_COMPLETED',
+      actorType: 'AGENT',
+      taskId: null,
+      taskName: null,
+    },
+  ];
+  setup(
+    '/delivery?view=activity&activityPerson=amna&activityFrom=2026-10-25&activityAnalysis=prepare&activityAssistant=old-assistant&activityAnalysisRequest=old-start&activityAnalysisRun=old-run&activityAnalysisCancel=old-cancel',
+  );
+  const user = userEvent.setup();
+  expect(
+    within(screen.getByRole('list', { name: 'Activity events' })).getByText(
+      'Work analysis ready',
+    ),
+  ).toBeVisible();
+  await user.click(screen.getByText('View event details'));
+  const href = screen
+    .getByRole('link', { name: 'Open saved work analysis' })
+    .getAttribute('href');
+  const destination = new URLSearchParams(href?.split('?')[1]);
+  expect(destination.get('activityPerson')).toBe('amna');
+  expect(destination.get('activityFrom')).toBe('2026-10-25');
+  expect(destination.get('activityAnalysis')).toBe('history');
+  expect(destination.get('activityAnalysisRun')).toBe(runId);
+  for (const key of [
+    'activityAssistant',
+    'activityAnalysisRequest',
+    'activityAnalysisCancel',
+  ])
+    expect(destination.has(key)).toBe(false);
+  await user.click(screen.getByText('More filters'));
+  for (const name of [
+    'Work analysis queued',
+    'Work analysis started',
+    'Work analysis ready',
+    'Work analysis failed',
+    'Work analysis cancelled',
+    'Work analysis interrupted',
+  ])
+    expect(screen.getByRole('option', { name })).toBeVisible();
+});
+
+it('does not construct an analysis destination from an invalid source identifier', async () => {
+  mockFeed.events = [
+    {
+      ...event,
+      sourceType: 'activity-analysis',
+      sourceId: 'invalid&activityAnalysisRequest=fake',
+      action: 'ACTIVITY_ANALYSIS_FAILED',
+      taskId: null,
+    },
+  ];
+  setup();
+  await userEvent.setup().click(screen.getByText('View event details'));
+  expect(
+    screen.queryByRole('link', { name: 'Open saved work analysis' }),
+  ).not.toBeInTheDocument();
 });

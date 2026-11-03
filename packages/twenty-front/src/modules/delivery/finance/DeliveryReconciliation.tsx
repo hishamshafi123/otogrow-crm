@@ -54,7 +54,6 @@ const StyledPaymentBoundary = styled.fieldset`
     display: none;
   }
 `;
-const cashLedgerDate = () => new Date().toISOString().slice(0, 10);
 export const DeliveryReconciliation = ({
   onChanged,
 }: DeliveryReconciliationProps) => {
@@ -444,7 +443,7 @@ const PaymentsWorkspace = ({
               {editor === 'PAYMENT' ? (
                 <ReconciliationPaymentForm
                   key={`payment:${editorVersion}`}
-                  date={cashLedgerDate()}
+                  reportingClocks={data?.reportingClocks ?? []}
                   currency={currency || selectedReceivable?.currency || 'USD'}
                   projects={data?.projects ?? []}
                   invoice={selectedReceivable ?? undefined}
@@ -452,6 +451,7 @@ const PaymentsWorkspace = ({
                   readOnly={!canManage || !available || query.loading}
                   onSave={savePayment}
                   onCancel={() => setEditor(null)}
+                  onRefreshCalendar={() => query.refetch()}
                 />
               ) : (
                 <ReconciliationAllocationForm

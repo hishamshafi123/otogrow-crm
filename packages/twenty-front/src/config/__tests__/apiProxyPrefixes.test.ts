@@ -19,6 +19,13 @@ describe('apiProxyPrefixes', () => {
     expect(isProxiedPath(`/${apiPath}?query=value`)).toBe(true);
   });
 
+  it('routes creative media to the authenticated server endpoint', () => {
+    expect(isProxiedPath('/delivery-creative/task-id/assets/asset-id')).toBe(
+      true,
+    );
+    expect(isProxiedPath('/delivery-creative-other')).toBe(false);
+  });
+
   it.each(
     // PublicForm and Portal are both SPA routes and public API prefixes; the
     // vite proxy splits them by Accept header, so they are proxied by design.

@@ -4,14 +4,21 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource, type EntityManager } from 'typeorm';
+import { DataSource, QueryFailedError, type EntityManager } from 'typeorm';
 import { z } from 'zod';
 import { escapeForIlike } from 'twenty-shared/utils';
 import { deliveryKnowledgeCategorySchema } from 'src/modules/delivery/knowledge/delivery-knowledge-category';
 import { WorkspaceEntity } from 'src/engine/core-modules/workspace/workspace.entity';
 import { DeliveryService } from 'src/modules/delivery/delivery.service';
+import { DeliveryFathomService } from 'src/modules/delivery/knowledge/fathom/delivery-fathom.service';
+import { fathomHash } from 'src/modules/delivery/knowledge/fathom/delivery-fathom.policy';
+import {
+  assertFathomKnowledgeAnchor,
+  fathomKnowledgeAnchorSql,
+} from 'src/modules/delivery/knowledge/fathom/fathom-knowledge-anchor';
 import { canAccessDeliveryProject } from 'src/modules/delivery/delivery-policy';
 import { DeliveryProjectEntity } from 'src/modules/delivery/entities/delivery-project.entity';
 import { readDeliverySnapshot } from 'src/modules/delivery/read-delivery-snapshot';
@@ -57,6 +64,11 @@ const SAVE = z
     sourceUrl: SOURCE_URL,
     transcript: z.string().trim().max(200000),
     knowledge: z.string().trim().max(8000),
+    fathomImportProof: z.string().max(16000).nullish(),
+    fathomImportHash: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .nullish(),
   })
   .strict()
   .refine(
@@ -88,6 +100,7 @@ export class DeliveryKnowledgeService {
   constructor(
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly delivery: DeliveryService,
+    @Optional() private readonly fathom?: DeliveryFathomService,
   ) {}
 
   private async scope(
@@ -132,6 +145,10 @@ export class DeliveryKnowledgeService {
           userWorkspaceId,
           input.projectId,
         );
+        await manager.query(
+          'SELECT pg_advisory_xact_lock_shared(hashtextextended($1,0))',
+          [`knowledge:${workspace.id}:${input.projectId}`],
+        );
         const rows = await manager
           .getRepository(DeliveryKnowledgeSourceEntity)
           .createQueryBuilder('source')
@@ -152,6 +169,7 @@ export class DeliveryKnowledgeService {
           .andWhere(input.after ? 'source.id > :after' : 'TRUE', {
             after: input.after,
           })
+          .andWhere(fathomKnowledgeAnchorSql('source', 'visible'))
           .andWhere(input.category ? 'visible.category=:category' : 'TRUE', {
             category: input.category,
           })
@@ -197,6 +215,13 @@ export class DeliveryKnowledgeService {
             });
           if (!content)
             throw new NotFoundException('Knowledge version is unavailable.');
+          if (includeContent)
+            await assertFathomKnowledgeAnchor(
+              manager,
+              workspace.id,
+              input.projectId,
+              content.fathomProvenance,
+            );
           const summary: DeliveryKnowledgeItemDTO = {
             id: source.id,
             revision: source.revision,
@@ -239,6 +264,9 @@ export class DeliveryKnowledgeService {
               : null,
             knowledge: result.content.knowledge,
             currentVersion: source.currentVersion,
+            fathomProvenance: result.summary.canEdit
+              ? (result.content.fathomProvenance ?? null)
+              : null,
           };
         }
         return {
@@ -261,80 +289,163 @@ export class DeliveryKnowledgeService {
     raw: unknown,
   ) {
     const input = parse(SAVE, raw);
-    return this.dataSource.transaction(async (manager) => {
-      await manager.query(
-        'SELECT pg_advisory_xact_lock_shared(hashtextextended($1,0))',
-        [`delivery:${workspace.id}`],
-      );
-      await manager.query(
-        'SELECT pg_advisory_xact_lock(hashtextextended($1,0))',
-        [`knowledge:${workspace.id}:${input.projectId}`],
-      );
-      const actor = await this.scope(
-        manager,
-        workspace,
-        memberId,
-        userWorkspaceId,
-        input.projectId,
-      );
-      const repository = manager.getRepository(DeliveryKnowledgeSourceEntity);
-      let source = await repository.findOneBy({ id: input.id });
-      if (
-        source &&
-        (source.workspaceId !== workspace.id ||
-          source.projectId !== input.projectId ||
-          (!actor.isManager && source.createdBy !== memberId))
-      )
-        throw new ForbiddenException();
-      if ((source?.revision ?? 0) !== input.revision)
-        throw new ConflictException(
-          'This knowledge source changed. Reload it before saving.',
+    return this.dataSource
+      .transaction(async (manager) => {
+        await manager.query(
+          'SELECT pg_advisory_xact_lock_shared(hashtextextended($1,0))',
+          [`delivery:${workspace.id}`],
         );
-      source ??= repository.create({
-        id: input.id,
-        workspaceId: workspace.id,
-        projectId: input.projectId,
-        createdBy: memberId,
-        revision: 0,
-        currentVersion: 0,
-        publishedVersion: null,
-        publishedBy: null,
-        publishedAt: null,
-      });
-      const previous = source.currentVersion
-        ? await manager
-            .getRepository(DeliveryKnowledgeVersionEntity)
-            .findOneByOrFail({
+        await manager.query(
+          'SELECT pg_advisory_xact_lock(hashtextextended($1,0))',
+          [`knowledge:${workspace.id}:${input.projectId}`],
+        );
+        const actor = await this.scope(
+          manager,
+          workspace,
+          memberId,
+          userWorkspaceId,
+          input.projectId,
+        );
+        const repository = manager.getRepository(DeliveryKnowledgeSourceEntity);
+        let source = await repository.findOneBy({ id: input.id });
+        if (
+          source &&
+          (source.workspaceId !== workspace.id ||
+            source.projectId !== input.projectId ||
+            (!actor.isManager && source.createdBy !== memberId))
+        )
+          throw new ForbiddenException();
+        if ((source?.revision ?? 0) !== input.revision)
+          throw new ConflictException(
+            'This knowledge source changed. Reload it before saving.',
+          );
+        const creating = !source;
+        source ??= repository.create({
+          id: input.id,
+          workspaceId: workspace.id,
+          projectId: input.projectId,
+          createdBy: memberId,
+          revision: 0,
+          currentVersion: 0,
+          publishedVersion: null,
+          publishedBy: null,
+          publishedAt: null,
+        });
+        const previous = source.currentVersion
+          ? await manager
+              .getRepository(DeliveryKnowledgeVersionEntity)
+              .findOneByOrFail({
+                workspaceId: workspace.id,
+                sourceId: source.id,
+                version: source.currentVersion,
+              })
+          : null;
+        await assertFathomKnowledgeAnchor(
+          manager,
+          workspace.id,
+          input.projectId,
+          previous?.fathomProvenance,
+        );
+        if (
+          Boolean(input.fathomImportProof) !== Boolean(input.fathomImportHash)
+        )
+          throw new BadRequestException(
+            'Use the exact Fathom preview and its evidence reference together.',
+          );
+        let fathomProvenance = previous?.fathomProvenance
+          ? {
+              ...previous.fathomProvenance,
+              humanEdited:
+                fathomHash(input.transcript) !==
+                previous.fathomProvenance.transcriptHash,
+            }
+          : null;
+        if (input.fathomImportProof && input.fathomImportHash) {
+          if (!this.fathom)
+            throw new BadRequestException(
+              'Fathom import verification is unavailable.',
+            );
+          fathomProvenance = await this.fathom.verifyImport(
+            manager,
+            workspace,
+            memberId,
+            userWorkspaceId,
+            {
+              ...input,
+              fathomImportProof: input.fathomImportProof,
+              fathomImportHash: input.fathomImportHash,
+            },
+          );
+        }
+        source.fathomRecordingId =
+          fathomProvenance?.recordingId ?? source.fathomRecordingId ?? null;
+        source.revision++;
+        source.currentVersion++;
+        if (creating)
+          await repository.insert({
+            id: source.id,
+            workspaceId: workspace.id,
+            projectId: input.projectId,
+            createdBy: memberId,
+            revision: source.revision,
+            currentVersion: source.currentVersion,
+            fathomRecordingId: source.fathomRecordingId,
+            publishedVersion: null,
+            publishedBy: null,
+            publishedAt: null,
+          });
+        else {
+          const updated = await repository.update(
+            {
+              id: source.id,
               workspaceId: workspace.id,
-              sourceId: source.id,
-              version: source.currentVersion,
-            })
-        : null;
-      source.revision++;
-      source.currentVersion++;
-      await repository.save(source);
-      await manager.getRepository(DeliveryKnowledgeVersionEntity).insert({
-        workspaceId: workspace.id,
-        sourceId: source.id,
-        version: source.currentVersion,
-        title: input.title,
-        category: input.category ?? previous?.category ?? 'MEETING',
-        meetingDate: input.meetingDate,
-        sourceUrl: input.sourceUrl,
-        transcript: input.transcript,
-        knowledge: input.knowledge,
-        createdBy: memberId,
+              projectId: input.projectId,
+              revision: input.revision,
+            },
+            {
+              revision: source.revision,
+              currentVersion: source.currentVersion,
+              fathomRecordingId: source.fathomRecordingId,
+            },
+          );
+          if (updated.affected !== 1)
+            throw new ConflictException(
+              'This knowledge source changed. Reload it before saving.',
+            );
+        }
+        await manager.getRepository(DeliveryKnowledgeVersionEntity).insert({
+          workspaceId: workspace.id,
+          sourceId: source.id,
+          version: source.currentVersion,
+          title: input.title,
+          category: input.category ?? previous?.category ?? 'MEETING',
+          meetingDate: input.meetingDate,
+          sourceUrl: input.sourceUrl,
+          transcript: input.transcript,
+          knowledge: input.knowledge,
+          fathomProvenance,
+          createdBy: memberId,
+        });
+        await this.activity(
+          manager,
+          workspace.id,
+          memberId,
+          source,
+          'KNOWLEDGE_DRAFT_SAVED',
+          'Saved a brand knowledge draft; published context is unchanged.',
+        );
+        return source.id;
+      })
+      .catch((error: unknown) => {
+        if (
+          error instanceof QueryFailedError &&
+          (error.driverError as { code?: unknown }).code === '23505'
+        )
+          throw new ConflictException(
+            'This knowledge source could not be created under that ID. Check the exact source before trying again.',
+          );
+        throw error;
       });
-      await this.activity(
-        manager,
-        workspace.id,
-        memberId,
-        source,
-        'KNOWLEDGE_DRAFT_SAVED',
-        'Saved a brand knowledge draft; published context is unchanged.',
-      );
-      return source.id;
-    });
   }
 
   async publish(
@@ -386,11 +497,34 @@ export class DeliveryKnowledgeService {
         throw new BadRequestException(
           'Add source notes or a transcript and reviewed knowledge before publishing. A recording link alone is not imported evidence.',
         );
+      await assertFathomKnowledgeAnchor(
+        manager,
+        workspace.id,
+        input.projectId,
+        content.fathomProvenance,
+      );
       source.publishedVersion = input.publish ? source.currentVersion : null;
       source.publishedAt = input.publish ? new Date() : null;
       source.publishedBy = input.publish ? memberId : null;
       source.revision++;
-      await repository.save(source);
+      const updated = await repository.update(
+        {
+          id: source.id,
+          workspaceId: workspace.id,
+          projectId: input.projectId,
+          revision: input.revision,
+        },
+        {
+          publishedVersion: source.publishedVersion,
+          publishedAt: source.publishedAt,
+          publishedBy: source.publishedBy,
+          revision: source.revision,
+        },
+      );
+      if (updated.affected !== 1)
+        throw new ConflictException(
+          'This knowledge source changed. Reload it before publishing.',
+        );
       await this.activity(
         manager,
         workspace.id,

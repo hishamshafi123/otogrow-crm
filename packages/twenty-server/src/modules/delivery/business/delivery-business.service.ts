@@ -1,3 +1,5 @@
+import { assertLegacyAdvertisingAssignmentAvailable } from 'src/modules/delivery/advertising/workbench/delivery-advertising-legacy-guard';
+import { type ConnectedInboxDraftSources } from 'src/modules/delivery/inbox/delivery-inbox-copy.types';
 import { canUseDeliveryAgent } from 'src/modules/delivery/agents/delivery-agent-access';
 import { OtogrowAiBudgetService } from 'src/modules/otogrow-ai-budget/otogrow-ai-budget.service';
 import { OtogrowAccessService } from 'src/modules/otogrow-access/otogrow-access.service';
@@ -10,7 +12,7 @@ import { advertisingInsights } from 'src/modules/delivery/business/delivery-adve
 import { generateText } from 'ai';
 import { AiModelRegistryService } from 'src/engine/metadata-modules/ai/ai-models/services/ai-model-registry.service';
 import { DeliveryAgentEntity } from 'src/modules/delivery/entities/delivery-agent.entity';
-import { DeliveryAgentRunEntity } from 'src/modules/delivery/entities/delivery-agent-run.entity';
+import { countDeliveryAgentRunsForUtcDay } from 'src/modules/delivery/agents/count-delivery-agent-runs-for-utc-day';
 import {
   BadRequestException,
   ConflictException,
@@ -19,7 +21,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource, MoreThanOrEqual, type EntityManager } from 'typeorm';
+import { DataSource, type EntityManager } from 'typeorm';
 import { randomUUID } from 'node:crypto';
 import { WorkspaceEntity } from 'src/engine/core-modules/workspace/workspace.entity';
 import { DeliveryService } from 'src/modules/delivery/delivery.service';
@@ -250,6 +252,7 @@ export class DeliveryBusinessService {
       agentId: string;
       sourceIds: string[];
     },
+    connectedSources?: ConnectedInboxDraftSources,
   ) {
     const prepared = await this.transact(
       workspace.id,
@@ -287,12 +290,14 @@ export class DeliveryBusinessService {
           workspace,
         );
         const sourceIds = [...new Set(input.sourceIds)];
-        const sources = business.inbox.filter(
-          (entry) =>
-            entry.conversationId === conversation.id &&
-            entry.kind === 'INBOUND_NOTE' &&
-            sourceIds.includes(entry.id),
-        );
+        const sources = connectedSources
+          ? await connectedSources.read(manager)
+          : business.inbox.filter(
+              (entry) =>
+                entry.conversationId === conversation.id &&
+                entry.kind === 'INBOUND_NOTE' &&
+                sourceIds.includes(entry.id),
+            );
         if (sources.length !== sourceIds.length)
           throw new ForbiddenException(
             'Select only inbound notes from this conversation.',
@@ -301,8 +306,6 @@ export class DeliveryBusinessService {
           throw new BadRequestException(
             'Select fewer messages for this draft.',
           );
-        const start = new Date();
-        start.setUTCHours(0, 0, 0, 0);
         business.agentRuns ??= [];
         for (const run of business.agentRuns)
           if (
@@ -342,28 +345,23 @@ export class DeliveryBusinessService {
           )
         )
           throw new ConflictException('A reply draft is already running.');
-        const taskRuns = await manager
-          .getRepository(DeliveryAgentRunEntity)
-          .count({
-            where: {
-              workspaceId: workspace.id,
-              agentId: agent.id,
-              createdAt: MoreThanOrEqual(start),
-            },
-          });
-        if (
-          taskRuns +
-            business.agentRuns.filter(
-              (run) =>
-                run.agentId === agent.id &&
-                run.createdAt >= start.toISOString(),
-            ).length >=
-          agent.configuration.dailyRunLimit
-        )
+        const count = await countDeliveryAgentRunsForUtcDay(
+          manager,
+          workspace.id,
+          agent.id,
+        );
+        if (count >= agent.configuration.dailyRunLimit)
           throw new BadRequestException(
             'This agent reached its daily run limit.',
           );
-        const id = randomUUID();
+        if (
+          connectedSources &&
+          agent.version !== connectedSources.quote.agentVersion
+        )
+          throw new ConflictException(
+            'The assistant changed after the reply preview. Preview again before generating.',
+          );
+        const id = connectedSources?.runId ?? randomUUID();
         await this.budget.reserve(manager, {
           workspaceId: workspace.id,
           actorId: memberId,
@@ -374,6 +372,9 @@ export class DeliveryBusinessService {
           modelId: agent.configuration.modelId,
           kind: 'TEXT',
           maxOutputTokens: Math.min(2048, agent.configuration.maxOutputTokens),
+          ...(connectedSources
+            ? { pricingRevision: connectedSources.quote.pricingRevision }
+            : {}),
         });
         business.agentRuns.push({
           id,
@@ -458,6 +459,14 @@ export class DeliveryBusinessService {
             agent.configuration.modelId!,
             workspace,
           );
+          if (
+            connectedSources &&
+            JSON.stringify(await connectedSources.read(manager)) !==
+              JSON.stringify(prepared.sources)
+          )
+            throw new ConflictException(
+              'Selected Gmail messages or owner consent changed before paid dispatch.',
+            );
         },
       );
       const result = await generateText({
@@ -516,16 +525,26 @@ export class DeliveryBusinessService {
           throw new BadRequestException(
             'The model did not return a usable draft.',
           );
-        business.inbox.push({
-          id: randomUUID(),
-          conversationId: conversation.id,
-          authorId: memberId,
-          createdAt: new Date().toISOString(),
-          kind: 'DRAFT',
-          text: result.text,
-          sourceUrl: null,
-          sourceIds: prepared.sources.map((entry) => entry.id),
-        });
+        if (connectedSources) {
+          if (
+            JSON.stringify(await connectedSources.read(manager)) !==
+            JSON.stringify(prepared.sources)
+          )
+            throw new ConflictException(
+              'Selected Gmail messages or owner consent changed. The generated draft was discarded.',
+            );
+          await connectedSources.commit(manager, result.text);
+        } else
+          business.inbox.push({
+            id: randomUUID(),
+            conversationId: conversation.id,
+            authorId: memberId,
+            createdAt: new Date().toISOString(),
+            kind: 'DRAFT',
+            text: result.text,
+            sourceUrl: null,
+            sourceIds: prepared.sources.map((entry) => entry.id),
+          });
         run.status = 'SUCCEEDED';
         run.inputTokens = result.usage.inputTokens ?? null;
         run.outputTokens = result.usage.outputTokens ?? null;
@@ -599,9 +618,210 @@ export class DeliveryBusinessService {
         'The reply draft failed. No message was sent. Check model availability before trying again.',
       );
     }
-    return this.snapshot(workspace, memberId, userWorkspaceId);
+    return connectedSources
+      ? { runId: prepared.id }
+      : this.snapshot(workspace, memberId, userWorkspaceId);
   }
 
+  async previewConnectedInboxDraft(
+    manager: EntityManager,
+    workspace: WorkspaceEntity,
+    memberId: string,
+    userWorkspaceId: string,
+    conversation: Extract<BusinessRecord, { kind: 'CONVERSATION' }>,
+    agentId: string,
+    runId: string,
+  ) {
+    const { actor } = await this.access(
+      workspace,
+      memberId,
+      userWorkspaceId,
+      manager,
+    );
+    const agent = await manager
+      .getRepository(DeliveryAgentEntity)
+      .findOneBy({ id: agentId, workspaceId: workspace.id });
+    if (
+      !canDraftConversation(conversation, actor) ||
+      !agent?.configuration.enabled ||
+      agent.configuration.kind !== 'COPY' ||
+      !canUseDeliveryAgent(agent.configuration, actor) ||
+      !agent.configuration.projectIds.includes(conversation.projectId ?? '') ||
+      !agent.configuration.modelId
+    )
+      throw new ForbiddenException(
+        'Select an enabled copy assistant allowed for your role and this conversation.',
+      );
+    this.models.validateModelAvailability(
+      agent.configuration.modelId,
+      workspace,
+    );
+    if (!this.models.getModel(agent.configuration.modelId))
+      throw new BadRequestException('Connect the configured model first.');
+    const count = await countDeliveryAgentRunsForUtcDay(
+      manager,
+      workspace.id,
+      agent.id,
+    );
+    if (count >= agent.configuration.dailyRunLimit)
+      throw new BadRequestException(
+        'This assistant reached its daily run limit.',
+      );
+    const quote = await this.budget.quote(manager, {
+      workspaceId: workspace.id,
+      actorId: memberId,
+      sourceKind: 'INBOX_DRAFT',
+      sourceRunId: runId,
+      projectId: conversation.projectId,
+      taskId: null,
+      modelId: agent.configuration.modelId,
+      kind: 'TEXT',
+      maxOutputTokens: Math.min(2048, agent.configuration.maxOutputTokens),
+    });
+    return {
+      agentId: agent.id,
+      agentName: agent.configuration.name,
+      agentVersion: agent.version,
+      modelId: agent.configuration.modelId,
+      budget: quote,
+    };
+  }
+
+  draftForConnectedInbox(
+    workspace: WorkspaceEntity,
+    memberId: string,
+    userWorkspaceId: string,
+    input: {
+      id: string;
+      revision: number;
+      agentId: string;
+      sourceIds: string[];
+    },
+    sources: ConnectedInboxDraftSources,
+  ) {
+    return this.draft(workspace, memberId, userWorkspaceId, input, sources);
+  }
+
+  failConnectedInboxDraft(workspaceId: string, runId: string) {
+    return this.transact(workspaceId, async (business, manager) => {
+      const run = business.agentRuns?.find(
+        (candidate) => candidate.id === runId,
+      );
+      if (run?.status !== 'RUNNING') return;
+      await this.budget.stop(manager, {
+        workspaceId,
+        sourceKind: 'INBOX_DRAFT',
+        sourceRunId: runId,
+      });
+      run.status = 'FAILED';
+      await recordOtogrowActivity(manager, {
+        workspaceId,
+        actorId: null,
+        actorType: 'SYSTEM',
+        category: 'AGENT',
+        action: 'INBOX_DRAFT_TIMED_OUT',
+        outcome: 'FAILED',
+        summary:
+          'An unfinished connected inbox draft stopped. No email was sent.',
+        sourceType: 'agent',
+        sourceId: run.agentId,
+        changes: [{ field: 'runStatus', before: 'RUNNING', after: 'FAILED' }],
+      });
+    });
+  }
+
+  private async applyAdvertisingReview(
+    manager: EntityManager,
+    workspace: WorkspaceEntity,
+    memberId: string,
+    actor: Awaited<ReturnType<DeliveryService['actor']>>,
+    record: Extract<BusinessRecord, { kind: 'AD_REPORT' }>,
+    input: {
+      revision: number;
+      status: 'APPROVED' | 'CHANGES_REQUESTED';
+      note: string;
+      evidence: string | null;
+    },
+  ) {
+    if (record.revision !== input.revision)
+      throw new ConflictException(
+        'This report changed. Refresh before reviewing.',
+      );
+    assertBusinessTransition(record, actor, input.status, input.evidence);
+    const previousStatus = record.status;
+    const now = new Date().toISOString();
+    record.status = input.status;
+    record.decisionBy = memberId;
+    record.evidence = input.evidence;
+    record.revision++;
+    record.updatedAt = now;
+    record.history.push({
+      at: now,
+      actorId: memberId,
+      action: input.status,
+      note: input.note,
+    });
+    await this.recordActivity(manager, workspace.id, memberId, record, {
+      action: `AD_REPORT_${input.status}`,
+      summary: `Changed a ad report record to ${input.status.toLowerCase().replace(/_/g, ' ')}.`,
+      outcome: input.status,
+      changes: [
+        {
+          field: 'revision',
+          before: String(input.revision),
+          after: String(record.revision),
+        },
+        { field: 'state', before: previousStatus, after: record.status },
+      ],
+    });
+  }
+  async reviewAdvertisingForWorkbench(
+    manager: EntityManager,
+    workspace: WorkspaceEntity,
+    memberId: string,
+    userWorkspaceId: string,
+    input: { id: string; revision: number; note: string },
+  ) {
+    if (!manager.queryRunner?.isTransactionActive)
+      throw new Error('Advertising review requires an authorized transaction.');
+    await manager.query(
+      'SELECT pg_advisory_xact_lock(hashtextextended($1,0))',
+      [`delivery:${workspace.id}`],
+    );
+    const { actor, projectIds } = await this.access(
+      workspace,
+      memberId,
+      userWorkspaceId,
+      manager,
+    );
+    const repository = manager.getRepository(DeliveryOperationsEntity);
+    const operations = await repository.findOneBy({
+      workspaceId: workspace.id,
+    });
+    const record = operations?.state.business?.records.find(
+      (item) => item.id === input.id,
+    );
+    if (
+      !operations ||
+      !record ||
+      record.kind !== 'AD_REPORT' ||
+      !canReadBusinessRecord(record, actor, projectIds)
+    )
+      throw new NotFoundException('This advertising source is unavailable.');
+    await this.applyAdvertisingReview(
+      manager,
+      workspace,
+      memberId,
+      actor,
+      record,
+      { ...input, status: 'APPROVED', evidence: null },
+    );
+    if (JSON.stringify(operations.state).length > 10000000)
+      throw new BadRequestException(
+        'Operational history needs archival before more decisions can be stored.',
+      );
+    await repository.save(operations);
+  }
   async command(
     workspace: WorkspaceEntity,
     memberId: string,
@@ -983,6 +1203,13 @@ export class DeliveryBusinessService {
       }
       const previousStatus = record.status;
       if (command.action === 'assign') {
+        if (record.kind === 'AD_REPORT')
+          await assertLegacyAdvertisingAssignmentAvailable(
+            manager,
+            workspace.id,
+            'MANUAL',
+            record.id,
+          );
         if (
           !actor.isManager ||
           record.kind === 'CONVERSATION' ||
@@ -1028,6 +1255,29 @@ export class DeliveryBusinessService {
           throw new BadRequestException('Could not create the follow-up task.');
         record.taskId = taskId;
       } else {
+        if (
+          record.kind === 'AD_REPORT' &&
+          ['APPROVED', 'CHANGES_REQUESTED'].includes(command.status)
+        ) {
+          await assertLegacyAdvertisingAssignmentAvailable(
+            manager,
+            workspace.id,
+            'MANUAL',
+            record.id,
+          );
+          await this.applyAdvertisingReview(
+            manager,
+            workspace,
+            memberId,
+            actor,
+            record,
+            {
+              ...command,
+              status: command.status as 'APPROVED' | 'CHANGES_REQUESTED',
+            },
+          );
+          return;
+        }
         if (
           record.kind === 'FINANCE' &&
           command.status === 'VOID' &&

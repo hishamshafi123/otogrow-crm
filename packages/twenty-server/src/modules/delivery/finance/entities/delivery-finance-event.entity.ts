@@ -19,7 +19,9 @@ export class DeliveryFinanceEventEntity extends WorkspaceRelatedEntity {
     | 'PERIOD'
     | 'FORECAST_ANCHOR'
     | 'FORECAST_ITEM'
-    | 'FORECAST_REALIZATION';
+    | 'FORECAST_REALIZATION'
+    | 'EXPORT_PROFILE'
+    | 'EXPORT_BATCH';
   @Column({ type: 'uuid' }) sourceId: string;
   @Column({ type: 'uuid' }) actorId: string;
   @Column({ type: 'text' }) actorName: string;

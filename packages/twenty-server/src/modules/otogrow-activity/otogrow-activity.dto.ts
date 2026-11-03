@@ -1,4 +1,5 @@
 import { Field, ID, InputType, Int, ObjectType } from '@nestjs/graphql';
+import { DeliveryAssistantActorDTO } from 'src/modules/delivery/agents/reads/delivery-assistants.dto';
 
 @ObjectType('OtogrowActivityChange')
 export class OtogrowActivityChangeDTO {
@@ -9,6 +10,7 @@ export class OtogrowActivityChangeDTO {
 
 @ObjectType('OtogrowActivityEvent')
 export class OtogrowActivityEventDTO {
+  @Field(() => Boolean, { nullable: true }) detailsTruncated?: boolean | null;
   @Field(() => ID) id: string;
   @Field() occurredAt: string;
   @Field(() => ID, { nullable: true }) actorId: string | null;
@@ -63,4 +65,81 @@ export class OtogrowActivityFilterInput {
   @Field(() => String, { nullable: true }) through?: string;
   @Field(() => String, { nullable: true }) cursor?: string;
   @Field(() => Int, { nullable: true }) limit?: number;
+}
+
+@ObjectType('OtogrowActivityIdentity')
+export class OtogrowActivityIdentityDTO {
+  @Field(() => ID) workspaceId: string;
+  @Field(() => ID) memberId: string;
+  @Field(() => ID) userWorkspaceId: string;
+  @Field(() => DeliveryAssistantActorDTO) actor: DeliveryAssistantActorDTO;
+  @Field() scope: string;
+  @Field() observedAt: string;
+}
+@InputType('OtogrowActivityFiltersInput')
+export class OtogrowActivityFiltersInput {
+  @Field(() => ID, { nullable: true }) personId?: string | null;
+  @Field(() => ID, { nullable: true }) projectId?: string | null;
+  @Field(() => ID, { nullable: true }) clientId?: string | null;
+  @Field(() => String, { nullable: true }) category?: string | null;
+  @Field(() => String, { nullable: true }) action?: string | null;
+  @Field(() => String, { nullable: true }) outcome?: string | null;
+  @Field(() => String, { nullable: true }) from?: string | null;
+  @Field(() => String, { nullable: true }) through?: string | null;
+}
+@ObjectType('OtogrowActivityFilters')
+export class OtogrowActivityFiltersDTO {
+  @Field(() => ID, { nullable: true }) personId: string | null;
+  @Field(() => ID, { nullable: true }) projectId: string | null;
+  @Field(() => ID, { nullable: true }) clientId: string | null;
+  @Field(() => String, { nullable: true }) category: string | null;
+  @Field(() => String, { nullable: true }) action: string | null;
+  @Field(() => String, { nullable: true }) outcome: string | null;
+  @Field(() => String, { nullable: true }) from: string | null;
+  @Field(() => String, { nullable: true }) through: string | null;
+}
+@InputType('OtogrowActivityPageInput')
+export class OtogrowActivityPageInput {
+  @Field(() => OtogrowActivityFiltersInput)
+  filters: OtogrowActivityFiltersInput;
+  @Field(() => String, { nullable: true }) after?: string | null;
+  @Field(() => Int, { nullable: true }) limit?: number | null;
+}
+@InputType('OtogrowActivityOptionsInput')
+export class OtogrowActivityOptionsInput {
+  @Field() kind: string;
+  @Field(() => String, { nullable: true }) search?: string | null;
+  @Field(() => String, { nullable: true }) after?: string | null;
+  @Field(() => ID, { nullable: true }) selectedId?: string | null;
+  @Field(() => Int, { nullable: true }) limit?: number | null;
+}
+@InputType('OtogrowActivityEventInput')
+export class OtogrowActivityEventInput {
+  @Field(() => ID) id: string;
+}
+@ObjectType('OtogrowActivityContext')
+export class OtogrowActivityContextDTO extends OtogrowActivityIdentityDTO {
+  @Field(() => String, { nullable: true }) coverageStartedAt: string | null;
+  @Field() canAnalyze: boolean;
+}
+@ObjectType('OtogrowActivityPage')
+export class OtogrowActivityPageDTO extends OtogrowActivityIdentityDTO {
+  @Field(() => OtogrowActivityFiltersDTO) filters: OtogrowActivityFiltersDTO;
+  @Field(() => [OtogrowActivityEventDTO]) events: OtogrowActivityEventDTO[];
+  @Field(() => Int) totalCount: number;
+  @Field(() => String, { nullable: true }) nextCursor: string | null;
+  @Field(() => String, { nullable: true }) coverageStartedAt: string | null;
+}
+@ObjectType('OtogrowActivityOptions')
+export class OtogrowActivityOptionsDTO extends OtogrowActivityIdentityDTO {
+  @Field(() => [OtogrowActivityOptionDTO]) items: OtogrowActivityOptionDTO[];
+  @Field(() => OtogrowActivityOptionDTO, { nullable: true })
+  selected: OtogrowActivityOptionDTO | null;
+  @Field(() => Int) totalCount: number;
+  @Field(() => String, { nullable: true }) nextCursor: string | null;
+}
+@ObjectType('OtogrowActivityEventDetail')
+export class OtogrowActivityEventDetailDTO extends OtogrowActivityIdentityDTO {
+  @Field(() => OtogrowActivityEventDTO, { nullable: true })
+  event: OtogrowActivityEventDTO | null;
 }

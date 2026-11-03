@@ -51,6 +51,27 @@ const mockMutate = jest.fn();
 const mockRefetch = jest.fn();
 const mockChanged = jest.fn();
 const mockRun = jest.fn();
+jest.mock('@/delivery/reviews/DeliveryTaskReview', () => ({
+  DeliveryTaskReview: () => null,
+}));
+jest.mock('@/delivery/reviews/useTaskReview', () => ({
+  useTaskReview: () => ({
+    data:
+      mockPermissionError || mockReadError || mockLoading
+        ? null
+        : {
+            canReviewSubmission:
+              mockManager &&
+              mockTask.details.reviewerId === mockMember &&
+              mockTask.assigneeId !== mockMember,
+            canApprove: true,
+            pending: {
+              submissionVersion: mockTask.details.submissions.at(-1)?.version,
+            },
+            assignment: null,
+          },
+  }),
+}));
 jest.mock('@/otogrow-access/useOtogrowIdentity', () => ({
   useOtogrowIdentity: () => ({ identity: `${mockWorkspace}:${mockMember}` }),
 }));
@@ -758,24 +779,32 @@ it('pages previous applications independently and does not count them as current
   const user = setup(false);
   await user.click(screen.getByText('Previous workflow applications'));
   await user.click(screen.getByRole('button', { name: 'Older applications' }));
-  expect(mockQueries).toHaveBeenLastCalledWith(
+  expect(
+    mockQueries.mock.calls
+      .filter(([operation]) => operation === 'DeliveryTaskWorkflow')
+      .at(-1),
+  ).toEqual([
     'DeliveryTaskWorkflow',
     expect.objectContaining({
       variables: expect.objectContaining({
         input: { taskId: 'task', historyCursor: 'older' },
       }),
     }),
-  );
+  ]);
   expect(
     screen.getByRole('checkbox', { name: /Inspect the backlinks/ }),
   ).not.toBeChecked();
   await user.click(screen.getByRole('button', { name: 'Latest applications' }));
-  expect(mockQueries).toHaveBeenLastCalledWith(
+  expect(
+    mockQueries.mock.calls
+      .filter(([operation]) => operation === 'DeliveryTaskWorkflow')
+      .at(-1),
+  ).toEqual([
     'DeliveryTaskWorkflow',
     expect.objectContaining({
       variables: expect.objectContaining({
         input: { taskId: 'task', historyCursor: null },
       }),
     }),
-  );
+  ]);
 });

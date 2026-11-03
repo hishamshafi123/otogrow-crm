@@ -37,6 +37,15 @@ export const StyledActivityEntry = styled.div`
   flex-direction: column;
   gap: ${themeCssVariables.spacing[2]};
 `;
+export const StyledActivityBoundary = styled.fieldset`
+  border: 0;
+  margin: 0;
+  min-width: 0;
+  padding: 0;
+  &[hidden] {
+    display: none;
+  }
+`;
 export const StyledActivityChanges = styled.dl`
   display: grid;
   gap: ${themeCssVariables.spacing[3]};

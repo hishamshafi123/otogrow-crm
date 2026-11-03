@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily Otogrow CRM recovery backup
+
+[Timer]
+OnCalendar=*-*-* 01:00:00 UTC
+Persistent=true
+RandomizedDelaySec=300
+Unit=otogrow-crm-backup.service
+
+[Install]
+WantedBy=timers.target

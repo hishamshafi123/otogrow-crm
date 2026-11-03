@@ -15,7 +15,7 @@ import {
   usageFromAiSdk,
   usageFromAiError,
 } from 'src/modules/otogrow-ai-budget/otogrow-ai-usage';
-import { DeliveryOperationsEntity } from 'src/modules/delivery/entities/delivery-operations.entity';
+import { countDeliveryAgentRunsForUtcDay } from 'src/modules/delivery/agents/count-delivery-agent-runs-for-utc-day';
 import { invalidateCreativeBrief } from 'src/modules/delivery/creative/delivery-creative.policy';
 import {
   BadRequestException,
@@ -31,7 +31,7 @@ import {
   DataSource,
   type EntityManager,
   LessThan,
-  MoreThanOrEqual,
+  QueryFailedError,
 } from 'typeorm';
 import { generateText, Output } from 'ai';
 import { z } from 'zod';
@@ -46,7 +46,12 @@ import { DeliveryAgentEntity } from 'src/modules/delivery/entities/delivery-agen
 import { DeliveryAgentRunEntity } from 'src/modules/delivery/entities/delivery-agent-run.entity';
 import { DeliveryTaskEntity } from 'src/modules/delivery/entities/delivery-task.entity';
 import { DeliveryProjectEntity } from 'src/modules/delivery/entities/delivery-project.entity';
-import { canAccessDeliveryProject } from 'src/modules/delivery/delivery-policy';
+import {
+  canAccessDeliveryAgentProject,
+  readDeliveryAgentActor,
+  canReadDeliveryAgentRun,
+} from 'src/modules/delivery/agents/delivery-agent-scope';
+import { sameDeliveryAssistantConfiguration } from 'src/modules/delivery/agents/reads/delivery-assistants.policy';
 import {
   deliveryAgentConfigurationSchema,
   deliveryAgentInputsSchema,
@@ -68,10 +73,14 @@ const commandSchema = z.discriminatedUnion('type', [
     .object({
       type: z.literal('save'),
       id: z.string().uuid().optional(),
+      createId: z.string().uuid().optional(),
       version: z.number().int().positive().optional(),
       configuration: deliveryAgentConfigurationSchema,
     })
-    .strict(),
+    .strict()
+    .refine(
+      (input) => !input.createId || (!input.id && input.version === undefined),
+    ),
   z
     .object({
       type: z.literal('preview'),
@@ -206,17 +215,12 @@ export class DeliveryAgentService {
     userWorkspaceId: string,
     taskId?: string,
   ) {
-    const active: { id: string }[] = await manager.query(
-      `SELECT m.id FROM ${this.delivery.schema(workspace)}."workspaceMember" m JOIN core."userWorkspace" u ON u."userId" = m."userId" WHERE m.id = $1 AND m."deletedAt" IS NULL AND u.id = $2 AND u."workspaceId" = $3 AND u."deletedAt" IS NULL`,
-      [memberId, userWorkspaceId, workspace.id],
-    );
-    if (!active.length)
-      throw new ForbiddenException('Your workspace access has changed.');
-    const actor = await this.delivery.actor(
+    const actor = await readDeliveryAgentActor(
+      manager,
+      this.delivery,
       workspace,
       memberId,
       userWorkspaceId,
-      manager,
     );
     if (!taskId) return { actor, task: null } as const;
     const task = await manager
@@ -230,7 +234,7 @@ export class DeliveryAgentService {
     if (
       !task ||
       !project ||
-      !canAccessDeliveryProject(actor.isManager, memberId, project.memberIds)
+      !canAccessDeliveryAgentProject(actor, memberId, project.memberIds)
     )
       throw new ForbiddenException('Task is unavailable.');
     return { actor, task } as const;
@@ -242,6 +246,14 @@ export class DeliveryAgentService {
     projectId: string,
     workspace: WorkspaceEntity,
   ) {
+    if (configuration.kind === 'ADVERTISING')
+      throw new BadRequestException(
+        'Advertising assistants run from an exact advertising report, not a delivery task.',
+      );
+    if (configuration.kind === 'ACTIVITY')
+      throw new BadRequestException(
+        'Activity assistants run from Team activity, not a delivery task.',
+      );
     if (
       !configuration.enabled ||
       !canUseDeliveryAgent(configuration, actor) ||
@@ -327,6 +339,7 @@ export class DeliveryAgentService {
         );
         const taskIds = new Set(visible.tasks.map((task) => task.id));
         const canRun = (agent: DeliveryAgentEntity) =>
+          ['BRIEF', 'COPY', 'SEO'].includes(agent.configuration.kind) &&
           agent.configuration.enabled &&
           canUseDeliveryAgent(agent.configuration, actor) &&
           agent.configuration.projectIds.some((id) => projectIds.has(id));
@@ -372,6 +385,72 @@ export class DeliveryAgentService {
     );
   }
 
+  async reviewAvailability(
+    manager: EntityManager,
+    workspace: WorkspaceEntity,
+    actor: DeliveryAgentActor,
+    memberId: string,
+    task: Pick<DeliveryTaskEntity, 'projectId' | 'revision' | 'taskId'> & {
+      state: string;
+      assigneeId: string | null;
+    },
+    run: DeliveryAgentRunEntity,
+  ) {
+    const pending = run.status === 'WAITING_REVIEW' && !run.decision;
+    const permitted = canReadDeliveryAgentRun(actor, memberId, run.initiatorId);
+    const result = {
+      canCancel:
+        permitted &&
+        ['QUEUED', 'RUNNING', 'WAITING_REVIEW'].includes(run.status),
+      canReject: permitted && pending,
+      canAcceptFindings: false,
+      canAcceptBrief: false,
+      canAcceptCopy: false,
+      acceptanceBlockedReason: null as string | null,
+    };
+    if (!permitted || !pending) return result;
+    try {
+      await assertDeliveryKnowledgeCurrent(
+        manager,
+        workspace.id,
+        task.projectId,
+        run.context.brandKnowledge,
+      );
+      const agent = await manager
+        .getRepository(DeliveryAgentEntity)
+        .findOneBy({ workspaceId: workspace.id, id: run.agentId });
+      if (!agent) throw new ForbiddenException();
+      this.assertAgent(agent.configuration, actor, task.projectId, workspace);
+      if (agent.version !== run.agentVersion) throw new ConflictException();
+    } catch (error) {
+      if (
+        !(
+          error instanceof BadRequestException ||
+          error instanceof ConflictException ||
+          error instanceof ForbiddenException ||
+          error instanceof NotFoundException
+        )
+      )
+        throw error;
+      return {
+        ...result,
+        acceptanceBlockedReason: 'CURRENT_AGENT_OR_KNOWLEDGE_UNAVAILABLE',
+      };
+    }
+    result.canAcceptFindings = true;
+    const editable =
+      task.revision === run.taskRevision &&
+      !['APPROVED', 'IN_REVIEW'].includes(task.state);
+    result.canAcceptBrief =
+      editable && actor.isManager && Boolean(run.result?.suggestedBrief);
+    result.canAcceptCopy =
+      editable &&
+      (actor.isManager || task.assigneeId === memberId) &&
+      Boolean(run.result?.suggestedCopy);
+    if (!editable) result.acceptanceBlockedReason = 'TASK_CHANGED_OR_SUBMITTED';
+    return result;
+  }
+
   async command(
     workspace: WorkspaceEntity,
     memberId: string,
@@ -398,6 +477,29 @@ export class DeliveryAgentService {
         if (!actor.isAdmin)
           throw new ForbiddenException('Only admins can configure agents.');
         const configuration = command.configuration;
+        if (command.createId) {
+          const previous = await agents.findOneBy({
+            workspaceId: workspace.id,
+            id: command.createId,
+          });
+          if (previous) {
+            if (
+              previous.version !== 1 ||
+              !sameDeliveryAssistantConfiguration(
+                previous.configuration,
+                configuration,
+              )
+            )
+              throw new ConflictException(
+                'This assistant identity already has different or edited settings. Review its current configuration.',
+              );
+            return {
+              saved: previous.id,
+              version: previous.version,
+              replayed: true,
+            };
+          }
+        }
         const projects = await manager
           .getRepository(DeliveryProjectEntity)
           .findBy({ workspaceId: workspace.id });
@@ -424,7 +526,11 @@ export class DeliveryAgentService {
               workspaceId: workspace.id,
               id: command.id,
             })
-          : agents.create({ workspaceId: workspace.id, version: 0 });
+          : agents.create({
+              ...(command.createId ? { id: command.createId } : {}),
+              workspaceId: workspace.id,
+              version: 0,
+            });
         if (!agent) throw new NotFoundException();
         if (command.id && agent.version !== command.version)
           throw new ConflictException('Agent changed. Refresh and try again.');
@@ -479,7 +585,28 @@ export class DeliveryAgentService {
           : null;
         agent.configuration = configuration;
         agent.version++;
-        await agents.save(agent);
+        if (command.createId) {
+          // A supplied global identity must never upsert a different workspace's row.
+          try {
+            await agents.insert({
+              id: agent.id,
+              workspaceId: agent.workspaceId,
+              version: agent.version,
+              configuration: agent.configuration,
+            });
+          } catch (error) {
+            if (
+              error instanceof QueryFailedError &&
+              (error.driverError as { code?: unknown }).code === '23505'
+            )
+              throw new ConflictException(
+                'This assistant identity is unavailable. Review the saved configuration before trying again.',
+              );
+            throw error;
+          }
+        } else {
+          await agents.save(agent);
+        }
         const after = configurationFields(configuration, agent.version);
         await recordOtogrowActivity(manager, {
           workspaceId: workspace.id,
@@ -509,7 +636,7 @@ export class DeliveryAgentService {
               : []),
           ],
         });
-        return { saved: agent.id };
+        return { saved: agent.id, version: agent.version, replayed: false };
       }
       if (command.type === 'preview' || command.type === 'start') {
         const { task, actor: scopedActor } = await this.scope(
@@ -607,24 +734,12 @@ export class DeliveryAgentService {
           throw new ConflictException(
             'Task or agent changed. Preview again before starting.',
           );
-        const start = new Date();
-        start.setUTCHours(0, 0, 0, 0);
-        const count = await runs.countBy({
-          workspaceId: workspace.id,
-          agentId: agent.id,
-          createdAt: MoreThanOrEqual(start),
-        });
-        const inboxRuns =
-          (
-            await manager
-              .getRepository(DeliveryOperationsEntity)
-              .findOneBy({ workspaceId: workspace.id })
-          )?.state.business?.agentRuns ?? [];
-        const inboxCount = inboxRuns.filter(
-          (run) =>
-            run.agentId === agent.id && run.createdAt >= start.toISOString(),
-        ).length;
-        if (count + inboxCount >= agent.configuration.dailyRunLimit)
+        const count = await countDeliveryAgentRunsForUtcDay(
+          manager,
+          workspace.id,
+          agent.id,
+        );
+        if (count >= agent.configuration.dailyRunLimit)
           throw new BadRequestException(
             'Daily agent run limit reached (UTC). Failed and cancelled runs also count.',
           );
@@ -703,7 +818,7 @@ export class DeliveryAgentService {
         userWorkspaceId,
         run.taskId,
       );
-      if (!task || (!actor.isManager && run.initiatorId !== memberId))
+      if (!task || !canReadDeliveryAgentRun(actor, memberId, run.initiatorId))
         throw new ForbiddenException();
       const previousStatus = run.status;
       if (command.type === 'cancel') {
@@ -948,6 +1063,14 @@ export class DeliveryAgentService {
         task.projectId,
         workspace,
       );
+      if (run.configuration.kind === 'ADVERTISING')
+        throw new BadRequestException(
+          'Advertising recommendations cannot execute through the delivery-task runtime.',
+        );
+      if (run.configuration.kind === 'ACTIVITY')
+        throw new BadRequestException(
+          'Activity analysis cannot execute through the delivery-task runtime.',
+        );
       const signal = AbortSignal.timeout(120000);
       let result;
       let usage = null;

@@ -132,11 +132,15 @@ describe('delivery commands', () => {
   it('accepts a versioned submission with evidence', () => {
     expect(deliveryCommandSchema.safeParse(submit).success).toBe(true);
   });
+  it('allows stored creative evidence to be validated against its task by the service', () => {
+    expect(
+      deliveryCommandSchema.safeParse({ ...submit, evidence: [] }).success,
+    ).toBe(true);
+  });
   it.each([
-    { evidence: [] },
     { evidence: ['javascript:alert(1)'] },
     { evidence: ['file:///etc/passwd'] },
-  ])('rejects missing or unsafe evidence %s', ({ evidence }) => {
+  ])('rejects unsafe evidence %s', ({ evidence }) => {
     expect(
       deliveryCommandSchema.safeParse({ ...submit, evidence }).success,
     ).toBe(false);

@@ -1,6 +1,7 @@
 export const OTOGROW_CAPABILITIES = [
   'workspace.admin',
   'delivery.manage',
+  'delivery.review',
   'phone.use',
   'finance.read',
   'finance.manage',
@@ -20,6 +21,13 @@ export const hasOtogrowCapability = (
   capability: OtogrowCapability,
 ) =>
   capabilities.includes(capability) ||
-  (['delivery.manage', 'finance.read', 'finance.manage'].includes(capability) &&
+  ([
+    'delivery.manage',
+    'delivery.review',
+    'finance.read',
+    'finance.manage',
+  ].includes(capability) &&
     capabilities.includes('workspace.admin')) ||
+  (capability === 'delivery.review' &&
+    capabilities.includes('delivery.manage')) ||
   (capability === 'finance.read' && capabilities.includes('finance.manage'));

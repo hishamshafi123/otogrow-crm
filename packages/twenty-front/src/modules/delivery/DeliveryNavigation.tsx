@@ -1,12 +1,10 @@
-import { type DeliveryWorkspace } from '@/delivery/delivery.types';
-import { GET_DELIVERY_WORKSPACE } from '@/delivery/deliveryWorkspaceQuery';
+import { useWorkflowAccess } from '@/delivery/workflows/useWorkflowAccess';
 import { useDeliveryNavigation } from '@/delivery/useDeliveryNavigation';
 import { useDeliveryNavigationPreferences } from '@/delivery/navigation/useDeliveryNavigationPreferences';
 import { getDeliveryEntryView } from '@/delivery/navigation/delivery-navigation-preferences';
 import { NavigationDrawerAnimatedCollapseWrapper } from '@/ui/navigation/navigation-drawer/components/NavigationDrawerAnimatedCollapseWrapper';
 import { NavigationDrawerItem } from '@/ui/navigation/navigation-drawer/components/NavigationDrawerItem';
 import { NavigationDrawerSection } from '@/ui/navigation/navigation-drawer/components/NavigationDrawerSection';
-import { useQuery } from '@apollo/client/react';
 import { useLingui } from '@lingui/react/macro';
 import { useSearchParams } from 'react-router-dom';
 import { styled } from '@linaria/react';
@@ -31,7 +29,7 @@ const StyledGroup = styled.details`
     background: ${themeCssVariables.background.transparent.light};
   }
   summary:focus-visible {
-    outline: 2px solid ${themeCssVariables.color.blue8};
+    outline: 2px solid ${themeCssVariables.color.blue11};
     outline-offset: -2px;
   }
   summary > svg {
@@ -50,20 +48,21 @@ const StyledGroupLabel = styled.span`
 export const DeliveryNavigation = () => {
   const { t } = useLingui();
   const [params] = useSearchParams();
-  const { data } = useQuery<{ deliveryWorkspace: DeliveryWorkspace }>(
-    GET_DELIVERY_WORKSPACE,
-  );
-  const actor = data?.deliveryWorkspace.actor ?? {
-    memberId: '',
-    isAdmin: false,
-    isManager: false,
+  const permission = useWorkflowAccess();
+  const actor = {
+    memberId: permission.access?.memberId ?? '',
+    isAdmin:
+      permission.ready &&
+      permission.access?.capabilities.includes('workspace.admin') === true,
+    isManager: permission.manager,
   };
   const groups = useDeliveryNavigation(actor);
   const personalNavigation = useDeliveryNavigationPreferences(actor, groups);
-  const view = getDeliveryEntryView(
+  const requestedView = getDeliveryEntryView(
     params,
     personalNavigation.preferences.startView,
   );
+  const view = requestedView === 'onboarding' ? 'clients' : requestedView;
 
   return (
     <>

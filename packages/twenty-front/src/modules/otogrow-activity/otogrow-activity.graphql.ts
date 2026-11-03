@@ -18,6 +18,7 @@ export const GET_OTOGROW_ACTIVITY = gql`
         category
         outcome
         summary
+        detailsTruncated
         projectId
         projectName
         clientId

@@ -2,10 +2,19 @@ import { i18n } from '@lingui/core';
 import { I18nProvider } from '@lingui/react';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { useState } from 'react';
+import { Request } from 'cross-fetch';
+import { CombinedGraphQLErrors } from '@apollo/client/errors';
+import {
+  createMemoryRouter,
+  Link,
+  MemoryRouter,
+  RouterProvider,
+} from 'react-router-dom';
 import { ThemeProvider } from 'twenty-ui/theme-constants';
 import { DeliveryChat } from '@/delivery/chat/DeliveryChat';
 import { SEND_DELIVERY_CHAT } from '@/delivery/chat/deliveryChatGraphql';
+import { DeliveryDraftGuardProvider } from '@/delivery/drafts/DeliveryDraftGuard';
 import { type DeliveryChatQuery } from '~/generated-metadata/graphql';
 
 const mockSend = jest.fn();
@@ -44,6 +53,59 @@ const page = () => (
     </ThemeProvider>
   </I18nProvider>
 );
+let refreshGuardedChat: () => void = () => undefined;
+const GuardedChat = () => {
+  const [, refresh] = useState(0);
+  refreshGuardedChat = () => refresh((revision) => revision + 1);
+  return (
+    <DeliveryDraftGuardProvider>
+      <Link to="/elsewhere">Other work</Link>
+      <DeliveryChat />
+    </DeliveryDraftGuardProvider>
+  );
+};
+const guardedPage = () => {
+  const router = createMemoryRouter(
+    [
+      { path: '/delivery', element: <GuardedChat /> },
+      { path: '/elsewhere', element: <p>Other work opened</p> },
+    ],
+    {
+      initialEntries: ['/elsewhere', '/delivery?view=chat&chatWith=peer'],
+      initialIndex: 1,
+    },
+  );
+  render(
+    <I18nProvider i18n={i18n}>
+      <ThemeProvider colorScheme="light">
+        <RouterProvider router={router} />
+      </ThemeProvider>
+    </I18nProvider>,
+  );
+  return {
+    router,
+    user: userEvent.setup(),
+    update: () => act(() => refreshGuardedChat()),
+  };
+};
+const forbidden = () =>
+  new CombinedGraphQLErrors({
+    errors: [
+      {
+        message: 'Conversation unavailable',
+        extensions: { code: 'FORBIDDEN' },
+      },
+    ],
+  });
+beforeAll(() => {
+  Object.assign(globalThis, { Request });
+  HTMLDialogElement.prototype.showModal = function () {
+    this.setAttribute('open', '');
+  };
+  HTMLDialogElement.prototype.close = function () {
+    this.removeAttribute('open');
+  };
+});
 beforeEach(() => {
   jest.spyOn(document, 'hasFocus').mockReturnValue(true);
   Object.defineProperty(window, 'IntersectionObserver', {
@@ -58,7 +120,9 @@ beforeEach(() => {
     .mockReset()
     .mockResolvedValue({ data: { sendDeliveryChatMessage: 'message' } });
   mockViewed.mockReset();
-  mockRefetch.mockReset().mockResolvedValue({});
+  mockRefetch
+    .mockReset()
+    .mockImplementation(async () => ({ data: { deliveryChat: mockData } }));
   mockReady = true;
   mockError = undefined;
   mockData = {
@@ -195,3 +259,254 @@ it('does not display data from a different workspace', () => {
     screen.queryByText('Please review the new brief.'),
   ).not.toBeInTheDocument();
 });
+
+it('disposes private state on a denied chat query and requires a verified refetch before restoring current history', async () => {
+  const rendered = render(page());
+  await userEvent.type(
+    screen.getByLabelText('Message'),
+    'Private unsent reply.',
+  );
+  mockError = forbidden();
+  rendered.rerender(page());
+  expect(screen.getByRole('alert')).toHaveTextContent('Chat access changed');
+  expect(
+    screen.queryByText('Please review the new brief.'),
+  ).not.toBeInTheDocument();
+  expect(screen.queryByLabelText('Message')).not.toBeInTheDocument();
+  mockError = undefined;
+  rendered.rerender(page());
+  expect(screen.queryByLabelText('Message')).not.toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+  expect(await screen.findByLabelText('Message')).toHaveValue('');
+  expect(screen.getByText('Please review the new brief.')).toBeVisible();
+  expect(mockSend).not.toHaveBeenCalled();
+});
+
+it('drops a denied send body and never restores its old request when current access is reverified', async () => {
+  mockSend.mockRejectedValueOnce(forbidden());
+  render(page());
+  await userEvent.type(
+    screen.getByLabelText('Message'),
+    'This denied body must be discarded.',
+  );
+  await userEvent.click(screen.getByRole('button', { name: 'Send message' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    'Chat access changed',
+  );
+  expect(screen.queryByLabelText('Message')).not.toBeInTheDocument();
+  const firstRequest = mockSend.mock.calls[0][0].variables.input.requestId;
+  await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+  expect(await screen.findByLabelText('Message')).toHaveValue('');
+  expect(
+    screen.queryByRole('button', { name: 'Retry send' }),
+  ).not.toBeInTheDocument();
+  await userEvent.type(
+    screen.getByLabelText('Message'),
+    'A fresh reviewed reply.',
+  );
+  await userEvent.click(screen.getByRole('button', { name: 'Send message' }));
+  expect(mockSend.mock.calls[1][0].variables.input.requestId).not.toBe(
+    firstRequest,
+  );
+  expect(mockSend.mock.calls[1][0].variables.input.text).toBe(
+    'A fresh reviewed reply.',
+  );
+});
+
+it('does not release confirmed denial for a refetch response belonging to another conversation', async () => {
+  const rendered = render(page());
+  mockError = forbidden();
+  rendered.rerender(page());
+  mockError = undefined;
+  rendered.rerender(page());
+  mockRefetch.mockResolvedValueOnce({}).mockResolvedValueOnce({
+    data: {
+      deliveryChat: {
+        ...mockData,
+        peer: { ...mockData.peer, id: 'another-peer' },
+      },
+    },
+  });
+  await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+  expect(screen.queryByLabelText('Message')).not.toBeInTheDocument();
+  expect(screen.getByRole('alert')).toHaveTextContent('Chat access changed');
+  await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+  expect(await screen.findByLabelText('Message')).toHaveValue('');
+});
+
+it('treats a denied viewed receipt as scope loss without treating it as saved or repeatedly retrying it', async () => {
+  mockViewed.mockRejectedValueOnce(forbidden());
+  render(page());
+  await userEvent.type(
+    screen.getByLabelText('Message'),
+    'Private draft before read denial.',
+  );
+  viewIncomingMessage();
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    'Chat access changed',
+  );
+  expect(
+    screen.queryByText('Please review the new brief.'),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole('button', { name: 'Retry viewed status' }),
+  ).not.toBeInTheDocument();
+  expect(mockViewed).toHaveBeenCalledTimes(1);
+  await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+  expect(await screen.findByLabelText('Message')).toHaveValue('');
+  expect(mockViewed).toHaveBeenCalledTimes(1);
+});
+
+it('cancels a pending conversation callback on local denial before clearing its dirty registration', async () => {
+  mockData.people.push({
+    id: 'another-peer',
+    name: 'Felix',
+    active: true,
+    unread: 0,
+    lastMessageAt: null,
+  });
+  const { user, router, update } = guardedPage();
+  await user.type(
+    screen.getByLabelText('Message'),
+    'Keep this private until access is lost.',
+  );
+  await user.click(screen.getByRole('button', { name: 'Felix' }));
+  expect(screen.getByRole('dialog')).toBeVisible();
+  mockError = forbidden();
+  update();
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  expect(router.state.location.search).toBe('?view=chat&chatWith=peer');
+  expect(screen.queryByLabelText('Message')).not.toBeInTheDocument();
+  mockError = undefined;
+  update();
+  await user.click(screen.getByRole('button', { name: 'Try again' }));
+  expect(await screen.findByLabelText('Message')).toHaveValue('');
+  expect(router.state.location.search).toBe('?view=chat&chatWith=peer');
+});
+
+it('resets blocked browser Back after a local chat-query denial while global access remains current', async () => {
+  const { user, router, update } = guardedPage();
+  await user.type(
+    screen.getByLabelText('Message'),
+    'Private message preparation.',
+  );
+  await act(async () => {
+    await router.navigate(-1);
+  });
+  expect(screen.getByRole('dialog')).toBeVisible();
+  mockError = forbidden();
+  update();
+  await waitFor(() =>
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+  );
+  expect(router.state.location.pathname).toBe('/delivery');
+  expect(router.state.location.search).toBe('?view=chat&chatWith=peer');
+  expect(screen.queryByText('Other work opened')).not.toBeInTheDocument();
+});
+
+it('ignores a late successful send from before confirmed denial instead of clearing a fresh current draft', async () => {
+  let finishSend:
+    | ((result: { data: { sendDeliveryChatMessage: string } }) => void)
+    | undefined;
+  mockSend.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finishSend = resolve;
+      }),
+  );
+  const rendered = render(page());
+  await userEvent.type(
+    screen.getByLabelText('Message'),
+    'The earlier submitted body.',
+  );
+  await userEvent.click(screen.getByRole('button', { name: 'Send message' }));
+  mockError = forbidden();
+  rendered.rerender(page());
+  mockError = undefined;
+  rendered.rerender(page());
+  await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+  await userEvent.type(
+    await screen.findByLabelText('Message'),
+    'Fresh preparation after access check.',
+  );
+  expect(finishSend).toBeDefined();
+  await act(async () => {
+    finishSend?.({ data: { sendDeliveryChatMessage: 'old-message' } });
+  });
+  expect(screen.getByLabelText('Message')).toHaveValue(
+    'Fresh preparation after access check.',
+  );
+  expect(screen.queryByText('Message sent.')).not.toBeInTheDocument();
+});
+
+it.each([
+  {
+    destination: '/delivery?view=chat&chatWith=another-peer',
+    peer: 'another-peer',
+    before: null,
+  },
+  {
+    destination: '/delivery?view=chat&chatWith=peer&chatBefore=older-page',
+    peer: 'peer',
+    before: 'older-page',
+  },
+])(
+  'owns drafts and uncertain send bodies by the exact conversation/page through direct navigation and POP: $destination',
+  async ({ destination, peer, before }) => {
+    const original = mockData;
+    mockSend.mockRejectedValueOnce(new Error('Send outcome unavailable'));
+    const { user, router } = guardedPage();
+    await user.type(
+      screen.getByLabelText('Message'),
+      'Earlier uncertain message body.',
+    );
+    await user.click(screen.getByRole('button', { name: 'Send message' }));
+    expect(
+      await screen.findByRole('button', { name: 'Retry send' }),
+    ).toBeVisible();
+    await act(async () => {
+      await router.navigate(destination);
+    });
+    expect(screen.getByRole('dialog')).toBeVisible();
+    mockData = {
+      ...original,
+      before,
+      peer: {
+        id: peer,
+        name: 'Current teammate',
+        active: true,
+        unread: 0,
+        lastMessageAt: null,
+      },
+      messages: [],
+    };
+    await user.click(
+      screen.getByRole('button', { name: 'Discard and continue' }),
+    );
+    expect(router.state.location.search).toBe(
+      new URL(destination, 'http://localhost').search,
+    );
+    expect(screen.getByLabelText('Message')).toHaveValue('');
+    expect(
+      screen.queryByRole('button', { name: 'Retry send' }),
+    ).not.toBeInTheDocument();
+    await user.type(
+      screen.getByLabelText('Message'),
+      'New current-source preparation.',
+    );
+    await act(async () => {
+      await router.navigate(-1);
+    });
+    expect(screen.getByRole('dialog')).toBeVisible();
+    mockData = original;
+    await user.click(
+      screen.getByRole('button', { name: 'Discard and continue' }),
+    );
+    expect(router.state.location.search).toBe('?view=chat&chatWith=peer');
+    expect(screen.getByLabelText('Message')).toHaveValue('');
+    expect(
+      screen.queryByRole('button', { name: 'Retry send' }),
+    ).not.toBeInTheDocument();
+    expect(mockSend).toHaveBeenCalledTimes(1);
+  },
+);
