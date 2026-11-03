@@ -5,11 +5,6 @@ import { type VerifyCallback } from 'passport-google-oauth20';
 import { GoogleAPIsOauthCommonStrategy } from 'src/engine/core-modules/auth/strategies/google-apis-oauth-common.auth.strategy';
 import { TwentyConfigService } from 'src/engine/core-modules/twenty-config/twenty-config.service';
 
-export type GoogleAPIScopeConfig = {
-  isCalendarEnabled?: boolean;
-  isMessagingAliasFetchingEnabled?: boolean;
-};
-
 @Injectable()
 export class GoogleAPIsOauthRequestCodeStrategy extends GoogleAPIsOauthCommonStrategy {
   constructor(twentyConfigService: TwentyConfigService) {

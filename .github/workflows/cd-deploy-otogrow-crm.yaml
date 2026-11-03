@@ -121,7 +121,7 @@ jobs:
         working-directory: packages/twenty-server
         env:
           NODE_OPTIONS: '--max-old-space-size=3072'
-        run: npx jest src/modules/delivery src/modules/otogrow-access src/modules/otogrow-activity src/modules/otogrow-ai-budget src/database/commands/__tests__/run-instance-commands.command.spec.ts src/database/commands/upgrade-version-command/__tests__/upgrade.command.spec.ts src/engine/core-modules/upgrade/services/__tests__/upgrade-sequence-runner.service.spec.ts src/modules/lead-assignment/services/__tests__/telegram-config.service.spec.ts src/modules/messaging/message-outbound-manager/utils/__tests__/to-mail-composer-options.util.spec.ts src/engine/twenty-orm/global-workspace-datasource/__tests__ --config jest.config.mjs --runInBand
+        run: npx jest src/modules/delivery src/modules/otogrow-access src/modules/otogrow-activity src/modules/otogrow-ai-budget src/database/commands/__tests__/run-instance-commands.command.spec.ts src/database/commands/upgrade-version-command/__tests__/upgrade.command.spec.ts src/engine/core-modules/upgrade/services/__tests__/upgrade-sequence-runner.service.spec.ts src/modules/lead-assignment/services/__tests__/telegram-config.service.spec.ts src/modules/messaging/message-outbound-manager/utils/__tests__/to-mail-composer-options.util.spec.ts src/engine/twenty-orm/global-workspace-datasource/__tests__ src/engine/core-modules/auth/strategies/google-apis-oauth-request-code.auth.strategy.spec.ts src/engine/core-modules/auth/services/google-apis-scopes.spec.ts src/engine/core-modules/auth/services/google-apis-scopes.service.util.spec.ts --config jest.config.mjs --runInBand
 
       - name: Test frontend OS workflows
         working-directory: packages/twenty-front

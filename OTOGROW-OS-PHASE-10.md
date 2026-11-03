@@ -61,3 +61,6 @@ Confirmed production crm.otogrow.com and existing GitHub main-push deployment au
 
 
 2026-11-03 release checkpoint: full OS gates pass locally (945 server,1725 frontend and22 native-boundary tests), with direct package contracts and workflow Bash/order validation. The existing GitHub main-push deployment now runs those contract/workflow gates before connecting to the host, then checks exact active revision and API/worker status. Application rollout and root-owned installer/backup-unit installation remain separate; ordinary archives do not replace privileged programs. The improvement tracker retains21 unfinished items and the actual provider/staff/backup prerequisites.
+
+
+2026-11-03 application rollout succeeded: GitHub run41585502637 for main b85fbc4aa95ab225a81d5b98542ca0d10282f306 passed builds, contracts, OS regressions, remote activation, exact REVISION, API+worker and public health. Ordinary code deployment is verified. Privileged backup installer/units, offsite recovery, real provider/role journeys and staff acceptance remain incomplete; later local work is not part of this release.
