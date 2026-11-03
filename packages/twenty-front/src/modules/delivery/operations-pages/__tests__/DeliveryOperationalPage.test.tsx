@@ -15,6 +15,7 @@ import {
 } from 'react-router-dom';
 import { DeliveryChatPage } from '@/delivery/operations-pages/DeliveryChatPage';
 import { DeliveryCompanyOverviewPage } from '@/delivery/operations-pages/DeliveryCompanyOverviewPage';
+import { DeliveryOperationalPage } from '@/delivery/operations-pages/DeliveryOperationalPage';
 import {
   DeliveryDraftGuardProvider,
   useDeliveryDraftGuard,
@@ -181,6 +182,10 @@ const Route = () => {
         <DeliveryChatPage />
       ) : params.get('view') === 'health' ? (
         <DeliveryCompanyOverviewPage />
+      ) : params.get('view') === 'development' ? (
+        <DeliveryOperationalPage view="development">
+          <p>Current development releases</p>
+        </DeliveryOperationalPage>
       ) : (
         <p>Accountable task opened</p>
       )}
@@ -287,7 +292,7 @@ it.each([
   },
 );
 
-it.each(['chat', 'health'] as const)(
+it.each(['chat', 'health', 'development'] as const)(
   'refreshes only active typed %s queries and verifies current access',
   async (view) => {
     const queries = [
@@ -299,6 +304,9 @@ it.each(['chat', 'health'] as const)(
       'DeliveryWorkspace',
       'DeliveryOperations',
       'DeliveryBusiness',
+      'DeliveryReleaseProjects',
+      'DeliveryReleaseList',
+      'DeliveryReleaseDetail',
     ];
     const refetches = new Map(
       queries.map((name) => [name, jest.fn(async () => undefined)]),
@@ -327,14 +335,16 @@ it.each(['chat', 'health'] as const)(
       expect(refetch).toHaveBeenCalledTimes(
         view === 'chat'
           ? Number(queryName === 'DeliveryChat')
-          : Number(
-              [
-                'DeliveryFounderExceptions',
-                'DeliveryReadiness',
-                'DeliveryFounderEscalations',
-                'PreviewDeliveryFounderEscalationRule',
-              ].includes(queryName),
-            ),
+          : view === 'development'
+            ? Number(queryName.startsWith('DeliveryRelease'))
+            : Number(
+                [
+                  'DeliveryFounderExceptions',
+                  'DeliveryReadiness',
+                  'DeliveryFounderEscalations',
+                  'PreviewDeliveryFounderEscalationRule',
+                ].includes(queryName),
+              ),
       );
   },
 );
@@ -473,4 +483,19 @@ it('uses the normal compact navigation with draft confirmation', async () => {
   expect(screen.getByRole('combobox', { name: 'Go to workspace' })).toHaveValue(
     'chat',
   );
+});
+
+it('identifies Development releases with its own heading and next workflow', () => {
+  mount('/delivery?view=development');
+  expect(
+    screen.getByRole('heading', { name: 'Development releases', level: 1 }),
+  ).toBeVisible();
+  expect(
+    screen.getByText(
+      'Plan reviewed releases, record deployment and track client handover.',
+    ),
+  ).toBeVisible();
+  expect(
+    screen.queryByRole('heading', { name: 'Company overview' }),
+  ).not.toBeInTheDocument();
 });

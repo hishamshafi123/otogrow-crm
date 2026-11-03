@@ -64,6 +64,7 @@ export type OtogrowActivityInput = {
     | 'advertising-draft'
     | 'activity-analysis'
     | 'seo-report'
+    | 'development-release'
     | 'creative-learning'
     | 'budget'
     | 'finance'

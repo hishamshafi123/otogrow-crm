@@ -891,3 +891,25 @@ it('does not construct an analysis destination from an invalid source identifier
     screen.queryByRole('link', { name: 'Open saved work analysis' }),
   ).not.toBeInTheDocument();
 });
+
+it('links a recorded release decision to its exact project release with familiar language', () => {
+  const projectId = '550e8400-e29b-41d4-a716-446655440001';
+  const releaseId = '550e8400-e29b-41d4-a716-446655440002';
+  mockFeed.events = [
+    {
+      ...event,
+      action: 'DEVELOPMENT_RELEASE_RECORD_DEPLOYMENT_FAILED',
+      sourceType: 'development-release',
+      sourceId: releaseId,
+      projectId,
+      taskId: null,
+      taskName: null,
+    },
+  ];
+  setup();
+  expect(screen.getByText('Failed deployment recorded')).toBeVisible();
+  expect(screen.getByRole('link', { name: 'Open release' })).toHaveAttribute(
+    'href',
+    `/delivery?view=development&releaseProject=${projectId}&releaseId=${releaseId}`,
+  );
+});

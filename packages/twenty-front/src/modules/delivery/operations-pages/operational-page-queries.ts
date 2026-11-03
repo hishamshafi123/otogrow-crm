@@ -1,4 +1,11 @@
 export const OPERATIONAL_PAGE_QUERIES = {
+  development: [
+    'DeliveryReleaseProjects',
+    'DeliveryReleaseList',
+    'DeliveryReleaseDetail',
+    'DeliveryReleaseChoices',
+    'DeliveryReleaseReceipt',
+  ],
   inbox: [
     'DeliveryInboxContext',
     'DeliveryInboxConversations',

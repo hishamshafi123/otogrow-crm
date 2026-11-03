@@ -201,6 +201,7 @@ import { AddSeoOutcomeReportsFastInstanceCommand } from 'src/database/commands/u
 import { AddVideoQaAndFathomImportsFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1793666115145-add-video-qa-and-fathom-imports';
 import { AddCreativePerformanceLearningFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1793675579721-add-creative-performance-learning';
 import { AddDelegatedGmailInboxFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1793677084748-add-delegated-gmail-inbox';
+import { AddDeveloperReleasesFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1793686027809-add-developer-releases';
 
 export const INSTANCE_COMMANDS = [
   AddViewFieldGroupIdIndexOnViewFieldFastInstanceCommand,
@@ -404,4 +405,5 @@ export const INSTANCE_COMMANDS = [
   AddVideoQaAndFathomImportsFastInstanceCommand,
   AddCreativePerformanceLearningFastInstanceCommand,
   AddDelegatedGmailInboxFastInstanceCommand,
+  AddDeveloperReleasesFastInstanceCommand,
 ];

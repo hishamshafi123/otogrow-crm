@@ -132,11 +132,13 @@ const OperationalWorkspace = ({
                   ? t`Client inbox`
                   : view === 'creative'
                     ? t`Creative studio`
-                    : view === 'seo'
-                      ? t`SEO results`
-                      : view === 'activity'
-                        ? t`Team activity`
-                        : t`Company overview`}
+                    : view === 'development'
+                      ? t`Development releases`
+                      : view === 'seo'
+                        ? t`SEO results`
+                        : view === 'activity'
+                          ? t`Team activity`
+                          : t`Company overview`}
             </h1>
             <p>
               {view === 'chat'
@@ -145,11 +147,13 @@ const OperationalWorkspace = ({
                   ? t`Read selected client conversations and review each reply before sending.`
                   : view === 'creative'
                     ? t`Plan and produce one exact task at a time.`
-                    : view === 'seo'
-                      ? t`Separate completed SEO work from measured client results.`
-                      : view === 'activity'
-                        ? t`Inspect recorded work and ask evidence-based questions.`
-                        : t`Business exceptions and connection readiness.`}
+                    : view === 'development'
+                      ? t`Plan reviewed releases, record deployment and track client handover.`
+                      : view === 'seo'
+                        ? t`Separate completed SEO work from measured client results.`
+                        : view === 'activity'
+                          ? t`Inspect recorded work and ask evidence-based questions.`
+                          : t`Business exceptions and connection readiness.`}
             </p>
           </div>
         </StyledDeliveryRow>

@@ -334,6 +334,8 @@ function syntheticCurrentWork(access, fixture, sharedNative) {
     unusedDependency,
   );
   return {
+    workspaceOrm,
+    cache,
     currentWork: new OtogrowActivityCurrentWorkService(
       workspaceOrm,
       access,

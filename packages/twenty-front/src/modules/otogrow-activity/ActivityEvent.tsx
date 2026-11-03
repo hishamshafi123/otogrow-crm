@@ -89,6 +89,10 @@ export const ActivityEvent = ({
     taskParams.set('panel', 'operations');
   else taskParams.delete('panel');
   const businessSources: Record<string, { to: string; name: string }> = {
+    'development-release': {
+      to: `/delivery?view=development&releaseProject=${event.projectId ?? ''}&releaseId=${event.sourceId}`,
+      name: t`Open release`,
+    },
     'creative-learning': {
       to: `/delivery?view=creative&creativeView=learning&learningProject=${event.projectId ?? ''}&learningLink=${event.sourceId}`,
       name: t`Open creative performance evidence`,

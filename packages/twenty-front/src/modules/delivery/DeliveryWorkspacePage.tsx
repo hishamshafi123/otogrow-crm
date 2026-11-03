@@ -3,6 +3,7 @@ import { DeliveryInboxPage } from '@/delivery/inbox/workspace/DeliveryInboxPage'
 import { DeliveryAdvertisingPage } from '@/delivery/advertising/workbench/DeliveryAdvertisingPage';
 import { DeliveryCreativeProductionPage } from '@/delivery/creative/production/DeliveryCreativeProductionPage';
 import { DeliverySeoResultsPage } from '@/delivery/seo-results/DeliverySeoResultsPage';
+import { DeliveryDevelopmentPage } from '@/delivery/development/DeliveryDevelopmentPage';
 import { DeliveryCapacity } from '@/delivery/capacity/DeliveryCapacity';
 import { DeliveryTasksPage } from '@/delivery/tasks/DeliveryTasksPage';
 import { AtlasMediaPage } from '@/delivery/creative/atlas/AtlasMediaPage';
@@ -140,6 +141,11 @@ export const DeliveryWorkspacePage = () => {
         <DeliveryCreativeLearningPage />
       ) : view === 'creative' && params.get('creativeView') !== 'legacy' ? (
         <DeliveryCreativeProductionPage />
+      ) : view === 'development' &&
+        params.get('developerView') !== 'legacy' &&
+        !params.has('businessRecord') &&
+        !params.has('task') ? (
+        <DeliveryDevelopmentPage />
       ) : view === 'seo' ? (
         <DeliverySeoResultsPage />
       ) : view === 'knowledge' ? (

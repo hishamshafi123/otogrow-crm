@@ -62,7 +62,7 @@ export const useReadinessLabels = () => {
     AGENT_TOOLS_MISSING: t`Custom external tools, automatic triggers and unrestricted external actions are not available. Use the configured task assistants.`,
     CREATIVE_CHECKS: t`Briefs, uploads and independent approvals are available. Atlas image/video generation and Google image or short-video/audio checks require compatible enabled models, verified pricing and AI spending coverage. AI findings retain uncertainty and never replace final human approval. Saved settings do not confirm live provider quality.`,
     SEO_MANUAL: t`Plan recurring work and review evidence, then record weekly or monthly measured results with an independent reviewer. Compatible approved periods can be compared. Analytics measurements are entered with their sources; automatic ranking, traffic and conversion imports are not configured.`,
-    DEVELOPMENT_MANUAL: t`Use task boards, release checklists and evidence links. Issue, PR, deployment and Jira synchronization are not implemented.`,
+    DEVELOPMENT_MANUAL: t`Plan releases from existing tasks, review independently, then record deployment and client acceptance. Issue and pull request links are manual; GitHub and Jira synchronization are not implemented.`,
   };
   const destinations: Record<string, string> = {
     ads: t`Open Advertising`,

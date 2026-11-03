@@ -6671,6 +6671,280 @@ export type DeliveryReadinessSnapshot = {
   workspaceId: Scalars['ID']['output'];
 };
 
+export type DeliveryReleaseBodyInput = {
+  acceptanceCriteria: Scalars['String']['input'];
+  checks: Array<DeliveryReleaseCheckInput>;
+  commitSha: Scalars['String']['input'];
+  ownerId: Scalars['ID']['input'];
+  repositoryUrl: Scalars['String']['input'];
+  rollbackPlan: Scalars['String']['input'];
+  summary: Scalars['String']['input'];
+  targetDate: Scalars['String']['input'];
+  title: Scalars['String']['input'];
+  work: Array<DeliveryReleaseWorkInput>;
+};
+
+export type DeliveryReleaseCheck = {
+  __typename?: 'DeliveryReleaseCheck';
+  evidenceUrl: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  kind: Scalars['String']['output'];
+  label: Scalars['String']['output'];
+  note: Scalars['String']['output'];
+  status: Scalars['String']['output'];
+};
+
+export type DeliveryReleaseCheckInput = {
+  evidenceUrl: Scalars['String']['input'];
+  id: Scalars['ID']['input'];
+  kind: Scalars['String']['input'];
+  label: Scalars['String']['input'];
+  note: Scalars['String']['input'];
+  status: Scalars['String']['input'];
+};
+
+export type DeliveryReleaseChoices = {
+  __typename?: 'DeliveryReleaseChoices';
+  isManager: Scalars['Boolean']['output'];
+  memberId: Scalars['ID']['output'];
+  nextTaskId?: Maybe<Scalars['ID']['output']>;
+  observedAt: Scalars['String']['output'];
+  owners: Array<DeliveryReleaseOwner>;
+  project: DeliveryReleaseProject;
+  scope: Scalars['String']['output'];
+  selectedTasks: Array<DeliveryReleaseTask>;
+  tasks: Array<DeliveryReleaseTask>;
+  totalCount: Scalars['Int']['output'];
+  userWorkspaceId: Scalars['ID']['output'];
+  workspaceId: Scalars['ID']['output'];
+};
+
+export type DeliveryReleaseChoicesInput = {
+  afterTaskId?: InputMaybe<Scalars['ID']['input']>;
+  projectId: Scalars['ID']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+  selectedTaskIds?: InputMaybe<Array<Scalars['ID']['input']>>;
+};
+
+export type DeliveryReleaseDecisionInput = {
+  action: Scalars['String']['input'];
+  commitSha: Scalars['String']['input'];
+  environment: Scalars['String']['input'];
+  evidenceUrl: Scalars['String']['input'];
+  id: Scalars['ID']['input'];
+  note: Scalars['String']['input'];
+  requestId: Scalars['ID']['input'];
+  revision: Scalars['Int']['input'];
+  sourceFingerprint: Scalars['String']['input'];
+};
+
+export type DeliveryReleaseDetail = {
+  __typename?: 'DeliveryReleaseDetail';
+  body: DeliveryReleaseSavedBody;
+  canEdit: Scalars['Boolean']['output'];
+  canRecordAcceptance: Scalars['Boolean']['output'];
+  canRecordDeployment: Scalars['Boolean']['output'];
+  canRecordHandover: Scalars['Boolean']['output'];
+  canReview: Scalars['Boolean']['output'];
+  canSubmit: Scalars['Boolean']['output'];
+  currentSourceFingerprint: Scalars['String']['output'];
+  history: Array<DeliveryReleaseReceipt>;
+  isManager: Scalars['Boolean']['output'];
+  memberId: Scalars['ID']['output'];
+  nextEventId?: Maybe<Scalars['ID']['output']>;
+  observedAt: Scalars['String']['output'];
+  project: DeliveryReleaseProject;
+  release: DeliveryReleaseSummary;
+  reviewBlockedReason?: Maybe<Scalars['String']['output']>;
+  scope: Scalars['String']['output'];
+  selectedVersion: Scalars['Int']['output'];
+  sourceChanged: Scalars['Boolean']['output'];
+  userWorkspaceId: Scalars['ID']['output'];
+  workspaceId: Scalars['ID']['output'];
+};
+
+export type DeliveryReleaseList = {
+  __typename?: 'DeliveryReleaseList';
+  isManager: Scalars['Boolean']['output'];
+  items: Array<DeliveryReleaseSummary>;
+  memberId: Scalars['ID']['output'];
+  nextId?: Maybe<Scalars['ID']['output']>;
+  observedAt: Scalars['String']['output'];
+  project: DeliveryReleaseProject;
+  scope: Scalars['String']['output'];
+  totalCount: Scalars['Int']['output'];
+  userWorkspaceId: Scalars['ID']['output'];
+  workspaceId: Scalars['ID']['output'];
+};
+
+export type DeliveryReleaseListInput = {
+  afterId?: InputMaybe<Scalars['ID']['input']>;
+  projectId: Scalars['ID']['input'];
+  status?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type DeliveryReleaseOwner = {
+  __typename?: 'DeliveryReleaseOwner';
+  id: Scalars['ID']['output'];
+  name: Scalars['String']['output'];
+};
+
+export type DeliveryReleasePreview = {
+  __typename?: 'DeliveryReleasePreview';
+  body: DeliveryReleaseSavedBody;
+  inputHash: Scalars['String']['output'];
+  isManager: Scalars['Boolean']['output'];
+  memberId: Scalars['ID']['output'];
+  observedAt: Scalars['String']['output'];
+  ownerName: Scalars['String']['output'];
+  releaseId: Scalars['ID']['output'];
+  requestId: Scalars['ID']['output'];
+  reviewBlockedReason?: Maybe<Scalars['String']['output']>;
+  scope: Scalars['String']['output'];
+  userWorkspaceId: Scalars['ID']['output'];
+  workspaceId: Scalars['ID']['output'];
+};
+
+export type DeliveryReleaseProject = {
+  __typename?: 'DeliveryReleaseProject';
+  companyId?: Maybe<Scalars['ID']['output']>;
+  id: Scalars['ID']['output'];
+  name: Scalars['String']['output'];
+  revision: Scalars['Int']['output'];
+};
+
+export type DeliveryReleaseProjects = {
+  __typename?: 'DeliveryReleaseProjects';
+  isManager: Scalars['Boolean']['output'];
+  items: Array<DeliveryReleaseProject>;
+  memberId: Scalars['ID']['output'];
+  nextId?: Maybe<Scalars['ID']['output']>;
+  observedAt: Scalars['String']['output'];
+  scope: Scalars['String']['output'];
+  totalCount: Scalars['Int']['output'];
+  userWorkspaceId: Scalars['ID']['output'];
+  workspaceId: Scalars['ID']['output'];
+};
+
+export type DeliveryReleaseProjectsInput = {
+  afterId?: InputMaybe<Scalars['ID']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type DeliveryReleaseReceipt = {
+  __typename?: 'DeliveryReleaseReceipt';
+  action: Scalars['String']['output'];
+  actorId: Scalars['ID']['output'];
+  actorName: Scalars['String']['output'];
+  commitSha: Scalars['String']['output'];
+  createdAt: Scalars['String']['output'];
+  environment: Scalars['String']['output'];
+  evidenceUrl: Scalars['String']['output'];
+  inputHash: Scalars['String']['output'];
+  note: Scalars['String']['output'];
+  releaseId: Scalars['ID']['output'];
+  requestId: Scalars['ID']['output'];
+  revision: Scalars['Int']['output'];
+  status: Scalars['String']['output'];
+  userWorkspaceId: Scalars['ID']['output'];
+  version: Scalars['Int']['output'];
+  workspaceId: Scalars['ID']['output'];
+};
+
+export type DeliveryReleaseReceiptInput = {
+  requestId: Scalars['ID']['input'];
+};
+
+export type DeliveryReleaseReceiptResult = {
+  __typename?: 'DeliveryReleaseReceiptResult';
+  isManager: Scalars['Boolean']['output'];
+  memberId: Scalars['ID']['output'];
+  observedAt: Scalars['String']['output'];
+  receipt?: Maybe<DeliveryReleaseReceipt>;
+  scope: Scalars['String']['output'];
+  userWorkspaceId: Scalars['ID']['output'];
+  workspaceId: Scalars['ID']['output'];
+};
+
+export type DeliveryReleaseSaveInput = {
+  body: DeliveryReleaseBodyInput;
+  expectedCompanyId?: InputMaybe<Scalars['ID']['input']>;
+  id: Scalars['ID']['input'];
+  projectId: Scalars['ID']['input'];
+  projectRevision: Scalars['Int']['input'];
+  requestId: Scalars['ID']['input'];
+  revision: Scalars['Int']['input'];
+};
+
+export type DeliveryReleaseSavedBody = {
+  __typename?: 'DeliveryReleaseSavedBody';
+  acceptanceCriteria: Scalars['String']['output'];
+  checks: Array<DeliveryReleaseCheck>;
+  commitSha: Scalars['String']['output'];
+  ownerId: Scalars['ID']['output'];
+  repositoryUrl: Scalars['String']['output'];
+  rollbackPlan: Scalars['String']['output'];
+  sourceFingerprint: Scalars['String']['output'];
+  summary: Scalars['String']['output'];
+  targetDate: Scalars['String']['output'];
+  tasks: Array<DeliveryReleaseTask>;
+  title: Scalars['String']['output'];
+  work: Array<DeliveryReleaseWork>;
+};
+
+export type DeliveryReleaseSelectionInput = {
+  afterEventId?: InputMaybe<Scalars['ID']['input']>;
+  id: Scalars['ID']['input'];
+  version?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type DeliveryReleaseSummary = {
+  __typename?: 'DeliveryReleaseSummary';
+  companyId?: Maybe<Scalars['ID']['output']>;
+  createdBy: Scalars['ID']['output'];
+  currentVersion: Scalars['Int']['output'];
+  id: Scalars['ID']['output'];
+  ownerId: Scalars['ID']['output'];
+  ownerName: Scalars['String']['output'];
+  projectId: Scalars['ID']['output'];
+  revision: Scalars['Int']['output'];
+  status: Scalars['String']['output'];
+  targetDate: Scalars['String']['output'];
+  title: Scalars['String']['output'];
+};
+
+export type DeliveryReleaseTask = {
+  __typename?: 'DeliveryReleaseTask';
+  approved: Scalars['Boolean']['output'];
+  assigneeId?: Maybe<Scalars['ID']['output']>;
+  reviewedAt?: Maybe<Scalars['String']['output']>;
+  reviewedBy?: Maybe<Scalars['ID']['output']>;
+  revision: Scalars['Int']['output'];
+  sourceHash: Scalars['String']['output'];
+  state: Scalars['String']['output'];
+  submissionVersion?: Maybe<Scalars['Int']['output']>;
+  submittedBy?: Maybe<Scalars['ID']['output']>;
+  taskId: Scalars['ID']['output'];
+  title: Scalars['String']['output'];
+};
+
+export type DeliveryReleaseWork = {
+  __typename?: 'DeliveryReleaseWork';
+  blockedByTaskIds: Array<Scalars['ID']['output']>;
+  issueUrl: Scalars['String']['output'];
+  pullRequestUrl: Scalars['String']['output'];
+  revision: Scalars['Int']['output'];
+  taskId: Scalars['ID']['output'];
+};
+
+export type DeliveryReleaseWorkInput = {
+  blockedByTaskIds: Array<Scalars['ID']['input']>;
+  issueUrl: Scalars['String']['input'];
+  pullRequestUrl: Scalars['String']['input'];
+  revision: Scalars['Int']['input'];
+  taskId: Scalars['ID']['input'];
+};
+
 export type DeliveryReviewAssignment = {
   __typename?: 'DeliveryReviewAssignment';
   changedAt?: Maybe<Scalars['String']['output']>;
@@ -9139,6 +9413,7 @@ export type Mutation = {
   deactivateSkill: Skill;
   decideDeliveryAssistantRun: DeliveryAssistantRunReceipt;
   decideDeliveryCreativeAdLink: DeliveryCreativeLearningReceipt;
+  decideDeliveryRelease: DeliveryReleaseReceipt;
   decideDeliverySeoReport: DeliverySeoReceipt;
   deleteAppKeyValue: Scalars['Boolean']['output'];
   deleteApplicationRegistration: Scalars['Boolean']['output'];
@@ -9281,6 +9556,7 @@ export type Mutation = {
   saveDeliveryFounderEscalationRule: DeliveryFounderEscalationRuleResult;
   saveDeliveryKnowledge: Scalars['String']['output'];
   saveDeliveryKnowledgeSource: DeliveryKnowledgeWriteResult;
+  saveDeliveryRelease: DeliveryReleaseReceipt;
   saveDeliveryRevision: Scalars['Boolean']['output'];
   saveDeliverySeoReport: DeliverySeoReceipt;
   saveDeliveryWorkflow: DeliveryWorkflowCatalog;
@@ -9887,6 +10163,11 @@ export type MutationDecideDeliveryAssistantRunArgs = {
 
 export type MutationDecideDeliveryCreativeAdLinkArgs = {
   input: DeliveryCreativeAdLinkDecisionInput;
+};
+
+
+export type MutationDecideDeliveryReleaseArgs = {
+  input: DeliveryReleaseDecisionInput;
 };
 
 
@@ -10534,6 +10815,11 @@ export type MutationSaveDeliveryKnowledgeArgs = {
 
 export type MutationSaveDeliveryKnowledgeSourceArgs = {
   input: DeliveryKnowledgeSaveInput;
+};
+
+
+export type MutationSaveDeliveryReleaseArgs = {
+  input: DeliveryReleaseSaveInput;
 };
 
 
@@ -12537,6 +12823,11 @@ export type Query = {
   deliveryMetaReport: Scalars['JSON']['output'];
   deliveryOperations: Scalars['JSON']['output'];
   deliveryReadiness: DeliveryReadinessSnapshot;
+  deliveryReleaseChoices: DeliveryReleaseChoices;
+  deliveryReleaseDetail: DeliveryReleaseDetail;
+  deliveryReleaseList: DeliveryReleaseList;
+  deliveryReleaseProjects: DeliveryReleaseProjects;
+  deliveryReleaseReceipt: DeliveryReleaseReceiptResult;
   deliveryReviewAssignmentHistory: DeliveryReviewAssignmentHistory;
   deliveryReviewQueue: DeliveryReviewQueueSnapshot;
   deliveryRevisionCosts: DeliveryRevisionCosts;
@@ -12664,6 +12955,7 @@ export type Query = {
   otogrowRoleDirectory: OtogrowRoleDirectory;
   pieChartData: PieChartData;
   previewDeliveryFounderEscalationRule: DeliveryFounderEscalationPreview;
+  previewDeliveryRelease: DeliveryReleasePreview;
   previewMessageCampaignAudience: CampaignAudiencePreviewDto;
   publicMarketplaceAppDetail: MarketplaceAppDetail;
   publicMarketplaceApps: Array<MarketplaceApp>;
@@ -13174,6 +13466,31 @@ export type QueryDeliveryMetaReportArgs = {
 };
 
 
+export type QueryDeliveryReleaseChoicesArgs = {
+  input: DeliveryReleaseChoicesInput;
+};
+
+
+export type QueryDeliveryReleaseDetailArgs = {
+  input: DeliveryReleaseSelectionInput;
+};
+
+
+export type QueryDeliveryReleaseListArgs = {
+  input: DeliveryReleaseListInput;
+};
+
+
+export type QueryDeliveryReleaseProjectsArgs = {
+  input: DeliveryReleaseProjectsInput;
+};
+
+
+export type QueryDeliveryReleaseReceiptArgs = {
+  input: DeliveryReleaseReceiptInput;
+};
+
+
 export type QueryDeliveryReviewAssignmentHistoryArgs = {
   input: DeliveryReviewAssignmentHistoryInput;
 };
@@ -13652,6 +13969,11 @@ export type QueryPieChartDataArgs = {
 
 export type QueryPreviewDeliveryFounderEscalationRuleArgs = {
   input: DeliveryFounderEscalationRuleDraftInput;
+};
+
+
+export type QueryPreviewDeliveryReleaseArgs = {
+  input: DeliveryReleaseSaveInput;
 };
 
 
@@ -17063,6 +17385,70 @@ export type CancelDeliveryVideoQaMutationVariables = Exact<{
 
 export type CancelDeliveryVideoQaMutation = { __typename?: 'Mutation', cancelDeliveryVideoQa: { __typename?: 'DeliveryVideoQaReceipt', workspaceId: string, memberId: string, userWorkspaceId: string, observedAt: string, scope: string, taskId: string, runId: string, requestId: string, inputHash: string, action: string, status: string, createdAt: string, actor: { __typename?: 'DeliveryCreativeActor', memberId: string, isAdmin: boolean, isManager: boolean, roleIds: Array<string>, capabilities: Array<string> } } };
 
+export type ReleaseProjectFragment = { __typename?: 'DeliveryReleaseProject', id: string, name: string, revision: number, companyId?: string | null };
+
+export type ReleaseSummaryFragment = { __typename?: 'DeliveryReleaseSummary', id: string, projectId: string, companyId?: string | null, title: string, ownerName: string, ownerId: string, createdBy: string, revision: number, currentVersion: number, status: string, targetDate: string };
+
+export type ReleaseTaskFragment = { __typename?: 'DeliveryReleaseTask', taskId: string, revision: number, title: string, assigneeId?: string | null, state: string, submissionVersion?: number | null, submittedBy?: string | null, reviewedBy?: string | null, reviewedAt?: string | null, approved: boolean, sourceHash: string };
+
+export type ReleaseReceiptFragment = { __typename?: 'DeliveryReleaseReceipt', workspaceId: string, actorId: string, userWorkspaceId: string, requestId: string, releaseId: string, inputHash: string, action: string, note: string, evidenceUrl: string, environment: string, commitSha: string, actorName: string, revision: number, version: number, status: string, createdAt: string };
+
+export type DeliveryReleaseProjectsQueryVariables = Exact<{
+  input: DeliveryReleaseProjectsInput;
+}>;
+
+
+export type DeliveryReleaseProjectsQuery = { __typename?: 'Query', deliveryReleaseProjects: { __typename?: 'DeliveryReleaseProjects', workspaceId: string, memberId: string, userWorkspaceId: string, scope: string, observedAt: string, isManager: boolean, totalCount: number, nextId?: string | null, items: Array<{ __typename?: 'DeliveryReleaseProject', id: string, name: string, revision: number, companyId?: string | null }> } };
+
+export type DeliveryReleaseListQueryVariables = Exact<{
+  input: DeliveryReleaseListInput;
+}>;
+
+
+export type DeliveryReleaseListQuery = { __typename?: 'Query', deliveryReleaseList: { __typename?: 'DeliveryReleaseList', workspaceId: string, memberId: string, userWorkspaceId: string, scope: string, observedAt: string, isManager: boolean, totalCount: number, nextId?: string | null, project: { __typename?: 'DeliveryReleaseProject', id: string, name: string, revision: number, companyId?: string | null }, items: Array<{ __typename?: 'DeliveryReleaseSummary', id: string, projectId: string, companyId?: string | null, title: string, ownerName: string, ownerId: string, createdBy: string, revision: number, currentVersion: number, status: string, targetDate: string }> } };
+
+export type DeliveryReleaseChoicesQueryVariables = Exact<{
+  input: DeliveryReleaseChoicesInput;
+}>;
+
+
+export type DeliveryReleaseChoicesQuery = { __typename?: 'Query', deliveryReleaseChoices: { __typename?: 'DeliveryReleaseChoices', workspaceId: string, memberId: string, userWorkspaceId: string, scope: string, observedAt: string, isManager: boolean, totalCount: number, nextTaskId?: string | null, project: { __typename?: 'DeliveryReleaseProject', id: string, name: string, revision: number, companyId?: string | null }, owners: Array<{ __typename?: 'DeliveryReleaseOwner', id: string, name: string }>, tasks: Array<{ __typename?: 'DeliveryReleaseTask', taskId: string, revision: number, title: string, assigneeId?: string | null, state: string, submissionVersion?: number | null, submittedBy?: string | null, reviewedBy?: string | null, reviewedAt?: string | null, approved: boolean, sourceHash: string }>, selectedTasks: Array<{ __typename?: 'DeliveryReleaseTask', taskId: string, revision: number, title: string, assigneeId?: string | null, state: string, submissionVersion?: number | null, submittedBy?: string | null, reviewedBy?: string | null, reviewedAt?: string | null, approved: boolean, sourceHash: string }> } };
+
+export type DeliveryReleaseDetailQueryVariables = Exact<{
+  input: DeliveryReleaseSelectionInput;
+}>;
+
+
+export type DeliveryReleaseDetailQuery = { __typename?: 'Query', deliveryReleaseDetail: { __typename?: 'DeliveryReleaseDetail', workspaceId: string, memberId: string, userWorkspaceId: string, scope: string, observedAt: string, isManager: boolean, selectedVersion: number, nextEventId?: string | null, currentSourceFingerprint: string, sourceChanged: boolean, canEdit: boolean, canSubmit: boolean, canReview: boolean, canRecordDeployment: boolean, canRecordHandover: boolean, canRecordAcceptance: boolean, reviewBlockedReason?: string | null, release: { __typename?: 'DeliveryReleaseSummary', id: string, projectId: string, companyId?: string | null, title: string, ownerName: string, ownerId: string, createdBy: string, revision: number, currentVersion: number, status: string, targetDate: string }, project: { __typename?: 'DeliveryReleaseProject', id: string, name: string, revision: number, companyId?: string | null }, body: { __typename?: 'DeliveryReleaseSavedBody', title: string, ownerId: string, targetDate: string, repositoryUrl: string, commitSha: string, summary: string, acceptanceCriteria: string, rollbackPlan: string, sourceFingerprint: string, work: Array<{ __typename?: 'DeliveryReleaseWork', taskId: string, revision: number, issueUrl: string, pullRequestUrl: string, blockedByTaskIds: Array<string> }>, checks: Array<{ __typename?: 'DeliveryReleaseCheck', id: string, kind: string, label: string, status: string, evidenceUrl: string, note: string }>, tasks: Array<{ __typename?: 'DeliveryReleaseTask', taskId: string, revision: number, title: string, assigneeId?: string | null, state: string, submissionVersion?: number | null, submittedBy?: string | null, reviewedBy?: string | null, reviewedAt?: string | null, approved: boolean, sourceHash: string }> }, history: Array<{ __typename?: 'DeliveryReleaseReceipt', workspaceId: string, actorId: string, userWorkspaceId: string, requestId: string, releaseId: string, inputHash: string, action: string, note: string, evidenceUrl: string, environment: string, commitSha: string, actorName: string, revision: number, version: number, status: string, createdAt: string }> } };
+
+export type DeliveryReleaseReceiptQueryVariables = Exact<{
+  input: DeliveryReleaseReceiptInput;
+}>;
+
+
+export type DeliveryReleaseReceiptQuery = { __typename?: 'Query', deliveryReleaseReceipt: { __typename?: 'DeliveryReleaseReceiptResult', workspaceId: string, memberId: string, userWorkspaceId: string, scope: string, observedAt: string, isManager: boolean, receipt?: { __typename?: 'DeliveryReleaseReceipt', workspaceId: string, actorId: string, userWorkspaceId: string, requestId: string, releaseId: string, inputHash: string, action: string, note: string, evidenceUrl: string, environment: string, commitSha: string, actorName: string, revision: number, version: number, status: string, createdAt: string } | null } };
+
+export type SaveDeliveryReleaseMutationVariables = Exact<{
+  input: DeliveryReleaseSaveInput;
+}>;
+
+
+export type SaveDeliveryReleaseMutation = { __typename?: 'Mutation', saveDeliveryRelease: { __typename?: 'DeliveryReleaseReceipt', workspaceId: string, actorId: string, userWorkspaceId: string, requestId: string, releaseId: string, inputHash: string, action: string, note: string, evidenceUrl: string, environment: string, commitSha: string, actorName: string, revision: number, version: number, status: string, createdAt: string } };
+
+export type PreviewDeliveryReleaseQueryVariables = Exact<{
+  input: DeliveryReleaseSaveInput;
+}>;
+
+
+export type PreviewDeliveryReleaseQuery = { __typename?: 'Query', previewDeliveryRelease: { __typename?: 'DeliveryReleasePreview', workspaceId: string, memberId: string, userWorkspaceId: string, scope: string, observedAt: string, isManager: boolean, releaseId: string, requestId: string, inputHash: string, ownerName: string, reviewBlockedReason?: string | null, body: { __typename?: 'DeliveryReleaseSavedBody', title: string, ownerId: string, targetDate: string, repositoryUrl: string, commitSha: string, summary: string, acceptanceCriteria: string, rollbackPlan: string, sourceFingerprint: string, work: Array<{ __typename?: 'DeliveryReleaseWork', taskId: string, revision: number, issueUrl: string, pullRequestUrl: string, blockedByTaskIds: Array<string> }>, checks: Array<{ __typename?: 'DeliveryReleaseCheck', id: string, kind: string, label: string, status: string, evidenceUrl: string, note: string }>, tasks: Array<{ __typename?: 'DeliveryReleaseTask', taskId: string, revision: number, title: string, assigneeId?: string | null, state: string, submissionVersion?: number | null, submittedBy?: string | null, reviewedBy?: string | null, reviewedAt?: string | null, approved: boolean, sourceHash: string }> } } };
+
+export type DecideDeliveryReleaseMutationVariables = Exact<{
+  input: DeliveryReleaseDecisionInput;
+}>;
+
+
+export type DecideDeliveryReleaseMutation = { __typename?: 'Mutation', decideDeliveryRelease: { __typename?: 'DeliveryReleaseReceipt', workspaceId: string, actorId: string, userWorkspaceId: string, requestId: string, releaseId: string, inputHash: string, action: string, note: string, evidenceUrl: string, environment: string, commitSha: string, actorName: string, revision: number, version: number, status: string, createdAt: string } };
+
 export type DeliveryFinanceAiCostsQueryVariables = Exact<{
   input: DeliveryFinanceAiCostsInput;
 }>;
@@ -20154,6 +20540,10 @@ export const VideoQaPreparationFragmentDoc = {"kind":"Document","definitions":[{
 export const VideoQaPreviewFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"VideoQaPreview"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryVideoQaPreview"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"observedAt"}},{"kind":"Field","name":{"kind":"Name","value":"scope"}},{"kind":"Field","name":{"kind":"Name","value":"actor"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"VideoQaActor"}}]}},{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"taskRevision"}},{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"creativeVersion"}},{"kind":"Field","name":{"kind":"Name","value":"briefVersion"}},{"kind":"Field","name":{"kind":"Name","value":"brief"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"outputKind"}},{"kind":"Field","name":{"kind":"Name","value":"objective"}},{"kind":"Field","name":{"kind":"Name","value":"audience"}},{"kind":"Field","name":{"kind":"Name","value":"painPoint"}},{"kind":"Field","name":{"kind":"Name","value":"angle"}},{"kind":"Field","name":{"kind":"Name","value":"concept"}},{"kind":"Field","name":{"kind":"Name","value":"productFacts"}},{"kind":"Field","name":{"kind":"Name","value":"mandatoryClaims"}},{"kind":"Field","name":{"kind":"Name","value":"visualDirection"}},{"kind":"Field","name":{"kind":"Name","value":"format"}},{"kind":"Field","name":{"kind":"Name","value":"duration"}},{"kind":"Field","name":{"kind":"Name","value":"hook"}},{"kind":"Field","name":{"kind":"Name","value":"cta"}},{"kind":"Field","name":{"kind":"Name","value":"music"}},{"kind":"Field","name":{"kind":"Name","value":"brandAssets"}}]}},{"kind":"Field","name":{"kind":"Name","value":"asset"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"VideoQaAsset"}}]}},{"kind":"Field","name":{"kind":"Name","value":"references"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"VideoQaAsset"}}]}},{"kind":"Field","name":{"kind":"Name","value":"modelId"}},{"kind":"Field","name":{"kind":"Name","value":"manualTranscript"}},{"kind":"Field","name":{"kind":"Name","value":"sourceFingerprint"}},{"kind":"Field","name":{"kind":"Name","value":"preparationFingerprint"}},{"kind":"Field","name":{"kind":"Name","value":"preparation"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"VideoQaPreparation"}}]}},{"kind":"Field","name":{"kind":"Name","value":"maximumCostUsd"}},{"kind":"Field","name":{"kind":"Name","value":"pricingRevision"}},{"kind":"Field","name":{"kind":"Name","value":"budgetReady"}},{"kind":"Field","name":{"kind":"Name","value":"blockedReason"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"VideoQaActor"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryCreativeActor"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"isAdmin"}},{"kind":"Field","name":{"kind":"Name","value":"isManager"}},{"kind":"Field","name":{"kind":"Name","value":"roleIds"}},{"kind":"Field","name":{"kind":"Name","value":"capabilities"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"VideoQaAsset"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryVideoQaAsset"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"mimeType"}},{"kind":"Field","name":{"kind":"Name","value":"size"}},{"kind":"Field","name":{"kind":"Name","value":"sha256"}},{"kind":"Field","name":{"kind":"Name","value":"briefVersion"}},{"kind":"Field","name":{"kind":"Name","value":"productionVersion"}},{"kind":"Field","name":{"kind":"Name","value":"assemblyVersion"}},{"kind":"Field","name":{"kind":"Name","value":"shotId"}},{"kind":"Field","name":{"kind":"Name","value":"shotVersion"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"VideoQaPreparation"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryVideoQaPreparation"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"pipelineVersion"}},{"kind":"Field","name":{"kind":"Name","value":"durationMs"}},{"kind":"Field","name":{"kind":"Name","value":"width"}},{"kind":"Field","name":{"kind":"Name","value":"height"}},{"kind":"Field","name":{"kind":"Name","value":"hasAudio"}},{"kind":"Field","name":{"kind":"Name","value":"audioChannels"}},{"kind":"Field","name":{"kind":"Name","value":"proxySha256"}},{"kind":"Field","name":{"kind":"Name","value":"proxyBytes"}},{"kind":"Field","name":{"kind":"Name","value":"samplingIntervalMs"}},{"kind":"Field","name":{"kind":"Name","value":"limitations"}},{"kind":"Field","name":{"kind":"Name","value":"frames"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"index"}},{"kind":"Field","name":{"kind":"Name","value":"atMs"}},{"kind":"Field","name":{"kind":"Name","value":"sha256"}},{"kind":"Field","name":{"kind":"Name","value":"size"}}]}},{"kind":"Field","name":{"kind":"Name","value":"technicalFindings"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"code"}},{"kind":"Field","name":{"kind":"Name","value":"startMs"}},{"kind":"Field","name":{"kind":"Name","value":"endMs"}},{"kind":"Field","name":{"kind":"Name","value":"evidence"}}]}}]}}]} as unknown as DocumentNode<VideoQaPreviewFragment, unknown>;
 export const VideoQaStateFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"VideoQaState"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryVideoQaState"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"observedAt"}},{"kind":"Field","name":{"kind":"Name","value":"scope"}},{"kind":"Field","name":{"kind":"Name","value":"actor"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"VideoQaActor"}}]}},{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"taskRevision"}},{"kind":"Field","name":{"kind":"Name","value":"runId"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"error"}},{"kind":"Field","name":{"kind":"Name","value":"sourceCurrent"}},{"kind":"Field","name":{"kind":"Name","value":"canCancel"}},{"kind":"Field","name":{"kind":"Name","value":"assetId"}},{"kind":"Field","name":{"kind":"Name","value":"briefVersion"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"VideoQaActor"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryCreativeActor"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"isAdmin"}},{"kind":"Field","name":{"kind":"Name","value":"isManager"}},{"kind":"Field","name":{"kind":"Name","value":"roleIds"}},{"kind":"Field","name":{"kind":"Name","value":"capabilities"}}]}}]} as unknown as DocumentNode<VideoQaStateFragment, unknown>;
 export const VideoQaReceiptFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"VideoQaReceipt"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryVideoQaReceipt"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"observedAt"}},{"kind":"Field","name":{"kind":"Name","value":"scope"}},{"kind":"Field","name":{"kind":"Name","value":"actor"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"VideoQaActor"}}]}},{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"runId"}},{"kind":"Field","name":{"kind":"Name","value":"requestId"}},{"kind":"Field","name":{"kind":"Name","value":"inputHash"}},{"kind":"Field","name":{"kind":"Name","value":"action"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"VideoQaActor"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryCreativeActor"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"isAdmin"}},{"kind":"Field","name":{"kind":"Name","value":"isManager"}},{"kind":"Field","name":{"kind":"Name","value":"roleIds"}},{"kind":"Field","name":{"kind":"Name","value":"capabilities"}}]}}]} as unknown as DocumentNode<VideoQaReceiptFragment, unknown>;
+export const ReleaseProjectFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ReleaseProject"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryReleaseProject"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"companyId"}}]}}]} as unknown as DocumentNode<ReleaseProjectFragment, unknown>;
+export const ReleaseSummaryFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ReleaseSummary"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryReleaseSummary"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"companyId"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"ownerName"}},{"kind":"Field","name":{"kind":"Name","value":"ownerId"}},{"kind":"Field","name":{"kind":"Name","value":"createdBy"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"currentVersion"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"targetDate"}}]}}]} as unknown as DocumentNode<ReleaseSummaryFragment, unknown>;
+export const ReleaseTaskFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ReleaseTask"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryReleaseTask"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"assigneeId"}},{"kind":"Field","name":{"kind":"Name","value":"state"}},{"kind":"Field","name":{"kind":"Name","value":"submissionVersion"}},{"kind":"Field","name":{"kind":"Name","value":"submittedBy"}},{"kind":"Field","name":{"kind":"Name","value":"reviewedBy"}},{"kind":"Field","name":{"kind":"Name","value":"reviewedAt"}},{"kind":"Field","name":{"kind":"Name","value":"approved"}},{"kind":"Field","name":{"kind":"Name","value":"sourceHash"}}]}}]} as unknown as DocumentNode<ReleaseTaskFragment, unknown>;
+export const ReleaseReceiptFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ReleaseReceipt"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryReleaseReceipt"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"actorId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"requestId"}},{"kind":"Field","name":{"kind":"Name","value":"releaseId"}},{"kind":"Field","name":{"kind":"Name","value":"inputHash"}},{"kind":"Field","name":{"kind":"Name","value":"action"}},{"kind":"Field","name":{"kind":"Name","value":"note"}},{"kind":"Field","name":{"kind":"Name","value":"evidenceUrl"}},{"kind":"Field","name":{"kind":"Name","value":"environment"}},{"kind":"Field","name":{"kind":"Name","value":"commitSha"}},{"kind":"Field","name":{"kind":"Name","value":"actorName"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"version"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}}]} as unknown as DocumentNode<ReleaseReceiptFragment, unknown>;
 export const FinanceAiCostEntryReferenceFieldsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"FinanceAiCostEntryReferenceFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinanceAiCostEntryReference"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"month"}},{"kind":"Field","name":{"kind":"Name","value":"amountMicros"}},{"kind":"Field","name":{"kind":"Name","value":"matchedMicros"}},{"kind":"Field","name":{"kind":"Name","value":"activeMatchCount"}}]}}]} as unknown as DocumentNode<FinanceAiCostEntryReferenceFieldsFragment, unknown>;
 export const FinanceAiCostSourceFieldsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"FinanceAiCostSourceFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinanceAiCostSource"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"state"}},{"kind":"Field","name":{"kind":"Name","value":"sourceKind"}},{"kind":"Field","name":{"kind":"Name","value":"modelId"}},{"kind":"Field","name":{"kind":"Name","value":"currency"}},{"kind":"Field","name":{"kind":"Name","value":"settledAmountMicros"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"dispatchedAt"}},{"kind":"Field","name":{"kind":"Name","value":"settledAt"}},{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"projectName"}},{"kind":"Field","name":{"kind":"Name","value":"eligible"}},{"kind":"Field","name":{"kind":"Name","value":"sourceWarnings"}},{"kind":"Field","name":{"kind":"Name","value":"sourceReviewToken"}},{"kind":"Field","name":{"kind":"Name","value":"nextEvidenceId"}},{"kind":"Field","name":{"kind":"Name","value":"claim"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"currentEntry"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"FinanceAiCostEntryReferenceFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"replacementEntry"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"FinanceAiCostEntryReferenceFields"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"evidenceOptions"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"basis"}},{"kind":"Field","name":{"kind":"Name","value":"amountMicros"}},{"kind":"Field","name":{"kind":"Name","value":"recordedAt"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"FinanceAiCostEntryReferenceFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinanceAiCostEntryReference"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"month"}},{"kind":"Field","name":{"kind":"Name","value":"amountMicros"}},{"kind":"Field","name":{"kind":"Name","value":"matchedMicros"}},{"kind":"Field","name":{"kind":"Name","value":"activeMatchCount"}}]}}]} as unknown as DocumentNode<FinanceAiCostSourceFieldsFragment, unknown>;
 export const FinanceForecastItemFieldsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"FinanceForecastItemFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinanceForecastItem"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"sourceType"}},{"kind":"Field","name":{"kind":"Name","value":"sourceId"}},{"kind":"Field","name":{"kind":"Name","value":"planMonth"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"currency"}},{"kind":"Field","name":{"kind":"Name","value":"amountMicros"}},{"kind":"Field","name":{"kind":"Name","value":"remainingMicros"}},{"kind":"Field","name":{"kind":"Name","value":"appliedMicros"}},{"kind":"Field","name":{"kind":"Name","value":"expectedDate"}},{"kind":"Field","name":{"kind":"Name","value":"contractualDueDate"}},{"kind":"Field","name":{"kind":"Name","value":"ownerId"}},{"kind":"Field","name":{"kind":"Name","value":"ownerName"}},{"kind":"Field","name":{"kind":"Name","value":"ownerEligible"}},{"kind":"Field","name":{"kind":"Name","value":"nextActionDate"}},{"kind":"Field","name":{"kind":"Name","value":"note"}},{"kind":"Field","name":{"kind":"Name","value":"sourceReviewToken"}},{"kind":"Field","name":{"kind":"Name","value":"reviewToken"}},{"kind":"Field","name":{"kind":"Name","value":"eligible"}},{"kind":"Field","name":{"kind":"Name","value":"warnings"}},{"kind":"Field","name":{"kind":"Name","value":"changedAt"}},{"kind":"Field","name":{"kind":"Name","value":"changedByName"}}]}}]} as unknown as DocumentNode<FinanceForecastItemFieldsFragment, unknown>;
@@ -20417,6 +20807,14 @@ export const DeliveryVideoQaRunDocument = {"kind":"Document","definitions":[{"ki
 export const DeliveryVideoQaReceiptDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"DeliveryVideoQaReceipt"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryVideoQaReceiptInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deliveryVideoQaReceipt"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"VideoQaReceipt"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"VideoQaActor"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryCreativeActor"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"isAdmin"}},{"kind":"Field","name":{"kind":"Name","value":"isManager"}},{"kind":"Field","name":{"kind":"Name","value":"roleIds"}},{"kind":"Field","name":{"kind":"Name","value":"capabilities"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"VideoQaReceipt"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryVideoQaReceipt"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"observedAt"}},{"kind":"Field","name":{"kind":"Name","value":"scope"}},{"kind":"Field","name":{"kind":"Name","value":"actor"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"VideoQaActor"}}]}},{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"runId"}},{"kind":"Field","name":{"kind":"Name","value":"requestId"}},{"kind":"Field","name":{"kind":"Name","value":"inputHash"}},{"kind":"Field","name":{"kind":"Name","value":"action"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}}]} as unknown as DocumentNode<DeliveryVideoQaReceiptQuery, DeliveryVideoQaReceiptQueryVariables>;
 export const StartDeliveryVideoQaDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"StartDeliveryVideoQa"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryVideoQaStartInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"startDeliveryVideoQa"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"VideoQaReceipt"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"VideoQaActor"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryCreativeActor"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"isAdmin"}},{"kind":"Field","name":{"kind":"Name","value":"isManager"}},{"kind":"Field","name":{"kind":"Name","value":"roleIds"}},{"kind":"Field","name":{"kind":"Name","value":"capabilities"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"VideoQaReceipt"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryVideoQaReceipt"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"observedAt"}},{"kind":"Field","name":{"kind":"Name","value":"scope"}},{"kind":"Field","name":{"kind":"Name","value":"actor"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"VideoQaActor"}}]}},{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"runId"}},{"kind":"Field","name":{"kind":"Name","value":"requestId"}},{"kind":"Field","name":{"kind":"Name","value":"inputHash"}},{"kind":"Field","name":{"kind":"Name","value":"action"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}}]} as unknown as DocumentNode<StartDeliveryVideoQaMutation, StartDeliveryVideoQaMutationVariables>;
 export const CancelDeliveryVideoQaDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CancelDeliveryVideoQa"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryVideoQaCancelInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"cancelDeliveryVideoQa"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"VideoQaReceipt"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"VideoQaActor"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryCreativeActor"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"isAdmin"}},{"kind":"Field","name":{"kind":"Name","value":"isManager"}},{"kind":"Field","name":{"kind":"Name","value":"roleIds"}},{"kind":"Field","name":{"kind":"Name","value":"capabilities"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"VideoQaReceipt"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryVideoQaReceipt"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"observedAt"}},{"kind":"Field","name":{"kind":"Name","value":"scope"}},{"kind":"Field","name":{"kind":"Name","value":"actor"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"VideoQaActor"}}]}},{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"runId"}},{"kind":"Field","name":{"kind":"Name","value":"requestId"}},{"kind":"Field","name":{"kind":"Name","value":"inputHash"}},{"kind":"Field","name":{"kind":"Name","value":"action"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}}]} as unknown as DocumentNode<CancelDeliveryVideoQaMutation, CancelDeliveryVideoQaMutationVariables>;
+export const DeliveryReleaseProjectsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"DeliveryReleaseProjects"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryReleaseProjectsInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deliveryReleaseProjects"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"scope"}},{"kind":"Field","name":{"kind":"Name","value":"observedAt"}},{"kind":"Field","name":{"kind":"Name","value":"isManager"}},{"kind":"Field","name":{"kind":"Name","value":"items"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"ReleaseProject"}}]}},{"kind":"Field","name":{"kind":"Name","value":"totalCount"}},{"kind":"Field","name":{"kind":"Name","value":"nextId"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ReleaseProject"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryReleaseProject"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"companyId"}}]}}]} as unknown as DocumentNode<DeliveryReleaseProjectsQuery, DeliveryReleaseProjectsQueryVariables>;
+export const DeliveryReleaseListDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"DeliveryReleaseList"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryReleaseListInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deliveryReleaseList"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"scope"}},{"kind":"Field","name":{"kind":"Name","value":"observedAt"}},{"kind":"Field","name":{"kind":"Name","value":"isManager"}},{"kind":"Field","name":{"kind":"Name","value":"project"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"ReleaseProject"}}]}},{"kind":"Field","name":{"kind":"Name","value":"items"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"ReleaseSummary"}}]}},{"kind":"Field","name":{"kind":"Name","value":"totalCount"}},{"kind":"Field","name":{"kind":"Name","value":"nextId"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ReleaseProject"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryReleaseProject"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"companyId"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ReleaseSummary"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryReleaseSummary"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"companyId"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"ownerName"}},{"kind":"Field","name":{"kind":"Name","value":"ownerId"}},{"kind":"Field","name":{"kind":"Name","value":"createdBy"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"currentVersion"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"targetDate"}}]}}]} as unknown as DocumentNode<DeliveryReleaseListQuery, DeliveryReleaseListQueryVariables>;
+export const DeliveryReleaseChoicesDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"DeliveryReleaseChoices"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryReleaseChoicesInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deliveryReleaseChoices"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"scope"}},{"kind":"Field","name":{"kind":"Name","value":"observedAt"}},{"kind":"Field","name":{"kind":"Name","value":"isManager"}},{"kind":"Field","name":{"kind":"Name","value":"project"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"ReleaseProject"}}]}},{"kind":"Field","name":{"kind":"Name","value":"owners"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"tasks"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"ReleaseTask"}}]}},{"kind":"Field","name":{"kind":"Name","value":"selectedTasks"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"ReleaseTask"}}]}},{"kind":"Field","name":{"kind":"Name","value":"totalCount"}},{"kind":"Field","name":{"kind":"Name","value":"nextTaskId"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ReleaseProject"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryReleaseProject"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"companyId"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ReleaseTask"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryReleaseTask"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"assigneeId"}},{"kind":"Field","name":{"kind":"Name","value":"state"}},{"kind":"Field","name":{"kind":"Name","value":"submissionVersion"}},{"kind":"Field","name":{"kind":"Name","value":"submittedBy"}},{"kind":"Field","name":{"kind":"Name","value":"reviewedBy"}},{"kind":"Field","name":{"kind":"Name","value":"reviewedAt"}},{"kind":"Field","name":{"kind":"Name","value":"approved"}},{"kind":"Field","name":{"kind":"Name","value":"sourceHash"}}]}}]} as unknown as DocumentNode<DeliveryReleaseChoicesQuery, DeliveryReleaseChoicesQueryVariables>;
+export const DeliveryReleaseDetailDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"DeliveryReleaseDetail"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryReleaseSelectionInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deliveryReleaseDetail"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"scope"}},{"kind":"Field","name":{"kind":"Name","value":"observedAt"}},{"kind":"Field","name":{"kind":"Name","value":"isManager"}},{"kind":"Field","name":{"kind":"Name","value":"release"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"ReleaseSummary"}}]}},{"kind":"Field","name":{"kind":"Name","value":"project"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"ReleaseProject"}}]}},{"kind":"Field","name":{"kind":"Name","value":"selectedVersion"}},{"kind":"Field","name":{"kind":"Name","value":"body"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"ownerId"}},{"kind":"Field","name":{"kind":"Name","value":"targetDate"}},{"kind":"Field","name":{"kind":"Name","value":"repositoryUrl"}},{"kind":"Field","name":{"kind":"Name","value":"commitSha"}},{"kind":"Field","name":{"kind":"Name","value":"summary"}},{"kind":"Field","name":{"kind":"Name","value":"acceptanceCriteria"}},{"kind":"Field","name":{"kind":"Name","value":"rollbackPlan"}},{"kind":"Field","name":{"kind":"Name","value":"sourceFingerprint"}},{"kind":"Field","name":{"kind":"Name","value":"work"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"issueUrl"}},{"kind":"Field","name":{"kind":"Name","value":"pullRequestUrl"}},{"kind":"Field","name":{"kind":"Name","value":"blockedByTaskIds"}}]}},{"kind":"Field","name":{"kind":"Name","value":"checks"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"evidenceUrl"}},{"kind":"Field","name":{"kind":"Name","value":"note"}}]}},{"kind":"Field","name":{"kind":"Name","value":"tasks"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"ReleaseTask"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"history"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"ReleaseReceipt"}}]}},{"kind":"Field","name":{"kind":"Name","value":"nextEventId"}},{"kind":"Field","name":{"kind":"Name","value":"currentSourceFingerprint"}},{"kind":"Field","name":{"kind":"Name","value":"sourceChanged"}},{"kind":"Field","name":{"kind":"Name","value":"canEdit"}},{"kind":"Field","name":{"kind":"Name","value":"canSubmit"}},{"kind":"Field","name":{"kind":"Name","value":"canReview"}},{"kind":"Field","name":{"kind":"Name","value":"canRecordDeployment"}},{"kind":"Field","name":{"kind":"Name","value":"canRecordHandover"}},{"kind":"Field","name":{"kind":"Name","value":"canRecordAcceptance"}},{"kind":"Field","name":{"kind":"Name","value":"reviewBlockedReason"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ReleaseSummary"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryReleaseSummary"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"companyId"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"ownerName"}},{"kind":"Field","name":{"kind":"Name","value":"ownerId"}},{"kind":"Field","name":{"kind":"Name","value":"createdBy"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"currentVersion"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"targetDate"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ReleaseProject"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryReleaseProject"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"companyId"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ReleaseTask"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryReleaseTask"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"assigneeId"}},{"kind":"Field","name":{"kind":"Name","value":"state"}},{"kind":"Field","name":{"kind":"Name","value":"submissionVersion"}},{"kind":"Field","name":{"kind":"Name","value":"submittedBy"}},{"kind":"Field","name":{"kind":"Name","value":"reviewedBy"}},{"kind":"Field","name":{"kind":"Name","value":"reviewedAt"}},{"kind":"Field","name":{"kind":"Name","value":"approved"}},{"kind":"Field","name":{"kind":"Name","value":"sourceHash"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ReleaseReceipt"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryReleaseReceipt"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"actorId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"requestId"}},{"kind":"Field","name":{"kind":"Name","value":"releaseId"}},{"kind":"Field","name":{"kind":"Name","value":"inputHash"}},{"kind":"Field","name":{"kind":"Name","value":"action"}},{"kind":"Field","name":{"kind":"Name","value":"note"}},{"kind":"Field","name":{"kind":"Name","value":"evidenceUrl"}},{"kind":"Field","name":{"kind":"Name","value":"environment"}},{"kind":"Field","name":{"kind":"Name","value":"commitSha"}},{"kind":"Field","name":{"kind":"Name","value":"actorName"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"version"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}}]} as unknown as DocumentNode<DeliveryReleaseDetailQuery, DeliveryReleaseDetailQueryVariables>;
+export const DeliveryReleaseReceiptDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"DeliveryReleaseReceipt"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryReleaseReceiptInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deliveryReleaseReceipt"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"scope"}},{"kind":"Field","name":{"kind":"Name","value":"observedAt"}},{"kind":"Field","name":{"kind":"Name","value":"isManager"}},{"kind":"Field","name":{"kind":"Name","value":"receipt"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"ReleaseReceipt"}}]}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ReleaseReceipt"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryReleaseReceipt"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"actorId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"requestId"}},{"kind":"Field","name":{"kind":"Name","value":"releaseId"}},{"kind":"Field","name":{"kind":"Name","value":"inputHash"}},{"kind":"Field","name":{"kind":"Name","value":"action"}},{"kind":"Field","name":{"kind":"Name","value":"note"}},{"kind":"Field","name":{"kind":"Name","value":"evidenceUrl"}},{"kind":"Field","name":{"kind":"Name","value":"environment"}},{"kind":"Field","name":{"kind":"Name","value":"commitSha"}},{"kind":"Field","name":{"kind":"Name","value":"actorName"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"version"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}}]} as unknown as DocumentNode<DeliveryReleaseReceiptQuery, DeliveryReleaseReceiptQueryVariables>;
+export const SaveDeliveryReleaseDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SaveDeliveryRelease"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryReleaseSaveInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"saveDeliveryRelease"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"ReleaseReceipt"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ReleaseReceipt"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryReleaseReceipt"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"actorId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"requestId"}},{"kind":"Field","name":{"kind":"Name","value":"releaseId"}},{"kind":"Field","name":{"kind":"Name","value":"inputHash"}},{"kind":"Field","name":{"kind":"Name","value":"action"}},{"kind":"Field","name":{"kind":"Name","value":"note"}},{"kind":"Field","name":{"kind":"Name","value":"evidenceUrl"}},{"kind":"Field","name":{"kind":"Name","value":"environment"}},{"kind":"Field","name":{"kind":"Name","value":"commitSha"}},{"kind":"Field","name":{"kind":"Name","value":"actorName"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"version"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}}]} as unknown as DocumentNode<SaveDeliveryReleaseMutation, SaveDeliveryReleaseMutationVariables>;
+export const PreviewDeliveryReleaseDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"PreviewDeliveryRelease"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryReleaseSaveInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"previewDeliveryRelease"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"scope"}},{"kind":"Field","name":{"kind":"Name","value":"observedAt"}},{"kind":"Field","name":{"kind":"Name","value":"isManager"}},{"kind":"Field","name":{"kind":"Name","value":"releaseId"}},{"kind":"Field","name":{"kind":"Name","value":"requestId"}},{"kind":"Field","name":{"kind":"Name","value":"inputHash"}},{"kind":"Field","name":{"kind":"Name","value":"ownerName"}},{"kind":"Field","name":{"kind":"Name","value":"reviewBlockedReason"}},{"kind":"Field","name":{"kind":"Name","value":"body"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"ownerId"}},{"kind":"Field","name":{"kind":"Name","value":"targetDate"}},{"kind":"Field","name":{"kind":"Name","value":"repositoryUrl"}},{"kind":"Field","name":{"kind":"Name","value":"commitSha"}},{"kind":"Field","name":{"kind":"Name","value":"summary"}},{"kind":"Field","name":{"kind":"Name","value":"acceptanceCriteria"}},{"kind":"Field","name":{"kind":"Name","value":"rollbackPlan"}},{"kind":"Field","name":{"kind":"Name","value":"sourceFingerprint"}},{"kind":"Field","name":{"kind":"Name","value":"work"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"issueUrl"}},{"kind":"Field","name":{"kind":"Name","value":"pullRequestUrl"}},{"kind":"Field","name":{"kind":"Name","value":"blockedByTaskIds"}}]}},{"kind":"Field","name":{"kind":"Name","value":"checks"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"evidenceUrl"}},{"kind":"Field","name":{"kind":"Name","value":"note"}}]}},{"kind":"Field","name":{"kind":"Name","value":"tasks"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"ReleaseTask"}}]}}]}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ReleaseTask"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryReleaseTask"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"assigneeId"}},{"kind":"Field","name":{"kind":"Name","value":"state"}},{"kind":"Field","name":{"kind":"Name","value":"submissionVersion"}},{"kind":"Field","name":{"kind":"Name","value":"submittedBy"}},{"kind":"Field","name":{"kind":"Name","value":"reviewedBy"}},{"kind":"Field","name":{"kind":"Name","value":"reviewedAt"}},{"kind":"Field","name":{"kind":"Name","value":"approved"}},{"kind":"Field","name":{"kind":"Name","value":"sourceHash"}}]}}]} as unknown as DocumentNode<PreviewDeliveryReleaseQuery, PreviewDeliveryReleaseQueryVariables>;
+export const DecideDeliveryReleaseDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DecideDeliveryRelease"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryReleaseDecisionInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"decideDeliveryRelease"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"ReleaseReceipt"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ReleaseReceipt"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryReleaseReceipt"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"actorId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"requestId"}},{"kind":"Field","name":{"kind":"Name","value":"releaseId"}},{"kind":"Field","name":{"kind":"Name","value":"inputHash"}},{"kind":"Field","name":{"kind":"Name","value":"action"}},{"kind":"Field","name":{"kind":"Name","value":"note"}},{"kind":"Field","name":{"kind":"Name","value":"evidenceUrl"}},{"kind":"Field","name":{"kind":"Name","value":"environment"}},{"kind":"Field","name":{"kind":"Name","value":"commitSha"}},{"kind":"Field","name":{"kind":"Name","value":"actorName"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"version"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}}]} as unknown as DocumentNode<DecideDeliveryReleaseMutation, DecideDeliveryReleaseMutationVariables>;
 export const DeliveryFinanceAiCostsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"DeliveryFinanceAiCosts"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinanceAiCostsInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deliveryFinanceAiCosts"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"canManage"}},{"kind":"Field","name":{"kind":"Name","value":"canReadBudget"}},{"kind":"Field","name":{"kind":"Name","value":"filter"}},{"kind":"Field","name":{"kind":"Name","value":"nextSpendId"}},{"kind":"Field","name":{"kind":"Name","value":"projects"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"sources"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"FinanceAiCostSourceFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"selectedSource"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"FinanceAiCostSourceFields"}}]}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"FinanceAiCostEntryReferenceFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinanceAiCostEntryReference"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"month"}},{"kind":"Field","name":{"kind":"Name","value":"amountMicros"}},{"kind":"Field","name":{"kind":"Name","value":"matchedMicros"}},{"kind":"Field","name":{"kind":"Name","value":"activeMatchCount"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"FinanceAiCostSourceFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinanceAiCostSource"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"state"}},{"kind":"Field","name":{"kind":"Name","value":"sourceKind"}},{"kind":"Field","name":{"kind":"Name","value":"modelId"}},{"kind":"Field","name":{"kind":"Name","value":"currency"}},{"kind":"Field","name":{"kind":"Name","value":"settledAmountMicros"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"dispatchedAt"}},{"kind":"Field","name":{"kind":"Name","value":"settledAt"}},{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"projectName"}},{"kind":"Field","name":{"kind":"Name","value":"eligible"}},{"kind":"Field","name":{"kind":"Name","value":"sourceWarnings"}},{"kind":"Field","name":{"kind":"Name","value":"sourceReviewToken"}},{"kind":"Field","name":{"kind":"Name","value":"nextEvidenceId"}},{"kind":"Field","name":{"kind":"Name","value":"claim"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"currentEntry"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"FinanceAiCostEntryReferenceFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"replacementEntry"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"FinanceAiCostEntryReferenceFields"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"evidenceOptions"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"basis"}},{"kind":"Field","name":{"kind":"Name","value":"amountMicros"}},{"kind":"Field","name":{"kind":"Name","value":"recordedAt"}}]}}]}}]} as unknown as DocumentNode<DeliveryFinanceAiCostsQuery, DeliveryFinanceAiCostsQueryVariables>;
 export const PrepareDeliveryFinanceAiCostDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"PrepareDeliveryFinanceAiCost"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinanceAiCostPrepareInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"prepareDeliveryFinanceAiCost"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"entryId"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"replayed"}}]}}]}}]} as unknown as DocumentNode<PrepareDeliveryFinanceAiCostMutation, PrepareDeliveryFinanceAiCostMutationVariables>;
 export const PostDeliveryFinanceAiCostDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"PostDeliveryFinanceAiCost"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryFinanceAiCostPostInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"postDeliveryFinanceAiCost"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"entryId"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"replayed"}}]}}]}}]} as unknown as DocumentNode<PostDeliveryFinanceAiCostMutation, PostDeliveryFinanceAiCostMutationVariables>;

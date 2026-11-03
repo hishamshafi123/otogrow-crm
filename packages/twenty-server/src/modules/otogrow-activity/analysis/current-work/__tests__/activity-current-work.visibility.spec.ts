@@ -67,6 +67,30 @@ describe('current work native read permissions', () => {
     ] = { canRead: false, canUpdate: false };
     expect(() => buildActivityCurrentWorkVisibility(context)).toThrow();
   });
+  it('checks only the fields projected by the requesting delivery workflow', () => {
+    const { context, roleId, taskObject, taskFields } = fixture();
+    context.permissionsPerRoleId[roleId][taskObject.id].restrictedFields[
+      taskFields[3].id
+    ] = { canRead: false, canUpdate: false };
+    expect(() => buildActivityCurrentWorkVisibility(context)).toThrow();
+    expect(() =>
+      buildActivityCurrentWorkVisibility(context, [
+        'id',
+        'title',
+        'assigneeId',
+      ]),
+    ).not.toThrow();
+    context.permissionsPerRoleId[roleId][taskObject.id].restrictedFields[
+      taskFields[1].id
+    ] = { canRead: false, canUpdate: false };
+    expect(() =>
+      buildActivityCurrentWorkVisibility(context, [
+        'id',
+        'title',
+        'assigneeId',
+      ]),
+    ).toThrow();
+  });
   it('does not substitute a system or missing native role for a current user', () => {
     const { context } = fixture();
     context.userWorkspaceRoleMap = {};
