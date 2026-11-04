@@ -182,6 +182,10 @@ const Route = () => {
         <DeliveryChatPage />
       ) : params.get('view') === 'health' ? (
         <DeliveryCompanyOverviewPage />
+      ) : params.get('view') === 'competitors' ? (
+        <DeliveryOperationalPage view="competitors">
+          <p>Current competitor sources</p>
+        </DeliveryOperationalPage>
       ) : params.get('view') === 'development' ? (
         <DeliveryOperationalPage view="development">
           <p>Current development releases</p>
@@ -292,7 +296,7 @@ it.each([
   },
 );
 
-it.each(['chat', 'health', 'development'] as const)(
+it.each(['chat', 'health', 'development', 'competitors'] as const)(
   'refreshes only active typed %s queries and verifies current access',
   async (view) => {
     const queries = [
@@ -307,6 +311,14 @@ it.each(['chat', 'health', 'development'] as const)(
       'DeliveryReleaseProjects',
       'DeliveryReleaseList',
       'DeliveryReleaseDetail',
+      'DeliveryCompetitorProjects',
+      'DeliveryCompetitorSources',
+      'DeliveryCompetitorSourceChoices',
+      'DeliveryCompetitorSource',
+      'PreviewDeliveryCompetitorSource',
+      'DeliveryCompetitorSourceReceipt',
+      'SaveDeliveryCompetitorSource',
+      'ChangeDeliveryCompetitorSourceState',
     ];
     const refetches = new Map(
       queries.map((name) => [name, jest.fn(async () => undefined)]),
@@ -335,16 +347,18 @@ it.each(['chat', 'health', 'development'] as const)(
       expect(refetch).toHaveBeenCalledTimes(
         view === 'chat'
           ? Number(queryName === 'DeliveryChat')
-          : view === 'development'
-            ? Number(queryName.startsWith('DeliveryRelease'))
-            : Number(
-                [
-                  'DeliveryFounderExceptions',
-                  'DeliveryReadiness',
-                  'DeliveryFounderEscalations',
-                  'PreviewDeliveryFounderEscalationRule',
-                ].includes(queryName),
-              ),
+          : view === 'competitors'
+            ? Number(queryName.includes('Competitor'))
+            : view === 'development'
+              ? Number(queryName.startsWith('DeliveryRelease'))
+              : Number(
+                  [
+                    'DeliveryFounderExceptions',
+                    'DeliveryReadiness',
+                    'DeliveryFounderEscalations',
+                    'PreviewDeliveryFounderEscalationRule',
+                  ].includes(queryName),
+                ),
       );
   },
 );
@@ -493,6 +507,21 @@ it('identifies Development releases with its own heading and next workflow', () 
   expect(
     screen.getByText(
       'Plan reviewed releases, record deployment and track client handover.',
+    ),
+  ).toBeVisible();
+  expect(
+    screen.queryByRole('heading', { name: 'Company overview' }),
+  ).not.toBeInTheDocument();
+});
+
+it('identifies competitor sources and states the collection limit', () => {
+  mount('/delivery?view=competitors');
+  expect(
+    screen.getByRole('heading', { name: 'Competitor sources', level: 1 }),
+  ).toBeVisible();
+  expect(
+    screen.getByText(
+      'Register research sources, assign owners and preserve configuration history. Collection is OFF.',
     ),
   ).toBeVisible();
   expect(

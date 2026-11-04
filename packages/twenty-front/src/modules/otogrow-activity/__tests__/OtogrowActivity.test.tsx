@@ -913,3 +913,48 @@ it('links a recorded release decision to its exact project release with familiar
     `/delivery?view=development&releaseProject=${projectId}&releaseId=${releaseId}`,
   );
 });
+
+it('links a saved competitor source to its exact project directory detail', () => {
+  const projectId = '550e8400-e29b-41d4-a716-446655440001';
+  const sourceId = '550e8400-e29b-41d4-a716-446655440002';
+  mockFeed.events = [
+    {
+      ...event,
+      action: 'COMPETITOR_SOURCE_SAVE',
+      sourceType: 'competitor-source',
+      sourceId,
+      projectId,
+      taskId: null,
+      taskName: null,
+    },
+  ];
+  setup();
+  expect(
+    screen.getByText('Competitor source saved', { selector: 'strong' }),
+  ).toBeVisible();
+  expect(
+    screen.getByRole('link', { name: 'Open competitor source' }),
+  ).toHaveAttribute(
+    'href',
+    `/delivery?view=competitors&competitorProject=${projectId}&competitorSource=${sourceId}`,
+  );
+});
+it('keeps earlier manual competitor activity linked to its original finding', () => {
+  mockFeed.events = [
+    {
+      ...event,
+      action: 'COMPETITOR_CREATED',
+      sourceType: 'competitor',
+      sourceId: '550e8400-e29b-41d4-a716-446655440003',
+      taskId: null,
+      taskName: null,
+    },
+  ];
+  setup();
+  expect(
+    screen.getByRole('link', { name: 'Open competitor research' }),
+  ).toHaveAttribute(
+    'href',
+    '/delivery?view=competitors&competitorView=legacy&businessRecord=550e8400-e29b-41d4-a716-446655440003',
+  );
+});

@@ -89,6 +89,10 @@ export const ActivityEvent = ({
     taskParams.set('panel', 'operations');
   else taskParams.delete('panel');
   const businessSources: Record<string, { to: string; name: string }> = {
+    'competitor-source': {
+      to: `/delivery?view=competitors&competitorProject=${encodeURIComponent(event.projectId ?? '')}&competitorSource=${encodeURIComponent(event.sourceId)}`,
+      name: t`Open competitor source`,
+    },
     'development-release': {
       to: `/delivery?view=development&releaseProject=${event.projectId ?? ''}&releaseId=${event.sourceId}`,
       name: t`Open release`,
@@ -166,7 +170,7 @@ export const ActivityEvent = ({
     },
     content: { to: '/delivery?view=content', name: t`Open content` },
     competitor: {
-      to: '/delivery?view=competitors',
+      to: `/delivery?view=competitors&competitorView=legacy&businessRecord=${encodeURIComponent(event.sourceId)}`,
       name: t`Open competitor research`,
     },
     release: { to: '/delivery?view=development', name: t`Open development` },

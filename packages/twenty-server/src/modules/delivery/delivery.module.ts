@@ -162,6 +162,7 @@ import { DeliveryAssistantsResolver } from 'src/modules/delivery/agents/reads/de
 import { DeliveryAgentEntity } from 'src/modules/delivery/entities/delivery-agent.entity';
 import { DeliveryAgentRunEntity } from 'src/modules/delivery/entities/delivery-agent-run.entity';
 import { DeliveryReleaseModule } from 'src/modules/delivery/development/delivery-release.module';
+import { DeliveryCompetitorModule } from 'src/modules/delivery/competitors/delivery-competitor.module';
 import { DeliverySeoResultsModule } from 'src/modules/delivery/seo-results/seo-results.module';
 import { DeliveryCreativeReadsService } from 'src/modules/delivery/creative/reads/delivery-creative-reads.service';
 import { DeliveryCreativeReadsResolver } from 'src/modules/delivery/creative/reads/delivery-creative-reads.resolver';
@@ -171,6 +172,7 @@ import { DeliveryCreativeReadsResolver } from 'src/modules/delivery/creative/rea
     MessagingSendManagerModule,
     DeliverySeoResultsModule,
     DeliveryReleaseModule,
+    DeliveryCompetitorModule,
     OtogrowAiBudgetModule,
     OtogrowAccessModule,
     OtogrowActivityModule,

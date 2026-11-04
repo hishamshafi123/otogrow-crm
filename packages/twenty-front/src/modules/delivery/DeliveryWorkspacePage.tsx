@@ -1,3 +1,4 @@
+import { DeliveryCompetitorSourcesPage } from '@/delivery/competitors/DeliveryCompetitorSourcesPage';
 import { DeliveryCreativeLearningPage } from '@/delivery/creative/learning/DeliveryCreativeLearningPage';
 import { DeliveryInboxPage } from '@/delivery/inbox/workspace/DeliveryInboxPage';
 import { DeliveryAdvertisingPage } from '@/delivery/advertising/workbench/DeliveryAdvertisingPage';
@@ -146,6 +147,11 @@ export const DeliveryWorkspacePage = () => {
         !params.has('businessRecord') &&
         !params.has('task') ? (
         <DeliveryDevelopmentPage />
+      ) : view === 'competitors' &&
+        params.get('competitorView') !== 'legacy' &&
+        !params.has('businessRecord') &&
+        !params.has('task') ? (
+        <DeliveryCompetitorSourcesPage />
       ) : view === 'seo' ? (
         <DeliverySeoResultsPage />
       ) : view === 'knowledge' ? (

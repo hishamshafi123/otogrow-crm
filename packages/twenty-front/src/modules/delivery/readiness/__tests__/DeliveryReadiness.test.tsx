@@ -263,3 +263,16 @@ it('does not fabricate a label, explanation or navigation for an unknown contrac
   ).toBeVisible();
   expect(screen.queryByRole('link')).not.toBeInTheDocument();
 });
+
+it('describes the source registry with collection off and links to its directory', () => {
+  setup();
+  expect(
+    screen.getByText(/Register project sources with an owner/),
+  ).toBeVisible();
+  expect(
+    screen.getByText(/Collection stays OFF; scheduled collection/),
+  ).toBeVisible();
+  expect(
+    screen.getByRole('link', { name: 'Open Competitor sources' }),
+  ).toHaveAttribute('href', '/delivery?view=competitors');
+});

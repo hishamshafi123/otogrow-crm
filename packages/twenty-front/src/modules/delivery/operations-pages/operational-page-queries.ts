@@ -1,4 +1,14 @@
 export const OPERATIONAL_PAGE_QUERIES = {
+  competitors: [
+    'DeliveryCompetitorProjects',
+    'DeliveryCompetitorSources',
+    'DeliveryCompetitorSourceChoices',
+    'DeliveryCompetitorSource',
+    'PreviewDeliveryCompetitorSource',
+    'DeliveryCompetitorSourceReceipt',
+    'SaveDeliveryCompetitorSource',
+    'ChangeDeliveryCompetitorSourceState',
+  ],
   development: [
     'DeliveryReleaseProjects',
     'DeliveryReleaseList',
