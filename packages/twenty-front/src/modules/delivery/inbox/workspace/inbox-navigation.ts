@@ -11,6 +11,12 @@ export const INBOX_CLOSE_CONVERSATION = {
   inboxMessagesAfter: null,
   inboxRepliesAfter: null,
 };
+export const closeInboxReply = (params: URLSearchParams) => ({
+  ...(['send', 'cancel'].includes(params.get('inboxMode') ?? '')
+    ? INBOX_CLOSE_COMMAND
+    : {}),
+  inboxReply: null,
+});
 export const inboxDestination = (
   params: URLSearchParams,
   changes: Record<string, string | null>,

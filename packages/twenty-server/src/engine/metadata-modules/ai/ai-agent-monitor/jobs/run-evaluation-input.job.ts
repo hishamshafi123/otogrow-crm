@@ -19,6 +19,7 @@ export type RunEvaluationInputJobData = {
   agentId: string;
   input: string;
   workspaceId: string;
+  userWorkspaceId?: string;
 };
 
 @Processor(MessageQueue.aiQueue)
@@ -59,7 +60,7 @@ export class RunEvaluationInputJob {
       messages: [{ role: 'user', content: data.input }],
       baseSystemPrompt: AGENT_RUN_BASE_SYSTEM_PROMPT,
       workspaceId: data.workspaceId,
-      userWorkspaceId: null,
+      userWorkspaceId: data.userWorkspaceId,
     });
 
     await this.agentChatService.addMessage({

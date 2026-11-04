@@ -16,7 +16,10 @@ import {
   GET_INBOX_REPLY_STATE,
   RECONCILE_INBOX_REPLY,
 } from '@/delivery/inbox/workspace/delivery-inbox.graphql';
-import { inboxDestination } from '@/delivery/inbox/workspace/inbox-navigation';
+import {
+  closeInboxReply,
+  inboxDestination,
+} from '@/delivery/inbox/workspace/inbox-navigation';
 import { useInboxLabels } from '@/delivery/inbox/workspace/useInboxLabels';
 import { InboxAttempt } from '@/delivery/inbox/workspace/InboxAttempt';
 import {
@@ -154,7 +157,7 @@ export const InboxReplyView = ({
           <h3>
             <Trans>Saved reply and delivery outcome</Trans>
           </h3>
-          <Link to={inboxDestination(params, { inboxReply: null })}>
+          <Link to={inboxDestination(params, closeInboxReply(params))}>
             <Trans>Close recorded reply</Trans>
           </Link>
         </StyledDeliveryRow>
@@ -212,6 +215,15 @@ export const InboxReplyView = ({
                     </div>
                   </StyledInboxFacts>
                   <StyledInboxMessage>{value.body.text}</StyledInboxMessage>
+                  {value.status === 'DRAFT' && !value.canSend && (
+                    <p role="status">
+                      <Trans>
+                        Sending is unavailable with the current account or
+                        conversation permissions. Ask the Gmail owner to review
+                        sharing and email account access.
+                      </Trans>
+                    </p>
+                  )}
                   <StyledDeliveryRow>
                     {value.canSend && (
                       <StyledDeliveryButton
@@ -279,7 +291,8 @@ export const InboxReplyView = ({
                           current() &&
                           result &&
                           state.matches(result) &&
-                          result.id === id
+                          result.id === id &&
+                          result.conversationId === conversationId
                         ) {
                           setMessage(
                             result.status === 'SENT'
@@ -287,6 +300,10 @@ export const InboxReplyView = ({
                               : t`No confirming synchronized evidence is available. Delivery remains uncertain; do not resend.`,
                           );
                           await refresh();
+                        } else if (current()) {
+                          setMessage(
+                            t`The returned evidence does not match this saved reply. Its sending outcome remains unconfirmed; do not resend.`,
+                          );
                         }
                       } catch (caught) {
                         if (current()) {

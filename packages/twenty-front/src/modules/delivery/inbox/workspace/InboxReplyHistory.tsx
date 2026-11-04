@@ -72,13 +72,6 @@ export const InboxReplyHistory = ({
               </div>
             ))}
             <StyledDeliveryRow>
-              {input.after && (
-                <Link
-                  to={inboxDestination(params, { inboxRepliesAfter: null })}
-                >
-                  <Trans>First reply history page</Trans>
-                </Link>
-              )}
               {reading.data.nextCursor && (
                 <Link
                   to={inboxDestination(params, {
@@ -96,6 +89,11 @@ export const InboxReplyHistory = ({
               ? t`Reply history could not be checked.`
               : t`Loading recorded replies…`}
           </p>
+        )}
+        {input.after && (
+          <Link to={inboxDestination(params, { inboxRepliesAfter: null })}>
+            <Trans>First reply history page</Trans>
+          </Link>
         )}
         <StyledDeliveryButton
           type="button"

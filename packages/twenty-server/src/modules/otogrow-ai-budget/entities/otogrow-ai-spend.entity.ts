@@ -19,6 +19,9 @@ import {
 @Index(['workspaceId', 'createdAt', 'id'])
 @Index(['workspaceId', 'clientId'])
 @Index(['workspaceId', 'taskId'])
+@Index('IDX_otogrow_native_ai_recovery', ['state', 'createdAt', 'id'], {
+  where: "\"sourceKind\" = 'NATIVE_CRM' AND state IN ('RESERVED','DISPATCHED')",
+})
 export class OtogrowAiSpendEntity extends WorkspaceRelatedEntity {
   @PrimaryGeneratedColumn('uuid') id: string;
   @Column({ type: 'integer', default: 1 }) revision: number;

@@ -20,6 +20,7 @@ import {
   retainsInboxReader,
 } from '@/delivery/inbox/workspace/inbox-navigation';
 import { StyledInboxBoundary } from '@/delivery/inbox/workspace/inboxWorkspaceStyles';
+import { useAssistantPanelFocus } from '@/delivery/assistants/useAssistantPanelFocus';
 import {
   StyledDeliveryButton,
   StyledDeliveryStack,
@@ -102,7 +103,15 @@ export const InboxAttempt = ({
     setRetry(false);
     setMessage(
       bodyMatched
-        ? t`The saved request matches your submitted preparation. Check the recorded reply status; a send request alone does not confirm delivery.`
+        ? kind === 'CONSENT'
+          ? t`Your Gmail thread sharing permissions were saved. Only this selected thread is shared.`
+          : kind === 'REVOKE'
+            ? t`Gmail thread access was withdrawn. This does not disconnect the mailbox or recall email.`
+            : kind === 'PREPARE'
+              ? t`Your reply preparation request was saved. Open the recorded reply to check its status; no email was sent.`
+              : kind === 'CANCEL'
+                ? t`Your unsent reply was cancelled before email dispatch.`
+                : t`Your reviewed send request was saved. Check the recorded reply status; a send request alone does not confirm delivery.`
         : t`An earlier request was found. Open its recorded result to inspect what happened. Unsaved preparation was not restored.`,
     );
     onSaved(value);
@@ -144,7 +153,7 @@ export const InboxAttempt = ({
   };
   return (
     <StyledDeliveryStack data-inbox-request={requestId} data-inbox-command={id}>
-      {(message || commands.error) && (
+      {!recorded && (message || commands.error) && (
         <p role={commands.error ? 'alert' : 'status'}>
           {message || commands.error}
         </p>
@@ -178,16 +187,19 @@ export const InboxAttempt = ({
         </StyledDeliveryRow>
       )}
       {recorded?.receipt && (
-        <Link
-          to={inboxDestination(params, {
-            ...INBOX_CLOSE_COMMAND,
-            inboxReply: recorded.receipt.replyId ?? null,
-          })}
-        >
-          {recorded.receipt.replyId
-            ? t`Open recorded reply`
-            : t`Open connected conversation`}
-        </Link>
+        <InboxSavedResult>
+          <p role="status">{message}</p>
+          <Link
+            to={inboxDestination(params, {
+              ...INBOX_CLOSE_COMMAND,
+              inboxReply: recorded.receipt.replyId ?? null,
+            })}
+          >
+            {recorded.receipt.replyId
+              ? t`Open recorded reply`
+              : t`Open connected conversation`}
+          </Link>
+        </InboxSavedResult>
       )}
       {owned && !recorded && (
         <StyledInboxBoundary
@@ -199,5 +211,15 @@ export const InboxAttempt = ({
         </StyledInboxBoundary>
       )}
     </StyledDeliveryStack>
+  );
+};
+
+const InboxSavedResult = ({ children }: { children: ReactNode }) => {
+  const { t } = useLingui();
+  const focus = useAssistantPanelFocus();
+  return (
+    <section ref={focus} tabIndex={-1} aria-label={t`Saved inbox request`}>
+      {children}
+    </section>
   );
 };

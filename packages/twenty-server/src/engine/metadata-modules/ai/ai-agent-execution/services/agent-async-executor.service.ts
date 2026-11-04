@@ -1,4 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { OtogrowNativeAiService } from 'src/modules/otogrow-ai-budget/otogrow-native-ai.service';
+import { isBoundedNativeAiTool } from 'src/modules/otogrow-ai-budget/otogrow-native-ai.policy';
 import { InjectRepository } from '@nestjs/typeorm';
 
 import {
@@ -110,6 +112,7 @@ export class AgentAsyncExecutorService {
     private readonly roleTargetRepository: WorkspaceScopedRepository<RoleTargetEntity>,
     @InjectRepository(WorkspaceEntity)
     private readonly workspaceRepository: Repository<WorkspaceEntity>,
+    private readonly nativeAi: OtogrowNativeAiService,
   ) {}
 
   private async getAgentRoleId(
@@ -175,6 +178,7 @@ export class AgentAsyncExecutorService {
       categories: WORKFLOW_AGENT_REGISTRY_TOOL_CATEGORIES,
       excludeTools: [...OUTPUT_NAVIGATION_TOOL_NAMES],
       wrapWithErrorContext: false,
+      isToolAllowed: isBoundedNativeAiTool,
     });
   }
 
@@ -211,11 +215,13 @@ export class AgentAsyncExecutorService {
       userWorkspaceId,
     };
 
-    const fullCatalog = await this.toolRegistry.buildToolIndex(
-      agent.workspaceId,
-      agentRoleId,
-      { userId, userWorkspaceId, rolePermissionConfig },
-    );
+    const fullCatalog = (
+      await this.toolRegistry.buildToolIndex(agent.workspaceId, agentRoleId, {
+        userId,
+        userWorkspaceId,
+        rolePermissionConfig,
+      })
+    ).filter(isBoundedNativeAiTool);
 
     const allowedCategories = new Set(WORKFLOW_AGENT_REGISTRY_TOOL_CATEGORIES);
     const excludedToolNames = new Set<string>(OUTPUT_NAVIGATION_TOOL_NAMES);
@@ -302,6 +308,16 @@ export class AgentAsyncExecutorService {
 
       const registeredModel =
         await this.aiModelRegistryService.resolveModelForAgent(agent);
+      const budgetedModel = this.nativeAi.wrap(registeredModel.model, {
+        workspaceId,
+        userWorkspaceId:
+          userWorkspaceId ??
+          this.resolveUserIdentity(authContext).userWorkspaceId,
+        modelId: registeredModel.modelId,
+        modelConfig: this.aiModelRegistryService.getEffectiveModelConfig(
+          registeredModel.modelId,
+        ),
+      });
 
       let tools: ToolSet = {};
       let toolCatalogSection = '';
@@ -377,7 +393,7 @@ export class AgentAsyncExecutorService {
       const textResponse = await generateText({
         system: `${baseSystemPrompt}\n\n${agent ? tipTapDocumentToMarkdown(agent.prompt) : ''}${toolCatalogSection}`,
         tools,
-        model: registeredModel.model,
+        model: budgetedModel,
         messages: messages.map(
           (message): ModelMessage => ({
             role: message.role,
@@ -467,7 +483,7 @@ export class AgentAsyncExecutorService {
             tools: toolsForRepair,
             inputSchema,
             error,
-            model: registeredModel.model,
+            model: budgetedModel,
           });
         },
       });
@@ -491,7 +507,7 @@ export class AgentAsyncExecutorService {
       if (agentSchema) {
         const structuredResult = await generateText({
           system: STRUCTURED_OUTPUT_SYSTEM_PROMPT,
-          model: registeredModel.model,
+          model: budgetedModel,
           prompt: `Based on the following execution results, generate the structured output according to the schema:
 
                  Execution Results: ${textResponse.text}

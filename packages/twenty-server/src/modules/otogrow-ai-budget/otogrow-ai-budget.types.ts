@@ -16,7 +16,8 @@ export type OtogrowAiSpendSource =
   | 'INBOX_DRAFT'
   | 'MEDIA'
   | 'ADVERTISING_DRAFT'
-  | 'ACTIVITY_ANALYSIS';
+  | 'ACTIVITY_ANALYSIS'
+  | 'NATIVE_CRM';
 
 export type OtogrowAiPricing = {
   inputUsdPerMillionTokens: string;

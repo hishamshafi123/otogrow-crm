@@ -196,7 +196,7 @@ const uncertainSpend = () => {
 it('shows unconfigured boundaries and never supplies funding or assumed historical spend', async () => {
   const { user } = setup();
   expect(screen.getByText('Workspace limit needed')).toBeVisible();
-  expect(screen.getByText(/Native CRM chat, search/)).toBeVisible();
+  expect(screen.getByText(/Native CRM text requests/)).toBeVisible();
   expect(mockQuery.mock.calls.at(-1)?.[1].fetchPolicy).toBe('no-cache');
   await user.click(screen.getByRole('button', { name: 'Add limit' }));
   expect(screen.getByLabelText('Total limit (USD)')).toHaveValue('');
@@ -204,6 +204,22 @@ it('shows unconfigured boundaries and never supplies funding or assumed historic
   expect(
     screen.getByLabelText('Allow paid requests within this limit'),
   ).not.toBeChecked();
+  expect(mockMutate).not.toHaveBeenCalled();
+});
+
+it('identifies a native CRM request and retains its unresolved charge', async () => {
+  uncertainSpend();
+  mockSnapshot.recentSpend[0].sourceKind = 'NATIVE_CRM';
+  mockSnapshot.recentSpend[0].clientName = null;
+  mockSnapshot.recentSpend[0].taskName = null;
+  const { user } = setup();
+  await user.click(screen.getByRole('button', { name: 'Usage & charges' }));
+  await user.click(screen.getByText('Request and pricing evidence'));
+  expect(screen.getByText(/Native CRM AI/)).toBeVisible();
+  expect(screen.getByText(/Confirmed charge unavailable/)).toHaveTextContent(
+    'Held USD 0.4',
+  );
+  expect(screen.getByRole('button', { name: 'Resolve charge' })).toBeVisible();
   expect(mockMutate).not.toHaveBeenCalled();
 });
 

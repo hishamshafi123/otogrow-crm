@@ -254,6 +254,7 @@ it('recovers the saved send request without dispatching it again or claiming del
   ).toBeVisible();
   expect(mockSend).toHaveBeenCalledTimes(1);
   expect(mockSaved).toHaveBeenCalledWith(saved);
+  expect(screen.getByLabelText('Saved inbox request')).toHaveFocus();
   expect(mockRefetchQueries).toHaveBeenCalledWith({
     include: ['DeliveryInboxConversations', 'DeliveryInboxReplies'],
   });

@@ -24,6 +24,7 @@ import { AiModelRegistryService } from 'src/engine/metadata-modules/ai/ai-models
 import { buildAiTelemetry } from 'src/engine/metadata-modules/ai/ai-models/utils/build-ai-telemetry.util';
 import { withDedicatedAiTrace } from 'src/engine/metadata-modules/ai/ai-models/utils/with-dedicated-ai-trace.util';
 import { PermissionsRestApiExceptionFilter } from 'src/engine/metadata-modules/permissions/utils/permissions-rest-api-exception.filter';
+import { OtogrowNativeAiService } from 'src/modules/otogrow-ai-budget/otogrow-native-ai.service';
 
 @Controller(`${ApiPath.Rest}/ai`)
 @UseGuards(JwtAuthGuard, WorkspaceAuthGuard)
@@ -37,6 +38,7 @@ export class AiGenerateTextController {
     private readonly aiModelRegistryService: AiModelRegistryService,
     private readonly aiBillingService: AiBillingService,
     private readonly billingUsageService: BillingUsageService,
+    private readonly nativeAi: OtogrowNativeAiService,
   ) {}
 
   @Post('generate-text')
@@ -72,7 +74,14 @@ export class AiGenerateTextController {
     try {
       result = await withDedicatedAiTrace(() =>
         generateText({
-          model: registeredModel.model,
+          model: this.nativeAi.wrap(registeredModel.model, {
+            workspaceId: workspace.id,
+            userWorkspaceId,
+            modelId: registeredModel.modelId,
+            modelConfig: this.aiModelRegistryService.getEffectiveModelConfig(
+              registeredModel.modelId,
+            ),
+          }),
           system: body.systemPrompt,
           prompt: body.userPrompt,
           experimental_telemetry: buildAiTelemetry({

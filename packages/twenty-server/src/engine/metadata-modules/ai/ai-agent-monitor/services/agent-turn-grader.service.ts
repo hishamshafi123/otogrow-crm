@@ -1,7 +1,14 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  ForbiddenException,
+  HttpException,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 
 import { msg } from '@lingui/core/macro';
 import { generateText } from 'ai';
+import { isValidUuid } from 'twenty-shared/utils';
+import { z } from 'zod';
 
 import { NotFoundError } from 'src/engine/core-modules/graphql/utils/graphql-errors.util';
 import { AgentMessageEntity } from 'src/engine/metadata-modules/ai/ai-agent-execution/entities/agent-message.entity';
@@ -11,6 +18,18 @@ import { buildAiTelemetry } from 'src/engine/metadata-modules/ai/ai-models/utils
 import { AiModelRegistryService } from 'src/engine/metadata-modules/ai/ai-models/services/ai-model-registry.service';
 import { InjectWorkspaceScopedRepository } from 'src/engine/twenty-orm/workspace-scoped-repository/inject-workspace-scoped-repository.decorator';
 import { WorkspaceScopedRepository } from 'src/engine/twenty-orm/workspace-scoped-repository/workspace-scoped-repository';
+import { OtogrowNativeAiService } from 'src/modules/otogrow-ai-budget/otogrow-native-ai.service';
+import {
+  AiException,
+  AiExceptionCode,
+} from 'src/engine/metadata-modules/ai/ai.exception';
+
+const evaluationSchema = z
+  .object({
+    score: z.number().min(0).max(100),
+    comment: z.string().trim().min(1).max(500),
+  })
+  .strict();
 @Injectable()
 export class AgentTurnGraderService {
   private readonly logger = new Logger(AgentTurnGraderService.name);
@@ -21,18 +40,21 @@ export class AgentTurnGraderService {
     @InjectWorkspaceScopedRepository(AgentTurnEvaluationEntity)
     private readonly evaluationRepository: WorkspaceScopedRepository<AgentTurnEvaluationEntity>,
     private readonly aiModelRegistryService: AiModelRegistryService,
+    private readonly nativeAi: OtogrowNativeAiService,
   ) {}
 
   async evaluateTurn({
     turnId,
     workspaceId,
+    userWorkspaceId,
   }: {
     turnId: string;
     workspaceId: string;
+    userWorkspaceId?: string;
   }): Promise<AgentTurnEvaluationEntity> {
     const turn = await this.turnRepository.findOne(workspaceId, {
       where: { id: turnId },
-      relations: ['messages', 'messages.parts'],
+      relations: ['messages', 'messages.parts', 'thread'],
     });
 
     if (!turn) {
@@ -41,7 +63,10 @@ export class AgentTurnGraderService {
       });
     }
 
-    const { score, comment } = await this.evaluateWithAI(turn);
+    const { score, comment } = await this.evaluateWithAI(
+      turn,
+      userWorkspaceId ?? turn.thread?.userWorkspaceId,
+    );
 
     return this.evaluationRepository.insertAndReturnOne(workspaceId, {
       turnId,
@@ -52,14 +77,18 @@ export class AgentTurnGraderService {
 
   private async evaluateWithAI(
     turn: AgentTurnEntity & { messages: AgentMessageEntity[] },
+    userWorkspaceId: string | null | undefined,
   ): Promise<{ score: number; comment: string }> {
+    if (typeof userWorkspaceId !== 'string' || !isValidUuid(userWorkspaceId))
+      throw new ForbiddenException('An active person must own this AI review.');
     try {
       const defaultModel = this.aiModelRegistryService.getDefaultSpeedModel();
 
       if (!defaultModel) {
-        this.logger.warn('No default AI model available for evaluation');
-
-        return this.getFallbackEvaluation(turn);
+        throw new AiException(
+          'Configure an available model before requesting an AI review.',
+          AiExceptionCode.API_KEY_NOT_CONFIGURED,
+        );
       }
 
       const evaluationContext = this.buildEvaluationContext(turn);
@@ -82,7 +111,15 @@ Respond ONLY with valid JSON in this exact format:
 {"score": <number>, "comment": "<string>"}`;
 
       const result = await generateText({
-        model: defaultModel.model,
+        model: this.nativeAi.wrap(defaultModel.model, {
+          workspaceId: turn.workspaceId,
+          userWorkspaceId,
+          modelId: defaultModel.modelId,
+          modelConfig: this.aiModelRegistryService.getEffectiveModelConfig(
+            defaultModel.modelId,
+          ),
+        }),
+        maxOutputTokens: 512,
         prompt,
         temperature: 0.3,
         experimental_telemetry: buildAiTelemetry({
@@ -94,16 +131,22 @@ Respond ONLY with valid JSON in this exact format:
         }),
       });
 
-      const parsed = JSON.parse(result.text);
+      const parsed = evaluationSchema.parse(JSON.parse(result.text));
 
       return {
-        score: Math.max(0, Math.min(100, Math.round(parsed.score))),
-        comment: (parsed.comment || 'Evaluation completed').substring(0, 500),
+        score: Math.round(parsed.score),
+        comment: parsed.comment,
       };
     } catch (error) {
-      this.logger.error('Failed to evaluate turn with AI:', error);
-
-      return this.getFallbackEvaluation(turn);
+      if (error instanceof HttpException || error instanceof AiException)
+        throw error;
+      this.logger.error(
+        'AI review could not be completed; no evaluation was saved.',
+      );
+      throw new AiException(
+        'AI review could not be completed. No evaluation was saved. Check the model connection and AI spending status before trying again.',
+        AiExceptionCode.AGENT_EXECUTION_FAILED,
+      );
     }
   }
 
@@ -153,44 +196,5 @@ Respond ONLY with valid JSON in this exact format:
     }
 
     return context;
-  }
-
-  private getFallbackEvaluation(
-    turn: AgentTurnEntity & { messages: AgentMessageEntity[] },
-  ): {
-    score: number;
-    comment: string;
-  } {
-    const parts = turn.messages.flatMap((m) => m.parts || []);
-    const errorCount = parts.filter((p) => p.errorMessage).length;
-    const hasResponse = parts.some((p) => p.textContent);
-    const toolCount = parts.filter((p) => p.toolName).length;
-
-    let score = 100;
-
-    if (errorCount > 0) {
-      score -= errorCount * 30;
-    }
-
-    if (!hasResponse) {
-      score -= 50;
-    }
-
-    const comments = [];
-
-    if (errorCount > 0) {
-      comments.push(`${errorCount} error(s)`);
-    }
-    if (toolCount > 0) {
-      comments.push(`${toolCount} tool(s) used`);
-    }
-    if (!hasResponse) {
-      comments.push('No response');
-    }
-
-    return {
-      score: Math.max(0, score),
-      comment: comments.length > 0 ? comments.join('; ') : 'Completed',
-    };
   }
 }

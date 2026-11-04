@@ -1,3 +1,4 @@
+import { OtogrowAiBudgetModule } from 'src/modules/otogrow-ai-budget/otogrow-ai-budget.module';
 import { Module } from '@nestjs/common';
 
 import { TokenModule } from 'src/engine/core-modules/auth/token/token.module';
@@ -10,6 +11,7 @@ import { AiGenerateTextController } from './controllers/ai-generate-text.control
 
 @Module({
   imports: [
+    OtogrowAiBudgetModule,
     TokenModule,
     WorkspaceCacheStorageModule,
     PermissionsModule,

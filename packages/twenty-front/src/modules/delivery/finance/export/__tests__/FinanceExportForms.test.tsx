@@ -96,6 +96,80 @@ beforeEach(() => {
 });
 
 describe('accountant export forms', () => {
+  it('keeps an invalid mapping actionable after its section is collapsed', async () => {
+    setup(profileForm());
+    const user = userEvent.setup();
+    await user.click(
+      screen.getByText('Account and counterparty mappings', {
+        selector: 'summary',
+      }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Add mapping' }));
+    await user.type(
+      screen.getByLabelText('Reason for profile change'),
+      'Map accounts',
+    );
+    await user.click(
+      screen.getByText('Account and counterparty mappings', {
+        selector: 'summary',
+      }),
+    );
+    expect(
+      screen.getByLabelText('Mapping 1 accounting code'),
+    ).not.toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'Save export profile' }),
+    ).toBeDisabled();
+    const requirement = screen.getByRole('button', {
+      name: 'Review account and counterparty mappings: complete codes and matching values, and remove duplicate rules.',
+    });
+    expect(requirement).toBeVisible();
+    await user.click(requirement);
+    expect(
+      screen.getByText('Account and counterparty mappings', {
+        selector: 'summary',
+      }),
+    ).toHaveFocus();
+    expect(screen.getByLabelText('Mapping 1 accounting code')).toBeVisible();
+    await user.type(screen.getByLabelText('Mapping 1 accounting code'), '4100');
+    expect(screen.queryByText('Before saving:')).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Save export profile' }),
+    ).toBeEnabled();
+    expect(screen.getByLabelText('Reason for profile change')).toHaveValue(
+      'Map accounts',
+    );
+    expect(mockSave).not.toHaveBeenCalled();
+  });
+
+  it('keeps duplicate CSV headers actionable after closing the columns section', async () => {
+    setup(profileForm());
+    const user = userEvent.setup();
+    await user.clear(screen.getByLabelText('Column 2 header'));
+    await user.type(screen.getByLabelText('Column 2 header'), 'Reference');
+    await user.type(
+      screen.getByLabelText('Reason for profile change'),
+      'Update columns',
+    );
+    await user.click(screen.getByText('CSV columns', { selector: 'summary' }));
+    expect(screen.getByLabelText('Column 2 header')).not.toBeVisible();
+    await user.click(
+      screen.getByRole('button', {
+        name: 'Review CSV columns: choose supported fields and unique plain-text headers.',
+      }),
+    );
+    expect(
+      screen.getByText('CSV columns', { selector: 'summary' }),
+    ).toHaveFocus();
+    expect(screen.getByLabelText('Column 2 header')).toHaveValue('Reference');
+    await user.clear(screen.getByLabelText('Column 2 header'));
+    await user.type(screen.getByLabelText('Column 2 header'), 'Amount');
+    expect(
+      screen.getByRole('button', { name: 'Save export profile' }),
+    ).toBeEnabled();
+    expect(mockSave).not.toHaveBeenCalled();
+  });
+
   it('requires explicit cash dates and currency without guessing a reporting period', async () => {
     setup(selectionForm());
     expect(screen.getByLabelText('Cash date from')).toHaveValue('');

@@ -88,6 +88,7 @@ export const InboxConversations = ({
           <label>
             <Trans>Find a conversation</Trans>
             <input
+              key={input.search ?? ''}
               name="search"
               maxLength={160}
               defaultValue={input.search ?? ''}

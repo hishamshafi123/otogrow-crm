@@ -25,7 +25,6 @@ import { UsageOperationType } from 'src/engine/core-modules/usage/enums/usage-op
 
 import { type CodeExecutionStreamEmitter } from 'src/engine/core-modules/tool-provider/interfaces/code-execution-stream-emitter.type';
 
-import { CodeInterpreterService } from 'src/engine/core-modules/code-interpreter/code-interpreter.service';
 import { WorkspaceDomainsService } from 'src/engine/core-modules/domain/workspace-domains/services/workspace-domains.service';
 import { ExceptionHandlerService } from 'src/engine/core-modules/exception-handler/exception-handler.service';
 import { ToolRegistryService } from 'src/engine/core-modules/tool-provider/services/tool-registry.service';
@@ -85,7 +84,8 @@ import { buildAiTelemetry } from 'src/engine/metadata-modules/ai/ai-models/utils
 import { AiModelRegistryService } from 'src/engine/metadata-modules/ai/ai-models/services/ai-model-registry.service';
 import { NativeToolBinderService } from 'src/engine/metadata-modules/ai/ai-models/services/native-tool-binder.service';
 import { type AiModelConfig } from 'src/engine/metadata-modules/ai/ai-models/types/ai-model-config.type';
-import { getNativeModelCapabilities } from 'src/engine/metadata-modules/ai/ai-models/utils/get-native-model-capabilities.util';
+import { OtogrowNativeAiService } from 'src/modules/otogrow-ai-budget/otogrow-native-ai.service';
+import { isBoundedNativeAiTool } from 'src/modules/otogrow-ai-budget/otogrow-native-ai.policy';
 import {
   AiException,
   AiExceptionCode,
@@ -124,11 +124,11 @@ export class ChatExecutionService {
     private readonly aiBillingService: AiBillingService,
     private readonly agentActorContextService: AgentActorContextService,
     private readonly workspaceDomainsService: WorkspaceDomainsService,
-    private readonly codeInterpreterService: CodeInterpreterService,
     private readonly exceptionHandlerService: ExceptionHandlerService,
     private readonly nativeToolBinder: NativeToolBinderService,
     private readonly messagePruningService: MessagePruningService,
     private readonly metricsService: MetricsService,
+    private readonly nativeAi: OtogrowNativeAiService,
   ) {}
 
   async streamChat({
@@ -164,11 +164,15 @@ export class ChatExecutionService {
       onCodeExecutionUpdate,
     };
 
-    const toolCatalog = await this.toolRegistry.buildToolIndex(
-      workspace.id,
-      roleId,
-      { userId, userWorkspaceId, locale },
-    );
+    const toolCatalog = (
+      await this.toolRegistry.buildToolIndex(workspace.id, roleId, {
+        userId,
+        userWorkspaceId,
+        locale,
+      })
+    ).filter(isBoundedNativeAiTool);
+    const allowedToolNames = new Set(toolCatalog.map((entry) => entry.name));
+    const isToolAllowed = (name: string) => allowedToolNames.has(name);
 
     const skillCatalog = await this.skillService.findAllFlatSkills(
       workspace.id,
@@ -179,7 +183,7 @@ export class ChatExecutionService {
     );
 
     const preloadedTools = await this.toolRegistry.getToolsByName(
-      AI_CHAT_TOOL_NAMES_TO_PRELOAD,
+      AI_CHAT_TOOL_NAMES_TO_PRELOAD.filter(isToolAllowed),
       toolContext,
       { compactOutput: true, spillLargeOutput: true },
     );
@@ -200,13 +204,16 @@ export class ChatExecutionService {
       registeredModel.modelId,
     );
 
-    // Native and action search may both be bound here; the model picks at runtime.
-    const nativeCapabilities = getNativeModelCapabilities(
-      registeredModel.sdkPackage,
-    );
+    const budgetedModel = this.nativeAi.wrap(registeredModel.model, {
+      workspaceId: workspace.id,
+      userWorkspaceId,
+      modelId: registeredModel.modelId,
+      modelConfig,
+    });
+    // Provider-hosted searches have separate fees without a verified OS bound.
     const nativeTools = this.nativeToolBinder.bind(registeredModel, {
-      webSearch: nativeCapabilities?.webSearch === true,
-      twitterSearch: nativeCapabilities?.twitterSearch === true,
+      webSearch: false,
+      twitterSearch: false,
     });
 
     // Tools the model can call directly: preloaded registry tools (already
@@ -254,12 +261,12 @@ export class ChatExecutionService {
       [LEARN_TOOLS_TOOL_NAME]: createLearnToolsTool(
         this.toolRegistry,
         toolContext,
-        { spillLargeOutput: true },
+        { spillLargeOutput: true, isToolAllowed },
       ),
       [EXECUTE_TOOL_TOOL_NAME]: createExecuteToolTool(
         this.toolRegistry,
         toolContext,
-        { compactOutput: true, spillLargeOutput: true },
+        { compactOutput: true, spillLargeOutput: true, isToolAllowed },
       ),
       [LOAD_SKILL_TOOL_NAME]: createLoadSkillTool(
         (skillNames) =>
@@ -274,7 +281,7 @@ export class ChatExecutionService {
       ),
     };
 
-    const isCodeInterpreterEnabled = this.codeInterpreterService.isEnabled();
+    const isCodeInterpreterEnabled = false;
 
     let processedMessages: ExtendedUIMessage[] = replaceUnsupportedFileParts(
       messages,
@@ -333,7 +340,7 @@ export class ChatExecutionService {
 
     const systemMessage: SystemModelMessage = {
       role: 'system',
-      content: systemPrompt,
+      content: `${systemPrompt}\n\nExternal search, app functions, HTTP, sandbox and workflow-execution tools are unavailable until their separate spending bounds are supported. Do not claim to have used them. Use only the permitted local tools actually listed.`,
       providerOptions: getCacheProviderOptions(registeredModel.sdkPackage),
     };
 
@@ -472,7 +479,7 @@ export class ChatExecutionService {
     };
 
     const stream = streamText({
-      model: registeredModel.model,
+      model: budgetedModel,
       messages: [systemMessage, ...modelMessages],
       tools: activeTools,
       // Every step of the kickoff turn is forced so it cannot end in prose; stopWhen ends it at the first ask_questions.
@@ -623,7 +630,7 @@ export class ChatExecutionService {
           tools: toolsForRepair,
           inputSchema,
           error,
-          model: registeredModel.model,
+          model: budgetedModel,
           billingContext: {
             aiBillingService: this.aiBillingService,
             modelId: registeredModel.modelId,

@@ -1,3 +1,4 @@
+import { OtogrowAiBudgetModule } from 'src/modules/otogrow-ai-budget/otogrow-ai-budget.module';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
@@ -18,6 +19,7 @@ import { AgentTurnGraderService } from './services/agent-turn-grader.service';
 
 @Module({
   imports: [
+    OtogrowAiBudgetModule,
     TypeOrmModule.forFeature([
       AgentTurnEvaluationEntity,
       AgentTurnEntity,

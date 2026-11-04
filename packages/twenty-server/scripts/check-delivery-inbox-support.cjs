@@ -47,7 +47,10 @@ async function seedInboxFixture(manager, prefix = 'inbox_rollback') {
     `CREATE TABLE ${schema}."messageChannelMessageAssociation" (id uuid PRIMARY KEY,"messageId" uuid NOT NULL,"messageChannelId" uuid NOT NULL,"messageThreadExternalId" text,"messageExternalId" text,direction text,"createdAt" timestamptz DEFAULT now(),"updatedAt" timestamptz DEFAULT now(),"deletedAt" timestamptz)`,
   );
   await manager.query(
-    `CREATE TABLE ${schema}."messageParticipant" (id uuid PRIMARY KEY,"messageId" uuid NOT NULL,role text,handle text,"displayName" text,"deletedAt" timestamptz)`,
+    `CREATE TYPE ${schema}.message_participant_role_enum AS ENUM ('FROM','TO','CC','BCC','REPLY_TO')`,
+  );
+  await manager.query(
+    `CREATE TABLE ${schema}."messageParticipant" (id uuid PRIMARY KEY,"messageId" uuid NOT NULL,role ${schema}.message_participant_role_enum,handle text,"displayName" text,"deletedAt" timestamptz)`,
   );
   fixture.accounts = { owner: randomUUID(), other: randomUUID() };
   fixture.channels = { owner: randomUUID(), other: randomUUID() };
@@ -126,7 +129,7 @@ async function seedInboxFixture(manager, prefix = 'inbox_rollback') {
       [associationId, id, channelId, thread, `native-${id}`],
     );
     await manager.query(
-      `INSERT INTO ${schema}."messageParticipant"(id,"messageId",role,handle,"displayName") VALUES($1,$2,'from','client@example.invalid','Synthetic client')`,
+      `INSERT INTO ${schema}."messageParticipant"(id,"messageId",role,handle,"displayName") VALUES($1,$2,'FROM','client@example.invalid','Synthetic client')`,
       [participantId, id],
     );
     return id;

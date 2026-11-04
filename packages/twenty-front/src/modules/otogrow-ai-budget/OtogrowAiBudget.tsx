@@ -196,9 +196,12 @@ export const OtogrowAiBudget = ({ workspace }: OtogrowAiBudgetProps) => {
         </h2>
         <p>
           <Trans>
-            Controls for task assistants, inbox drafts and supported media
-            requests. Native CRM chat, search and other provider activity are
-            outside this budget.
+            Shared spending controls cover delivery assistants, inbox drafts,
+            supported media and native CRM AI requests. Native CRM text requests
+            use the workspace limit. External search, connected-app actions,
+            code execution, automated workflows and media inputs remain
+            unavailable to native CRM AI until their additional costs can be
+            controlled.
           </Trans>
         </p>
       </div>
@@ -558,7 +561,9 @@ export const OtogrowAiBudget = ({ workspace }: OtogrowAiBudgetProps) => {
                                       ? t`Team activity analysis`
                                       : spend.sourceKind === 'MEDIA'
                                         ? t`Media request`
-                                        : t`Request source unavailable`}
+                                        : spend.sourceKind === 'NATIVE_CRM'
+                                          ? t`Native CRM AI`
+                                          : t`Request source unavailable`}
                             </p>
                             <p>{t`Maximum reserved: USD ${formatAiAmount(spend.reservedUsd)}`}</p>
                             <p>

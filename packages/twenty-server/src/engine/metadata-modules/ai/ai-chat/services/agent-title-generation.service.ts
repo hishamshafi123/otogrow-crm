@@ -13,6 +13,7 @@ import { AiBillingService } from 'src/engine/metadata-modules/ai/ai-billing/serv
 import { extractCacheCreationTokensFromSteps } from 'src/engine/metadata-modules/ai/ai-billing/utils/extract-cache-creation-tokens.util';
 import { buildAiTelemetry } from 'src/engine/metadata-modules/ai/ai-models/utils/build-ai-telemetry.util';
 import { AiModelRegistryService } from 'src/engine/metadata-modules/ai/ai-models/services/ai-model-registry.service';
+import { OtogrowNativeAiService } from 'src/modules/otogrow-ai-budget/otogrow-native-ai.service';
 
 @Injectable()
 export class AgentTitleGenerationService {
@@ -22,6 +23,7 @@ export class AgentTitleGenerationService {
     private readonly aiModelRegistryService: AiModelRegistryService,
     private readonly aiBillingService: AiBillingService,
     private readonly billingUsageService: BillingUsageService,
+    private readonly nativeAi: OtogrowNativeAiService,
   ) {}
 
   async generateThreadTitle(
@@ -44,7 +46,15 @@ export class AgentTitleGenerationService {
 
     try {
       const result = await generateText({
-        model: defaultModel.model,
+        model: this.nativeAi.wrap(defaultModel.model, {
+          workspaceId,
+          userWorkspaceId,
+          modelId: defaultModel.modelId,
+          modelConfig: this.aiModelRegistryService.getEffectiveModelConfig(
+            defaultModel.modelId,
+          ),
+        }),
+        maxOutputTokens: 64,
         prompt: `Generate a concise, descriptive title (maximum 60 characters) for a chat thread based on the following message. The title should capture the main topic or purpose of the conversation. Return only the title, nothing else. Message: "${messageContent}"`,
         experimental_telemetry: buildAiTelemetry({
           functionId: 'agent-title-generation',

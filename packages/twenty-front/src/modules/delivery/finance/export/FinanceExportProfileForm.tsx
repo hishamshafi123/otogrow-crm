@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useId, useState, type FormEvent } from 'react';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { isValidUuid } from 'twenty-shared/utils';
 import { type DeliveryFinanceExportProfileInput } from '~/generated-metadata/graphql';
@@ -15,6 +15,7 @@ import {
 import { useDeliveryNativeDraft } from '@/delivery/drafts/useDeliveryNativeDraft';
 import { useDeliveryDraftGuard } from '@/delivery/drafts/DeliveryDraftGuard';
 import { DeliveryDraftConflict } from '@/delivery/drafts/DeliveryDraftConflict';
+import { DeliveryFormRequirements } from '@/delivery/forms/DeliveryFormRequirements';
 import {
   StyledDeliveryButton,
   StyledDeliveryRow,
@@ -53,6 +54,7 @@ export const FinanceExportProfileForm = ({
   const labels = useFinanceExportLabels();
   const financeLabels = useFinanceLabels();
   const { requestAction } = useDeliveryDraftGuard();
+  const fieldId = useId();
   const [commandId] = useState(() => crypto.randomUUID());
   const [id] = useState(() => initial?.id ?? crypto.randomUUID());
   const [revision] = useState(initial?.revision ?? 0);
@@ -128,6 +130,43 @@ export const FinanceExportProfileForm = ({
         (mapping.scope !== 'KIND' ||
           Object.hasOwn(labels.kinds, mapping.key ?? '')),
     );
+  const requirements = [
+    ...(!values.name.trim()
+      ? [{ targetId: `${fieldId}-name`, message: t`Add a profile name.` }]
+      : []),
+    ...(!['CASH', 'RECOGNITION'].includes(values.basis)
+      ? [
+          {
+            targetId: `${fieldId}-basis`,
+            message: t`Choose an accounting basis.`,
+          },
+        ]
+      : []),
+    ...(!columnsValid
+      ? [
+          {
+            targetId: `${fieldId}-columns`,
+            message: t`Review CSV columns: choose supported fields and unique plain-text headers.`,
+          },
+        ]
+      : []),
+    ...(!mappingsValid
+      ? [
+          {
+            targetId: `${fieldId}-mappings`,
+            message: t`Review account and counterparty mappings: complete codes and matching values, and remove duplicate rules.`,
+          },
+        ]
+      : []),
+    ...(!values.reason.trim()
+      ? [
+          {
+            targetId: `${fieldId}-reason`,
+            message: t`Add a reason for this profile change.`,
+          },
+        ]
+      : []),
+  ];
   const canSave =
     !readOnly &&
     !stale &&
@@ -226,6 +265,7 @@ export const FinanceExportProfileForm = ({
               <label>
                 <Trans>Profile name</Trans>
                 <input
+                  id={`${fieldId}-name`}
                   name="name"
                   required
                   maxLength={160}
@@ -238,6 +278,7 @@ export const FinanceExportProfileForm = ({
               <label>
                 <Trans>Accounting basis</Trans>
                 <select
+                  id={`${fieldId}-basis`}
                   name="basis"
                   value={values.basis}
                   onChange={(event) =>
@@ -315,7 +356,7 @@ export const FinanceExportProfileForm = ({
               </Trans>
             </small>
             <details open>
-              <summary>
+              <summary id={`${fieldId}-columns`}>
                 <Trans>CSV columns</Trans>
               </summary>
               {columns.map((column, index) => (
@@ -421,7 +462,7 @@ export const FinanceExportProfileForm = ({
               )}
             </details>
             <details>
-              <summary>
+              <summary id={`${fieldId}-mappings`}>
                 <Trans>Account and counterparty mappings</Trans>
               </summary>
               <p>
@@ -621,6 +662,7 @@ export const FinanceExportProfileForm = ({
             <label>
               <Trans>Reason for profile change</Trans>
               <textarea
+                id={`${fieldId}-reason`}
                 name="reason"
                 required
                 maxLength={2000}
@@ -630,6 +672,7 @@ export const FinanceExportProfileForm = ({
                 }
               />
             </label>
+            <DeliveryFormRequirements requirements={requirements} />
             <StyledDeliveryButton
               type="submit"
               data-primary="true"

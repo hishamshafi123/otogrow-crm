@@ -69,11 +69,6 @@ export const InboxMessages = ({ value, onRefresh }: InboxMessagesProps) => {
           </StyledInboxMessage>
         ))}
         <StyledDeliveryRow>
-          {params.has('inboxMessagesAfter') && (
-            <Link to={inboxDestination(params, { inboxMessagesAfter: null })}>
-              <Trans>Newest messages</Trans>
-            </Link>
-          )}
           {value.nextCursor && (
             <Link
               to={inboxDestination(params, {

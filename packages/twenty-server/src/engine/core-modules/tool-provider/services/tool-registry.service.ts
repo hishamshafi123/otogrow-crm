@@ -361,6 +361,7 @@ export class ToolRegistryService {
       wrapWithErrorContext,
       compactOutput,
       spillLargeOutput,
+      isToolAllowed,
     } = options;
     const categorySet = categories ? new Set(categories) : undefined;
 
@@ -391,6 +392,8 @@ export class ToolRegistryService {
         (descriptor) => !excludeSet.has(descriptor.name),
       );
     }
+    if (isToolAllowed)
+      filteredDescriptors = filteredDescriptors.filter(isToolAllowed);
 
     const toolSet = this.hydrateToolSet(filteredDescriptors, context, {
       wrapWithErrorContext,

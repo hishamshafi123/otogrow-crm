@@ -70,6 +70,7 @@ export const InboxConsent = ({
     conversationRevision: value.conversation.revision,
     revision: value.binding?.revision ?? 0,
   }));
+  const [completed, setCompleted] = useState(false);
   const stale =
     value.conversation.revision !== opened.conversationRevision ||
     (value.binding?.revision ?? 0) !== opened.revision;
@@ -91,7 +92,7 @@ export const InboxConsent = ({
             other threads.
           </Trans>
         </p>
-        {stale && (
+        {stale && !completed && (
           <p role="alert">
             <Trans>
               Conversation access or consent changed. Your preparation is kept;
@@ -108,7 +109,10 @@ export const InboxConsent = ({
           owned={owned}
           enabled={enabled}
           onDenied={onDenied}
-          onSaved={onSaved}
+          onSaved={(result) => {
+            setCompleted(true);
+            onSaved(result);
+          }}
         >
           {({ execute, busy }) => (
             <InboxConsentFields

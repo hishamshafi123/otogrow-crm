@@ -1,3 +1,4 @@
+import { OtogrowAiBudgetModule } from 'src/modules/otogrow-ai-budget/otogrow-ai-budget.module';
 import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
@@ -31,6 +32,7 @@ import { AgentRunService } from './services/agent-run.service';
 
 @Module({
   imports: [
+    OtogrowAiBudgetModule,
     AiBillingModule,
     AiModelsModule,
     AiAgentModule,

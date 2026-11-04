@@ -1,8 +1,10 @@
 import { type ToolCategory } from 'twenty-shared/ai';
+import { type ToolIndexEntry } from 'src/engine/core-modules/tool-provider/types/tool-index-entry.type';
 
 export type ToolRetrievalOptions = {
   categories?: ToolCategory[];
   excludeTools?: string[];
+  isToolAllowed?: (entry: ToolIndexEntry) => boolean;
   wrapWithErrorContext?: boolean;
   // Apply output compaction (strip nulls/empty values) to dispatch results
   // before returning. Chat enables this to reduce token usage in the

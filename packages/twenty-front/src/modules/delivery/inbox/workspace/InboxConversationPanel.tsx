@@ -117,18 +117,27 @@ export const InboxConversationPanel = ({
     [],
   );
   // oxlint-disable-next-line twenty/no-state-useref -- Only verified permission loss may dispose private preparation; ordinary polls retain it.
-  const rights = useRef({ verified: false, draft: false });
+  const rights = useRef({ verified: false, read: false, draft: false });
   const { invalidate } = state;
   useLayoutEffect(() => {
     if (reading.data) {
-      const current = reading.data.binding?.canDraft === true;
-      if (rights.current.verified && rights.current.draft && !current) {
+      const currentRead = reading.data.binding?.canRead === true;
+      const currentDraft = reading.data.binding?.canDraft === true;
+      if (
+        rights.current.verified &&
+        ((rights.current.read && !currentRead) ||
+          (rights.current.draft && !currentDraft))
+      ) {
         invalidate();
         cancelPendingNavigation();
         setIntent(null);
         setPrivateEpoch((epoch) => epoch + 1);
       }
-      rights.current = { verified: true, draft: current };
+      rights.current = {
+        verified: true,
+        read: currentRead,
+        draft: currentDraft,
+      };
     }
   }, [reading.data, invalidate, cancelPendingNavigation]);
   const available = enabled && !denied && reading.data !== null;
@@ -257,6 +266,13 @@ export const InboxConversationPanel = ({
                   <Trans>Manual notes and conversation access</Trans>
                 </Link>
               </StyledDeliveryRow>
+              {connected && messagesInput.after && (
+                <Link
+                  to={inboxDestination(params, { inboxMessagesAfter: null })}
+                >
+                  <Trans>Return to newest messages</Trans>
+                </Link>
+              )}
               {connected &&
                 (messages.data ? (
                   <InboxMessages

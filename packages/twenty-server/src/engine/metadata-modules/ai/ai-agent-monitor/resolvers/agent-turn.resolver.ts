@@ -59,8 +59,13 @@ export class AgentTurnResolver {
   async evaluateAgentTurn(
     @Args('turnId', { type: () => UUIDScalarType }) turnId: string,
     @AuthWorkspace() { id: workspaceId }: WorkspaceEntity,
+    @AuthUserWorkspaceId() userWorkspaceId: string,
   ): Promise<AgentTurnEvaluationDTO> {
-    return this.graderService.evaluateTurn({ turnId, workspaceId });
+    return this.graderService.evaluateTurn({
+      turnId,
+      workspaceId,
+      userWorkspaceId,
+    });
   }
 
   @Mutation(() => AgentTurnDTO)
@@ -99,12 +104,14 @@ export class AgentTurnResolver {
       agentId: string;
       input: string;
       workspaceId: string;
+      userWorkspaceId: string;
     }>(RunEvaluationInputJob.name, {
       turnId: savedTurn.id,
       threadId: savedThread.id,
       agentId,
       input,
       workspaceId: workspace.id,
+      userWorkspaceId,
     });
 
     const turnWithRelations = await this.turnRepository.findOne(workspace.id, {

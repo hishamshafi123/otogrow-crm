@@ -17,7 +17,7 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource, type EntityManager } from 'typeorm';
+import { DataSource, type EntityManager, LessThan } from 'typeorm';
 import { v4 } from 'uuid';
 import { WorkspaceEntity } from 'src/engine/core-modules/workspace/workspace.entity';
 import { DeliveryProjectEntity } from 'src/modules/delivery/entities/delivery-project.entity';
@@ -59,6 +59,10 @@ import {
   assertOtogrowAiMediaQuoteFresh,
   validateOtogrowAiMediaReservation,
 } from 'src/modules/otogrow-ai-budget/otogrow-ai-media.policy';
+import {
+  OTOGROW_NATIVE_AI_RECOVERY_GRACE_MS,
+  OTOGROW_NATIVE_AI_RECOVERY_PAGE_SIZE,
+} from 'src/modules/otogrow-ai-budget/otogrow-native-ai.constants';
 
 type SpendRequest = {
   workspaceId: string;
@@ -446,6 +450,54 @@ export class OtogrowAiBudgetService {
       spend.id,
     );
     return spend;
+  }
+
+  async reserveNative(
+    manager: EntityManager,
+    input: Omit<
+      SpendRequest,
+      'kind' | 'sourceKind' | 'projectId' | 'taskId' | 'maxOutputTokens'
+    > & {
+      maxOutputTokens?: number;
+      modelContextWindowTokens: number;
+      modelMaxOutputTokens: number;
+    },
+  ) {
+    await this.lock(manager, input.workspaceId);
+    const profile = await this.price(
+      manager,
+      input.workspaceId,
+      input.modelId,
+      'TEXT',
+    );
+    if (
+      !Number.isSafeInteger(input.modelContextWindowTokens) ||
+      input.modelContextWindowTokens <= 0 ||
+      profile.pricing.maxInputTokens < input.modelContextWindowTokens ||
+      !Number.isSafeInteger(input.modelMaxOutputTokens) ||
+      input.modelMaxOutputTokens <= 0 ||
+      (input.maxOutputTokens !== undefined &&
+        (!Number.isSafeInteger(input.maxOutputTokens) ||
+          input.maxOutputTokens <= 0))
+    ) {
+      throw new BadRequestException(
+        'Verify the full model context and output bounds in AI spending settings before using CRM AI.',
+      );
+    }
+    const maxOutputTokens = Math.min(
+      input.maxOutputTokens ?? profile.pricing.maxOutputTokens,
+      profile.pricing.maxOutputTokens,
+      input.modelMaxOutputTokens,
+    );
+    return this.reserve(manager, {
+      ...input,
+      sourceKind: 'NATIVE_CRM',
+      kind: 'TEXT',
+      projectId: null,
+      taskId: null,
+      maxOutputTokens,
+      pricingRevision: profile.revision,
+    });
   }
   async quoteMedia(
     manager: EntityManager,
@@ -991,6 +1043,55 @@ export class OtogrowAiBudgetService {
   }
   async fail(source: Source) {
     return this.dataSource.transaction((manager) => this.stop(manager, source));
+  }
+
+  async recoverNativeSpends() {
+    const expiredBefore = new Date(
+      Date.now() - OTOGROW_NATIVE_AI_RECOVERY_GRACE_MS,
+    );
+    const candidates = await this.dataSource
+      .getRepository(OtogrowAiSpendEntity)
+      .find({
+        where: [
+          {
+            sourceKind: 'NATIVE_CRM',
+            state: 'RESERVED',
+            createdAt: LessThan(expiredBefore),
+          },
+          {
+            sourceKind: 'NATIVE_CRM',
+            state: 'DISPATCHED',
+            dispatchedAt: LessThan(expiredBefore),
+          },
+        ],
+        order: { createdAt: 'ASC', id: 'ASC' },
+        take: OTOGROW_NATIVE_AI_RECOVERY_PAGE_SIZE,
+      });
+    for (const candidate of candidates) {
+      await this.dataSource.transaction(async (manager) => {
+        await this.lock(manager, candidate.workspaceId);
+        const current = await manager
+          .getRepository(OtogrowAiSpendEntity)
+          .findOneBy({
+            id: candidate.id,
+            workspaceId: candidate.workspaceId,
+            sourceKind: 'NATIVE_CRM',
+          });
+        if (!current) return;
+        const expired =
+          current.state === 'RESERVED'
+            ? current.createdAt < expiredBefore
+            : current.state === 'DISPATCHED' &&
+              current.dispatchedAt !== null &&
+              current.dispatchedAt < expiredBefore;
+        if (expired)
+          await this.stop(manager, {
+            workspaceId: current.workspaceId,
+            sourceKind: 'NATIVE_CRM',
+            sourceRunId: current.sourceRunId,
+          });
+      });
+    }
   }
 
   async saveBudget(
