@@ -156,7 +156,14 @@ export const DeliveryCreative = ({
         },
       });
     } catch (failure) {
-      if (isCreativeSourceUnavailable(failure)) onAuthorityLost?.();
+      if (isCreativeSourceUnavailable(failure)) {
+        // Reopening can deny a native status write while the creative remains readable.
+        try {
+          await onChanged();
+        } catch (readFailure) {
+          if (isCreativeSourceUnavailable(readFailure)) onAuthorityLost?.();
+        }
+      }
       setError(
         failure instanceof Error
           ? failure.message

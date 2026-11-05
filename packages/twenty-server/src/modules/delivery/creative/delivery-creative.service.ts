@@ -666,6 +666,14 @@ export class DeliveryCreativeService {
               throw new BadRequestException(
                 'This task is already open for production.',
               );
+            await this.nativeTasks.assert(
+              manager,
+              workspace,
+              { memberId, userWorkspaceId },
+              command.taskId,
+              ['id', 'assigneeId'],
+              { type: 'update', updatedColumns: ['status'] },
+            );
             await recordDeliveryRevision(
               manager,
               scope.task,
@@ -684,6 +692,14 @@ export class DeliveryCreativeService {
             await manager.query(
               `UPDATE ${this.delivery.schema(workspace)}.task SET status='IN_PROGRESS', "updatedAt"=now() WHERE id=$1`,
               [command.taskId],
+            );
+            await this.nativeTasks.assert(
+              manager,
+              workspace,
+              { memberId, userWorkspaceId },
+              command.taskId,
+              ['id', 'assigneeId'],
+              { type: 'update', updatedColumns: ['status'] },
             );
             document.finalAssetId = null;
             break;

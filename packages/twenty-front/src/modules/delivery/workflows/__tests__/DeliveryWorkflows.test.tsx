@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { CombinedGraphQLErrors } from '@apollo/client/errors';
 import { Request } from 'cross-fetch';
 import { type DocumentNode } from 'graphql';
 import { i18n } from '@lingui/core';
@@ -807,4 +808,126 @@ it('pages previous applications independently and does not count them as current
       }),
     }),
   ]);
+});
+
+it('keeps locked requirements readable and explains unavailable reopening without offering the action', () => {
+  mockSnapshot.canEdit = false;
+  mockSnapshot.canManage = false;
+  mockSnapshot.locked = true;
+  mockTask.details.state = 'APPROVED';
+  setup(false);
+  expect(screen.getByText(/Saved requirements are visible/)).toBeVisible();
+  expect(
+    screen.queryByRole('button', { name: 'Change or reopen workflow' }),
+  ).not.toBeInTheDocument();
+});
+it('retains an open workflow selection but disables its action after current management eligibility is lost', async () => {
+  const user = setup(false);
+  await user.click(
+    screen.getByRole('button', { name: 'Change or reopen workflow' }),
+  );
+  await user.selectOptions(
+    screen.getByRole('combobox', { name: 'Published workflow' }),
+    'template',
+  );
+  await user.type(
+    screen.getByRole('textbox', { name: 'Reason for applying this version' }),
+    'Updated evidence standard',
+  );
+  mockSnapshot = { ...mockSnapshot, canManage: false };
+  await user.click(screen.getByRole('button', { name: 'Refresh test state' }));
+  expect(screen.getByRole('button', { name: 'Apply workflow' })).toBeDisabled();
+  expect(
+    screen.getByRole('textbox', { name: 'Reason for applying this version' }),
+  ).toHaveValue('Updated evidence standard');
+  expect(
+    screen.getByText(
+      /Your current access does not allow changing these requirements/,
+    ),
+  ).toBeVisible();
+});
+
+it('offers first-page recovery from a policy-bound history conflict while protecting unsaved answers', async () => {
+  mockSnapshot.previousApplications = [
+    { ...mockSnapshot.workflow!, revision: 1 },
+  ];
+  mockSnapshot.nextHistoryCursor = 'older-policy';
+  const user = setup(false);
+  await user.click(screen.getByText('Previous workflow applications'));
+  await user.click(screen.getByRole('button', { name: 'Older applications' }));
+  await user.type(
+    screen.getByRole('textbox', { name: /Verification URL/ }),
+    'https://example.com/unsent',
+  );
+  mockReadError = new CombinedGraphQLErrors({
+    errors: [{ message: 'Policy changed', extensions: { code: 'CONFLICT' } }],
+  });
+  await user.click(screen.getByRole('button', { name: 'Refresh test state' }));
+  await user.click(
+    screen.getByRole('button', { name: 'Check latest requirements' }),
+  );
+  await user.click(screen.getByRole('button', { name: 'Keep editing' }));
+  expect(
+    screen.getByRole('button', { name: 'Check latest requirements' }),
+  ).toBeVisible();
+  await user.click(
+    screen.getByRole('button', { name: 'Check latest requirements' }),
+  );
+  await user.click(
+    screen.getByRole('button', { name: 'Discard and continue' }),
+  );
+  expect(mockQueries).toHaveBeenCalledWith(
+    'DeliveryTaskWorkflow',
+    expect.objectContaining({
+      variables: expect.objectContaining({
+        input: { taskId: 'task', historyCursor: null },
+      }),
+    }),
+  );
+});
+
+it('disposes an open workflow selection only after confirming first-page recovery', async () => {
+  mockSnapshot.previousApplications = [
+    { ...mockSnapshot.workflow!, revision: 1 },
+  ];
+  mockSnapshot.nextHistoryCursor = 'older-policy';
+  const user = setup(false);
+  await user.click(screen.getByText('Previous workflow applications'));
+  await user.click(screen.getByRole('button', { name: 'Older applications' }));
+  await user.click(
+    screen.getByRole('button', { name: 'Change or reopen workflow' }),
+  );
+  await user.selectOptions(
+    screen.getByRole('combobox', { name: 'Published workflow' }),
+    'template',
+  );
+  await user.type(
+    screen.getByRole('textbox', { name: 'Reason for applying this version' }),
+    'Unsent workflow change',
+  );
+  mockReadError = new CombinedGraphQLErrors({
+    errors: [{ message: 'Policy changed', extensions: { code: 'CONFLICT' } }],
+  });
+  await user.click(screen.getByRole('button', { name: 'Refresh test state' }));
+  await user.click(
+    screen.getByRole('button', { name: 'Check latest requirements' }),
+  );
+  await user.click(screen.getByRole('button', { name: 'Keep editing' }));
+  expect(screen.getByLabelText('Reason for applying this version')).toHaveValue(
+    'Unsent workflow change',
+  );
+  await user.click(
+    screen.getByRole('button', { name: 'Check latest requirements' }),
+  );
+  await user.click(
+    screen.getByRole('button', { name: 'Discard and continue' }),
+  );
+  expect(
+    screen.queryByLabelText('Reason for applying this version'),
+  ).not.toBeInTheDocument();
+  mockReadError = undefined;
+  await user.click(screen.getByRole('button', { name: 'Refresh test state' }));
+  expect(
+    screen.getByRole('button', { name: 'Change or reopen workflow' }),
+  ).toBeVisible();
 });

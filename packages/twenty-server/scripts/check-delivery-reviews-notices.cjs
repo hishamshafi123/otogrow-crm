@@ -1,3 +1,6 @@
+const {
+  createIsolatedNativeTaskAccess,
+} = require('./helpers/isolated-native-task-access.cjs');
 const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
 const axios = require('axios');
@@ -77,6 +80,7 @@ async function main() {
           jobs.push(input.outboxId);
         },
       },
+      createIsolatedNativeTaskAccess(),
     );
     const reminder = new DeliveryReminderService(
       source,

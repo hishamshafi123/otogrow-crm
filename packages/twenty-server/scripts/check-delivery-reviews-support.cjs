@@ -140,6 +140,7 @@ function buildReviewsServices(source, fixture) {
     telegram,
     { get: () => 'http://localhost:3001' },
     { add: async () => undefined },
+    createIsolatedNativeTaskAccess(),
   );
   return {
     ...services,

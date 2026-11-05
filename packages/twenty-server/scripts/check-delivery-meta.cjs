@@ -215,6 +215,8 @@ const {
       ),
       { findByWorkspaceId: async () => null },
       { get: () => null },
+      undefined,
+      createIsolatedNativeTaskAccess(),
     );
     const configuration = {
       accountId: '1657332765534462',

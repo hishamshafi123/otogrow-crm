@@ -797,6 +797,7 @@ export const DeliveryTasksPage = () => {
                                 workspace={context}
                                 run={state.run}
                                 reviewController={taskReview}
+                                onUnavailable={state.invalidateDetail}
                                 busy={state.busy || !state.detailVerified}
                                 onChanged={state.refresh}
                                 stateLabel={labels.state}

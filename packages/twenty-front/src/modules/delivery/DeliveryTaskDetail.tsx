@@ -42,6 +42,7 @@ type DeliveryTaskDetailProps = {
   celebrateApproval: boolean;
   stateLabel: (state: string) => string;
   onChanged?: () => Promise<unknown>;
+  onUnavailable?: () => void;
   reviewController?: TaskReviewController;
   onCelebrationShown?: () => void;
 };
@@ -57,6 +58,7 @@ export const DeliveryTaskDetail = (props: DeliveryTaskDetailProps) => {
       stateLabel={props.stateLabel}
       celebrateApproval={props.celebrateApproval}
       onChanged={props.onChanged}
+      onUnavailable={props.onUnavailable}
       reviewController={props.reviewController}
       onCelebrationShown={props.onCelebrationShown}
     />
@@ -71,6 +73,7 @@ const TaskDetailWorkspace = ({
   stateLabel,
   celebrateApproval,
   onChanged,
+  onUnavailable,
   reviewController,
   onCelebrationShown,
 }: TaskDetailWorkspaceProps) => {
@@ -82,6 +85,7 @@ const TaskDetailWorkspace = ({
     taskId: task.id,
     taskRevision: task.revision,
     onChanged,
+    onUnavailable,
   });
   const latestSubmission = task.details.submissions.at(-1);
   const standaloneReview = useTaskReview({
@@ -89,6 +93,7 @@ const TaskDetailWorkspace = ({
     taskRevision: task.revision,
     enabled: !reviewController,
     onChanged,
+    onUnavailable,
   });
   const taskReview = reviewController ?? standaloneReview;
   const creativeReview = Boolean(
@@ -681,7 +686,7 @@ const TaskDetailWorkspace = ({
           </StyledDeliveryStack>
         </StyledDeliveryCard>
       )}
-      <DeliveryRevisions task={task} />
+      <DeliveryRevisions task={task} onUnavailable={onUnavailable} />
       {(!latestSubmission || taskReview.data) && (
         <section aria-label={t`Submission history`}>
           <h3>

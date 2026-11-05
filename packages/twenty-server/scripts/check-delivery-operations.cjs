@@ -119,6 +119,7 @@ const {
           queuedReminders.push(data.outboxId);
         },
       },
+      createIsolatedNativeTaskAccess(),
     );
     const reminders = new DeliveryReminderService(scoped, operations, noChat, noChat);
     const dispatchAndDrain = async (targetWorkspace, time) => {

@@ -70,8 +70,14 @@ function read() {
     `Disposable native task access ${fixture.nonce.slice(0, 8)}`,
   );
   assert.equal(fixture.marker, `native-task-access-ui:${fixture.nonce}`);
-  assert(['ALLOWED', 'DENIED'].includes(fixture.desired));
-  assert(['TASKS', 'REVIEWS'].includes(fixture.surface ?? 'TASKS'));
+  assert(['ALLOWED', 'DENIED', 'READ_ONLY'].includes(fixture.desired));
+  assert(['TASKS', 'REVIEWS', 'SERVICE'].includes(fixture.surface ?? 'TASKS'));
+  if (fixture.surface === 'SERVICE') {
+    assert.equal(fixture.revisionIds.length, 2);
+    assert.equal(new Set(fixture.revisionIds).size, 2);
+    assert.match(fixture.workflowTemplateId, UUID);
+    for (const id of fixture.revisionIds) assert.match(id, UUID);
+  }
   return fixture;
 }
 function rowGroups(fixture) {
@@ -81,6 +87,9 @@ function rowGroups(fixture) {
     ['core', 'deliveryTask', [fixture.firstManagedId, fixture.secondManagedId]],
     ['core', 'role', [fixture.nativeRoleId]],
     ['core', 'objectPermission', [fixture.permissionId]],
+    ...(fixture.surface === 'SERVICE'
+      ? [['core', 'deliveryRevision', fixture.revisionIds]]
+      : []),
   ];
 }
 async function validate(manager, fixture) {
@@ -123,11 +132,14 @@ async function validate(manager, fixture) {
         for (const task of actual) assert.equal(task.assigneeId, null);
       if (group.name === 'objectPermission') {
         assert(
-          fixture.transitions.includes(
-            actual[0].canReadObjectRecords ? 'ALLOWED' : 'DENIED',
+          fixture.transitions.some(
+            (state) =>
+              actual[0].canReadObjectRecords === (state !== 'DENIED') &&
+              actual[0].canUpdateObjectRecords === (state !== 'READ_ONLY'),
           ),
         );
         actual[0].canReadObjectRecords = true;
+        actual[0].canUpdateObjectRecords = true;
       }
       assert.equal(
         fingerprint(actual),
@@ -183,7 +195,7 @@ function print(fixture) {
         projectId: fixture.projectId,
         title: fixture.title,
         taskIds: [fixture.firstTaskId, fixture.secondTaskId],
-        controls: ['inspect', 'deny', 'allow', 'cleanup'],
+        controls: ['inspect', 'deny', 'read-only', 'allow', 'cleanup'],
         boundary:
           'Read-only browser acceptance only. No task edits, assignment acknowledgements, comments, sends, approvals or other product writes.',
       },
@@ -197,7 +209,7 @@ async function create() {
   assert(!existsSync(FILE));
   const nonce = randomUUID();
   const surface = process.env.OTOGROW_NATIVE_ACCESS_UI_SURFACE ?? 'TASKS';
-  assert(['TASKS', 'REVIEWS'].includes(surface));
+  assert(['TASKS', 'REVIEWS', 'SERVICE'].includes(surface));
   const fixture = {
     checker: CHECKER,
     surface,
@@ -218,6 +230,12 @@ async function create() {
     seeds: {},
     cacheIntents: [],
     cleanupAttempts: [],
+    ...(surface === 'SERVICE'
+      ? {
+          revisionIds: [randomUUID(), randomUUID()],
+          workflowTemplateId: randomUUID(),
+        }
+      : {}),
   };
   write(fixture, true);
   await connectionSource.transaction(async (manager) => {
@@ -328,14 +346,67 @@ async function create() {
         events: [],
         creative,
       };
+      if (surface === 'SERVICE') {
+        details.state = suffix === 'first' ? 'IN_PROGRESS' : 'APPROVED';
+        details.workflow = {
+          templateId: fixture.workflowTemplateId,
+          version: 1,
+          revision: 1,
+          definition: {
+            name: 'Disposable service acceptance',
+            description: fixture.marker,
+            service: 'CUSTOM',
+            definitionOfDone:
+              'Check the draft evidence and the revision cause.',
+            checklist: [
+              { id: 'quality', label: 'Check the evidence', required: true },
+            ],
+            evidence: [
+              {
+                id: 'context',
+                label: 'Work evidence',
+                instructions: 'Describe only this disposable work.',
+                kind: 'TEXT',
+                required: true,
+              },
+            ],
+            reviewChecks: [],
+          },
+          checkedIds: [],
+          evidence: [],
+          appliedAt: new Date().toISOString(),
+          appliedBy: fixture.actorId,
+          appliedByName: 'Disposable service fixture',
+        };
+      }
       await manager.query(
-        `INSERT INTO ${quote(fixture.schema)}.task (id,title,"assigneeId","dueAt",status) VALUES($1,$2,$3,NULL,'TODO')`,
-        [taskId, `${fixture.title} ${suffix}`, null],
+        `INSERT INTO ${quote(fixture.schema)}.task (id,title,"assigneeId","dueAt",status) VALUES($1,$2,$3,NULL,$4)`,
+        [
+          taskId,
+          `${fixture.title} ${suffix}`,
+          null,
+          details.state === 'APPROVED'
+            ? 'DONE'
+            : details.state === 'IN_PROGRESS'
+              ? 'IN_PROGRESS'
+              : 'TODO',
+        ],
       );
       await manager.query(
         'INSERT INTO core."deliveryTask" (id,"workspaceId","taskId","projectId",details,revision) VALUES($1,$2,$3,$4,$5,1)',
         [managedId, WORKSPACE_ID, taskId, fixture.projectId, details],
       );
+      if (surface === 'SERVICE')
+        await manager.query(
+          'INSERT INTO core."deliveryRevision" (id,"workspaceId","taskId","projectId",round,"taskRevision","submissionVersion",source,reason,cause,"effortMinutes","internalCost","proposedCharge",currency,revision) VALUES($1,$2,$3,$4,1,1,NULL,\'WORKFLOW_REOPEN\',$5,\'UNCLASSIFIED\',NULL,NULL,0,NULL,1)',
+          [
+            fixture.revisionIds[suffix === 'first' ? 0 : 1],
+            WORKSPACE_ID,
+            taskId,
+            fixture.projectId,
+            `${fixture.marker}: private ${suffix} revision reason`,
+          ],
+        );
     }
     await manager.query(
       'UPDATE core."roleTarget" SET "roleId"=$2 WHERE id=$1',
@@ -359,7 +430,7 @@ async function create() {
   print(fixture);
 }
 async function transition(fixture, desired) {
-  assert(['ALLOWED', 'DENIED'].includes(desired));
+  assert(['ALLOWED', 'DENIED', 'READ_ONLY'].includes(desired));
   await connectionSource.transaction(async (manager) => {
     await locked(manager);
     assert((await validate(manager, fixture)).present);
@@ -368,8 +439,13 @@ async function transition(fixture, desired) {
     fixture.status = 'TRANSITION_PREPARED';
     write(fixture);
     await manager.query(
-      'UPDATE core."objectPermission" SET "canReadObjectRecords"=$2 WHERE id=$1 AND "roleId"=$3',
-      [fixture.permissionId, desired === 'ALLOWED', fixture.nativeRoleId],
+      'UPDATE core."objectPermission" SET "canReadObjectRecords"=$2,"canUpdateObjectRecords"=$4 WHERE id=$1 AND "roleId"=$3',
+      [
+        fixture.permissionId,
+        desired !== 'DENIED',
+        fixture.nativeRoleId,
+        desired !== 'READ_ONLY',
+      ],
     );
     fault('TRANSITION_PRECOMMIT');
   });
@@ -389,6 +465,7 @@ async function cleanup(fixture) {
         'objectPermission',
         'deliveryProject',
         'deliveryTask',
+        ...(fixture.surface === 'SERVICE' ? ['deliveryRevision'] : []),
       ])
         assert.equal(
           (
@@ -401,6 +478,7 @@ async function cleanup(fixture) {
                   fixture.projectId,
                   fixture.firstManagedId,
                   fixture.secondManagedId,
+                  ...(fixture.revisionIds ?? []),
                 ],
               ],
             )
@@ -425,6 +503,7 @@ async function cleanup(fixture) {
         [fixture.targetOriginal.id, fixture.targetOriginal.roleId],
       );
       for (const name of [
+        ...(fixture.surface === 'SERVICE' ? ['deliveryRevision'] : []),
         'deliveryTask',
         'task',
         'deliveryProject',
@@ -477,14 +556,21 @@ async function main() {
   );
   const mode = process.argv[2];
   assert.equal(process.argv.length, 3);
-  assert(['create', 'inspect', 'allow', 'deny', 'cleanup'].includes(mode));
+  assert(
+    ['create', 'inspect', 'allow', 'deny', 'read-only', 'cleanup'].includes(
+      mode,
+    ),
+  );
   await connectionSource.initialize();
   try {
     if (mode === 'create') return await create();
     const fixture = read();
     if (mode === 'cleanup') return await cleanup(fixture);
-    if (mode === 'allow' || mode === 'deny')
-      return await transition(fixture, mode === 'allow' ? 'ALLOWED' : 'DENIED');
+    if (['allow', 'deny', 'read-only'].includes(mode))
+      return await transition(
+        fixture,
+        mode === 'allow' ? 'ALLOWED' : mode === 'deny' ? 'DENIED' : 'READ_ONLY',
+      );
     await connectionSource.transaction(async (manager) => {
       await locked(manager);
       await validate(manager, fixture);

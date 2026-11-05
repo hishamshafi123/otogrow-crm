@@ -186,6 +186,7 @@ async function main() {
         {},
         { get: () => 'http://localhost:3001' },
         { add: async () => assert.fail('No external reminders may be queued') },
+        createIsolatedNativeTaskAccess(),
       ),
   );
   let workspace;

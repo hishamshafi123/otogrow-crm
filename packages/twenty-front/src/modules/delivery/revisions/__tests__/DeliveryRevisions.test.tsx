@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react';
+import { CombinedGraphQLErrors } from '@apollo/client/errors';
 import { i18n } from '@lingui/core';
 import { I18nProvider } from '@lingui/react';
 import { act, render, screen, waitFor } from '@testing-library/react';
@@ -47,6 +48,7 @@ const round: RevisionData['rounds'][number] = {
 let history: RevisionData;
 let costs: DeliveryRevisionCostsQuery['deliveryRevisionCosts'];
 let queryError: Error | undefined;
+let queryLoading = false;
 let finance = true;
 let verified = true;
 const refetch = jest.fn();
@@ -69,6 +71,7 @@ jest.mock('@apollo/client/react', () => ({
           ? { deliveryRevisionCosts: costs }
           : { deliveryRevisions: history },
       error: queryError,
+      loading: queryLoading,
       refetch,
     };
   },
@@ -148,6 +151,7 @@ beforeEach(() => {
   finance = true;
   verified = true;
   queryError = undefined;
+  queryLoading = false;
   refetch.mockReset();
   queryCalls.mockClear();
   mutate.mockReset();
@@ -266,7 +270,7 @@ it('requires currency, converts decimals to minor units and preserves a failed d
     ),
   );
   expect(screen.getByLabelText('Recorded internal cost')).toHaveValue(12.5);
-  expect(screen.getByText(/Your draft is preserved/)).toBeVisible();
+  expect(screen.getByText(/Your draft is kept/)).toBeVisible();
 });
 it('keeps and explicitly discards a conflicting draft before reloading the latest version', async () => {
   show(
@@ -566,4 +570,155 @@ it('protects another cash draft when changing URL filters is declined', async ()
       'revisionCostsProject',
     ),
   ).toBe(false);
+});
+
+const RevisionRecoveryHarness = ({
+  onUnavailable,
+}: {
+  onUnavailable: () => void;
+}) => {
+  const [refresh, setRefresh] = useState(0);
+  return (
+    <>
+      <button onClick={() => setRefresh(refresh + 1)}>Refresh source</button>
+      <DeliveryRevisions task={task} onUnavailable={onUnavailable} />
+    </>
+  );
+};
+const deniedRevision = () =>
+  new CombinedGraphQLErrors({
+    errors: [{ message: 'History denied', extensions: { code: 'FORBIDDEN' } }],
+  });
+it('keeps the exact revision draft hidden through a network outage and restores it on verified recovery', async () => {
+  const user = userEvent.setup();
+  const unavailable = jest.fn();
+  show(<RevisionRecoveryHarness onUnavailable={unavailable} />);
+  await user.click(screen.getByRole('button', { name: 'Edit round 1' }));
+  await user.type(
+    screen.getByLabelText('Recorded revision effort (minutes)'),
+    '42',
+  );
+  queryError = new Error('Offline');
+  await user.click(screen.getByRole('button', { name: 'Refresh source' }));
+  expect(
+    screen.getByLabelText('Recorded revision effort (minutes)'),
+  ).not.toBeVisible();
+  expect(screen.queryByText('Correct the logo')).not.toBeInTheDocument();
+  queryError = undefined;
+  await user.click(screen.getByRole('button', { name: 'Refresh source' }));
+  expect(
+    screen.getByLabelText('Recorded revision effort (minutes)'),
+  ).toHaveValue(42);
+  expect(unavailable).not.toHaveBeenCalled();
+});
+it('clears a revoked revision draft, rejects a late save and only opens original values after explicit access recovery', async () => {
+  const user = userEvent.setup();
+  const unavailable = jest.fn();
+  let finish: (value: { data: { saveDeliveryRevision: boolean } }) => void;
+  mutate.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
+  show(<RevisionRecoveryHarness onUnavailable={unavailable} />);
+  await user.click(screen.getByRole('button', { name: 'Edit round 1' }));
+  await user.type(
+    screen.getByLabelText('Recorded revision effort (minutes)'),
+    '42',
+  );
+  await user.click(
+    screen.getByRole('button', { name: 'Save revision details' }),
+  );
+  queryError = deniedRevision();
+  await user.click(screen.getByRole('button', { name: 'Refresh source' }));
+  expect(
+    screen.queryByLabelText('Recorded revision effort (minutes)'),
+  ).not.toBeInTheDocument();
+  expect(unavailable).toHaveBeenCalledTimes(1);
+  await act(async () => finish!({ data: { saveDeliveryRevision: true } }));
+  expect(screen.queryByText('Revision details saved.')).not.toBeInTheDocument();
+  queryError = undefined;
+  await user.click(screen.getByRole('button', { name: 'Refresh source' }));
+  expect(screen.queryByText('Correct the logo')).not.toBeInTheDocument();
+  refetch.mockResolvedValueOnce({ data: { deliveryRevisions: history } });
+  await user.click(
+    screen.getByRole('button', { name: 'Retry revision history' }),
+  );
+  await user.click(screen.getByRole('button', { name: 'Edit round 1' }));
+  expect(
+    screen.getByLabelText('Recorded revision effort (minutes)'),
+  ).toHaveValue(null);
+});
+it('keeps readable revision preparation when a correction is forbidden and a fresh history read succeeds', async () => {
+  const user = userEvent.setup();
+  const unavailable = jest.fn();
+  mutate.mockRejectedValueOnce(deniedRevision());
+  refetch.mockResolvedValueOnce({ data: { deliveryRevisions: history } });
+  show(<RevisionRecoveryHarness onUnavailable={unavailable} />);
+  await user.click(screen.getByRole('button', { name: 'Edit round 1' }));
+  await user.type(
+    screen.getByLabelText('Recorded revision effort (minutes)'),
+    '42',
+  );
+  await user.click(
+    screen.getByRole('button', { name: 'Save revision details' }),
+  );
+  expect(refetch).toHaveBeenCalledTimes(1);
+  expect(
+    screen.getByLabelText('Recorded revision effort (minutes)'),
+  ).toHaveValue(42);
+  expect(unavailable).not.toHaveBeenCalled();
+});
+
+it('rechecks same-user financial authority and fences an earlier save without losing unrelated preparation', async () => {
+  const user = userEvent.setup();
+  let finish: (value: { data: { saveDeliveryRevision: boolean } }) => void;
+  mutate.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
+  show(<RevisionRecoveryHarness onUnavailable={jest.fn()} />);
+  await user.click(screen.getByRole('button', { name: 'Edit round 1' }));
+  await user.type(
+    screen.getByLabelText('Recorded revision effort (minutes)'),
+    '42',
+  );
+  await user.click(
+    screen.getByRole('button', { name: 'Save revision details' }),
+  );
+  finance = false;
+  queryLoading = true;
+  await user.click(screen.getByRole('button', { name: 'Refresh source' }));
+  expect(
+    screen.getByLabelText('Recorded revision effort (minutes)'),
+  ).not.toBeVisible();
+  expect(screen.queryByText(/Recorded cost:/)).not.toBeInTheDocument();
+  expect(queryCalls).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      variables: expect.objectContaining({
+        authorization: JSON.stringify({
+          capabilities: [],
+          roleIds: [],
+          grants: [],
+        }),
+      }),
+    }),
+  );
+  queryLoading = false;
+  history = { ...history, canReadFinance: false, canManageFinance: false };
+  await user.click(screen.getByRole('button', { name: 'Refresh source' }));
+  await act(async () => finish!({ data: { saveDeliveryRevision: true } }));
+  expect(
+    screen.getByLabelText('Recorded revision effort (minutes)'),
+  ).toHaveValue(42);
+  expect(
+    screen.queryByLabelText('Recorded internal cost'),
+  ).not.toBeInTheDocument();
+  expect(screen.queryByText('Revision details saved.')).not.toBeInTheDocument();
+  expect(screen.getByRole('alert')).toHaveTextContent(
+    'Revision details could not be confirmed. Your draft is kept. Check current history before retrying.',
+  );
 });

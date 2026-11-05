@@ -70,7 +70,7 @@ async function main() {
     );
     const command = (actor, input) =>
       service.command(workspace, actor, actor, input);
-    const revisions = new DeliveryRevisionsService(scopedDataSource, service);
+    const revisions = new DeliveryRevisionsService(scopedDataSource, service, createIsolatedNativeTaskAccess());
     let state = await command(admin, {
       action: 'project',
       name: 'Revision accounting fixture',

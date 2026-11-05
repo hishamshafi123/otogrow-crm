@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { useDeliveryDraftGuard } from '@/delivery/drafts/DeliveryDraftGuard';
 import {
@@ -25,6 +25,25 @@ export const DeliveryTaskWorkflow = ({
   const [applying, setApplying] = useState<TaskWorkflow | null>(null);
   const { data, draft, busy, error } = controller;
   const workflow = controller.snapshot?.workflow;
+  const recovery = useRef<HTMLButtonElement>(null);
+  // oxlint-disable-next-line twenty/no-state-useref -- Only restore focus lost when the private editor is removed.
+  const wasVisible = useRef(false);
+  // oxlint-disable-next-line twenty/no-state-useref -- Loading may finish after the editor loses keyboard focus.
+  const pendingFocus = useRef(false);
+  useLayoutEffect(() => {
+    if (controller.unavailable) setApplying(null);
+    if (data) pendingFocus.current = false;
+    else if (wasVisible.current) pendingFocus.current = true;
+    wasVisible.current = Boolean(data);
+    if (pendingFocus.current && !controller.loading) {
+      pendingFocus.current = false;
+      if (
+        document.activeElement === document.body ||
+        document.activeElement === document.documentElement
+      )
+        recovery.current?.focus();
+    }
+  }, [data, controller.unavailable, controller.loading]);
   const openSelection = () =>
     requestAction(() => {
       controller.reset();
@@ -41,17 +60,35 @@ export const DeliveryTaskWorkflow = ({
             <p>
               {controller.loading
                 ? t`Loading task requirements…`
-                : t`Task requirements are unavailable. Previously loaded details are hidden.`}
+                : controller.unavailable
+                  ? t`Task requirements are no longer available. Private preparation was cleared. Check current access before reopening.`
+                  : t`Task requirements could not be verified. Previous details are hidden and your draft is kept.`}
             </p>
-            <StyledDeliveryButton onClick={controller.retry}>
-              <Trans>Try again</Trans>
-            </StyledDeliveryButton>
+            <StyledWorkflowActions>
+              <StyledDeliveryButton
+                ref={recovery}
+                onClick={controller.retry}
+                disabled={controller.loading}
+              >
+                <Trans>Try again</Trans>
+              </StyledDeliveryButton>
+              {controller.historyCursor && (
+                <StyledDeliveryButton
+                  onClick={() =>
+                    controller.changePage(null, () => setApplying(null))
+                  }
+                  disabled={controller.loading}
+                >
+                  <Trans>Check latest requirements</Trans>
+                </StyledDeliveryButton>
+              )}
+            </StyledWorkflowActions>
           </div>
         )}
         {controller.notice && <p role="status">{controller.notice}</p>}
         <div hidden={!data}>
           <StyledWorkflowFields disabled={!data || busy}>
-            {applying ? (
+            {applying && !controller.unavailable ? (
               <WorkflowApplyEditor
                 snapshot={applying}
                 controller={controller}
@@ -251,6 +288,16 @@ export const DeliveryTaskWorkflow = ({
                     )}
                   </>
                 )}
+                {data?.locked &&
+                  !data.canManage &&
+                  controller.access.manager && (
+                    <p role="status">
+                      <Trans>
+                        Saved requirements are visible. Your current access does
+                        not allow reopening this workflow.
+                      </Trans>
+                    </p>
+                  )}
                 {data?.canManage && controller.access.manager && (
                   <StyledDeliveryButton onClick={openSelection}>
                     {workflow

@@ -115,6 +115,8 @@ const {
         decryptBotToken: () => 'fixture-token',
       },
       { get: () => 'http://localhost:3001' },
+      undefined,
+      createIsolatedNativeTaskAccess(),
     );
     const clients = new DeliveryClientsService(
       scoped,

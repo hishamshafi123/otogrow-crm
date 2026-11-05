@@ -11,6 +11,7 @@ import { isDefined } from 'twenty-shared/utils';
 import { z } from 'zod';
 import { WorkspaceEntity } from 'src/engine/core-modules/workspace/workspace.entity';
 import { DeliveryService } from 'src/modules/delivery/delivery.service';
+import { DeliveryNativeTaskAccessService } from 'src/modules/delivery/delivery-native-task-access.service';
 import { DeliveryTaskEntity } from 'src/modules/delivery/entities/delivery-task.entity';
 import { DeliveryProjectEntity } from 'src/modules/delivery/entities/delivery-project.entity';
 import { canAccessDeliveryProject } from 'src/modules/delivery/delivery-policy';
@@ -98,6 +99,7 @@ export class DeliveryRevisionsService {
   constructor(
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly delivery: DeliveryService,
+    private readonly nativeTasks: DeliveryNativeTaskAccessService,
   ) {}
   private async scope(
     manager: EntityManager,
@@ -112,6 +114,13 @@ export class DeliveryRevisionsService {
       userWorkspaceId,
       manager,
     );
+    await this.nativeTasks.assert(
+      manager,
+      workspace,
+      { memberId, userWorkspaceId },
+      taskId,
+      ['id'],
+    );
     const task = await manager
       .getRepository(DeliveryTaskEntity)
       .findOneBy({ workspaceId: workspace.id, taskId });
@@ -120,14 +129,9 @@ export class DeliveryRevisionsService {
       (await manager
         .getRepository(DeliveryProjectEntity)
         .findOneBy({ workspaceId: workspace.id, id: task.projectId }));
-    const [native] = await manager.query(
-      `SELECT id FROM ${this.delivery.schema(workspace)}.task WHERE id=$1 AND "deletedAt" IS NULL`,
-      [taskId],
-    );
     if (
       !task ||
       !project ||
-      !native ||
       !canAccessDeliveryProject(actor.isManager, memberId, project.memberIds)
     )
       throw new NotFoundException('Task not available.');

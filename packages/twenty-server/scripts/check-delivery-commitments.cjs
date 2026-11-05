@@ -127,6 +127,8 @@ const {
       creative,
       { findByWorkspaceId: async () => ({ isActive: false }) },
       { get: () => null },
+      undefined,
+      createIsolatedNativeTaskAccess(),
     );
     const companyId = randomUUID();
     await runner.query(

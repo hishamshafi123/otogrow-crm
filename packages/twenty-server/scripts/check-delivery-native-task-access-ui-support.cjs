@@ -227,7 +227,12 @@ async function recomputeCache(manager, fixture, write) {
     assert.equal(
       actual.rolesPermissions[fixture.nativeRoleId][fixture.taskObjectId]
         .canReadObjectRecords,
-      fixture.desired === 'ALLOWED',
+      fixture.desired !== 'DENIED',
+    );
+    assert.equal(
+      actual.rolesPermissions[fixture.nativeRoleId][fixture.taskObjectId]
+        .canUpdateObjectRecords,
+      fixture.desired !== 'READ_ONLY',
     );
     // Publishing a complete cache pair prevents live reads from recomputing a transiently absent entry.
     const batchId = require('node:crypto').randomUUID();

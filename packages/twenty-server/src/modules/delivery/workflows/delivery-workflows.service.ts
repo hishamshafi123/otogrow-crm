@@ -12,6 +12,7 @@ import { DataSource, type EntityManager } from 'typeorm';
 import { z } from 'zod';
 import { WorkspaceEntity } from 'src/engine/core-modules/workspace/workspace.entity';
 import { DeliveryService } from 'src/modules/delivery/delivery.service';
+import { DeliveryNativeTaskAccessService } from 'src/modules/delivery/delivery-native-task-access.service';
 import { canAccessDeliveryProject } from 'src/modules/delivery/delivery-policy';
 import { DeliveryProjectEntity } from 'src/modules/delivery/entities/delivery-project.entity';
 import { DeliveryTaskEntity } from 'src/modules/delivery/entities/delivery-task.entity';
@@ -40,6 +41,8 @@ import {
 import {
   assertWorkflowAnswers,
   missingWorkflowRequirements,
+  workflowHistoryCursor,
+  readWorkflowHistoryCursor,
 } from 'src/modules/delivery/workflows/delivery-workflows.policy';
 import { recordOtogrowActivity } from 'src/modules/otogrow-activity/record-otogrow-activity';
 
@@ -54,14 +57,6 @@ const parseInput = <TOutput>(
     );
   return result.data;
 };
-const archiveCursorSchema = z
-  .object({
-    workspaceId: z.uuid(),
-    taskId: z.uuid(),
-    at: z.iso.datetime(),
-    id: z.uuid(),
-  })
-  .strict();
 const versionDTO = (
   version: DeliveryWorkflowVersionEntity,
 ): DeliveryWorkflowVersionDTO => ({
@@ -77,6 +72,7 @@ export class DeliveryWorkflowsService {
   constructor(
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly delivery: DeliveryService,
+    private readonly nativeTasks: DeliveryNativeTaskAccessService,
   ) {}
   private async requireManager(
     workspace: WorkspaceEntity,
@@ -331,6 +327,13 @@ export class DeliveryWorkflowsService {
       userWorkspaceId,
       manager,
     );
+    const nativeVisibility = await this.nativeTasks.assert(
+      manager,
+      workspace,
+      { memberId, userWorkspaceId },
+      taskId,
+      ['id', 'assigneeId'],
+    );
     const task = await manager
       .getRepository(DeliveryTaskEntity)
       .findOneBy({ workspaceId: workspace.id, taskId });
@@ -350,7 +353,13 @@ export class DeliveryWorkflowsService {
       [taskId],
     );
     if (!native[0]) throw new NotFoundException('Task not available.');
-    return { task, actor, assigneeId: native[0].assigneeId };
+    return {
+      task,
+      actor,
+      project,
+      nativeVisibility,
+      assigneeId: native[0].assigneeId,
+    };
   }
   private async readTask(
     workspace: WorkspaceEntity,
@@ -359,13 +368,26 @@ export class DeliveryWorkflowsService {
     manager: EntityManager,
     input: z.infer<typeof taskWorkflowSchema>,
   ): Promise<DeliveryTaskWorkflowDTO> {
-    const { task, actor, assigneeId } = await this.scope(
-      workspace,
+    const { task, actor, project, nativeVisibility, assigneeId } =
+      await this.scope(
+        workspace,
+        memberId,
+        userWorkspaceId,
+        input.taskId,
+        manager,
+      );
+    const historyScope = {
+      workspaceId: workspace.id,
       memberId,
       userWorkspaceId,
-      input.taskId,
-      manager,
-    );
+      taskId: task.taskId,
+      projectId: project.id,
+      projectRevision: project.revision,
+      projectMembers: [...project.memberIds].sort(),
+      capabilities: [...actor.capabilities].sort(),
+      roleIds: [...actor.roleIds].sort(),
+      nativeAccess: nativeVisibility.fingerprint,
+    };
     const history = manager
       .getRepository(DeliveryWorkflowArchiveEntity)
       .createQueryBuilder('archive')
@@ -377,34 +399,46 @@ export class DeliveryWorkflowsService {
       .addOrderBy('archive.id', 'DESC')
       .take((input.limit ?? 10) + 1);
     if (input.historyCursor) {
-      try {
-        const cursor = archiveCursorSchema.parse(
-          JSON.parse(Buffer.from(input.historyCursor, 'base64url').toString()),
-        );
-        if (
-          cursor.workspaceId !== workspace.id ||
-          cursor.taskId !== task.taskId
-        )
-          throw new Error();
-        history.andWhere(
-          '(archive."createdAt",archive.id)<(:at::timestamptz,:id::uuid)',
-          cursor,
-        );
-      } catch {
-        throw new BadRequestException('Invalid workflow history page.');
-      }
+      const cursor = readWorkflowHistoryCursor(
+        input.historyCursor,
+        historyScope,
+      );
+      history.andWhere(
+        '(archive."createdAt",archive.id)<(:at::timestamptz,:id::uuid)',
+        cursor,
+      );
     }
     const rows = await history.getMany();
     const visible = rows.slice(0, input.limit ?? 10);
     const last = visible[visible.length - 1];
     const locked = ['APPROVED', 'IN_REVIEW'].includes(task.details.state);
+    let canManage = actor.isManager;
+    if (canManage && locked) {
+      try {
+        await this.nativeTasks.assert(
+          manager,
+          workspace,
+          { memberId, userWorkspaceId },
+          task.taskId,
+          ['id', 'assigneeId'],
+          { type: 'update', updatedColumns: ['status'] },
+        );
+      } catch (error) {
+        if (
+          error instanceof ForbiddenException ||
+          error instanceof NotFoundException
+        )
+          canManage = false;
+        else throw error;
+      }
+    }
     return {
       workspaceId: workspace.id,
       memberId,
       userWorkspaceId,
       taskId: task.taskId,
       taskRevision: task.revision,
-      canManage: actor.isManager,
+      canManage,
       canEdit: !locked && (actor.isManager || assigneeId === memberId),
       locked,
       workflow: task.details.workflow ?? null,
@@ -412,14 +446,7 @@ export class DeliveryWorkflowsService {
       missingRequirements: missingWorkflowRequirements(task.details.workflow),
       nextHistoryCursor:
         rows.length > (input.limit ?? 10) && last
-          ? Buffer.from(
-              JSON.stringify({
-                workspaceId: workspace.id,
-                taskId: task.taskId,
-                at: last.createdAt.toISOString(),
-                id: last.id,
-              }),
-            ).toString('base64url')
+          ? workflowHistoryCursor(historyScope, last)
           : null,
     };
   }
@@ -462,6 +489,15 @@ export class DeliveryWorkflowsService {
         throw new ConflictException(
           'Explicitly reopen this work before changing its requirements.',
         );
+      if (locked)
+        await this.nativeTasks.assert(
+          manager,
+          workspace,
+          { memberId, userWorkspaceId },
+          task.taskId,
+          ['id', 'assigneeId'],
+          { type: 'update', updatedColumns: ['status'] },
+        );
       const { published } = await getPublishedDeliveryWorkflow(
         manager,
         workspace.id,
@@ -489,6 +525,14 @@ export class DeliveryWorkflowsService {
         await manager.query(
           `UPDATE ${this.delivery.schema(workspace)}.task SET status='IN_PROGRESS',"updatedAt"=now() WHERE id=$1`,
           [task.taskId],
+        );
+        await this.nativeTasks.assert(
+          manager,
+          workspace,
+          { memberId, userWorkspaceId },
+          task.taskId,
+          ['id', 'assigneeId'],
+          { type: 'update', updatedColumns: ['status'] },
         );
       }
       task.revision++;

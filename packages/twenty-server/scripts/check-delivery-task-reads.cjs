@@ -221,6 +221,7 @@ async function main() {
             );
           },
         },
+        createIsolatedNativeTaskAccess(),
       ),
       reads = new DeliveryTasksService(
         source,

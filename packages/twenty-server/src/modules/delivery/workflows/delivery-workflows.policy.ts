@@ -1,4 +1,6 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
+import { z } from 'zod';
+import { financeReviewToken } from 'src/modules/delivery/finance/delivery-finance-reconciliation.policy';
 import {
   type DeliveryAppliedWorkflow,
   type DeliveryWorkflowAnswer,
@@ -101,4 +103,36 @@ export const assertWorkflowReview = (
     throw new BadRequestException(
       `Confirm the quality review: ${missing.map((item) => item.label).join(' · ')}`,
     );
+};
+
+const workflowHistoryCursorSchema = z.strictObject({
+  version: z.literal(1),
+  scope: z.string().regex(/^[a-f0-9]{64}$/),
+  at: z.iso.datetime(),
+  id: z.uuid(),
+});
+export const workflowHistoryCursor = (
+  scope: unknown,
+  row: { createdAt: Date; id: string },
+) =>
+  Buffer.from(
+    JSON.stringify({
+      version: 1,
+      scope: financeReviewToken(scope),
+      at: row.createdAt.toISOString(),
+      id: row.id,
+    }),
+  ).toString('base64url');
+export const readWorkflowHistoryCursor = (value: string, scope: unknown) => {
+  try {
+    const cursor = workflowHistoryCursorSchema.parse(
+      JSON.parse(Buffer.from(value, 'base64url').toString('utf8')),
+    );
+    if (cursor.scope !== financeReviewToken(scope)) throw new Error();
+    return { at: cursor.at, id: cursor.id };
+  } catch {
+    throw new ConflictException(
+      'Workflow history access changed. Return to its first page.',
+    );
+  }
 };

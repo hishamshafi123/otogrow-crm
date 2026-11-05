@@ -98,11 +98,11 @@ export const RevisionEditor = ({
             onClose();
           } else
             setError(
-              t`Revision details were not saved. Your draft is preserved. Refresh to check for newer changes.`,
+              t`Revision details could not be confirmed. Your draft is kept. Check current history before retrying.`,
             );
         } catch {
           setError(
-            t`Revision details were not saved. Your draft is preserved. Try again.`,
+            t`Revision details could not be confirmed. Your draft is kept. Check current history before retrying.`,
           );
         } finally {
           setBusy(false);

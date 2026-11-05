@@ -27,6 +27,7 @@ import { randomBytes, createHash, randomUUID } from 'node:crypto';
 import { WorkspaceEntity } from 'src/engine/core-modules/workspace/workspace.entity';
 import { TwentyConfigService } from 'src/engine/core-modules/twenty-config/twenty-config.service';
 import { DeliveryService } from 'src/modules/delivery/delivery.service';
+import { DeliveryNativeTaskAccessService } from 'src/modules/delivery/delivery-native-task-access.service';
 import { DeliveryCreativeService } from 'src/modules/delivery/creative/delivery-creative.service';
 import { DeliveryTaskEntity } from 'src/modules/delivery/entities/delivery-task.entity';
 import { DeliveryOperationsEntity } from 'src/modules/delivery/entities/delivery-operations.entity';
@@ -93,6 +94,7 @@ export class DeliveryOperationsService {
     private readonly config: TwentyConfigService,
     @InjectMessageQueue(MessageQueue.messagingQueue)
     private readonly queue: MessageQueueService,
+    private readonly nativeTasks: DeliveryNativeTaskAccessService,
   ) {}
 
   private async transact<TResult>(
@@ -946,6 +948,15 @@ export class DeliveryOperationsService {
           throw new ConflictException(
             'The approved version changed. Record its delivery before confirming fulfilment.',
           );
+        if (command.decision === 'REDOING')
+          await this.nativeTasks.assert(
+            manager,
+            workspace,
+            { memberId, userWorkspaceId },
+            command.taskId,
+            ['id', 'assigneeId'],
+            { type: 'update', updatedColumns: ['status'] },
+          );
         fulfilment.history.push({
           at: now.toISOString(),
           actorId: memberId,
@@ -979,6 +990,14 @@ export class DeliveryOperationsService {
           await manager.query(
             `UPDATE ${this.delivery.schema(workspace)}.task SET status='IN_PROGRESS', "updatedAt"=now() WHERE id=$1`,
             [command.taskId],
+          );
+          await this.nativeTasks.assert(
+            manager,
+            workspace,
+            { memberId, userWorkspaceId },
+            command.taskId,
+            ['id', 'assigneeId'],
+            { type: 'update', updatedColumns: ['status'] },
           );
         }
       }

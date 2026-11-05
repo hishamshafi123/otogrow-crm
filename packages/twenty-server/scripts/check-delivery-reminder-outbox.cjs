@@ -161,6 +161,7 @@ async function main() {
     },
     { get: () => 'http://localhost:3001' },
     queue,
+    createIsolatedNativeTaskAccess(),
   );
   const reminders = new DeliveryReminderService(scoped[0], operations, noChat, noChat);
   let workspace;

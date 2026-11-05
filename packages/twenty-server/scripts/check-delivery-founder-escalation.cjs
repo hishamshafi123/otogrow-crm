@@ -218,6 +218,7 @@ async function main() {
       services.telegram,
       services.config,
       { add: async () => {} },
+      createIsolatedNativeTaskAccess(),
     );
     for (const notice of legacy.filter((notice) => notice.kind === 'ALERT')) {
       const existing = (

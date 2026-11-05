@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { CombinedGraphQLErrors } from '@apollo/client/errors';
 import { Request } from 'cross-fetch';
 import { i18n } from '@lingui/core';
 import { I18nProvider } from '@lingui/react';
@@ -25,6 +26,7 @@ jest.mock('@/delivery/deliveryStyles', () => ({
 }));
 const mockMutate = jest.fn();
 const changed = jest.fn();
+const authorityLost = jest.fn();
 jest.mock('@apollo/client/react', () => ({
   useMutation: () => [mockMutate, { loading: false }],
   useQuery: () => ({
@@ -135,6 +137,7 @@ const Harness = ({ canEdit }: { canEdit?: boolean }) => {
         workspace={workspace}
         canEdit={canEdit}
         onChanged={changed}
+        onAuthorityLost={authorityLost}
         onOpenTask={jest.fn()}
       />
     </>
@@ -174,6 +177,8 @@ beforeEach(() => {
   i18n.loadAndActivate({ locale: 'en', messages: {} });
   mockMutate.mockReset().mockResolvedValue({ data: {} });
   changed.mockReset().mockResolvedValue(undefined);
+  authorityLost.mockReset();
+  task.details.state = 'PLANNED';
 });
 
 it('keeps production changes disabled when the current source denies editing even for a manager', async () => {
@@ -343,3 +348,38 @@ it('protects prepared media inputs on stage changes and requires reselecting a r
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   expect(mockMutate).not.toHaveBeenCalled();
 });
+
+it.each(['readable', 'denied', 'offline'])(
+  'checks current creative reads after a rejected reopen: %s',
+  async (outcome) => {
+    const denied = new CombinedGraphQLErrors({
+      errors: [
+        { message: 'Status update denied', extensions: { code: 'FORBIDDEN' } },
+      ],
+    });
+    mockMutate.mockRejectedValueOnce(denied);
+    if (outcome === 'denied') changed.mockRejectedValueOnce(denied);
+    if (outcome === 'offline')
+      changed.mockRejectedValueOnce(new Error('Offline'));
+    task.details.state = 'APPROVED';
+    const user = setup();
+    await user.click(screen.getByRole('button', { name: 'Final review' }));
+    await user.type(
+      screen.getByLabelText('Revision request'),
+      'Unsent brand direction',
+    );
+    await user.click(
+      screen.getByRole('button', { name: 'Reopen for revision' }),
+    );
+    expect(mockMutate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        variables: { input: expect.objectContaining({ action: 'reopen' }) },
+      }),
+    );
+    expect(changed).toHaveBeenCalledTimes(1);
+    expect(authorityLost).toHaveBeenCalledTimes(outcome === 'denied' ? 1 : 0);
+    expect(screen.getByLabelText('Revision request')).toHaveValue(
+      'Unsent brand direction',
+    );
+  },
+);

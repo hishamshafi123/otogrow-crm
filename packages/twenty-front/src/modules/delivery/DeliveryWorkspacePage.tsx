@@ -1389,6 +1389,7 @@ const LegacyDeliveryWorkspacePage = ({
                             key={selectedTask.id}
                             task={selectedTask}
                             reviewController={taskReview}
+                            onUnavailable={onWorkspaceDenied}
                             onChanged={() => query.refetch()}
                             workspace={workspace}
                             run={run}

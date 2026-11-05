@@ -163,7 +163,7 @@ async function main() {
     (source, index) =>
       new DeliveryCapacityService(source, deliveries[index], access[index]),
   );
-  const revisions = scoped.map((source,index)=>new DeliveryRevisionsService(source,deliveries[index]));
+  const revisions = scoped.map((source,index)=>new DeliveryRevisionsService(source,deliveries[index], createIsolatedNativeTaskAccess()));
   const creative = new DeliveryCreativeService(
     scoped[0],
     deliveries[0],
@@ -182,6 +182,7 @@ async function main() {
     },
     { get: () => 'http://localhost:3001' },
     { add: async () => assert.fail('Read must not enqueue work') },
+    createIsolatedNativeTaskAccess(),
   );
   const business = new DeliveryBusinessService(
     scoped[0],

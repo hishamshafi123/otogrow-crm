@@ -75,6 +75,8 @@ export const WorkflowApplyEditor = ({
     snapshot.workflow?.templateId === draft.values.templateId &&
     snapshot.workflow?.version === draft.values.version;
   const disabled =
+    !controller.data?.canManage ||
+    !controller.access.manager ||
     controller.busy ||
     !catalog ||
     !version ||
@@ -108,6 +110,14 @@ export const WorkflowApplyEditor = ({
           <h4>
             <Trans>Choose workflow requirements</Trans>
           </h4>
+          {controller.data && !controller.data.canManage && (
+            <p role="status">
+              <Trans>
+                Your current access does not allow changing these requirements.
+                Your selection is kept.
+              </Trans>
+            </p>
+          )}
           {!catalog && (
             <div role="alert">
               <p>

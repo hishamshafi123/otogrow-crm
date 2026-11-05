@@ -130,6 +130,8 @@ const {
       creative,
       { findByWorkspaceId: async () => ({ isActive: false }) },
       { get: () => null },
+      undefined,
+      createIsolatedNativeTaskAccess(),
     );
     const companyId = randomUUID();
     await runner.query(
@@ -165,7 +167,7 @@ const {
     };
     const engagement = await makeEngagement('Monthly videos');
     const oneTime = await makeEngagement('Website release', 'ONE_TIME');
-    const workflows = new DeliveryWorkflowsService(source, delivery);
+    const workflows = new DeliveryWorkflowsService(source, delivery, createIsolatedNativeTaskAccess());
     const catalog = () =>
       workflows.catalog(workspace, founder, founder, { includeArchived: true });
     const readTask = (taskId) =>
