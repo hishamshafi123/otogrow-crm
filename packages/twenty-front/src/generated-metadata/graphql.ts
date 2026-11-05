@@ -3794,6 +3794,424 @@ export type DeliveryCompetitorSourcesInput = {
   status?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type DeliveryContentAccount = {
+  __typename?: 'DeliveryContentAccount';
+  archived: Scalars['Boolean']['output'];
+  companyId?: Maybe<Scalars['ID']['output']>;
+  handle: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  name: Scalars['String']['output'];
+  platform: Scalars['String']['output'];
+  profileUrl: Scalars['String']['output'];
+  projectId: Scalars['ID']['output'];
+  revision: Scalars['Int']['output'];
+};
+
+export type DeliveryContentAccountSaveInput = {
+  archived: Scalars['Boolean']['input'];
+  expectedCompanyId?: InputMaybe<Scalars['ID']['input']>;
+  handle: Scalars['String']['input'];
+  id: Scalars['ID']['input'];
+  name: Scalars['String']['input'];
+  platform: Scalars['String']['input'];
+  profileUrl: Scalars['String']['input'];
+  projectId: Scalars['ID']['input'];
+  projectRevision: Scalars['Int']['input'];
+  requestId: Scalars['ID']['input'];
+  revision: Scalars['Int']['input'];
+};
+
+export type DeliveryContentAsset = {
+  __typename?: 'DeliveryContentAsset';
+  assetId: Scalars['ID']['output'];
+  submissionVersion: Scalars['Int']['output'];
+  taskId: Scalars['ID']['output'];
+};
+
+export type DeliveryContentAssetChoices = {
+  __typename?: 'DeliveryContentAssetChoices';
+  isManager: Scalars['Boolean']['output'];
+  items: Array<DeliveryContentAssetSnapshot>;
+  memberId: Scalars['ID']['output'];
+  nextTaskId?: Maybe<Scalars['ID']['output']>;
+  observedAt: Scalars['String']['output'];
+  scope: Scalars['String']['output'];
+  userWorkspaceId: Scalars['ID']['output'];
+  workspaceId: Scalars['ID']['output'];
+};
+
+export type DeliveryContentAssetChoicesInput = {
+  afterTaskId?: InputMaybe<Scalars['ID']['input']>;
+  projectId: Scalars['ID']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type DeliveryContentAssetInput = {
+  assetId: Scalars['ID']['input'];
+  submissionVersion: Scalars['Int']['input'];
+  taskId: Scalars['ID']['input'];
+};
+
+export type DeliveryContentAssetSnapshot = {
+  __typename?: 'DeliveryContentAssetSnapshot';
+  assetId: Scalars['ID']['output'];
+  creativeVersion: Scalars['Int']['output'];
+  mimeType: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  reviewedAt: Scalars['String']['output'];
+  reviewedBy: Scalars['ID']['output'];
+  sourceHash: Scalars['String']['output'];
+  submissionVersion: Scalars['Int']['output'];
+  taskId: Scalars['ID']['output'];
+  title: Scalars['String']['output'];
+};
+
+export type DeliveryContentBodyInput = {
+  accountId: Scalars['ID']['input'];
+  accountRevision: Scalars['Int']['input'];
+  asset?: InputMaybe<DeliveryContentAssetInput>;
+  caption: Scalars['String']['input'];
+  format: Scalars['String']['input'];
+  notes: Scalars['String']['input'];
+  ownerId: Scalars['ID']['input'];
+  plannedAt: Scalars['String']['input'];
+  plannedLocal: Scalars['String']['input'];
+  reviewerId: Scalars['ID']['input'];
+  timezone: Scalars['String']['input'];
+};
+
+export type DeliveryContentCalendar = {
+  __typename?: 'DeliveryContentCalendar';
+  days: Array<DeliveryContentDay>;
+  from: Scalars['String']['output'];
+  isManager: Scalars['Boolean']['output'];
+  memberId: Scalars['ID']['output'];
+  observedAt: Scalars['String']['output'];
+  scope: Scalars['String']['output'];
+  timezone: Scalars['String']['output'];
+  to: Scalars['String']['output'];
+  totalCount: Scalars['Int']['output'];
+  userWorkspaceId: Scalars['ID']['output'];
+  workspaceId: Scalars['ID']['output'];
+};
+
+export type DeliveryContentCalendarInput = {
+  accountId?: InputMaybe<Scalars['ID']['input']>;
+  from: Scalars['String']['input'];
+  ownerId?: InputMaybe<Scalars['ID']['input']>;
+  planId?: InputMaybe<Scalars['ID']['input']>;
+  projectId: Scalars['ID']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+  status?: InputMaybe<Scalars['String']['input']>;
+  timezone: Scalars['String']['input'];
+  to: Scalars['String']['input'];
+};
+
+export type DeliveryContentDay = {
+  __typename?: 'DeliveryContentDay';
+  count: Scalars['Int']['output'];
+  date: Scalars['String']['output'];
+};
+
+export type DeliveryContentDecisionInput = {
+  action: Scalars['String']['input'];
+  correctsEventId?: InputMaybe<Scalars['ID']['input']>;
+  evidenceUrl: Scalars['String']['input'];
+  id: Scalars['ID']['input'];
+  note: Scalars['String']['input'];
+  publishedAt?: InputMaybe<Scalars['String']['input']>;
+  requestId: Scalars['ID']['input'];
+  revision: Scalars['Int']['input'];
+  sourceFingerprint: Scalars['String']['input'];
+};
+
+export type DeliveryContentDetail = {
+  __typename?: 'DeliveryContentDetail';
+  allowedActions: Array<Scalars['String']['output']>;
+  blockedReason?: Maybe<Scalars['String']['output']>;
+  body: DeliveryContentSavedBody;
+  canEdit: Scalars['Boolean']['output'];
+  currentSourceFingerprint: Scalars['String']['output'];
+  history: Array<DeliveryContentReceipt>;
+  isManager: Scalars['Boolean']['output'];
+  latestPublication?: Maybe<DeliveryContentReceipt>;
+  memberId: Scalars['ID']['output'];
+  nextEventId?: Maybe<Scalars['ID']['output']>;
+  observedAt: Scalars['String']['output'];
+  plan: DeliveryContentPlan;
+  project: DeliveryContentProject;
+  scope: Scalars['String']['output'];
+  selectedVersion: Scalars['Int']['output'];
+  sourceChanged: Scalars['Boolean']['output'];
+  userWorkspaceId: Scalars['ID']['output'];
+  variant: DeliveryContentSummary;
+  workspaceId: Scalars['ID']['output'];
+};
+
+export type DeliveryContentEngagement = {
+  __typename?: 'DeliveryContentEngagement';
+  id: Scalars['ID']['output'];
+  name: Scalars['String']['output'];
+  services: Array<Scalars['String']['output']>;
+};
+
+export type DeliveryContentList = {
+  __typename?: 'DeliveryContentList';
+  isManager: Scalars['Boolean']['output'];
+  items: Array<DeliveryContentSummary>;
+  memberId: Scalars['ID']['output'];
+  nextId?: Maybe<Scalars['ID']['output']>;
+  observedAt: Scalars['String']['output'];
+  platformCounts: Array<DeliveryContentPlatformCount>;
+  scope: Scalars['String']['output'];
+  totalCount: Scalars['Int']['output'];
+  userWorkspaceId: Scalars['ID']['output'];
+  workspaceId: Scalars['ID']['output'];
+};
+
+export type DeliveryContentListInput = {
+  accountId?: InputMaybe<Scalars['ID']['input']>;
+  afterId?: InputMaybe<Scalars['ID']['input']>;
+  from?: InputMaybe<Scalars['String']['input']>;
+  ownerId?: InputMaybe<Scalars['ID']['input']>;
+  planId?: InputMaybe<Scalars['ID']['input']>;
+  projectId: Scalars['ID']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+  status?: InputMaybe<Scalars['String']['input']>;
+  to?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type DeliveryContentMember = {
+  __typename?: 'DeliveryContentMember';
+  canReview: Scalars['Boolean']['output'];
+  id: Scalars['ID']['output'];
+  name: Scalars['String']['output'];
+};
+
+export type DeliveryContentPlan = {
+  __typename?: 'DeliveryContentPlan';
+  canEdit: Scalars['Boolean']['output'];
+  companyId?: Maybe<Scalars['ID']['output']>;
+  createdBy: Scalars['ID']['output'];
+  engagementId?: Maybe<Scalars['ID']['output']>;
+  id: Scalars['ID']['output'];
+  projectId: Scalars['ID']['output'];
+  purpose: Scalars['String']['output'];
+  revision: Scalars['Int']['output'];
+  service?: Maybe<Scalars['String']['output']>;
+  title: Scalars['String']['output'];
+};
+
+export type DeliveryContentPlanSaveInput = {
+  engagementId?: InputMaybe<Scalars['ID']['input']>;
+  expectedCompanyId?: InputMaybe<Scalars['ID']['input']>;
+  id: Scalars['ID']['input'];
+  projectId: Scalars['ID']['input'];
+  projectRevision: Scalars['Int']['input'];
+  purpose: Scalars['String']['input'];
+  requestId: Scalars['ID']['input'];
+  revision: Scalars['Int']['input'];
+  service?: InputMaybe<Scalars['String']['input']>;
+  title: Scalars['String']['input'];
+};
+
+export type DeliveryContentPlans = {
+  __typename?: 'DeliveryContentPlans';
+  isManager: Scalars['Boolean']['output'];
+  items: Array<DeliveryContentPlan>;
+  memberId: Scalars['ID']['output'];
+  nextId?: Maybe<Scalars['ID']['output']>;
+  observedAt: Scalars['String']['output'];
+  scope: Scalars['String']['output'];
+  totalCount: Scalars['Int']['output'];
+  userWorkspaceId: Scalars['ID']['output'];
+  workspaceId: Scalars['ID']['output'];
+};
+
+export type DeliveryContentPlansInput = {
+  afterId?: InputMaybe<Scalars['ID']['input']>;
+  planId?: InputMaybe<Scalars['ID']['input']>;
+  projectId: Scalars['ID']['input'];
+};
+
+export type DeliveryContentPlatformCount = {
+  __typename?: 'DeliveryContentPlatformCount';
+  count: Scalars['Int']['output'];
+  platform: Scalars['String']['output'];
+  publishedCount: Scalars['Int']['output'];
+  reviewCount: Scalars['Int']['output'];
+};
+
+export type DeliveryContentPreview = {
+  __typename?: 'DeliveryContentPreview';
+  body: DeliveryContentSavedBody;
+  inputHash: Scalars['String']['output'];
+  isManager: Scalars['Boolean']['output'];
+  memberId: Scalars['ID']['output'];
+  observedAt: Scalars['String']['output'];
+  requestId: Scalars['ID']['output'];
+  scope: Scalars['String']['output'];
+  userWorkspaceId: Scalars['ID']['output'];
+  variantId: Scalars['ID']['output'];
+  workspaceId: Scalars['ID']['output'];
+};
+
+export type DeliveryContentProject = {
+  __typename?: 'DeliveryContentProject';
+  companyId?: Maybe<Scalars['ID']['output']>;
+  id: Scalars['ID']['output'];
+  name: Scalars['String']['output'];
+  revision: Scalars['Int']['output'];
+};
+
+export type DeliveryContentProjectChoices = {
+  __typename?: 'DeliveryContentProjectChoices';
+  accounts: Array<DeliveryContentAccount>;
+  engagements: Array<DeliveryContentEngagement>;
+  isManager: Scalars['Boolean']['output'];
+  memberId: Scalars['ID']['output'];
+  members: Array<DeliveryContentMember>;
+  nextAccountId?: Maybe<Scalars['ID']['output']>;
+  nextEngagementId?: Maybe<Scalars['ID']['output']>;
+  nextMemberId?: Maybe<Scalars['ID']['output']>;
+  observedAt: Scalars['String']['output'];
+  project: DeliveryContentProject;
+  scope: Scalars['String']['output'];
+  selectedAccounts: Array<DeliveryContentAccount>;
+  selectedEngagements: Array<DeliveryContentEngagement>;
+  selectedMembers: Array<DeliveryContentMember>;
+  unavailableSelectedIds: Array<Scalars['ID']['output']>;
+  userWorkspaceId: Scalars['ID']['output'];
+  workspaceId: Scalars['ID']['output'];
+};
+
+export type DeliveryContentProjectChoicesInput = {
+  afterAccountId?: InputMaybe<Scalars['ID']['input']>;
+  afterEngagementId?: InputMaybe<Scalars['ID']['input']>;
+  afterMemberId?: InputMaybe<Scalars['ID']['input']>;
+  projectId: Scalars['ID']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+  selectedAccountIds?: InputMaybe<Array<Scalars['ID']['input']>>;
+  selectedEngagementIds?: InputMaybe<Array<Scalars['ID']['input']>>;
+  selectedMemberIds?: InputMaybe<Array<Scalars['ID']['input']>>;
+};
+
+export type DeliveryContentProjects = {
+  __typename?: 'DeliveryContentProjects';
+  isManager: Scalars['Boolean']['output'];
+  items: Array<DeliveryContentProject>;
+  memberId: Scalars['ID']['output'];
+  nextId?: Maybe<Scalars['ID']['output']>;
+  observedAt: Scalars['String']['output'];
+  scope: Scalars['String']['output'];
+  totalCount: Scalars['Int']['output'];
+  userWorkspaceId: Scalars['ID']['output'];
+  workspaceId: Scalars['ID']['output'];
+};
+
+export type DeliveryContentProjectsInput = {
+  afterId?: InputMaybe<Scalars['ID']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type DeliveryContentReceipt = {
+  __typename?: 'DeliveryContentReceipt';
+  action: Scalars['String']['output'];
+  actorId: Scalars['ID']['output'];
+  actorName: Scalars['String']['output'];
+  correctsEventId?: Maybe<Scalars['ID']['output']>;
+  createdAt: Scalars['String']['output'];
+  evidenceUrl: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  inputHash: Scalars['String']['output'];
+  note: Scalars['String']['output'];
+  planId?: Maybe<Scalars['ID']['output']>;
+  publishedAt?: Maybe<Scalars['String']['output']>;
+  requestId: Scalars['ID']['output'];
+  revision: Scalars['Int']['output'];
+  status: Scalars['String']['output'];
+  targetId: Scalars['ID']['output'];
+  targetKind: Scalars['String']['output'];
+  userWorkspaceId: Scalars['ID']['output'];
+  version?: Maybe<Scalars['Int']['output']>;
+  workspaceId: Scalars['ID']['output'];
+};
+
+export type DeliveryContentReceiptInput = {
+  requestId: Scalars['ID']['input'];
+};
+
+export type DeliveryContentReceiptResult = {
+  __typename?: 'DeliveryContentReceiptResult';
+  isManager: Scalars['Boolean']['output'];
+  memberId: Scalars['ID']['output'];
+  observedAt: Scalars['String']['output'];
+  receipt?: Maybe<DeliveryContentReceipt>;
+  scope: Scalars['String']['output'];
+  userWorkspaceId: Scalars['ID']['output'];
+  workspaceId: Scalars['ID']['output'];
+};
+
+export type DeliveryContentSaveInput = {
+  body: DeliveryContentBodyInput;
+  expectedSourceFingerprint?: InputMaybe<Scalars['String']['input']>;
+  id: Scalars['ID']['input'];
+  planId: Scalars['ID']['input'];
+  planRevision: Scalars['Int']['input'];
+  requestId: Scalars['ID']['input'];
+  revision: Scalars['Int']['input'];
+};
+
+export type DeliveryContentSavedBody = {
+  __typename?: 'DeliveryContentSavedBody';
+  account: DeliveryContentAccount;
+  accountId: Scalars['ID']['output'];
+  accountRevision: Scalars['Int']['output'];
+  asset?: Maybe<DeliveryContentAsset>;
+  assetSnapshot?: Maybe<DeliveryContentAssetSnapshot>;
+  caption: Scalars['String']['output'];
+  contributorIds: Array<Scalars['ID']['output']>;
+  format: Scalars['String']['output'];
+  notes: Scalars['String']['output'];
+  ownerId: Scalars['ID']['output'];
+  ownerName: Scalars['String']['output'];
+  plannedAt: Scalars['String']['output'];
+  plannedLocal: Scalars['String']['output'];
+  reviewerId: Scalars['ID']['output'];
+  reviewerName: Scalars['String']['output'];
+  sourceFingerprint: Scalars['String']['output'];
+  timezone: Scalars['String']['output'];
+};
+
+export type DeliveryContentSelectionInput = {
+  afterEventId?: InputMaybe<Scalars['ID']['input']>;
+  id: Scalars['ID']['input'];
+  version?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type DeliveryContentSummary = {
+  __typename?: 'DeliveryContentSummary';
+  accountName: Scalars['String']['output'];
+  currentVersion: Scalars['Int']['output'];
+  format: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  lastAttemptAction?: Maybe<Scalars['String']['output']>;
+  lastAttemptAt?: Maybe<Scalars['String']['output']>;
+  ownerId: Scalars['ID']['output'];
+  ownerName: Scalars['String']['output'];
+  planId: Scalars['ID']['output'];
+  planTitle: Scalars['String']['output'];
+  plannedAt: Scalars['String']['output'];
+  plannedLocal: Scalars['String']['output'];
+  platform: Scalars['String']['output'];
+  projectId: Scalars['ID']['output'];
+  reviewerId: Scalars['ID']['output'];
+  reviewerName: Scalars['String']['output'];
+  revision: Scalars['Int']['output'];
+  status: Scalars['String']['output'];
+  timezone: Scalars['String']['output'];
+};
+
 export type DeliveryCreativeActor = {
   __typename?: 'DeliveryCreativeActor';
   capabilities: Array<Scalars['String']['output']>;
@@ -9630,6 +10048,7 @@ export type Mutation = {
   createWebhook: Webhook;
   deactivateSkill: Skill;
   decideDeliveryAssistantRun: DeliveryAssistantRunReceipt;
+  decideDeliveryContent: DeliveryContentReceipt;
   decideDeliveryCreativeAdLink: DeliveryCreativeLearningReceipt;
   decideDeliveryRelease: DeliveryReleaseReceipt;
   decideDeliverySeoReport: DeliverySeoReceipt;
@@ -9765,6 +10184,9 @@ export type Mutation = {
   saveDeliveryCommitmentLine: DeliveryCommitments;
   saveDeliveryCommitmentPeriod: DeliveryCommitments;
   saveDeliveryCompetitorSource: DeliveryCompetitorSourceReceipt;
+  saveDeliveryContent: DeliveryContentReceipt;
+  saveDeliveryContentAccount: DeliveryContentReceipt;
+  saveDeliveryContentPlan: DeliveryContentReceipt;
   saveDeliveryCreativeAdLink: DeliveryCreativeLearningReceipt;
   saveDeliveryFathomSettings: DeliveryFathomSettings;
   saveDeliveryFinanceEntry: Scalars['String']['output'];
@@ -10385,6 +10807,11 @@ export type MutationDecideDeliveryAssistantRunArgs = {
 };
 
 
+export type MutationDecideDeliveryContentArgs = {
+  input: DeliveryContentDecisionInput;
+};
+
+
 export type MutationDecideDeliveryCreativeAdLinkArgs = {
   input: DeliveryCreativeAdLinkDecisionInput;
 };
@@ -10994,6 +11421,21 @@ export type MutationSaveDeliveryCommitmentPeriodArgs = {
 
 export type MutationSaveDeliveryCompetitorSourceArgs = {
   input: DeliveryCompetitorSourceSaveInput;
+};
+
+
+export type MutationSaveDeliveryContentArgs = {
+  input: DeliveryContentSaveInput;
+};
+
+
+export type MutationSaveDeliveryContentAccountArgs = {
+  input: DeliveryContentAccountSaveInput;
+};
+
+
+export type MutationSaveDeliveryContentPlanArgs = {
+  input: DeliveryContentPlanSaveInput;
 };
 
 
@@ -13002,6 +13444,14 @@ export type Query = {
   deliveryCompetitorSourceChoices: DeliveryCompetitorSourceChoices;
   deliveryCompetitorSourceReceipt: DeliveryCompetitorSourceReceiptResult;
   deliveryCompetitorSources: DeliveryCompetitorSources;
+  deliveryContentAssetChoices: DeliveryContentAssetChoices;
+  deliveryContentCalendar: DeliveryContentCalendar;
+  deliveryContentDetail: DeliveryContentDetail;
+  deliveryContentList: DeliveryContentList;
+  deliveryContentPlans: DeliveryContentPlans;
+  deliveryContentProjectChoices: DeliveryContentProjectChoices;
+  deliveryContentProjects: DeliveryContentProjects;
+  deliveryContentReceipt: DeliveryContentReceiptResult;
   deliveryCreative: Scalars['JSON']['output'];
   deliveryCreativeAdLink: DeliveryCreativeAdLink;
   deliveryCreativeAdLinkChoices: DeliveryCreativeAdLinkChoices;
@@ -13189,6 +13639,7 @@ export type Query = {
   otogrowRoleDirectory: OtogrowRoleDirectory;
   pieChartData: PieChartData;
   previewDeliveryCompetitorSource: DeliveryCompetitorSourcePreview;
+  previewDeliveryContent: DeliveryContentPreview;
   previewDeliveryFounderEscalationRule: DeliveryFounderEscalationPreview;
   previewDeliveryRelease: DeliveryReleasePreview;
   previewMessageCampaignAudience: CampaignAudiencePreviewDto;
@@ -13473,6 +13924,46 @@ export type QueryDeliveryCompetitorSourceReceiptArgs = {
 
 export type QueryDeliveryCompetitorSourcesArgs = {
   input: DeliveryCompetitorSourcesInput;
+};
+
+
+export type QueryDeliveryContentAssetChoicesArgs = {
+  input: DeliveryContentAssetChoicesInput;
+};
+
+
+export type QueryDeliveryContentCalendarArgs = {
+  input: DeliveryContentCalendarInput;
+};
+
+
+export type QueryDeliveryContentDetailArgs = {
+  input: DeliveryContentSelectionInput;
+};
+
+
+export type QueryDeliveryContentListArgs = {
+  input: DeliveryContentListInput;
+};
+
+
+export type QueryDeliveryContentPlansArgs = {
+  input: DeliveryContentPlansInput;
+};
+
+
+export type QueryDeliveryContentProjectChoicesArgs = {
+  input: DeliveryContentProjectChoicesInput;
+};
+
+
+export type QueryDeliveryContentProjectsArgs = {
+  input: DeliveryContentProjectsInput;
+};
+
+
+export type QueryDeliveryContentReceiptArgs = {
+  input: DeliveryContentReceiptInput;
 };
 
 
@@ -14229,6 +14720,11 @@ export type QueryPieChartDataArgs = {
 
 export type QueryPreviewDeliveryCompetitorSourceArgs = {
   input: DeliveryCompetitorSourceSaveInput;
+};
+
+
+export type QueryPreviewDeliveryContentArgs = {
+  input: DeliveryContentSaveInput;
 };
 
 
@@ -17407,6 +17903,111 @@ export type ChangeDeliveryCompetitorSourceStateMutationVariables = Exact<{
 
 
 export type ChangeDeliveryCompetitorSourceStateMutation = { __typename?: 'Mutation', changeDeliveryCompetitorSourceState: { __typename?: 'DeliveryCompetitorSourceReceipt', workspaceId: string, actorId: string, userWorkspaceId: string, requestId: string, sourceId: string, inputHash: string, action: string, revision: number, version: number, status: string, note: string, actorName: string, createdAt: string } };
+
+export type ContentProjectFragment = { __typename?: 'DeliveryContentProject', id: string, name: string, revision: number, companyId?: string | null };
+
+export type ContentAccountFragment = { __typename?: 'DeliveryContentAccount', id: string, projectId: string, companyId?: string | null, revision: number, platform: string, name: string, handle: string, profileUrl: string, archived: boolean };
+
+export type ContentPlanFragment = { __typename?: 'DeliveryContentPlan', id: string, projectId: string, companyId?: string | null, revision: number, title: string, purpose: string, engagementId?: string | null, service?: string | null, createdBy: string, canEdit: boolean };
+
+export type ContentSummaryFragment = { __typename?: 'DeliveryContentSummary', id: string, planId: string, planTitle: string, projectId: string, revision: number, currentVersion: number, lastAttemptAction?: string | null, lastAttemptAt?: string | null, status: string, ownerId: string, ownerName: string, reviewerId: string, reviewerName: string, platform: string, accountName: string, plannedAt: string, plannedLocal: string, timezone: string, format: string };
+
+export type ContentAssetSnapshotFragment = { __typename?: 'DeliveryContentAssetSnapshot', taskId: string, submissionVersion: number, assetId: string, title: string, name: string, mimeType: string, creativeVersion: number, reviewedBy: string, reviewedAt: string, sourceHash: string };
+
+export type ContentSavedBodyFragment = { __typename?: 'DeliveryContentSavedBody', accountId: string, accountRevision: number, ownerId: string, reviewerId: string, format: string, caption: string, plannedAt: string, plannedLocal: string, timezone: string, notes: string, ownerName: string, reviewerName: string, contributorIds: Array<string>, sourceFingerprint: string, asset?: { __typename?: 'DeliveryContentAsset', taskId: string, submissionVersion: number, assetId: string } | null, account: { __typename?: 'DeliveryContentAccount', id: string, projectId: string, companyId?: string | null, revision: number, platform: string, name: string, handle: string, profileUrl: string, archived: boolean }, assetSnapshot?: { __typename?: 'DeliveryContentAssetSnapshot', taskId: string, submissionVersion: number, assetId: string, title: string, name: string, mimeType: string, creativeVersion: number, reviewedBy: string, reviewedAt: string, sourceHash: string } | null };
+
+export type ContentReceiptFragment = { __typename?: 'DeliveryContentReceipt', id: string, workspaceId: string, actorId: string, userWorkspaceId: string, requestId: string, targetKind: string, targetId: string, planId?: string | null, version?: number | null, inputHash: string, action: string, status: string, revision: number, note: string, evidenceUrl: string, publishedAt?: string | null, correctsEventId?: string | null, actorName: string, createdAt: string };
+
+export type DeliveryContentProjectsQueryVariables = Exact<{
+  input: DeliveryContentProjectsInput;
+}>;
+
+
+export type DeliveryContentProjectsQuery = { __typename?: 'Query', deliveryContentProjects: { __typename?: 'DeliveryContentProjects', workspaceId: string, memberId: string, userWorkspaceId: string, scope: string, observedAt: string, isManager: boolean, totalCount: number, nextId?: string | null, items: Array<{ __typename?: 'DeliveryContentProject', id: string, name: string, revision: number, companyId?: string | null }> } };
+
+export type DeliveryContentProjectChoicesQueryVariables = Exact<{
+  input: DeliveryContentProjectChoicesInput;
+}>;
+
+
+export type DeliveryContentProjectChoicesQuery = { __typename?: 'Query', deliveryContentProjectChoices: { __typename?: 'DeliveryContentProjectChoices', workspaceId: string, memberId: string, userWorkspaceId: string, scope: string, observedAt: string, isManager: boolean, nextAccountId?: string | null, nextMemberId?: string | null, nextEngagementId?: string | null, unavailableSelectedIds: Array<string>, project: { __typename?: 'DeliveryContentProject', id: string, name: string, revision: number, companyId?: string | null }, accounts: Array<{ __typename?: 'DeliveryContentAccount', id: string, projectId: string, companyId?: string | null, revision: number, platform: string, name: string, handle: string, profileUrl: string, archived: boolean }>, members: Array<{ __typename?: 'DeliveryContentMember', id: string, name: string, canReview: boolean }>, engagements: Array<{ __typename?: 'DeliveryContentEngagement', id: string, name: string, services: Array<string> }>, selectedAccounts: Array<{ __typename?: 'DeliveryContentAccount', id: string, projectId: string, companyId?: string | null, revision: number, platform: string, name: string, handle: string, profileUrl: string, archived: boolean }>, selectedMembers: Array<{ __typename?: 'DeliveryContentMember', id: string, name: string, canReview: boolean }>, selectedEngagements: Array<{ __typename?: 'DeliveryContentEngagement', id: string, name: string, services: Array<string> }> } };
+
+export type DeliveryContentPlansQueryVariables = Exact<{
+  input: DeliveryContentPlansInput;
+}>;
+
+
+export type DeliveryContentPlansQuery = { __typename?: 'Query', deliveryContentPlans: { __typename?: 'DeliveryContentPlans', workspaceId: string, memberId: string, userWorkspaceId: string, scope: string, observedAt: string, isManager: boolean, totalCount: number, nextId?: string | null, items: Array<{ __typename?: 'DeliveryContentPlan', id: string, projectId: string, companyId?: string | null, revision: number, title: string, purpose: string, engagementId?: string | null, service?: string | null, createdBy: string, canEdit: boolean }> } };
+
+export type DeliveryContentListQueryVariables = Exact<{
+  input: DeliveryContentListInput;
+}>;
+
+
+export type DeliveryContentListQuery = { __typename?: 'Query', deliveryContentList: { __typename?: 'DeliveryContentList', workspaceId: string, memberId: string, userWorkspaceId: string, scope: string, observedAt: string, isManager: boolean, totalCount: number, nextId?: string | null, items: Array<{ __typename?: 'DeliveryContentSummary', id: string, planId: string, planTitle: string, projectId: string, revision: number, currentVersion: number, lastAttemptAction?: string | null, lastAttemptAt?: string | null, status: string, ownerId: string, ownerName: string, reviewerId: string, reviewerName: string, platform: string, accountName: string, plannedAt: string, plannedLocal: string, timezone: string, format: string }>, platformCounts: Array<{ __typename?: 'DeliveryContentPlatformCount', platform: string, count: number, publishedCount: number, reviewCount: number }> } };
+
+export type DeliveryContentAssetChoicesQueryVariables = Exact<{
+  input: DeliveryContentAssetChoicesInput;
+}>;
+
+
+export type DeliveryContentAssetChoicesQuery = { __typename?: 'Query', deliveryContentAssetChoices: { __typename?: 'DeliveryContentAssetChoices', workspaceId: string, memberId: string, userWorkspaceId: string, scope: string, observedAt: string, isManager: boolean, nextTaskId?: string | null, items: Array<{ __typename?: 'DeliveryContentAssetSnapshot', taskId: string, submissionVersion: number, assetId: string, title: string, name: string, mimeType: string, creativeVersion: number, reviewedBy: string, reviewedAt: string, sourceHash: string }> } };
+
+export type DeliveryContentCalendarQueryVariables = Exact<{
+  input: DeliveryContentCalendarInput;
+}>;
+
+
+export type DeliveryContentCalendarQuery = { __typename?: 'Query', deliveryContentCalendar: { __typename?: 'DeliveryContentCalendar', workspaceId: string, memberId: string, userWorkspaceId: string, scope: string, observedAt: string, isManager: boolean, timezone: string, from: string, to: string, totalCount: number, days: Array<{ __typename?: 'DeliveryContentDay', date: string, count: number }> } };
+
+export type DeliveryContentDetailQueryVariables = Exact<{
+  input: DeliveryContentSelectionInput;
+}>;
+
+
+export type DeliveryContentDetailQuery = { __typename?: 'Query', deliveryContentDetail: { __typename?: 'DeliveryContentDetail', workspaceId: string, memberId: string, userWorkspaceId: string, scope: string, observedAt: string, isManager: boolean, selectedVersion: number, nextEventId?: string | null, currentSourceFingerprint: string, sourceChanged: boolean, canEdit: boolean, allowedActions: Array<string>, blockedReason?: string | null, variant: { __typename?: 'DeliveryContentSummary', id: string, planId: string, planTitle: string, projectId: string, revision: number, currentVersion: number, lastAttemptAction?: string | null, lastAttemptAt?: string | null, status: string, ownerId: string, ownerName: string, reviewerId: string, reviewerName: string, platform: string, accountName: string, plannedAt: string, plannedLocal: string, timezone: string, format: string }, project: { __typename?: 'DeliveryContentProject', id: string, name: string, revision: number, companyId?: string | null }, plan: { __typename?: 'DeliveryContentPlan', id: string, projectId: string, companyId?: string | null, revision: number, title: string, purpose: string, engagementId?: string | null, service?: string | null, createdBy: string, canEdit: boolean }, body: { __typename?: 'DeliveryContentSavedBody', accountId: string, accountRevision: number, ownerId: string, reviewerId: string, format: string, caption: string, plannedAt: string, plannedLocal: string, timezone: string, notes: string, ownerName: string, reviewerName: string, contributorIds: Array<string>, sourceFingerprint: string, asset?: { __typename?: 'DeliveryContentAsset', taskId: string, submissionVersion: number, assetId: string } | null, account: { __typename?: 'DeliveryContentAccount', id: string, projectId: string, companyId?: string | null, revision: number, platform: string, name: string, handle: string, profileUrl: string, archived: boolean }, assetSnapshot?: { __typename?: 'DeliveryContentAssetSnapshot', taskId: string, submissionVersion: number, assetId: string, title: string, name: string, mimeType: string, creativeVersion: number, reviewedBy: string, reviewedAt: string, sourceHash: string } | null }, history: Array<{ __typename?: 'DeliveryContentReceipt', id: string, workspaceId: string, actorId: string, userWorkspaceId: string, requestId: string, targetKind: string, targetId: string, planId?: string | null, version?: number | null, inputHash: string, action: string, status: string, revision: number, note: string, evidenceUrl: string, publishedAt?: string | null, correctsEventId?: string | null, actorName: string, createdAt: string }>, latestPublication?: { __typename?: 'DeliveryContentReceipt', id: string, workspaceId: string, actorId: string, userWorkspaceId: string, requestId: string, targetKind: string, targetId: string, planId?: string | null, version?: number | null, inputHash: string, action: string, status: string, revision: number, note: string, evidenceUrl: string, publishedAt?: string | null, correctsEventId?: string | null, actorName: string, createdAt: string } | null } };
+
+export type DeliveryContentReceiptQueryVariables = Exact<{
+  input: DeliveryContentReceiptInput;
+}>;
+
+
+export type DeliveryContentReceiptQuery = { __typename?: 'Query', deliveryContentReceipt: { __typename?: 'DeliveryContentReceiptResult', workspaceId: string, memberId: string, userWorkspaceId: string, scope: string, observedAt: string, isManager: boolean, receipt?: { __typename?: 'DeliveryContentReceipt', id: string, workspaceId: string, actorId: string, userWorkspaceId: string, requestId: string, targetKind: string, targetId: string, planId?: string | null, version?: number | null, inputHash: string, action: string, status: string, revision: number, note: string, evidenceUrl: string, publishedAt?: string | null, correctsEventId?: string | null, actorName: string, createdAt: string } | null } };
+
+export type PreviewDeliveryContentQueryVariables = Exact<{
+  input: DeliveryContentSaveInput;
+}>;
+
+
+export type PreviewDeliveryContentQuery = { __typename?: 'Query', previewDeliveryContent: { __typename?: 'DeliveryContentPreview', workspaceId: string, memberId: string, userWorkspaceId: string, scope: string, observedAt: string, isManager: boolean, variantId: string, requestId: string, inputHash: string, body: { __typename?: 'DeliveryContentSavedBody', accountId: string, accountRevision: number, ownerId: string, reviewerId: string, format: string, caption: string, plannedAt: string, plannedLocal: string, timezone: string, notes: string, ownerName: string, reviewerName: string, contributorIds: Array<string>, sourceFingerprint: string, asset?: { __typename?: 'DeliveryContentAsset', taskId: string, submissionVersion: number, assetId: string } | null, account: { __typename?: 'DeliveryContentAccount', id: string, projectId: string, companyId?: string | null, revision: number, platform: string, name: string, handle: string, profileUrl: string, archived: boolean }, assetSnapshot?: { __typename?: 'DeliveryContentAssetSnapshot', taskId: string, submissionVersion: number, assetId: string, title: string, name: string, mimeType: string, creativeVersion: number, reviewedBy: string, reviewedAt: string, sourceHash: string } | null } } };
+
+export type SaveDeliveryContentAccountMutationVariables = Exact<{
+  input: DeliveryContentAccountSaveInput;
+}>;
+
+
+export type SaveDeliveryContentAccountMutation = { __typename?: 'Mutation', saveDeliveryContentAccount: { __typename?: 'DeliveryContentReceipt', id: string, workspaceId: string, actorId: string, userWorkspaceId: string, requestId: string, targetKind: string, targetId: string, planId?: string | null, version?: number | null, inputHash: string, action: string, status: string, revision: number, note: string, evidenceUrl: string, publishedAt?: string | null, correctsEventId?: string | null, actorName: string, createdAt: string } };
+
+export type SaveDeliveryContentPlanMutationVariables = Exact<{
+  input: DeliveryContentPlanSaveInput;
+}>;
+
+
+export type SaveDeliveryContentPlanMutation = { __typename?: 'Mutation', saveDeliveryContentPlan: { __typename?: 'DeliveryContentReceipt', id: string, workspaceId: string, actorId: string, userWorkspaceId: string, requestId: string, targetKind: string, targetId: string, planId?: string | null, version?: number | null, inputHash: string, action: string, status: string, revision: number, note: string, evidenceUrl: string, publishedAt?: string | null, correctsEventId?: string | null, actorName: string, createdAt: string } };
+
+export type SaveDeliveryContentMutationVariables = Exact<{
+  input: DeliveryContentSaveInput;
+}>;
+
+
+export type SaveDeliveryContentMutation = { __typename?: 'Mutation', saveDeliveryContent: { __typename?: 'DeliveryContentReceipt', id: string, workspaceId: string, actorId: string, userWorkspaceId: string, requestId: string, targetKind: string, targetId: string, planId?: string | null, version?: number | null, inputHash: string, action: string, status: string, revision: number, note: string, evidenceUrl: string, publishedAt?: string | null, correctsEventId?: string | null, actorName: string, createdAt: string } };
+
+export type DecideDeliveryContentMutationVariables = Exact<{
+  input: DeliveryContentDecisionInput;
+}>;
+
+
+export type DecideDeliveryContentMutation = { __typename?: 'Mutation', decideDeliveryContent: { __typename?: 'DeliveryContentReceipt', id: string, workspaceId: string, actorId: string, userWorkspaceId: string, requestId: string, targetKind: string, targetId: string, planId?: string | null, version?: number | null, inputHash: string, action: string, status: string, revision: number, note: string, evidenceUrl: string, publishedAt?: string | null, correctsEventId?: string | null, actorName: string, createdAt: string } };
 
 export type DeliveryAtlasProfileFieldsFragment = { __typename?: 'DeliveryAtlasProfile', id: string, familyId: string, label: string, kind: string, operation: string, schemaRevision: string, enabled: boolean, available: boolean, blockedReasons: Array<string>, minimumReferences: number, maximumReferences: number, parameters: Array<{ __typename?: 'DeliveryAtlasParameter', name: string, label: string, type: string, required: boolean, choices: Array<string>, minimum?: number | null, maximum?: number | null, defaultValue?: string | null }> };
 
@@ -20850,6 +21451,13 @@ export const CompetitorProjectFragmentDoc = {"kind":"Document","definitions":[{"
 export const CompetitorSummaryFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"CompetitorSummary"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryCompetitorSourceSummary"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"companyId"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"platform"}},{"kind":"Field","name":{"kind":"Name","value":"canonicalReference"}},{"kind":"Field","name":{"kind":"Name","value":"ownerId"}},{"kind":"Field","name":{"kind":"Name","value":"ownerName"}},{"kind":"Field","name":{"kind":"Name","value":"reviewerId"}},{"kind":"Field","name":{"kind":"Name","value":"reviewerName"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"currentVersion"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"cadenceHours"}},{"kind":"Field","name":{"kind":"Name","value":"lookbackDays"}}]}}]} as unknown as DocumentNode<CompetitorSummaryFragment, unknown>;
 export const CompetitorBodyFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"CompetitorBody"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryCompetitorSourceSavedBody"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"platform"}},{"kind":"Field","name":{"kind":"Name","value":"accountReference"}},{"kind":"Field","name":{"kind":"Name","value":"canonicalReference"}},{"kind":"Field","name":{"kind":"Name","value":"canonicalKey"}},{"kind":"Field","name":{"kind":"Name","value":"ownerId"}},{"kind":"Field","name":{"kind":"Name","value":"ownerName"}},{"kind":"Field","name":{"kind":"Name","value":"reviewerId"}},{"kind":"Field","name":{"kind":"Name","value":"reviewerName"}},{"kind":"Field","name":{"kind":"Name","value":"cadenceHours"}},{"kind":"Field","name":{"kind":"Name","value":"lookbackDays"}},{"kind":"Field","name":{"kind":"Name","value":"purpose"}}]}}]} as unknown as DocumentNode<CompetitorBodyFragment, unknown>;
 export const CompetitorReceiptFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"CompetitorReceipt"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryCompetitorSourceReceipt"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"actorId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"requestId"}},{"kind":"Field","name":{"kind":"Name","value":"sourceId"}},{"kind":"Field","name":{"kind":"Name","value":"inputHash"}},{"kind":"Field","name":{"kind":"Name","value":"action"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"version"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"note"}},{"kind":"Field","name":{"kind":"Name","value":"actorName"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}}]} as unknown as DocumentNode<CompetitorReceiptFragment, unknown>;
+export const ContentProjectFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ContentProject"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryContentProject"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"companyId"}}]}}]} as unknown as DocumentNode<ContentProjectFragment, unknown>;
+export const ContentPlanFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ContentPlan"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryContentPlan"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"companyId"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"purpose"}},{"kind":"Field","name":{"kind":"Name","value":"engagementId"}},{"kind":"Field","name":{"kind":"Name","value":"service"}},{"kind":"Field","name":{"kind":"Name","value":"createdBy"}},{"kind":"Field","name":{"kind":"Name","value":"canEdit"}}]}}]} as unknown as DocumentNode<ContentPlanFragment, unknown>;
+export const ContentSummaryFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ContentSummary"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryContentSummary"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"planId"}},{"kind":"Field","name":{"kind":"Name","value":"planTitle"}},{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"currentVersion"}},{"kind":"Field","name":{"kind":"Name","value":"lastAttemptAction"}},{"kind":"Field","name":{"kind":"Name","value":"lastAttemptAt"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"ownerId"}},{"kind":"Field","name":{"kind":"Name","value":"ownerName"}},{"kind":"Field","name":{"kind":"Name","value":"reviewerId"}},{"kind":"Field","name":{"kind":"Name","value":"reviewerName"}},{"kind":"Field","name":{"kind":"Name","value":"platform"}},{"kind":"Field","name":{"kind":"Name","value":"accountName"}},{"kind":"Field","name":{"kind":"Name","value":"plannedAt"}},{"kind":"Field","name":{"kind":"Name","value":"plannedLocal"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"format"}}]}}]} as unknown as DocumentNode<ContentSummaryFragment, unknown>;
+export const ContentAccountFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ContentAccount"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryContentAccount"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"companyId"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"platform"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"handle"}},{"kind":"Field","name":{"kind":"Name","value":"profileUrl"}},{"kind":"Field","name":{"kind":"Name","value":"archived"}}]}}]} as unknown as DocumentNode<ContentAccountFragment, unknown>;
+export const ContentAssetSnapshotFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ContentAssetSnapshot"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryContentAssetSnapshot"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"submissionVersion"}},{"kind":"Field","name":{"kind":"Name","value":"assetId"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"mimeType"}},{"kind":"Field","name":{"kind":"Name","value":"creativeVersion"}},{"kind":"Field","name":{"kind":"Name","value":"reviewedBy"}},{"kind":"Field","name":{"kind":"Name","value":"reviewedAt"}},{"kind":"Field","name":{"kind":"Name","value":"sourceHash"}}]}}]} as unknown as DocumentNode<ContentAssetSnapshotFragment, unknown>;
+export const ContentSavedBodyFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ContentSavedBody"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryContentSavedBody"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"accountId"}},{"kind":"Field","name":{"kind":"Name","value":"accountRevision"}},{"kind":"Field","name":{"kind":"Name","value":"ownerId"}},{"kind":"Field","name":{"kind":"Name","value":"reviewerId"}},{"kind":"Field","name":{"kind":"Name","value":"format"}},{"kind":"Field","name":{"kind":"Name","value":"caption"}},{"kind":"Field","name":{"kind":"Name","value":"plannedAt"}},{"kind":"Field","name":{"kind":"Name","value":"plannedLocal"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"notes"}},{"kind":"Field","name":{"kind":"Name","value":"asset"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"submissionVersion"}},{"kind":"Field","name":{"kind":"Name","value":"assetId"}}]}},{"kind":"Field","name":{"kind":"Name","value":"account"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"ContentAccount"}}]}},{"kind":"Field","name":{"kind":"Name","value":"assetSnapshot"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"ContentAssetSnapshot"}}]}},{"kind":"Field","name":{"kind":"Name","value":"ownerName"}},{"kind":"Field","name":{"kind":"Name","value":"reviewerName"}},{"kind":"Field","name":{"kind":"Name","value":"contributorIds"}},{"kind":"Field","name":{"kind":"Name","value":"sourceFingerprint"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ContentAccount"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryContentAccount"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"companyId"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"platform"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"handle"}},{"kind":"Field","name":{"kind":"Name","value":"profileUrl"}},{"kind":"Field","name":{"kind":"Name","value":"archived"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ContentAssetSnapshot"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryContentAssetSnapshot"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"submissionVersion"}},{"kind":"Field","name":{"kind":"Name","value":"assetId"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"mimeType"}},{"kind":"Field","name":{"kind":"Name","value":"creativeVersion"}},{"kind":"Field","name":{"kind":"Name","value":"reviewedBy"}},{"kind":"Field","name":{"kind":"Name","value":"reviewedAt"}},{"kind":"Field","name":{"kind":"Name","value":"sourceHash"}}]}}]} as unknown as DocumentNode<ContentSavedBodyFragment, unknown>;
+export const ContentReceiptFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ContentReceipt"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryContentReceipt"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"actorId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"requestId"}},{"kind":"Field","name":{"kind":"Name","value":"targetKind"}},{"kind":"Field","name":{"kind":"Name","value":"targetId"}},{"kind":"Field","name":{"kind":"Name","value":"planId"}},{"kind":"Field","name":{"kind":"Name","value":"version"}},{"kind":"Field","name":{"kind":"Name","value":"inputHash"}},{"kind":"Field","name":{"kind":"Name","value":"action"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"note"}},{"kind":"Field","name":{"kind":"Name","value":"evidenceUrl"}},{"kind":"Field","name":{"kind":"Name","value":"publishedAt"}},{"kind":"Field","name":{"kind":"Name","value":"correctsEventId"}},{"kind":"Field","name":{"kind":"Name","value":"actorName"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}}]} as unknown as DocumentNode<ContentReceiptFragment, unknown>;
 export const DeliveryAtlasFamilyFieldsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DeliveryAtlasFamilyFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryAtlasFamily"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"textToImageProfileId"}},{"kind":"Field","name":{"kind":"Name","value":"imageEditProfileId"}}]}}]} as unknown as DocumentNode<DeliveryAtlasFamilyFieldsFragment, unknown>;
 export const DeliveryAtlasProfileFieldsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DeliveryAtlasProfileFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryAtlasProfile"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"familyId"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"operation"}},{"kind":"Field","name":{"kind":"Name","value":"schemaRevision"}},{"kind":"Field","name":{"kind":"Name","value":"enabled"}},{"kind":"Field","name":{"kind":"Name","value":"available"}},{"kind":"Field","name":{"kind":"Name","value":"blockedReasons"}},{"kind":"Field","name":{"kind":"Name","value":"minimumReferences"}},{"kind":"Field","name":{"kind":"Name","value":"maximumReferences"}},{"kind":"Field","name":{"kind":"Name","value":"parameters"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"type"}},{"kind":"Field","name":{"kind":"Name","value":"required"}},{"kind":"Field","name":{"kind":"Name","value":"choices"}},{"kind":"Field","name":{"kind":"Name","value":"minimum"}},{"kind":"Field","name":{"kind":"Name","value":"maximum"}},{"kind":"Field","name":{"kind":"Name","value":"defaultValue"}}]}}]}}]} as unknown as DocumentNode<DeliveryAtlasProfileFieldsFragment, unknown>;
 export const DeliveryAtlasSettingsFieldsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DeliveryAtlasSettingsFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryAtlasSettings"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"enabled"}},{"kind":"Field","name":{"kind":"Name","value":"keyConfigured"}},{"kind":"Field","name":{"kind":"Name","value":"verificationStatus"}},{"kind":"Field","name":{"kind":"Name","value":"verifiedAt"}},{"kind":"Field","name":{"kind":"Name","value":"defaultImageFamilyId"}},{"kind":"Field","name":{"kind":"Name","value":"defaultClipProfileId"}},{"kind":"Field","name":{"kind":"Name","value":"enabledProfileIds"}},{"kind":"Field","name":{"kind":"Name","value":"reservationLimits"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"profileId"}},{"kind":"Field","name":{"kind":"Name","value":"maximumCostUsd"}},{"kind":"Field","name":{"kind":"Name","value":"source"}},{"kind":"Field","name":{"kind":"Name","value":"verifiedAt"}}]}},{"kind":"Field","name":{"kind":"Name","value":"families"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DeliveryAtlasFamilyFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"profiles"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DeliveryAtlasProfileFields"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DeliveryAtlasFamilyFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryAtlasFamily"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"textToImageProfileId"}},{"kind":"Field","name":{"kind":"Name","value":"imageEditProfileId"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DeliveryAtlasProfileFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryAtlasProfile"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"familyId"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"operation"}},{"kind":"Field","name":{"kind":"Name","value":"schemaRevision"}},{"kind":"Field","name":{"kind":"Name","value":"enabled"}},{"kind":"Field","name":{"kind":"Name","value":"available"}},{"kind":"Field","name":{"kind":"Name","value":"blockedReasons"}},{"kind":"Field","name":{"kind":"Name","value":"minimumReferences"}},{"kind":"Field","name":{"kind":"Name","value":"maximumReferences"}},{"kind":"Field","name":{"kind":"Name","value":"parameters"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"type"}},{"kind":"Field","name":{"kind":"Name","value":"required"}},{"kind":"Field","name":{"kind":"Name","value":"choices"}},{"kind":"Field","name":{"kind":"Name","value":"minimum"}},{"kind":"Field","name":{"kind":"Name","value":"maximum"}},{"kind":"Field","name":{"kind":"Name","value":"defaultValue"}}]}}]}}]} as unknown as DocumentNode<DeliveryAtlasSettingsFieldsFragment, unknown>;
@@ -21110,6 +21718,19 @@ export const PreviewDeliveryCompetitorSourceDocument = {"kind":"Document","defin
 export const DeliveryCompetitorSourceReceiptDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"DeliveryCompetitorSourceReceipt"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryCompetitorSourceReceiptInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deliveryCompetitorSourceReceipt"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"scope"}},{"kind":"Field","name":{"kind":"Name","value":"observedAt"}},{"kind":"Field","name":{"kind":"Name","value":"isManager"}},{"kind":"Field","name":{"kind":"Name","value":"receipt"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"CompetitorReceipt"}}]}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"CompetitorReceipt"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryCompetitorSourceReceipt"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"actorId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"requestId"}},{"kind":"Field","name":{"kind":"Name","value":"sourceId"}},{"kind":"Field","name":{"kind":"Name","value":"inputHash"}},{"kind":"Field","name":{"kind":"Name","value":"action"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"version"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"note"}},{"kind":"Field","name":{"kind":"Name","value":"actorName"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}}]} as unknown as DocumentNode<DeliveryCompetitorSourceReceiptQuery, DeliveryCompetitorSourceReceiptQueryVariables>;
 export const SaveDeliveryCompetitorSourceDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SaveDeliveryCompetitorSource"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryCompetitorSourceSaveInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"saveDeliveryCompetitorSource"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"CompetitorReceipt"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"CompetitorReceipt"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryCompetitorSourceReceipt"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"actorId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"requestId"}},{"kind":"Field","name":{"kind":"Name","value":"sourceId"}},{"kind":"Field","name":{"kind":"Name","value":"inputHash"}},{"kind":"Field","name":{"kind":"Name","value":"action"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"version"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"note"}},{"kind":"Field","name":{"kind":"Name","value":"actorName"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}}]} as unknown as DocumentNode<SaveDeliveryCompetitorSourceMutation, SaveDeliveryCompetitorSourceMutationVariables>;
 export const ChangeDeliveryCompetitorSourceStateDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"ChangeDeliveryCompetitorSourceState"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryCompetitorSourceChangeInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"changeDeliveryCompetitorSourceState"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"CompetitorReceipt"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"CompetitorReceipt"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryCompetitorSourceReceipt"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"actorId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"requestId"}},{"kind":"Field","name":{"kind":"Name","value":"sourceId"}},{"kind":"Field","name":{"kind":"Name","value":"inputHash"}},{"kind":"Field","name":{"kind":"Name","value":"action"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"version"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"note"}},{"kind":"Field","name":{"kind":"Name","value":"actorName"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}}]} as unknown as DocumentNode<ChangeDeliveryCompetitorSourceStateMutation, ChangeDeliveryCompetitorSourceStateMutationVariables>;
+export const DeliveryContentProjectsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"DeliveryContentProjects"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryContentProjectsInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deliveryContentProjects"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"scope"}},{"kind":"Field","name":{"kind":"Name","value":"observedAt"}},{"kind":"Field","name":{"kind":"Name","value":"isManager"}},{"kind":"Field","name":{"kind":"Name","value":"items"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"ContentProject"}}]}},{"kind":"Field","name":{"kind":"Name","value":"totalCount"}},{"kind":"Field","name":{"kind":"Name","value":"nextId"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ContentProject"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryContentProject"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"companyId"}}]}}]} as unknown as DocumentNode<DeliveryContentProjectsQuery, DeliveryContentProjectsQueryVariables>;
+export const DeliveryContentProjectChoicesDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"DeliveryContentProjectChoices"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryContentProjectChoicesInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deliveryContentProjectChoices"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"scope"}},{"kind":"Field","name":{"kind":"Name","value":"observedAt"}},{"kind":"Field","name":{"kind":"Name","value":"isManager"}},{"kind":"Field","name":{"kind":"Name","value":"project"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"ContentProject"}}]}},{"kind":"Field","name":{"kind":"Name","value":"accounts"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"ContentAccount"}}]}},{"kind":"Field","name":{"kind":"Name","value":"members"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"canReview"}}]}},{"kind":"Field","name":{"kind":"Name","value":"engagements"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"services"}}]}},{"kind":"Field","name":{"kind":"Name","value":"selectedAccounts"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"ContentAccount"}}]}},{"kind":"Field","name":{"kind":"Name","value":"selectedMembers"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"canReview"}}]}},{"kind":"Field","name":{"kind":"Name","value":"selectedEngagements"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"services"}}]}},{"kind":"Field","name":{"kind":"Name","value":"nextAccountId"}},{"kind":"Field","name":{"kind":"Name","value":"nextMemberId"}},{"kind":"Field","name":{"kind":"Name","value":"nextEngagementId"}},{"kind":"Field","name":{"kind":"Name","value":"unavailableSelectedIds"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ContentProject"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryContentProject"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"companyId"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ContentAccount"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryContentAccount"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"companyId"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"platform"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"handle"}},{"kind":"Field","name":{"kind":"Name","value":"profileUrl"}},{"kind":"Field","name":{"kind":"Name","value":"archived"}}]}}]} as unknown as DocumentNode<DeliveryContentProjectChoicesQuery, DeliveryContentProjectChoicesQueryVariables>;
+export const DeliveryContentPlansDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"DeliveryContentPlans"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryContentPlansInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deliveryContentPlans"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"scope"}},{"kind":"Field","name":{"kind":"Name","value":"observedAt"}},{"kind":"Field","name":{"kind":"Name","value":"isManager"}},{"kind":"Field","name":{"kind":"Name","value":"items"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"ContentPlan"}}]}},{"kind":"Field","name":{"kind":"Name","value":"totalCount"}},{"kind":"Field","name":{"kind":"Name","value":"nextId"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ContentPlan"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryContentPlan"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"companyId"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"purpose"}},{"kind":"Field","name":{"kind":"Name","value":"engagementId"}},{"kind":"Field","name":{"kind":"Name","value":"service"}},{"kind":"Field","name":{"kind":"Name","value":"createdBy"}},{"kind":"Field","name":{"kind":"Name","value":"canEdit"}}]}}]} as unknown as DocumentNode<DeliveryContentPlansQuery, DeliveryContentPlansQueryVariables>;
+export const DeliveryContentListDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"DeliveryContentList"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryContentListInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deliveryContentList"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"scope"}},{"kind":"Field","name":{"kind":"Name","value":"observedAt"}},{"kind":"Field","name":{"kind":"Name","value":"isManager"}},{"kind":"Field","name":{"kind":"Name","value":"items"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"ContentSummary"}}]}},{"kind":"Field","name":{"kind":"Name","value":"totalCount"}},{"kind":"Field","name":{"kind":"Name","value":"nextId"}},{"kind":"Field","name":{"kind":"Name","value":"platformCounts"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"platform"}},{"kind":"Field","name":{"kind":"Name","value":"count"}},{"kind":"Field","name":{"kind":"Name","value":"publishedCount"}},{"kind":"Field","name":{"kind":"Name","value":"reviewCount"}}]}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ContentSummary"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryContentSummary"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"planId"}},{"kind":"Field","name":{"kind":"Name","value":"planTitle"}},{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"currentVersion"}},{"kind":"Field","name":{"kind":"Name","value":"lastAttemptAction"}},{"kind":"Field","name":{"kind":"Name","value":"lastAttemptAt"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"ownerId"}},{"kind":"Field","name":{"kind":"Name","value":"ownerName"}},{"kind":"Field","name":{"kind":"Name","value":"reviewerId"}},{"kind":"Field","name":{"kind":"Name","value":"reviewerName"}},{"kind":"Field","name":{"kind":"Name","value":"platform"}},{"kind":"Field","name":{"kind":"Name","value":"accountName"}},{"kind":"Field","name":{"kind":"Name","value":"plannedAt"}},{"kind":"Field","name":{"kind":"Name","value":"plannedLocal"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"format"}}]}}]} as unknown as DocumentNode<DeliveryContentListQuery, DeliveryContentListQueryVariables>;
+export const DeliveryContentAssetChoicesDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"DeliveryContentAssetChoices"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryContentAssetChoicesInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deliveryContentAssetChoices"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"scope"}},{"kind":"Field","name":{"kind":"Name","value":"observedAt"}},{"kind":"Field","name":{"kind":"Name","value":"isManager"}},{"kind":"Field","name":{"kind":"Name","value":"items"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"ContentAssetSnapshot"}}]}},{"kind":"Field","name":{"kind":"Name","value":"nextTaskId"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ContentAssetSnapshot"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryContentAssetSnapshot"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"submissionVersion"}},{"kind":"Field","name":{"kind":"Name","value":"assetId"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"mimeType"}},{"kind":"Field","name":{"kind":"Name","value":"creativeVersion"}},{"kind":"Field","name":{"kind":"Name","value":"reviewedBy"}},{"kind":"Field","name":{"kind":"Name","value":"reviewedAt"}},{"kind":"Field","name":{"kind":"Name","value":"sourceHash"}}]}}]} as unknown as DocumentNode<DeliveryContentAssetChoicesQuery, DeliveryContentAssetChoicesQueryVariables>;
+export const DeliveryContentCalendarDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"DeliveryContentCalendar"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryContentCalendarInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deliveryContentCalendar"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"scope"}},{"kind":"Field","name":{"kind":"Name","value":"observedAt"}},{"kind":"Field","name":{"kind":"Name","value":"isManager"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"from"}},{"kind":"Field","name":{"kind":"Name","value":"to"}},{"kind":"Field","name":{"kind":"Name","value":"days"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"date"}},{"kind":"Field","name":{"kind":"Name","value":"count"}}]}},{"kind":"Field","name":{"kind":"Name","value":"totalCount"}}]}}]}}]} as unknown as DocumentNode<DeliveryContentCalendarQuery, DeliveryContentCalendarQueryVariables>;
+export const DeliveryContentDetailDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"DeliveryContentDetail"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryContentSelectionInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deliveryContentDetail"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"scope"}},{"kind":"Field","name":{"kind":"Name","value":"observedAt"}},{"kind":"Field","name":{"kind":"Name","value":"isManager"}},{"kind":"Field","name":{"kind":"Name","value":"variant"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"ContentSummary"}}]}},{"kind":"Field","name":{"kind":"Name","value":"project"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"ContentProject"}}]}},{"kind":"Field","name":{"kind":"Name","value":"plan"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"ContentPlan"}}]}},{"kind":"Field","name":{"kind":"Name","value":"selectedVersion"}},{"kind":"Field","name":{"kind":"Name","value":"body"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"ContentSavedBody"}}]}},{"kind":"Field","name":{"kind":"Name","value":"history"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"ContentReceipt"}}]}},{"kind":"Field","name":{"kind":"Name","value":"nextEventId"}},{"kind":"Field","name":{"kind":"Name","value":"currentSourceFingerprint"}},{"kind":"Field","name":{"kind":"Name","value":"sourceChanged"}},{"kind":"Field","name":{"kind":"Name","value":"latestPublication"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"ContentReceipt"}}]}},{"kind":"Field","name":{"kind":"Name","value":"canEdit"}},{"kind":"Field","name":{"kind":"Name","value":"allowedActions"}},{"kind":"Field","name":{"kind":"Name","value":"blockedReason"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ContentAccount"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryContentAccount"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"companyId"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"platform"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"handle"}},{"kind":"Field","name":{"kind":"Name","value":"profileUrl"}},{"kind":"Field","name":{"kind":"Name","value":"archived"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ContentAssetSnapshot"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryContentAssetSnapshot"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"submissionVersion"}},{"kind":"Field","name":{"kind":"Name","value":"assetId"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"mimeType"}},{"kind":"Field","name":{"kind":"Name","value":"creativeVersion"}},{"kind":"Field","name":{"kind":"Name","value":"reviewedBy"}},{"kind":"Field","name":{"kind":"Name","value":"reviewedAt"}},{"kind":"Field","name":{"kind":"Name","value":"sourceHash"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ContentSummary"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryContentSummary"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"planId"}},{"kind":"Field","name":{"kind":"Name","value":"planTitle"}},{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"currentVersion"}},{"kind":"Field","name":{"kind":"Name","value":"lastAttemptAction"}},{"kind":"Field","name":{"kind":"Name","value":"lastAttemptAt"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"ownerId"}},{"kind":"Field","name":{"kind":"Name","value":"ownerName"}},{"kind":"Field","name":{"kind":"Name","value":"reviewerId"}},{"kind":"Field","name":{"kind":"Name","value":"reviewerName"}},{"kind":"Field","name":{"kind":"Name","value":"platform"}},{"kind":"Field","name":{"kind":"Name","value":"accountName"}},{"kind":"Field","name":{"kind":"Name","value":"plannedAt"}},{"kind":"Field","name":{"kind":"Name","value":"plannedLocal"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"format"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ContentProject"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryContentProject"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"companyId"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ContentPlan"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryContentPlan"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"companyId"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"purpose"}},{"kind":"Field","name":{"kind":"Name","value":"engagementId"}},{"kind":"Field","name":{"kind":"Name","value":"service"}},{"kind":"Field","name":{"kind":"Name","value":"createdBy"}},{"kind":"Field","name":{"kind":"Name","value":"canEdit"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ContentSavedBody"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryContentSavedBody"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"accountId"}},{"kind":"Field","name":{"kind":"Name","value":"accountRevision"}},{"kind":"Field","name":{"kind":"Name","value":"ownerId"}},{"kind":"Field","name":{"kind":"Name","value":"reviewerId"}},{"kind":"Field","name":{"kind":"Name","value":"format"}},{"kind":"Field","name":{"kind":"Name","value":"caption"}},{"kind":"Field","name":{"kind":"Name","value":"plannedAt"}},{"kind":"Field","name":{"kind":"Name","value":"plannedLocal"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"notes"}},{"kind":"Field","name":{"kind":"Name","value":"asset"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"submissionVersion"}},{"kind":"Field","name":{"kind":"Name","value":"assetId"}}]}},{"kind":"Field","name":{"kind":"Name","value":"account"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"ContentAccount"}}]}},{"kind":"Field","name":{"kind":"Name","value":"assetSnapshot"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"ContentAssetSnapshot"}}]}},{"kind":"Field","name":{"kind":"Name","value":"ownerName"}},{"kind":"Field","name":{"kind":"Name","value":"reviewerName"}},{"kind":"Field","name":{"kind":"Name","value":"contributorIds"}},{"kind":"Field","name":{"kind":"Name","value":"sourceFingerprint"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ContentReceipt"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryContentReceipt"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"actorId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"requestId"}},{"kind":"Field","name":{"kind":"Name","value":"targetKind"}},{"kind":"Field","name":{"kind":"Name","value":"targetId"}},{"kind":"Field","name":{"kind":"Name","value":"planId"}},{"kind":"Field","name":{"kind":"Name","value":"version"}},{"kind":"Field","name":{"kind":"Name","value":"inputHash"}},{"kind":"Field","name":{"kind":"Name","value":"action"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"note"}},{"kind":"Field","name":{"kind":"Name","value":"evidenceUrl"}},{"kind":"Field","name":{"kind":"Name","value":"publishedAt"}},{"kind":"Field","name":{"kind":"Name","value":"correctsEventId"}},{"kind":"Field","name":{"kind":"Name","value":"actorName"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}}]} as unknown as DocumentNode<DeliveryContentDetailQuery, DeliveryContentDetailQueryVariables>;
+export const DeliveryContentReceiptDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"DeliveryContentReceipt"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryContentReceiptInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deliveryContentReceipt"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"scope"}},{"kind":"Field","name":{"kind":"Name","value":"observedAt"}},{"kind":"Field","name":{"kind":"Name","value":"isManager"}},{"kind":"Field","name":{"kind":"Name","value":"receipt"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"ContentReceipt"}}]}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ContentReceipt"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryContentReceipt"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"actorId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"requestId"}},{"kind":"Field","name":{"kind":"Name","value":"targetKind"}},{"kind":"Field","name":{"kind":"Name","value":"targetId"}},{"kind":"Field","name":{"kind":"Name","value":"planId"}},{"kind":"Field","name":{"kind":"Name","value":"version"}},{"kind":"Field","name":{"kind":"Name","value":"inputHash"}},{"kind":"Field","name":{"kind":"Name","value":"action"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"note"}},{"kind":"Field","name":{"kind":"Name","value":"evidenceUrl"}},{"kind":"Field","name":{"kind":"Name","value":"publishedAt"}},{"kind":"Field","name":{"kind":"Name","value":"correctsEventId"}},{"kind":"Field","name":{"kind":"Name","value":"actorName"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}}]} as unknown as DocumentNode<DeliveryContentReceiptQuery, DeliveryContentReceiptQueryVariables>;
+export const PreviewDeliveryContentDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"PreviewDeliveryContent"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryContentSaveInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"previewDeliveryContent"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"scope"}},{"kind":"Field","name":{"kind":"Name","value":"observedAt"}},{"kind":"Field","name":{"kind":"Name","value":"isManager"}},{"kind":"Field","name":{"kind":"Name","value":"variantId"}},{"kind":"Field","name":{"kind":"Name","value":"requestId"}},{"kind":"Field","name":{"kind":"Name","value":"inputHash"}},{"kind":"Field","name":{"kind":"Name","value":"body"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"ContentSavedBody"}}]}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ContentAccount"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryContentAccount"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"projectId"}},{"kind":"Field","name":{"kind":"Name","value":"companyId"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"platform"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"handle"}},{"kind":"Field","name":{"kind":"Name","value":"profileUrl"}},{"kind":"Field","name":{"kind":"Name","value":"archived"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ContentAssetSnapshot"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryContentAssetSnapshot"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"submissionVersion"}},{"kind":"Field","name":{"kind":"Name","value":"assetId"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"mimeType"}},{"kind":"Field","name":{"kind":"Name","value":"creativeVersion"}},{"kind":"Field","name":{"kind":"Name","value":"reviewedBy"}},{"kind":"Field","name":{"kind":"Name","value":"reviewedAt"}},{"kind":"Field","name":{"kind":"Name","value":"sourceHash"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ContentSavedBody"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryContentSavedBody"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"accountId"}},{"kind":"Field","name":{"kind":"Name","value":"accountRevision"}},{"kind":"Field","name":{"kind":"Name","value":"ownerId"}},{"kind":"Field","name":{"kind":"Name","value":"reviewerId"}},{"kind":"Field","name":{"kind":"Name","value":"format"}},{"kind":"Field","name":{"kind":"Name","value":"caption"}},{"kind":"Field","name":{"kind":"Name","value":"plannedAt"}},{"kind":"Field","name":{"kind":"Name","value":"plannedLocal"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"notes"}},{"kind":"Field","name":{"kind":"Name","value":"asset"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"submissionVersion"}},{"kind":"Field","name":{"kind":"Name","value":"assetId"}}]}},{"kind":"Field","name":{"kind":"Name","value":"account"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"ContentAccount"}}]}},{"kind":"Field","name":{"kind":"Name","value":"assetSnapshot"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"ContentAssetSnapshot"}}]}},{"kind":"Field","name":{"kind":"Name","value":"ownerName"}},{"kind":"Field","name":{"kind":"Name","value":"reviewerName"}},{"kind":"Field","name":{"kind":"Name","value":"contributorIds"}},{"kind":"Field","name":{"kind":"Name","value":"sourceFingerprint"}}]}}]} as unknown as DocumentNode<PreviewDeliveryContentQuery, PreviewDeliveryContentQueryVariables>;
+export const SaveDeliveryContentAccountDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SaveDeliveryContentAccount"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryContentAccountSaveInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"saveDeliveryContentAccount"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"ContentReceipt"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ContentReceipt"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryContentReceipt"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"actorId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"requestId"}},{"kind":"Field","name":{"kind":"Name","value":"targetKind"}},{"kind":"Field","name":{"kind":"Name","value":"targetId"}},{"kind":"Field","name":{"kind":"Name","value":"planId"}},{"kind":"Field","name":{"kind":"Name","value":"version"}},{"kind":"Field","name":{"kind":"Name","value":"inputHash"}},{"kind":"Field","name":{"kind":"Name","value":"action"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"note"}},{"kind":"Field","name":{"kind":"Name","value":"evidenceUrl"}},{"kind":"Field","name":{"kind":"Name","value":"publishedAt"}},{"kind":"Field","name":{"kind":"Name","value":"correctsEventId"}},{"kind":"Field","name":{"kind":"Name","value":"actorName"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}}]} as unknown as DocumentNode<SaveDeliveryContentAccountMutation, SaveDeliveryContentAccountMutationVariables>;
+export const SaveDeliveryContentPlanDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SaveDeliveryContentPlan"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryContentPlanSaveInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"saveDeliveryContentPlan"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"ContentReceipt"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ContentReceipt"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryContentReceipt"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"actorId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"requestId"}},{"kind":"Field","name":{"kind":"Name","value":"targetKind"}},{"kind":"Field","name":{"kind":"Name","value":"targetId"}},{"kind":"Field","name":{"kind":"Name","value":"planId"}},{"kind":"Field","name":{"kind":"Name","value":"version"}},{"kind":"Field","name":{"kind":"Name","value":"inputHash"}},{"kind":"Field","name":{"kind":"Name","value":"action"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"note"}},{"kind":"Field","name":{"kind":"Name","value":"evidenceUrl"}},{"kind":"Field","name":{"kind":"Name","value":"publishedAt"}},{"kind":"Field","name":{"kind":"Name","value":"correctsEventId"}},{"kind":"Field","name":{"kind":"Name","value":"actorName"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}}]} as unknown as DocumentNode<SaveDeliveryContentPlanMutation, SaveDeliveryContentPlanMutationVariables>;
+export const SaveDeliveryContentDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SaveDeliveryContent"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryContentSaveInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"saveDeliveryContent"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"ContentReceipt"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ContentReceipt"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryContentReceipt"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"actorId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"requestId"}},{"kind":"Field","name":{"kind":"Name","value":"targetKind"}},{"kind":"Field","name":{"kind":"Name","value":"targetId"}},{"kind":"Field","name":{"kind":"Name","value":"planId"}},{"kind":"Field","name":{"kind":"Name","value":"version"}},{"kind":"Field","name":{"kind":"Name","value":"inputHash"}},{"kind":"Field","name":{"kind":"Name","value":"action"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"note"}},{"kind":"Field","name":{"kind":"Name","value":"evidenceUrl"}},{"kind":"Field","name":{"kind":"Name","value":"publishedAt"}},{"kind":"Field","name":{"kind":"Name","value":"correctsEventId"}},{"kind":"Field","name":{"kind":"Name","value":"actorName"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}}]} as unknown as DocumentNode<SaveDeliveryContentMutation, SaveDeliveryContentMutationVariables>;
+export const DecideDeliveryContentDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DecideDeliveryContent"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryContentDecisionInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"decideDeliveryContent"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"ContentReceipt"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ContentReceipt"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryContentReceipt"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"actorId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"requestId"}},{"kind":"Field","name":{"kind":"Name","value":"targetKind"}},{"kind":"Field","name":{"kind":"Name","value":"targetId"}},{"kind":"Field","name":{"kind":"Name","value":"planId"}},{"kind":"Field","name":{"kind":"Name","value":"version"}},{"kind":"Field","name":{"kind":"Name","value":"inputHash"}},{"kind":"Field","name":{"kind":"Name","value":"action"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"note"}},{"kind":"Field","name":{"kind":"Name","value":"evidenceUrl"}},{"kind":"Field","name":{"kind":"Name","value":"publishedAt"}},{"kind":"Field","name":{"kind":"Name","value":"correctsEventId"}},{"kind":"Field","name":{"kind":"Name","value":"actorName"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}}]} as unknown as DocumentNode<DecideDeliveryContentMutation, DecideDeliveryContentMutationVariables>;
 export const DeliveryAtlasSettingsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"DeliveryAtlasSettings"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deliveryAtlasSettings"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DeliveryAtlasSettingsFields"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DeliveryAtlasFamilyFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryAtlasFamily"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"textToImageProfileId"}},{"kind":"Field","name":{"kind":"Name","value":"imageEditProfileId"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DeliveryAtlasProfileFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryAtlasProfile"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"familyId"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"operation"}},{"kind":"Field","name":{"kind":"Name","value":"schemaRevision"}},{"kind":"Field","name":{"kind":"Name","value":"enabled"}},{"kind":"Field","name":{"kind":"Name","value":"available"}},{"kind":"Field","name":{"kind":"Name","value":"blockedReasons"}},{"kind":"Field","name":{"kind":"Name","value":"minimumReferences"}},{"kind":"Field","name":{"kind":"Name","value":"maximumReferences"}},{"kind":"Field","name":{"kind":"Name","value":"parameters"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"type"}},{"kind":"Field","name":{"kind":"Name","value":"required"}},{"kind":"Field","name":{"kind":"Name","value":"choices"}},{"kind":"Field","name":{"kind":"Name","value":"minimum"}},{"kind":"Field","name":{"kind":"Name","value":"maximum"}},{"kind":"Field","name":{"kind":"Name","value":"defaultValue"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DeliveryAtlasSettingsFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryAtlasSettings"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"enabled"}},{"kind":"Field","name":{"kind":"Name","value":"keyConfigured"}},{"kind":"Field","name":{"kind":"Name","value":"verificationStatus"}},{"kind":"Field","name":{"kind":"Name","value":"verifiedAt"}},{"kind":"Field","name":{"kind":"Name","value":"defaultImageFamilyId"}},{"kind":"Field","name":{"kind":"Name","value":"defaultClipProfileId"}},{"kind":"Field","name":{"kind":"Name","value":"enabledProfileIds"}},{"kind":"Field","name":{"kind":"Name","value":"reservationLimits"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"profileId"}},{"kind":"Field","name":{"kind":"Name","value":"maximumCostUsd"}},{"kind":"Field","name":{"kind":"Name","value":"source"}},{"kind":"Field","name":{"kind":"Name","value":"verifiedAt"}}]}},{"kind":"Field","name":{"kind":"Name","value":"families"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DeliveryAtlasFamilyFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"profiles"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DeliveryAtlasProfileFields"}}]}}]}}]} as unknown as DocumentNode<DeliveryAtlasSettingsQuery, DeliveryAtlasSettingsQueryVariables>;
 export const SaveDeliveryAtlasSettingsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SaveDeliveryAtlasSettings"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryAtlasSettingsInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"saveDeliveryAtlasSettings"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DeliveryAtlasSettingsFields"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DeliveryAtlasFamilyFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryAtlasFamily"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"textToImageProfileId"}},{"kind":"Field","name":{"kind":"Name","value":"imageEditProfileId"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DeliveryAtlasProfileFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryAtlasProfile"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"familyId"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"operation"}},{"kind":"Field","name":{"kind":"Name","value":"schemaRevision"}},{"kind":"Field","name":{"kind":"Name","value":"enabled"}},{"kind":"Field","name":{"kind":"Name","value":"available"}},{"kind":"Field","name":{"kind":"Name","value":"blockedReasons"}},{"kind":"Field","name":{"kind":"Name","value":"minimumReferences"}},{"kind":"Field","name":{"kind":"Name","value":"maximumReferences"}},{"kind":"Field","name":{"kind":"Name","value":"parameters"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"type"}},{"kind":"Field","name":{"kind":"Name","value":"required"}},{"kind":"Field","name":{"kind":"Name","value":"choices"}},{"kind":"Field","name":{"kind":"Name","value":"minimum"}},{"kind":"Field","name":{"kind":"Name","value":"maximum"}},{"kind":"Field","name":{"kind":"Name","value":"defaultValue"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DeliveryAtlasSettingsFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryAtlasSettings"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"enabled"}},{"kind":"Field","name":{"kind":"Name","value":"keyConfigured"}},{"kind":"Field","name":{"kind":"Name","value":"verificationStatus"}},{"kind":"Field","name":{"kind":"Name","value":"verifiedAt"}},{"kind":"Field","name":{"kind":"Name","value":"defaultImageFamilyId"}},{"kind":"Field","name":{"kind":"Name","value":"defaultClipProfileId"}},{"kind":"Field","name":{"kind":"Name","value":"enabledProfileIds"}},{"kind":"Field","name":{"kind":"Name","value":"reservationLimits"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"profileId"}},{"kind":"Field","name":{"kind":"Name","value":"maximumCostUsd"}},{"kind":"Field","name":{"kind":"Name","value":"source"}},{"kind":"Field","name":{"kind":"Name","value":"verifiedAt"}}]}},{"kind":"Field","name":{"kind":"Name","value":"families"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DeliveryAtlasFamilyFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"profiles"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DeliveryAtlasProfileFields"}}]}}]}}]} as unknown as DocumentNode<SaveDeliveryAtlasSettingsMutation, SaveDeliveryAtlasSettingsMutationVariables>;
 export const VerifyDeliveryAtlasConnectionDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"VerifyDeliveryAtlasConnection"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryAtlasRevisionInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"verifyDeliveryAtlasConnection"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DeliveryAtlasSettingsFields"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DeliveryAtlasFamilyFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryAtlasFamily"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"textToImageProfileId"}},{"kind":"Field","name":{"kind":"Name","value":"imageEditProfileId"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DeliveryAtlasProfileFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryAtlasProfile"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"familyId"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"operation"}},{"kind":"Field","name":{"kind":"Name","value":"schemaRevision"}},{"kind":"Field","name":{"kind":"Name","value":"enabled"}},{"kind":"Field","name":{"kind":"Name","value":"available"}},{"kind":"Field","name":{"kind":"Name","value":"blockedReasons"}},{"kind":"Field","name":{"kind":"Name","value":"minimumReferences"}},{"kind":"Field","name":{"kind":"Name","value":"maximumReferences"}},{"kind":"Field","name":{"kind":"Name","value":"parameters"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"type"}},{"kind":"Field","name":{"kind":"Name","value":"required"}},{"kind":"Field","name":{"kind":"Name","value":"choices"}},{"kind":"Field","name":{"kind":"Name","value":"minimum"}},{"kind":"Field","name":{"kind":"Name","value":"maximum"}},{"kind":"Field","name":{"kind":"Name","value":"defaultValue"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"DeliveryAtlasSettingsFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DeliveryAtlasSettings"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"memberId"}},{"kind":"Field","name":{"kind":"Name","value":"userWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"revision"}},{"kind":"Field","name":{"kind":"Name","value":"enabled"}},{"kind":"Field","name":{"kind":"Name","value":"keyConfigured"}},{"kind":"Field","name":{"kind":"Name","value":"verificationStatus"}},{"kind":"Field","name":{"kind":"Name","value":"verifiedAt"}},{"kind":"Field","name":{"kind":"Name","value":"defaultImageFamilyId"}},{"kind":"Field","name":{"kind":"Name","value":"defaultClipProfileId"}},{"kind":"Field","name":{"kind":"Name","value":"enabledProfileIds"}},{"kind":"Field","name":{"kind":"Name","value":"reservationLimits"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"profileId"}},{"kind":"Field","name":{"kind":"Name","value":"maximumCostUsd"}},{"kind":"Field","name":{"kind":"Name","value":"source"}},{"kind":"Field","name":{"kind":"Name","value":"verifiedAt"}}]}},{"kind":"Field","name":{"kind":"Name","value":"families"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DeliveryAtlasFamilyFields"}}]}},{"kind":"Field","name":{"kind":"Name","value":"profiles"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"DeliveryAtlasProfileFields"}}]}}]}}]} as unknown as DocumentNode<VerifyDeliveryAtlasConnectionMutation, VerifyDeliveryAtlasConnectionMutationVariables>;

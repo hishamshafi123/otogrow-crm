@@ -89,6 +89,18 @@ export const ActivityEvent = ({
     taskParams.set('panel', 'operations');
   else taskParams.delete('panel');
   const businessSources: Record<string, { to: string; name: string }> = {
+    'content-account': {
+      to: `/delivery?view=content&contentProject=${encodeURIComponent(event.projectId ?? '')}&contentAccountId=${encodeURIComponent(event.sourceId)}`,
+      name: t`Open content account`,
+    },
+    'content-plan': {
+      to: `/delivery?view=content&contentProject=${encodeURIComponent(event.projectId ?? '')}&contentPlanId=${encodeURIComponent(event.sourceId)}`,
+      name: t`Open content plan`,
+    },
+    'content-post': {
+      to: `/delivery?view=content&contentProject=${encodeURIComponent(event.projectId ?? '')}&contentPostId=${encodeURIComponent(event.sourceId)}`,
+      name: t`Open content post`,
+    },
     'competitor-source': {
       to: `/delivery?view=competitors&competitorProject=${encodeURIComponent(event.projectId ?? '')}&competitorSource=${encodeURIComponent(event.sourceId)}`,
       name: t`Open competitor source`,
@@ -168,7 +180,10 @@ export const ActivityEvent = ({
       to: `/delivery?view=health&founderPanel=alerts&founderRule=${encodeURIComponent(event.sourceId)}`,
       name: t`Open founder alert rules`,
     },
-    content: { to: '/delivery?view=content', name: t`Open content` },
+    content: {
+      to: `/delivery?view=content&contentView=legacy&businessRecord=${encodeURIComponent(event.sourceId)}`,
+      name: t`Open earlier content record`,
+    },
     competitor: {
       to: `/delivery?view=competitors&competitorView=legacy&businessRecord=${encodeURIComponent(event.sourceId)}`,
       name: t`Open competitor research`,

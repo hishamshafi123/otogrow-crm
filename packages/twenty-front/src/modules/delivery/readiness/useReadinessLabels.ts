@@ -52,7 +52,7 @@ export const useReadinessLabels = () => {
     WHATSAPP_BRIDGE: t`Automatic WhatsApp imports and sending are not available. Support for selected existing groups still needs a verified connection.`,
     SHOPIFY_IMPORT: t`Automatic order and revenue imports are not available. Revenue attributed by Meta is not a verified Shopify sales total.`,
     OTHER_AD_IMPORT: t`Automatic imports for these ad platforms are not available. You can add advertising reports manually and link their evidence.`,
-    SOCIAL_MANUAL: t`Plan and approve content, then publish outside the OS and record the link. Automatic posting and growth synchronization are not implemented.`,
+    SOCIAL_MANUAL: t`Register content accounts, plan each platform’s post and approve its exact posting package. Publish outside the OS and record the link separately for each post. Planned dates do not schedule publication; automatic posting and growth synchronization are not implemented.`,
     COMPETITOR_MANUAL: t`Register project sources with an owner, independent reviewer and planned interval. Collection stays OFF; scheduled collection and new-post alerts are not implemented. Earlier manual findings remain available. X and Instagram need verified connections; this registry uses manual evidence for Meta Ad Library.`,
     ACCOUNTING_EXPORT: t`Record transactions and export CSV. Automated accounting synchronization and your accountant’s import mapping are not configured here.`,
     MEETING_LINK_ONLY: t`Save a meeting reference and paste its transcript or notes. Links do not import transcripts; recording transcription is not implemented.`,

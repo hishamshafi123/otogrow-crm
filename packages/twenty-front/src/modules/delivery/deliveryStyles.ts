@@ -1,6 +1,6 @@
 import { styled } from '@linaria/react';
 import { GRAY_SCALE_LIGHT } from 'twenty-ui/theme';
-import { themeCssVariables } from 'twenty-ui/theme-constants';
+import { MOBILE_VIEWPORT, themeCssVariables } from 'twenty-ui/theme-constants';
 
 export const StyledDeliveryCanvas = styled.div`
   background: ${themeCssVariables.background.secondary};
@@ -10,7 +10,7 @@ export const StyledDeliveryCanvas = styled.div`
   line-height: 1.5;
   min-height: 100%;
   overflow: auto;
-  padding: 32px;
+  padding: 32px 32px 96px;
   h1,
   h2,
   h3,
@@ -109,6 +109,10 @@ export const StyledDeliveryCanvas = styled.div`
     h1 {
       font-size: 24px;
     }
+  }
+  @media (max-width: ${MOBILE_VIEWPORT}px) {
+    // Floating navigation and the phone control must not cover the last action.
+    padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
   }
 `;
 export const StyledDeliveryStack = styled.div`

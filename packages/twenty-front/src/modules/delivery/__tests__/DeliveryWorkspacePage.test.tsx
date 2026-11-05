@@ -119,6 +119,9 @@ jest.mock('@/delivery/competitors/DeliveryCompetitorSourcesPage', () => ({
     <p>Bounded competitor sources workspace</p>
   ),
 }));
+jest.mock('@/delivery/content/DeliveryContentPage', () => ({
+  DeliveryContentPage: () => <p>Platform-specific content planner</p>,
+}));
 jest.mock('@/delivery/seo-results/DeliverySeoResultsPage', () => ({
   DeliverySeoResultsPage: () => <p>Bounded SEO results workspace</p>,
 }));
@@ -1267,6 +1270,11 @@ it.each([
     'Bounded creative production workspace',
   ],
   ['/delivery?view=competitors', 'Bounded competitor sources workspace'],
+  ['/delivery?view=content', 'Platform-specific content planner'],
+  [
+    '/delivery?view=content&contentProject=project&contentPlanId=plan&contentPostId=post',
+    'Platform-specific content planner',
+  ],
   [
     '/delivery?view=competitors&competitorProject=project&competitorSource=source',
     'Bounded competitor sources workspace',
@@ -1314,6 +1322,18 @@ it.each([
   setup(entry);
   expect(
     screen.queryByText('Bounded competitor sources workspace'),
+  ).not.toBeInTheDocument();
+  expect(mockReadWorkspace).toHaveBeenCalled();
+});
+
+it.each([
+  '/delivery?view=content&contentView=legacy',
+  '/delivery?view=content&businessRecord=post',
+  '/delivery?view=content&task=task',
+])('preserves earlier content records and task bookmarks: %s', (entry) => {
+  setup(entry);
+  expect(
+    screen.queryByText('Platform-specific content planner'),
   ).not.toBeInTheDocument();
   expect(mockReadWorkspace).toHaveBeenCalled();
 });

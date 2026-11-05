@@ -1,4 +1,15 @@
 export const OPERATIONAL_PAGE_QUERIES = {
+  content: [
+    'DeliveryContentProjects',
+    'DeliveryContentProjectChoices',
+    'DeliveryContentPlans',
+    'DeliveryContentList',
+    'DeliveryContentCalendar',
+    'DeliveryContentAssetChoices',
+    'DeliveryContentDetail',
+    'DeliveryContentReceipt',
+    'PreviewDeliveryContent',
+  ],
   competitors: [
     'DeliveryCompetitorProjects',
     'DeliveryCompetitorSources',

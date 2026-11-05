@@ -186,6 +186,10 @@ const Route = () => {
         <DeliveryOperationalPage view="competitors">
           <p>Current competitor sources</p>
         </DeliveryOperationalPage>
+      ) : params.get('view') === 'content' ? (
+        <DeliveryOperationalPage view="content">
+          <p>Current content posting packages</p>
+        </DeliveryOperationalPage>
       ) : params.get('view') === 'development' ? (
         <DeliveryOperationalPage view="development">
           <p>Current development releases</p>
@@ -296,7 +300,7 @@ it.each([
   },
 );
 
-it.each(['chat', 'health', 'development', 'competitors'] as const)(
+it.each(['chat', 'health', 'development', 'competitors', 'content'] as const)(
   'refreshes only active typed %s queries and verifies current access',
   async (view) => {
     const queries = [
@@ -319,6 +323,15 @@ it.each(['chat', 'health', 'development', 'competitors'] as const)(
       'DeliveryCompetitorSourceReceipt',
       'SaveDeliveryCompetitorSource',
       'ChangeDeliveryCompetitorSourceState',
+      'DeliveryContentProjects',
+      'DeliveryContentProjectChoices',
+      'DeliveryContentPlans',
+      'DeliveryContentList',
+      'DeliveryContentCalendar',
+      'DeliveryContentAssetChoices',
+      'DeliveryContentDetail',
+      'DeliveryContentReceipt',
+      'PreviewDeliveryContent',
     ];
     const refetches = new Map(
       queries.map((name) => [name, jest.fn(async () => undefined)]),
@@ -347,18 +360,20 @@ it.each(['chat', 'health', 'development', 'competitors'] as const)(
       expect(refetch).toHaveBeenCalledTimes(
         view === 'chat'
           ? Number(queryName === 'DeliveryChat')
-          : view === 'competitors'
-            ? Number(queryName.includes('Competitor'))
-            : view === 'development'
-              ? Number(queryName.startsWith('DeliveryRelease'))
-              : Number(
-                  [
-                    'DeliveryFounderExceptions',
-                    'DeliveryReadiness',
-                    'DeliveryFounderEscalations',
-                    'PreviewDeliveryFounderEscalationRule',
-                  ].includes(queryName),
-                ),
+          : view === 'content'
+            ? Number(queryName.includes('DeliveryContent'))
+            : view === 'competitors'
+              ? Number(queryName.includes('Competitor'))
+              : view === 'development'
+                ? Number(queryName.startsWith('DeliveryRelease'))
+                : Number(
+                    [
+                      'DeliveryFounderExceptions',
+                      'DeliveryReadiness',
+                      'DeliveryFounderEscalations',
+                      'PreviewDeliveryFounderEscalationRule',
+                    ].includes(queryName),
+                  ),
       );
   },
 );
@@ -522,6 +537,21 @@ it('identifies competitor sources and states the collection limit', () => {
   expect(
     screen.getByText(
       'Register research sources, assign owners and preserve configuration history. Collection is OFF.',
+    ),
+  ).toBeVisible();
+  expect(
+    screen.queryByRole('heading', { name: 'Company overview' }),
+  ).not.toBeInTheDocument();
+});
+
+it('identifies the content planner without implying scheduled or connected posting', () => {
+  mount('/delivery?view=content');
+  expect(
+    screen.getByRole('heading', { name: 'Content planner', level: 1 }),
+  ).toBeVisible();
+  expect(
+    screen.getByText(
+      'Prepare platform-specific posts, review each posting package and record manual publication.',
     ),
   ).toBeVisible();
   expect(

@@ -161,6 +161,8 @@ async function realCachedCurrentWork(access, onDiagnostic = () => {}) {
       }
     };
     return {
+      workspaceOrm,
+      cache,
       currentWork: new OtogrowActivityCurrentWorkService(
         workspaceOrm,
         access,

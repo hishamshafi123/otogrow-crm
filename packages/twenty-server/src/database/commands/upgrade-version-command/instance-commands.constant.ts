@@ -204,6 +204,7 @@ import { AddDelegatedGmailInboxFastInstanceCommand } from 'src/database/commands
 import { AddDeveloperReleasesFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1793686027809-add-developer-releases';
 import { AddCompetitorSourceRegistryFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1793769401151-add-competitor-source-registry';
 import { AddNativeAiRecoveryIndexFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1793806940710-add-native-ai-recovery-index';
+import { AddContentPostingWorkflowFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1793810789786-add-content-posting-workflow';
 
 export const INSTANCE_COMMANDS = [
   AddViewFieldGroupIdIndexOnViewFieldFastInstanceCommand,
@@ -410,4 +411,5 @@ export const INSTANCE_COMMANDS = [
   AddDeveloperReleasesFastInstanceCommand,
   AddCompetitorSourceRegistryFastInstanceCommand,
   AddNativeAiRecoveryIndexFastInstanceCommand,
+  AddContentPostingWorkflowFastInstanceCommand,
 ];

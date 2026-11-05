@@ -69,6 +69,47 @@ const OperationalWorkspace = ({
   permission: ReturnType<typeof useWorkflowAccess>;
 }) => {
   const { t } = useLingui();
+  const pageLabels: Record<
+    DeliveryOperationalView,
+    { title: string; description: string }
+  > = {
+    chat: {
+      title: t`Team chat`,
+      description: t`Message teammates and follow up on unread messages.`,
+    },
+    inbox: {
+      title: t`Client inbox`,
+      description: t`Read selected client conversations and review each reply before sending.`,
+    },
+    creative: {
+      title: t`Creative studio`,
+      description: t`Plan and produce one exact task at a time.`,
+    },
+    development: {
+      title: t`Development releases`,
+      description: t`Plan reviewed releases, record deployment and track client handover.`,
+    },
+    competitors: {
+      title: t`Competitor sources`,
+      description: t`Register research sources, assign owners and preserve configuration history. Collection is OFF.`,
+    },
+    content: {
+      title: t`Content planner`,
+      description: t`Prepare platform-specific posts, review each posting package and record manual publication.`,
+    },
+    seo: {
+      title: t`SEO results`,
+      description: t`Separate completed SEO work from measured client results.`,
+    },
+    activity: {
+      title: t`Team activity`,
+      description: t`Inspect recorded work and ask evidence-based questions.`,
+    },
+    health: {
+      title: t`Company overview`,
+      description: t`Business exceptions and connection readiness.`,
+    },
+  };
   const client = useApolloClient();
   const navigate = useNavigate();
   const { requestAction, cancelPendingNavigation } = useDeliveryDraftGuard();
@@ -125,40 +166,8 @@ const OperationalWorkspace = ({
         <StyledDeliveryRow>
           {!expanded && <NavigationDrawerCollapseButton direction="right" />}
           <div>
-            <h1>
-              {view === 'chat'
-                ? t`Team chat`
-                : view === 'inbox'
-                  ? t`Client inbox`
-                  : view === 'creative'
-                    ? t`Creative studio`
-                    : view === 'development'
-                      ? t`Development releases`
-                      : view === 'competitors'
-                        ? t`Competitor sources`
-                        : view === 'seo'
-                          ? t`SEO results`
-                          : view === 'activity'
-                            ? t`Team activity`
-                            : t`Company overview`}
-            </h1>
-            <p>
-              {view === 'chat'
-                ? t`Message teammates and follow up on unread messages.`
-                : view === 'inbox'
-                  ? t`Read selected client conversations and review each reply before sending.`
-                  : view === 'creative'
-                    ? t`Plan and produce one exact task at a time.`
-                    : view === 'development'
-                      ? t`Plan reviewed releases, record deployment and track client handover.`
-                      : view === 'competitors'
-                        ? t`Register research sources, assign owners and preserve configuration history. Collection is OFF.`
-                        : view === 'seo'
-                          ? t`Separate completed SEO work from measured client results.`
-                          : view === 'activity'
-                            ? t`Inspect recorded work and ask evidence-based questions.`
-                            : t`Business exceptions and connection readiness.`}
-            </p>
+            <h1>{pageLabels[view].title}</h1>
+            <p>{pageLabels[view].description}</p>
           </div>
         </StyledDeliveryRow>
         <StyledDeliveryButton

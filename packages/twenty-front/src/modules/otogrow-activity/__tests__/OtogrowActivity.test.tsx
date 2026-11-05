@@ -958,3 +958,62 @@ it('keeps earlier manual competitor activity linked to its original finding', ()
     '/delivery?view=competitors&competitorView=legacy&businessRecord=550e8400-e29b-41d4-a716-446655440003',
   );
 });
+
+it.each([
+  [
+    'content-account',
+    'CONTENT_ACCOUNT_SAVE',
+    'contentAccountId',
+    'Open content account',
+  ],
+  ['content-plan', 'CONTENT_PLAN_SAVE', 'contentPlanId', 'Open content plan'],
+  [
+    'content-post',
+    'CONTENT_POST_RECORD_PUBLICATION',
+    'contentPostId',
+    'Open content post',
+  ],
+])(
+  'opens exact %s activity in its current project',
+  (sourceType, action, key, label) => {
+    const projectId = '550e8400-e29b-41d4-a716-446655440001';
+    const sourceId = '550e8400-e29b-41d4-a716-446655440002';
+    mockFeed.events = [
+      {
+        ...event,
+        sourceType,
+        action,
+        sourceId,
+        projectId,
+        taskId: null,
+        taskName: null,
+      },
+    ];
+    setup();
+    expect(screen.getByRole('link', { name: label })).toHaveAttribute(
+      'href',
+      `/delivery?view=content&contentProject=${projectId}&${key}=${sourceId}`,
+    );
+  },
+);
+
+it('keeps earlier manual content activity attached to the original record', () => {
+  const sourceId = '550e8400-e29b-41d4-a716-446655440003';
+  mockFeed.events = [
+    {
+      ...event,
+      action: 'CONTENT_PUBLISHED',
+      sourceType: 'content',
+      sourceId,
+      taskId: null,
+      taskName: null,
+    },
+  ];
+  setup();
+  expect(
+    screen.getByRole('link', { name: 'Open earlier content record' }),
+  ).toHaveAttribute(
+    'href',
+    `/delivery?view=content&contentView=legacy&businessRecord=${sourceId}`,
+  );
+});

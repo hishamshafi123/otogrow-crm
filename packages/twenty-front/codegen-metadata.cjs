@@ -5,6 +5,7 @@ module.exports = {
     (process.env.REACT_APP_SERVER_BASE_URL ?? 'http://localhost:3000') +
     '/metadata',
   documents: [
+    './src/modules/delivery/content/delivery-content.graphql.ts',
     './src/modules/delivery/competitors/delivery-competitors.graphql.ts',
     './src/modules/delivery/development/delivery-release.graphql.ts',
     './src/modules/delivery/creative/learning/delivery-creative-learning.graphql.ts',
