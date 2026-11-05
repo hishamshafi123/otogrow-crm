@@ -11,6 +11,7 @@ import { Request } from 'cross-fetch';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { DeliveryKnowledge } from '@/delivery/knowledge/DeliveryKnowledge';
 import { DeliveryDraftGuardProvider } from '@/delivery/drafts/DeliveryDraftGuard';
+import { type KnowledgeUploadFieldsFragment } from '~/generated-metadata/graphql';
 
 jest.mock('@/delivery/deliveryStyles', () => ({
   StyledDeliveryStack: 'div',
@@ -62,6 +63,7 @@ let mockSourceExists = true;
 let mockRevision = 1;
 let mockDetailVersion = 1;
 let mockCurrentVersion = 1;
+let mockPublishedVersion: number | null = 1;
 let mockProjectIds = [PROJECT];
 let mockVersion = 0;
 const mockSubscribers = new Set<() => void>();
@@ -127,7 +129,7 @@ const mockSource = () => ({
   meetingDate: '2026-10-30',
   version: 1,
   currentVersion: mockCurrentVersion,
-  publishedVersion: 1,
+  publishedVersion: mockPublishedVersion,
   publishedAt: '2026-10-30T00:00:00.000Z',
   createdBy: 'another-author',
   canEdit: mockManager,
@@ -137,6 +139,7 @@ const mockDetail = () => ({
   sourceUrl: mockManager ? 'https://fathom.video/share/synthetic' : '',
   transcript: mockManager ? 'Private raw meeting notes' : null,
   knowledge: 'Approved launch rules',
+  attachments: [],
 });
 type QueryOptions = {
   skip?: boolean;
@@ -304,6 +307,7 @@ beforeEach(() => {
   mockRevision = 1;
   mockDetailVersion = 1;
   mockCurrentVersion = 1;
+  mockPublishedVersion = 1;
   mockProjectIds = [PROJECT];
   jest.clearAllMocks();
   mockMutation.mockReset().mockRejectedValue(new Error('Lost response'));
@@ -621,4 +625,249 @@ it('refreshes only active knowledge reads after current project access is checke
   refresh({ queryName: 'DeliveryKnowledgeDetail', refetch });
   expect(refetch).toHaveBeenCalledTimes(2);
   expect(refresh({ queryName: 'DeliveryWorkspace', refetch })).toBe(false);
+});
+
+const recoverableUpload = (): KnowledgeUploadFieldsFragment => ({
+  id: '20000000-0000-4000-8000-000000000009',
+  requestId: '20000000-0000-4000-8000-000000000009',
+  workspaceId: IDENTITY.workspaceId,
+  projectId: PROJECT,
+  sourceId: SOURCE,
+  companyId: null,
+  sourceRevision: 0,
+  uploadedBy: IDENTITY.memberId,
+  uploaderUserWorkspaceId: IDENTITY.userWorkspaceId,
+  name: 'Original logo.png',
+  mimeType: 'image/png',
+  size: 4,
+  sha256: 'a'.repeat(64),
+  createdAt: '2026-11-05T00:00:00Z',
+  state: 'READY',
+  availability: 'CURRENT',
+  canAttach: true,
+  canRecover: false,
+  canDiscard: true,
+  cleanupPending: false,
+  failureReason: null,
+});
+const allowBlankRecovery = (upload = recoverableUpload()) => {
+  mockClientQuery.mockResolvedValueOnce({
+    data: { deliveryKnowledgeDetail: { ...mockEnvelope(), detail: null } },
+  });
+  mockClientQuery.mockResolvedValueOnce({
+    data: {
+      deliveryKnowledgeUploads: {
+        ...IDENTITY,
+        projectId: PROJECT,
+        items: [upload],
+        nextCursor: null,
+      },
+    },
+  });
+};
+it('requires fresh absence and owned upload proof before explicitly continuing the same source as a blank asset draft', async () => {
+  const { user } = mount(
+    `/delivery?view=knowledge&project=${PROJECT}&knowledgeCreate=${SOURCE}`,
+  );
+  expect(screen.queryByLabelText('Knowledge title')).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole('button', { name: 'Continue with a blank draft' }),
+  ).not.toBeInTheDocument();
+  allowBlankRecovery();
+  await user.click(
+    screen.getByRole('button', { name: 'Check saved knowledge source' }),
+  );
+  expect(screen.getByText(/Unsaved notes cannot be restored/)).toBeVisible();
+  expect(
+    screen.getByRole('button', { name: 'Continue with a blank draft' }),
+  ).toHaveFocus();
+  expect(mockMutation).not.toHaveBeenCalled();
+  await user.click(
+    screen.getByRole('button', { name: 'Continue with a blank draft' }),
+  );
+  expect(screen.getByLabelText('Knowledge category')).toHaveValue(
+    'ASSET_REFERENCE',
+  );
+  expect(screen.getByLabelText('Knowledge title')).toHaveValue('');
+  expect(screen.getByLabelText('Source evidence and notes')).toHaveValue('');
+  expect(mockMutation).not.toHaveBeenCalled();
+  await user.type(
+    screen.getByLabelText('Knowledge title'),
+    'Recovered brand assets',
+  );
+  await user.type(
+    screen.getByLabelText('Source evidence and notes'),
+    'Newly reviewed logo usage instructions',
+  );
+  await user.click(
+    screen.getByRole('button', { name: 'Save knowledge draft' }),
+  );
+  expect(mockMutation.mock.calls[0][1].variables.input).toEqual(
+    expect.objectContaining({
+      id: SOURCE,
+      projectId: PROJECT,
+      revision: 0,
+      category: 'ASSET_REFERENCE',
+      attachments: [],
+    }),
+  );
+});
+it.each([
+  { uploadedBy: 'other-person' },
+  { companyId: 'earlier-company', availability: 'PREVIOUS_COMPANY' },
+  { sourceId: 'other-source' },
+  { canAttach: false },
+])(
+  'does not offer a blank source for mismatched upload evidence %s',
+  async (changes) => {
+    const { user } = mount(
+      `/delivery?view=knowledge&project=${PROJECT}&knowledgeCreate=${SOURCE}`,
+    );
+    allowBlankRecovery({ ...recoverableUpload(), ...changes });
+    await user.click(
+      screen.getByRole('button', { name: 'Check saved knowledge source' }),
+    );
+    expect(
+      screen.queryByRole('button', { name: 'Continue with a blank draft' }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Knowledge title')).not.toBeInTheDocument();
+    expect(mockMutation).not.toHaveBeenCalled();
+  },
+);
+it('reviews an existing saved source instead of replacing it with a blank draft', async () => {
+  const { user } = mount(
+    `/delivery?view=knowledge&project=${PROJECT}&knowledgeCreate=${SOURCE}`,
+  );
+  mockClientQuery.mockResolvedValueOnce({
+    data: {
+      deliveryKnowledgeDetail: { ...mockEnvelope(), detail: mockDetail() },
+    },
+  });
+  await user.click(
+    screen.getByRole('button', { name: 'Check saved knowledge source' }),
+  );
+  expect(
+    screen.getByRole('link', { name: 'Review current saved draft' }),
+  ).toBeVisible();
+  expect(
+    screen.getByRole('link', { name: 'Review current saved draft' }),
+  ).toHaveFocus();
+  expect(
+    screen.queryByRole('button', { name: 'Continue with a blank draft' }),
+  ).not.toBeInTheDocument();
+  expect(mockClientQuery).toHaveBeenCalledTimes(1);
+  expect(mockMutation).not.toHaveBeenCalled();
+});
+
+it('does not take keyboard focus from another control when draft recovery finishes', async () => {
+  let finish: (value: unknown) => void = () => undefined;
+  mockClientQuery.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
+  mockClientQuery.mockResolvedValueOnce({
+    data: {
+      deliveryKnowledgeUploads: {
+        ...IDENTITY,
+        projectId: PROJECT,
+        items: [recoverableUpload()],
+        nextCursor: null,
+      },
+    },
+  });
+  const { user } = mount(
+    `/delivery?view=knowledge&project=${PROJECT}&knowledgeCreate=${SOURCE}`,
+  );
+  screen.getByRole('button', { name: 'Check saved knowledge source' }).focus();
+  await user.keyboard('{Enter}');
+  screen.getByRole('button', { name: 'Refresh page' }).focus();
+  await act(async () =>
+    finish({
+      data: { deliveryKnowledgeDetail: { ...mockEnvelope(), detail: null } },
+    }),
+  );
+  await screen.findByRole('button', { name: 'Continue with a blank draft' });
+  expect(screen.getByRole('button', { name: 'Refresh page' })).toHaveFocus();
+});
+
+it('shows Saving during a pending save and moves lost keyboard focus to its confirmed saved source link', async () => {
+  let finish: (value: unknown) => void = () => undefined;
+  mockMutation.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
+  const { user } = mount();
+  await prepareMeeting(user);
+  screen.getByRole('button', { name: 'Save meeting draft' }).focus();
+  await user.keyboard('{Enter}');
+  expect(screen.getByText('Saving knowledge draft…')).toBeVisible();
+  expect(
+    screen.queryByRole('button', { name: 'Check saved knowledge source' }),
+  ).not.toBeInTheDocument();
+  const input = mockMutation.mock.calls[0][1].variables.input;
+  await act(async () =>
+    finish({
+      data: {
+        saveDeliveryKnowledgeSource: {
+          ...mockEnvelope(),
+          source: {
+            ...mockSource(),
+            id: input.id,
+            revision: input.revision + 1,
+          },
+        },
+      },
+    }),
+  );
+  expect(
+    await screen.findByRole('link', { name: 'Open saved knowledge' }),
+  ).toHaveFocus();
+  expect(screen.queryByText('Saving knowledge draft…')).not.toBeInTheDocument();
+  expect(mockMutation).toHaveBeenCalledTimes(1);
+});
+
+it('keeps publication loading neutral and focuses confirmed withdrawal status after its button disappears', async () => {
+  let finish: (value: unknown) => void = () => undefined;
+  mockMutation.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
+  const { user } = mount(
+    `/delivery?view=knowledge&project=${PROJECT}&source=${SOURCE}`,
+  );
+  screen.getByRole('button', { name: 'Withdraw published knowledge' }).focus();
+  await user.keyboard('{Enter}');
+  expect(screen.getByText('Loading updated source…')).toBeVisible();
+  expect(
+    screen.queryByText(/Current source information could not be verified/),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole('button', { name: 'Check current source' }),
+  ).not.toBeInTheDocument();
+  mockRevision = 2;
+  mockPublishedVersion = null;
+  await act(async () =>
+    finish({
+      data: {
+        publishDeliveryKnowledgeSource: {
+          ...mockEnvelope(),
+          source: mockSource(),
+        },
+      },
+    }),
+  );
+  expect(
+    await screen.findByText(
+      'Knowledge and files withdrawn from project staff and future task assistants.',
+    ),
+  ).toHaveFocus();
+  expect(
+    screen.queryByRole('button', { name: 'Withdraw published knowledge' }),
+  ).not.toBeInTheDocument();
 });

@@ -14,6 +14,7 @@ import { useDeliveryDraftGuard } from '@/delivery/drafts/DeliveryDraftGuard';
 import { useKnowledgeContext } from '@/delivery/knowledge/useKnowledgeContext';
 import { KnowledgeProjects } from '@/delivery/knowledge/KnowledgeProjects';
 import { KnowledgeList } from '@/delivery/knowledge/KnowledgeList';
+import { KnowledgeUnusedUploads } from '@/delivery/knowledge/assets/KnowledgeUnusedUploads';
 import { KnowledgeSource } from '@/delivery/knowledge/KnowledgeSource';
 import {
   KnowledgeEditor,
@@ -307,6 +308,30 @@ export const DeliveryKnowledgeWorkspace = () => {
                   restoreFocus={restoreSource}
                 />
               )}
+              {createId === null &&
+                sourceId === null &&
+                context.selectedProject && (
+                  <KnowledgeUnusedUploads
+                    key={`${state.scope}:unused`}
+                    context={{
+                      workspaceId: context.workspaceId,
+                      memberId: context.memberId,
+                      userWorkspaceId: context.userWorkspaceId,
+                      projectId,
+                      projectRevision: context.selectedProject.revision,
+                      companyId: context.selectedProject.companyId ?? null,
+                      sourceId: projectId,
+                      sourceRevision: 0,
+                      scope: state.scope,
+                    }}
+                    projectWide
+                    enabled={state.data !== null}
+                    onAuthorityLost={() => {
+                      cancelPendingNavigation();
+                      setPrivateDenied(true);
+                    }}
+                  />
+                )}
               {createId === null && (
                 <div ref={listRegion}>
                   <KnowledgeList state={state} projectId={projectId} />

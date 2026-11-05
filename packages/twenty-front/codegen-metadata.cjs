@@ -41,6 +41,7 @@ module.exports = {
     './src/modules/delivery/capacity/delivery-capacity.graphql.ts',
     './src/modules/delivery/knowledge/delivery-knowledge.graphql.ts',
     './src/modules/delivery/knowledge/knowledge-read.graphql.ts',
+    './src/modules/delivery/knowledge/assets/knowledge-assets.graphql.ts',
     './src/modules/otogrow-access/otogrow-access.graphql.ts',
     './src/modules/otogrow-activity/otogrow-activity.graphql.ts',
     './src/modules/otogrow-ai-budget/otogrow-ai-budget.graphql.ts',

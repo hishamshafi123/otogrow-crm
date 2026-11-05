@@ -38,6 +38,7 @@ import { TwentyORMModule } from 'src/engine/twenty-orm/twenty-orm.module';
 import { WorkspaceCacheStorageModule } from 'src/engine/workspace-cache-storage/workspace-cache-storage.module';
 import { UnhandledExceptionFilter } from 'src/filters/unhandled-exception.filter';
 import { ModulesModule } from 'src/modules/modules.module';
+import { configureDeliveryFileAuthentication } from 'src/modules/delivery/configure-delivery-file-authentication';
 
 import { ClickHouseModule } from './database/clickHouse/clickHouse.module';
 import { CoreEngineModule } from './engine/core-modules/core-engine.module';
@@ -143,12 +144,7 @@ export class AppModule {
       .apply(McpMethodGuardMiddleware)
       .forRoutes({ path: ApiPath.Mcp, method: RequestMethod.ALL });
 
-    consumer
-      .apply(RestCoreMiddleware, WorkspaceAuthContextMiddleware)
-      .forRoutes({
-        path: `${ApiPath.DeliveryCreative}/*path`,
-        method: RequestMethod.ALL,
-      });
+    configureDeliveryFileAuthentication(consumer);
 
     for (const method of MIGRATED_REST_METHODS) {
       consumer

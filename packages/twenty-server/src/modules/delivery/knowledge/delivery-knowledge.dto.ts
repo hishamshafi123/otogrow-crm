@@ -1,4 +1,8 @@
 import { Field, ID, InputType, Int, ObjectType } from '@nestjs/graphql';
+import {
+  DeliveryKnowledgeAssetBindingInput,
+  DeliveryKnowledgeAssetDTO,
+} from 'src/modules/delivery/knowledge/assets/delivery-knowledge-assets.dto';
 import { DeliveryFathomProvenanceDTO } from 'src/modules/delivery/knowledge/fathom/delivery-fathom-provenance.dto';
 
 @InputType('DeliveryKnowledgeInput')
@@ -21,6 +25,8 @@ export class DeliveryKnowledgeSaveInput {
   @Field() sourceUrl: string;
   @Field() transcript: string;
   @Field() knowledge: string;
+  @Field(() => [DeliveryKnowledgeAssetBindingInput], { nullable: true })
+  attachments?: DeliveryKnowledgeAssetBindingInput[] | null;
   @Field(() => String, { nullable: true }) fathomImportProof?: string | null;
   @Field(() => String, { nullable: true }) fathomImportHash?: string | null;
 }
@@ -50,6 +56,8 @@ export class DeliveryKnowledgeDetailDTO extends DeliveryKnowledgeItemDTO {
   @Field(() => String, { nullable: true }) transcript: string | null;
   @Field() knowledge: string;
   @Field(() => Int) currentVersion: number;
+  @Field(() => [DeliveryKnowledgeAssetDTO])
+  attachments: DeliveryKnowledgeAssetDTO[];
   @Field(() => DeliveryFathomProvenanceDTO, { nullable: true })
   fathomProvenance?: DeliveryFathomProvenanceDTO | null;
 }

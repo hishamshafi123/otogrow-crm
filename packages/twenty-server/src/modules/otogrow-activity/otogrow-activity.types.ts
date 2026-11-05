@@ -41,6 +41,7 @@ export type OtogrowActivityInput = {
   sourceType:
     | 'capacity'
     | 'brand-knowledge'
+    | 'knowledge-upload'
     | 'task'
     | 'project'
     | 'roles'

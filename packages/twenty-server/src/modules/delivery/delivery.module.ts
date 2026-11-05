@@ -1,3 +1,7 @@
+import { DeliveryKnowledgeAssetEntity } from 'src/modules/delivery/knowledge/assets/entities/delivery-knowledge-asset.entity';
+import { DeliveryKnowledgeAssetsService } from 'src/modules/delivery/knowledge/assets/delivery-knowledge-assets.service';
+import { DeliveryKnowledgeAssetsResolver } from 'src/modules/delivery/knowledge/assets/delivery-knowledge-assets.resolver';
+import { DeliveryKnowledgeAssetsController } from 'src/modules/delivery/knowledge/assets/delivery-knowledge-assets.controller';
 import { DeliveryCreativeLearningService } from 'src/modules/delivery/creative/learning/delivery-creative-learning.service';
 import { DeliveryInboxService } from 'src/modules/delivery/inbox/delivery-inbox.service';
 import { DeliveryInboxGmailService } from 'src/modules/delivery/inbox/gmail/delivery-inbox-gmail.service';
@@ -226,6 +230,7 @@ import { DeliveryCreativeReadsResolver } from 'src/modules/delivery/creative/rea
       DeliveryHandoffEntity,
       DeliveryRevisionEntity,
       DeliveryAvailabilityEntity,
+      DeliveryKnowledgeAssetEntity,
       DeliveryKnowledgeSourceEntity,
       DeliveryKnowledgeVersionEntity,
       DeliveryChatMessageEntity,
@@ -250,6 +255,7 @@ import { DeliveryCreativeReadsResolver } from 'src/modules/delivery/creative/rea
     ]),
   ],
   controllers: [
+    DeliveryKnowledgeAssetsController,
     DeliveryVideoQaFilesController,
     DeliveryCreativeFilesController,
     DeliveryClientsController,
@@ -319,6 +325,8 @@ import { DeliveryCreativeReadsResolver } from 'src/modules/delivery/creative/rea
     DeliveryCapacityResolver,
     DeliveryCapacityReadService,
     DeliveryCapacityReadResolver,
+    DeliveryKnowledgeAssetsService,
+    DeliveryKnowledgeAssetsResolver,
     DeliveryKnowledgeService,
     DeliveryKnowledgeReadsService,
     DeliveryKnowledgeResolver,

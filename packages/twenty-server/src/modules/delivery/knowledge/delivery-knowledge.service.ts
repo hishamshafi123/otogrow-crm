@@ -1,4 +1,9 @@
 import {
+  knowledgeAssetAnchorSql,
+  knowledgeAssetBindingsSchema,
+} from 'src/modules/delivery/knowledge/assets/delivery-knowledge-assets.policy';
+import { readKnowledgeAssetBindings } from 'src/modules/delivery/knowledge/assets/delivery-knowledge-assets.binding';
+import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
@@ -64,6 +69,7 @@ const SAVE = z
     sourceUrl: SOURCE_URL,
     transcript: z.string().trim().max(200000),
     knowledge: z.string().trim().max(8000),
+    attachments: knowledgeAssetBindingsSchema.nullish(),
     fathomImportProof: z.string().max(16000).nullish(),
     fathomImportHash: z
       .string()
@@ -170,6 +176,7 @@ export class DeliveryKnowledgeService {
             after: input.after,
           })
           .andWhere(fathomKnowledgeAnchorSql('source', 'visible'))
+          .andWhere(knowledgeAssetAnchorSql('source', 'visible'))
           .andWhere(input.category ? 'visible.category=:category' : 'TRUE', {
             category: input.category,
           })
@@ -264,6 +271,13 @@ export class DeliveryKnowledgeService {
               : null,
             knowledge: result.content.knowledge,
             currentVersion: source.currentVersion,
+            attachments: await readKnowledgeAssetBindings(
+              manager,
+              workspace.id,
+              input.projectId,
+              source.id,
+              result.content.attachments,
+            ),
             fathomProvenance: result.summary.canEdit
               ? (result.content.fathomProvenance ?? null)
               : null,
@@ -346,6 +360,13 @@ export class DeliveryKnowledgeService {
           input.projectId,
           previous?.fathomProvenance,
         );
+        await readKnowledgeAssetBindings(
+          manager,
+          workspace.id,
+          input.projectId,
+          source.id,
+          previous?.attachments,
+        );
         if (
           Boolean(input.fathomImportProof) !== Boolean(input.fathomImportHash)
         )
@@ -377,6 +398,20 @@ export class DeliveryKnowledgeService {
             },
           );
         }
+        const attachments = input.attachments ?? previous?.attachments ?? [];
+        const category = input.category ?? previous?.category ?? 'MEETING';
+        if (attachments.length && category !== 'ASSET_REFERENCE')
+          throw new BadRequestException(
+            'Attach brand files to a Brand assets knowledge source.',
+          );
+        await readKnowledgeAssetBindings(
+          manager,
+          workspace.id,
+          input.projectId,
+          source.id,
+          attachments,
+          creating && !actor.isManager ? memberId : undefined,
+        );
         source.fathomRecordingId =
           fathomProvenance?.recordingId ?? source.fathomRecordingId ?? null;
         source.revision++;
@@ -418,12 +453,13 @@ export class DeliveryKnowledgeService {
           sourceId: source.id,
           version: source.currentVersion,
           title: input.title,
-          category: input.category ?? previous?.category ?? 'MEETING',
+          category,
           meetingDate: input.meetingDate,
           sourceUrl: input.sourceUrl,
           transcript: input.transcript,
           knowledge: input.knowledge,
           fathomProvenance,
+          attachments,
           createdBy: memberId,
         });
         await this.activity(
@@ -503,6 +539,14 @@ export class DeliveryKnowledgeService {
         input.projectId,
         content.fathomProvenance,
       );
+      if (input.publish)
+        await readKnowledgeAssetBindings(
+          manager,
+          workspace.id,
+          input.projectId,
+          source.id,
+          content.attachments,
+        );
       source.publishedVersion = input.publish ? source.currentVersion : null;
       source.publishedAt = input.publish ? new Date() : null;
       source.publishedBy = input.publish ? memberId : null;

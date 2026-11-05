@@ -44,6 +44,7 @@ export class DeliveryKnowledgeReadIdentityDTO {
 @ObjectType('DeliveryKnowledgeProject')
 export class DeliveryKnowledgeProjectDTO {
   @Field(() => ID) id: string;
+  @Field(() => ID, { nullable: true }) companyId?: string | null;
   @Field() name: string;
   @Field(() => Int) revision: number;
 }

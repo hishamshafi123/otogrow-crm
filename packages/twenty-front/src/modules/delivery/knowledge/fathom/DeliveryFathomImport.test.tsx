@@ -358,6 +358,7 @@ it('requires exact persisted provenance when checking an unknown imported save',
     publishedAt: null,
     createdBy: 'member',
     canEdit: true,
+    attachments: [],
     fathomProvenance: {
       provider: 'FATHOM',
       recordingId: '123',

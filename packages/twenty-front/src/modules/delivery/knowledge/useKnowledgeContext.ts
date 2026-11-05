@@ -51,6 +51,6 @@ export const useKnowledgeContext = (
     ...reading,
     query,
     denied: access.permission.denied || isOtogrowAccessDenied(query.error),
-    scope: `${source}:${reading.data?.selectedProject?.revision ?? ''}`,
+    scope: `${source}:${reading.data?.selectedProject?.revision ?? ''}:${reading.data?.selectedProject?.companyId ?? ''}`,
   };
 };

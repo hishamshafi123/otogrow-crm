@@ -1,4 +1,5 @@
 import { gql } from '@apollo/client';
+import { KNOWLEDGE_ASSET_FIELDS } from '@/delivery/knowledge/assets/knowledge-assets.graphql';
 
 const KNOWLEDGE_ACTOR = gql`
   fragment KnowledgeReadActor on DeliveryKnowledgeReadActor {
@@ -25,6 +26,7 @@ export const GET_KNOWLEDGE_CONTEXT = gql`
         id
         name
         revision
+        companyId
       }
     }
   }
@@ -47,6 +49,7 @@ export const GET_KNOWLEDGE_PROJECTS = gql`
         id
         name
         revision
+        companyId
       }
     }
   }
@@ -83,6 +86,7 @@ export const GET_KNOWLEDGE_LIST = gql`
         id
         name
         revision
+        companyId
       }
       items {
         ...KnowledgeReadItem
@@ -107,6 +111,7 @@ export const GET_KNOWLEDGE_STATE = gql`
         id
         name
         revision
+        companyId
       }
       source {
         id
@@ -140,6 +145,7 @@ export const GET_KNOWLEDGE_DETAIL = gql`
         id
         name
         revision
+        companyId
       }
       detail {
         id
@@ -156,6 +162,9 @@ export const GET_KNOWLEDGE_DETAIL = gql`
         sourceUrl
         transcript
         knowledge
+        attachments {
+          ...KnowledgeAssetFields
+        }
         fathomProvenance {
           provider
           recordingId
@@ -172,6 +181,7 @@ export const GET_KNOWLEDGE_DETAIL = gql`
     }
   }
   ${KNOWLEDGE_ACTOR}
+  ${KNOWLEDGE_ASSET_FIELDS}
 `;
 export const SAVE_KNOWLEDGE_SOURCE = gql`
   mutation SaveDeliveryKnowledgeSource($input: DeliveryKnowledgeSaveInput!) {
@@ -188,6 +198,7 @@ export const SAVE_KNOWLEDGE_SOURCE = gql`
         id
         name
         revision
+        companyId
       }
       source {
         id
@@ -223,6 +234,7 @@ export const PUBLISH_KNOWLEDGE_SOURCE = gql`
         id
         name
         revision
+        companyId
       }
       source {
         id

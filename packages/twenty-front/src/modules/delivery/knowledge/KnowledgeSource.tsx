@@ -14,6 +14,7 @@ import {
 } from '@/delivery/knowledge/knowledge-read.graphql';
 import { knowledgeDestination } from '@/delivery/knowledge/knowledge-navigation';
 import { knowledgeDraftFromDetail } from '@/delivery/knowledge/knowledge-recovery';
+import { KnowledgeAssetFile } from '@/delivery/knowledge/assets/KnowledgeAssetFile';
 import { KnowledgeEditor } from '@/delivery/knowledge/KnowledgeEditor';
 import { type useKnowledgeContext } from '@/delivery/knowledge/useKnowledgeContext';
 import { useKnowledgeCategories } from '@/delivery/knowledge/useKnowledgeCategories';
@@ -77,6 +78,8 @@ export const KnowledgeSource = ({
     state.permission.matches(value) &&
     value.project.id === projectId &&
     value.project.revision === state.data?.selectedProject?.revision &&
+    (value.project.companyId ?? null) ===
+      (state.data?.selectedProject?.companyId ?? null) &&
     fastDeepEqual(value.actor, state.data?.actor);
   const reading = useAssistantRead({
     value: query.data?.deliveryKnowledgeState,
@@ -160,6 +163,32 @@ export const KnowledgeSource = ({
       PUBLISH_KNOWLEDGE_SOURCE,
     );
   const [message, setMessage] = useState('');
+  const [publishing, setPublishing] = useState(false);
+  // oxlint-disable-next-line twenty/no-state-useref -- Only a requested publication may restore focus lost when its action disappears.
+  const publicationFocus = useRef<{
+    source: string;
+    opener: HTMLButtonElement;
+  } | null>(null);
+  // oxlint-disable-next-line twenty/no-state-useref -- This is a native focus target, not render state.
+  const publicationResult = useRef<HTMLParagraphElement | null>(null);
+  const updatingSource =
+    publishing || publication.loading || query.loading || detailQuery.loading;
+  useLayoutEffect(() => {
+    if (updatingSource || !publicationFocus.current) return;
+    const request = publicationFocus.current;
+    publicationFocus.current = null;
+    const active = document.activeElement;
+    if (
+      request.source === source &&
+      !lost &&
+      !denied &&
+      available &&
+      (active === request.opener ||
+        active === document.body ||
+        active === document.documentElement)
+    )
+      publicationResult.current?.focus();
+  }, [updatingSource, source, lost, denied, available, message]);
   const [uncertainPublication, setUncertainPublication] = useState(false);
   // oxlint-disable-next-line twenty/no-state-useref -- Publication responses cannot expose an earlier source after navigation, outage or revocation.
   const publicationEpoch = useRef(0);
@@ -185,16 +214,22 @@ export const KnowledgeSource = ({
   const onSaved = async () => {
     await Promise.all([query.refetch(), detailQuery.refetch()]);
   };
-  const publishVersion = async (publishValue: boolean) => {
+  const publishVersion = async (
+    publishValue: boolean,
+    opener: HTMLButtonElement,
+  ) => {
     if (
       !available ||
       !metadata ||
       !reading.data?.canPublish ||
       publication.loading ||
+      publishing ||
       uncertainPublication
     )
       return;
     const started = publicationEpoch.current;
+    publicationFocus.current = { source, opener };
+    setPublishing(true);
     setMessage('');
     setUncertainPublication(true);
     try {
@@ -221,8 +256,8 @@ export const KnowledgeSource = ({
       setUncertainPublication(false);
       setMessage(
         publishValue
-          ? t`Reviewed knowledge published for future task assistants.`
-          : t`Knowledge withdrawn from future task assistants.`,
+          ? t`Reviewed knowledge and selected files published for authorized project staff. Assistants use the reviewed text.`
+          : t`Knowledge and files withdrawn from project staff and future task assistants.`,
       );
       await onSaved();
     } catch (error) {
@@ -235,6 +270,8 @@ export const KnowledgeSource = ({
       setMessage(
         t`The publication outcome could not be confirmed. Check current publication before another action.`,
       );
+    } finally {
+      setPublishing(false);
     }
   };
   const restoreEdit = useCallback(() => {
@@ -261,7 +298,11 @@ export const KnowledgeSource = ({
             <Trans>Close source</Trans>
           </StyledDeliveryButton>
         </StyledDeliveryRow>
-        {message && <p role="status">{message}</p>}
+        {message && (
+          <p role="status" ref={publicationResult} tabIndex={-1}>
+            {message}
+          </p>
+        )}
         {reading.data !== null && metadata === null && (
           <p role="alert">
             <Trans>
@@ -275,11 +316,15 @@ export const KnowledgeSource = ({
             <p role={knownDenied || denied ? 'alert' : 'status'}>
               {denied || knownDenied
                 ? t`Source access changed. Private edits were discarded. Refresh current access before continuing.`
-                : t`Current source information could not be verified. Any same-source draft is hidden and retained.`}
+                : updatingSource
+                  ? t`Loading updated source…`
+                  : t`Current source information could not be verified. Any same-source draft is hidden and retained.`}
             </p>
-            <StyledDeliveryButton onClick={() => void refresh()}>
-              <Trans>Check current source</Trans>
-            </StyledDeliveryButton>
+            {!updatingSource && (
+              <StyledDeliveryButton onClick={() => void refresh()}>
+                <Trans>Check current source</Trans>
+              </StyledDeliveryButton>
+            )}
           </>
         )}
         <StyledKnowledgeBoundary
@@ -306,6 +351,10 @@ export const KnowledgeSource = ({
                   sourceId={sourceId}
                   createId={null}
                   initial={knowledgeDraftFromDetail(projectId, current)}
+                  initialAssets={current.attachments.map((asset) => ({
+                    asset,
+                    version: current.version,
+                  }))}
                   latestRevision={metadata?.revision}
                   enabled={available}
                   intent={null}
@@ -468,6 +517,32 @@ export const KnowledgeSource = ({
                       </StyledKnowledgeText>
                     </details>
                   )}
+                  {current.attachments.length > 0 && (
+                    <section aria-label={t`Files in this knowledge version`}>
+                      <h3>
+                        <Trans>Brand files in this version</Trans>
+                      </h3>
+                      <p>
+                        {current.version === current.publishedVersion
+                          ? t`These exact files are published for authorized project staff. Agents use the reviewed text below; file contents have not been analyzed.`
+                          : t`These files belong to a private or historical version. Only its authorized author and managers can read them.`}
+                      </p>
+                      {current.attachments.map((asset) => (
+                        <KnowledgeAssetFile
+                          key={`${source}:${current.version}:${asset.id}`}
+                          sourceId={sourceId}
+                          selection={{ asset, version: current.version }}
+                          scope={source}
+                          enabled={available && !uncertainPublication}
+                          onAuthorityLost={() => {
+                            cancelPendingNavigation();
+                            setRetained(null);
+                            setDenied(true);
+                          }}
+                        />
+                      ))}
+                    </section>
+                  )}
                   <h3>
                     <Trans>Reviewed brand knowledge</Trans>
                   </h3>
@@ -499,7 +574,9 @@ export const KnowledgeSource = ({
                             !current.transcript?.trim() ||
                             !current.knowledge.trim()
                           }
-                          onClick={() => void publishVersion(true)}
+                          onClick={(event) =>
+                            void publishVersion(true, event.currentTarget)
+                          }
                         >
                           <Trans>Publish reviewed knowledge</Trans>
                         </StyledDeliveryButton>
@@ -508,9 +585,11 @@ export const KnowledgeSource = ({
                       current.publishedVersion !== null && (
                         <StyledDeliveryButton
                           disabled={publication.loading || uncertainPublication}
-                          onClick={() => void publishVersion(false)}
+                          onClick={(event) =>
+                            void publishVersion(false, event.currentTarget)
+                          }
                         >
-                          <Trans>Withdraw from agents</Trans>
+                          <Trans>Withdraw published knowledge</Trans>
                         </StyledDeliveryButton>
                       )}
                   </StyledDeliveryRow>

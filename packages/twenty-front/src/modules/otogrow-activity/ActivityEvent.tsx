@@ -122,6 +122,10 @@ export const ActivityEvent = ({
       to: `/delivery?view=knowledge&project=${event.projectId}&source=${event.sourceId}`,
       name: t`Open brand knowledge`,
     },
+    'knowledge-upload': {
+      to: `/delivery?view=knowledge&project=${encodeURIComponent(event.projectId ?? '')}`,
+      name: t`Open unused brand uploads`,
+    },
     'delivery-batch': {
       to: `/delivery?view=batches&batchProject=${event.projectId}&batch=${event.sourceId}`,
       name: t`Open production batch`,
@@ -283,7 +287,9 @@ export const ActivityEvent = ({
                           ? t`Open recurring work`
                           : t`Open delivery settings`,
                     }
-                  : isValidUuid(event.sourceId)
+                  : isValidUuid(event.sourceId) &&
+                      (event.sourceType !== 'knowledge-upload' ||
+                        isValidUuid(event.projectId ?? ''))
                     ? (businessSources[event.sourceType] ?? null)
                     : null;
   const changeValue = (value: string | null | undefined) =>

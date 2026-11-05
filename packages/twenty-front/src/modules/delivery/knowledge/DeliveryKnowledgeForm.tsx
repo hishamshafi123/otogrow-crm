@@ -11,6 +11,11 @@ import { DeliveryDraftConflict } from '@/delivery/drafts/DeliveryDraftConflict';
 import { useKnowledgeCategories } from '@/delivery/knowledge/useKnowledgeCategories';
 import { DeliveryTranscriptImport } from '@/delivery/knowledge/transcript/DeliveryTranscriptImport';
 import { DeliveryFathomImport } from '@/delivery/knowledge/fathom/DeliveryFathomImport';
+import { KnowledgeAssetAttachments } from '@/delivery/knowledge/assets/KnowledgeAssetAttachments';
+import {
+  type KnowledgeAssetContext,
+  type KnowledgeAssetSelection,
+} from '@/delivery/knowledge/assets/knowledge-assets.types';
 import { type FathomContext } from '@/delivery/knowledge/fathom/fathom.types';
 import {
   StyledDeliveryButton,
@@ -31,6 +36,8 @@ type DeliveryKnowledgeFormProps = {
   readOnly?: boolean;
   onReload?: () => void;
   fathomContext?: FathomContext;
+  assetContext?: KnowledgeAssetContext;
+  initialAssets?: KnowledgeAssetSelection[];
   onAuthorityLost?: () => void;
 };
 export const DeliveryKnowledgeForm = ({
@@ -44,9 +51,13 @@ export const DeliveryKnowledgeForm = ({
   readOnly = false,
   onReload,
   fathomContext,
+  assetContext,
+  initialAssets = [],
   onAuthorityLost,
 }: DeliveryKnowledgeFormProps) => {
   const { t } = useLingui();
+  const [assetSelections, setAssetSelections] = useState(initialAssets);
+  const [assetBlocked, setAssetBlocked] = useState(false);
   const [fathomExpiresAt, setFathomExpiresAt] = useState<string | null>(null);
   const [fathomExpired, setFathomExpired] = useState(false);
   const draft = useDeliveryDraft({
@@ -99,7 +110,7 @@ export const DeliveryKnowledgeForm = ({
   ) => draft.update({ ...values, [field]: value });
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (!enabled || stale || readOnly || draft.saving) return;
+    if (!enabled || stale || readOnly || draft.saving || assetBlocked) return;
     if (fathomExpiresAt !== null && Date.parse(fathomExpiresAt) <= Date.now()) {
       setFathomExpired(true);
       return;
@@ -157,6 +168,7 @@ export const DeliveryKnowledgeForm = ({
                 <Trans>Knowledge category</Trans>
                 <select
                   value={values.category ?? 'MEETING'}
+                  disabled={assetSelections.length > 0 || assetBlocked}
                   onChange={(event) => update('category', event.target.value)}
                 >
                   {categories.map((category) => (
@@ -166,6 +178,14 @@ export const DeliveryKnowledgeForm = ({
                   ))}
                 </select>
               </label>
+              {(assetSelections.length > 0 || assetBlocked) && (
+                <small>
+                  <Trans>
+                    Remove draft files and finish pending uploads before
+                    changing this source category.
+                  </Trans>
+                </small>
+              )}
               <label>
                 {isMeeting ? t`Meeting title` : t`Knowledge title`}
                 <input
@@ -274,6 +294,28 @@ export const DeliveryKnowledgeForm = ({
                   </Trans>
                 </p>
               )}
+              {values.category === 'ASSET_REFERENCE' &&
+                assetContext &&
+                onAuthorityLost && (
+                  <KnowledgeAssetAttachments
+                    context={assetContext}
+                    selections={assetSelections}
+                    enabled={enabled && !stale && !readOnly && !draft.saving}
+                    onAuthorityLost={onAuthorityLost}
+                    onBlockingChange={setAssetBlocked}
+                    onChange={(selections) => {
+                      if (!enabled || stale || readOnly || draft.saving) return;
+                      setAssetSelections(selections);
+                      draft.update({
+                        ...values,
+                        attachments: selections.map(({ asset }) => ({
+                          id: asset.id,
+                          sha256: asset.sha256,
+                        })),
+                      });
+                    }}
+                  />
+                )}
               <label>
                 {isMeeting
                   ? t`Transcript or meeting notes`
@@ -315,6 +357,7 @@ export const DeliveryKnowledgeForm = ({
                   data-primary="true"
                   disabled={
                     stale ||
+                    assetBlocked ||
                     !values.title.trim() ||
                     (!values.sourceUrl.trim() && !values.transcript.trim())
                   }

@@ -1,6 +1,8 @@
 import { gql } from '@apollo/client';
+import { KNOWLEDGE_ASSET_FIELDS } from '@/delivery/knowledge/assets/knowledge-assets.graphql';
 
 export const GET_DELIVERY_KNOWLEDGE = gql`
+  ${KNOWLEDGE_ASSET_FIELDS}
   query DeliveryKnowledge($input: DeliveryKnowledgeInput!) {
     deliveryKnowledge(input: $input) {
       workspaceId
@@ -35,6 +37,9 @@ export const GET_DELIVERY_KNOWLEDGE = gql`
         sourceUrl
         transcript
         knowledge
+        attachments {
+          ...KnowledgeAssetFields
+        }
       }
     }
   }

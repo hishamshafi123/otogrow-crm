@@ -1017,3 +1017,54 @@ it('keeps earlier manual content activity attached to the original record', () =
     `/delivery?view=content&contentView=legacy&businessRecord=${sourceId}`,
   );
 });
+
+it.each([
+  ['KNOWLEDGE_FILE_UPLOAD_STARTED', 'Brand file upload started'],
+  ['KNOWLEDGE_FILE_READY', 'Brand file ready'],
+  ['KNOWLEDGE_FILE_UPLOAD_FAILED', 'Brand file upload failed'],
+  ['KNOWLEDGE_FILE_DISCARDED', 'Unused brand file discarded'],
+  ['KNOWLEDGE_FILE_CLEANED', 'Unused brand file removed'],
+])(
+  'explains %s and opens project recovery without treating an upload as saved knowledge',
+  (action, label) => {
+    const projectId = '550e8400-e29b-41d4-a716-446655440001';
+    mockFeed.events = [
+      {
+        ...event,
+        action,
+        sourceType: 'knowledge-upload',
+        sourceId: '550e8400-e29b-41d4-a716-446655440002',
+        projectId,
+        taskId: null,
+        taskName: null,
+      },
+    ];
+    setup();
+    expect(screen.getByText(label)).toBeVisible();
+    expect(
+      screen.getByRole('link', { name: 'Open unused brand uploads' }),
+    ).toHaveAttribute('href', `/delivery?view=knowledge&project=${projectId}`);
+    expect(
+      screen.queryByRole('link', { name: 'Open brand knowledge' }),
+    ).not.toBeInTheDocument();
+  },
+);
+
+it('does not invent a project link for an upload event without a current project', () => {
+  mockFeed.events = [
+    {
+      ...event,
+      action: 'KNOWLEDGE_FILE_READY',
+      sourceType: 'knowledge-upload',
+      sourceId: '550e8400-e29b-41d4-a716-446655440002',
+      projectId: null,
+      taskId: null,
+      taskName: null,
+    },
+  ];
+  setup();
+  expect(screen.getByText('Brand file ready')).toBeVisible();
+  expect(
+    screen.queryByRole('link', { name: 'Open unused brand uploads' }),
+  ).not.toBeInTheDocument();
+});

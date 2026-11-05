@@ -1,4 +1,5 @@
 import {
+  Check,
   Column,
   CreateDateColumn,
   Entity,
@@ -7,10 +8,14 @@ import {
 } from 'typeorm';
 import { WorkspaceRelatedEntity } from 'src/engine/workspace-manager/types/workspace-related-entity';
 import { type DeliveryKnowledgeCategory } from 'src/modules/delivery/knowledge/delivery-knowledge-category';
+import { type KnowledgeAssetBinding } from 'src/modules/delivery/knowledge/assets/delivery-knowledge-assets.policy';
 import { type FathomProvenance } from 'src/modules/delivery/knowledge/fathom/delivery-fathom.types';
 
 @Entity({ name: 'deliveryKnowledgeVersion', schema: 'core' })
 @Index(['workspaceId', 'sourceId', 'version'], { unique: true })
+@Check(
+  "jsonb_typeof(attachments)='array' AND jsonb_array_length(attachments)<=10",
+)
 export class DeliveryKnowledgeVersionEntity extends WorkspaceRelatedEntity {
   @PrimaryGeneratedColumn('uuid') id: string;
   @Column({ type: 'uuid' }) sourceId: string;
@@ -24,6 +29,8 @@ export class DeliveryKnowledgeVersionEntity extends WorkspaceRelatedEntity {
   @Column({ type: 'text' }) knowledge: string;
   @Column({ type: 'jsonb', nullable: true })
   fathomProvenance: FathomProvenance | null;
+  @Column({ type: 'jsonb', default: () => "'[]'::jsonb" })
+  attachments: KnowledgeAssetBinding[];
   @Column({ type: 'uuid' }) createdBy: string;
   @CreateDateColumn({ type: 'timestamptz' }) createdAt: Date;
 }

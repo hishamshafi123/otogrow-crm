@@ -14,6 +14,56 @@ jest.mock('@/delivery/deliveryStyles', () => ({
 jest.mock('@/delivery/knowledge/transcript/DeliveryTranscriptImport', () => ({
   DeliveryTranscriptImport: () => null,
 }));
+jest.mock('@/delivery/knowledge/assets/KnowledgeAssetAttachments', () => ({
+  KnowledgeAssetAttachments: ({
+    onChange,
+    onBlockingChange,
+  }: {
+    onChange: (
+      files: {
+        asset: {
+          id: string;
+          name: string;
+          mimeType: string;
+          size: number;
+          sha256: string;
+          uploadedBy: string;
+          createdAt: string;
+        };
+        version: null;
+      }[],
+    ) => void;
+    onBlockingChange: (blocked: boolean) => void;
+  }) => (
+    <>
+      <button type="button" onClick={() => onBlockingChange(true)}>
+        Select a local file
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          onChange([
+            {
+              asset: {
+                id: 'file',
+                name: 'Brand.png',
+                mimeType: 'image/png',
+                size: 4,
+                sha256: 'a'.repeat(64),
+                uploadedBy: 'member',
+                createdAt: '2026-11-05T00:00:00Z',
+              },
+              version: null,
+            },
+          ]);
+          onBlockingChange(false);
+        }}
+      >
+        Use uploaded file
+      </button>
+    </>
+  ),
+}));
 
 const initial: DeliveryKnowledgeSaveInput = {
   id: 'source',
@@ -41,6 +91,9 @@ const form = (
       latestRevision={props.latestRevision}
       readOnly={props.readOnly}
       onReload={props.onReload}
+      assetContext={props.assetContext}
+      initialAssets={props.initialAssets}
+      onAuthorityLost={props.onAuthorityLost}
     />
   </I18nProvider>
 );
@@ -64,6 +117,47 @@ it('retains exact reviewed notes after a failed save and does not publish', asyn
   expect(screen.getByLabelText('Knowledge to publish')).toHaveValue(
     'Confirmed webinar plan',
   );
+});
+
+it('blocks saving while a file is unresolved, then saves its exact binding alongside reviewed usage notes', async () => {
+  const save = jest.fn().mockResolvedValue(false);
+  render(
+    form({
+      initial: { ...initial, category: 'ASSET_REFERENCE' },
+      assetContext: {
+        workspaceId: 'workspace',
+        memberId: 'member',
+        userWorkspaceId: 'user-workspace',
+        projectId: 'project',
+        projectRevision: 1,
+        companyId: 'company',
+        sourceId: 'source',
+        sourceRevision: 1,
+        scope: 'scope',
+      },
+      onAuthorityLost: jest.fn(),
+      onSave: save,
+    }),
+  );
+  await userEvent.click(
+    screen.getByRole('button', { name: 'Select a local file' }),
+  );
+  expect(
+    screen.getByRole('button', { name: 'Save knowledge draft' }),
+  ).toBeDisabled();
+  expect(save).not.toHaveBeenCalled();
+  await userEvent.click(
+    screen.getByRole('button', { name: 'Use uploaded file' }),
+  );
+  expect(screen.getByLabelText('Knowledge category')).toBeDisabled();
+  await userEvent.click(
+    screen.getByRole('button', { name: 'Save knowledge draft' }),
+  );
+  expect(save).toHaveBeenCalledWith({
+    ...initial,
+    category: 'ASSET_REFERENCE',
+    attachments: [{ id: 'file', sha256: 'a'.repeat(64) }],
+  });
 });
 
 it('retains dirty notes when a newer source revision requires explicit reload', async () => {

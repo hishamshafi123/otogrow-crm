@@ -1,3 +1,4 @@
+import { fastDeepEqual } from 'twenty-shared/utils';
 import {
   type DeliveryKnowledgeSaveInput,
   type DeliveryKnowledgeDetailQuery,
@@ -19,6 +20,7 @@ export const knowledgeDraftFromDetail = (
   sourceUrl: detail.sourceUrl,
   transcript: detail.transcript ?? '',
   knowledge: detail.knowledge,
+  attachments: detail.attachments.map(({ id, sha256 }) => ({ id, sha256 })),
 });
 
 export const knowledgeMatchesSubmitted = (
@@ -34,5 +36,13 @@ export const knowledgeMatchesSubmitted = (
   detail.sourceUrl === input.sourceUrl.trim() &&
   detail.transcript === input.transcript.trim() &&
   detail.knowledge === input.knowledge.trim() &&
+  fastDeepEqual(
+    detail.attachments
+      .map(({ id, sha256 }) => ({ id, sha256 }))
+      .sort((left, right) => left.id.localeCompare(right.id)),
+    [...(input.attachments ?? [])].sort((left, right) =>
+      left.id.localeCompare(right.id),
+    ),
+  ) &&
   (!input.fathomImportHash ||
     detail.fathomProvenance?.proofHash === input.fathomImportHash);
