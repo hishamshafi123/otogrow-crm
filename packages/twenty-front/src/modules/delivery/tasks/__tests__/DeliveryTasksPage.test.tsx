@@ -37,6 +37,7 @@ let mockError: Error | undefined;
 let mockContextError: Error | undefined;
 let mockDetailError: Error | undefined;
 let mockDetailLoading = false;
+let mockReviewUnavailable = false;
 let mockRefresh: () => void;
 const mockMutate = jest.fn();
 const mockSeen = jest.fn();
@@ -108,9 +109,18 @@ jest.mock('@/delivery/capacity/read/DeliveryPlannerCapacity', () => {
     },
   };
 });
-jest.mock('@/delivery/reviews/useTaskReview', () => ({
-  useTaskReview: () => ({ data: null, available: false }),
-}));
+jest.mock('@/delivery/reviews/useTaskReview', () => {
+  const { useLayoutEffect } = jest.requireActual<typeof React>('react');
+  return {
+    useTaskReview: ({ onUnavailable }: { onUnavailable?: () => void }) => {
+      const unavailable = mockReviewUnavailable;
+      useLayoutEffect(() => {
+        if (unavailable) onUnavailable?.();
+      }, [unavailable, onUnavailable]);
+      return { data: null, available: false };
+    },
+  };
+});
 jest.mock('@/delivery/reviews/DeliveryReviewQueue', () => ({
   DeliveryReviewQueue: (props: { enabled: boolean; readScope: string }) => {
     mockReviewQueue(props);
@@ -296,6 +306,7 @@ beforeEach(() => {
   mockContextError = undefined;
   mockDetailError = undefined;
   mockDetailLoading = false;
+  mockReviewUnavailable = false;
   mockAccess = {
     workspaceId: 'workspace',
     memberId: MANAGER_ID,
@@ -864,6 +875,21 @@ it('removes the task editor immediately when its attempted save is denied', asyn
     screen.getByRole('button', { name: 'Check current task access' }),
   ).toHaveFocus();
   expect(mockMutate).toHaveBeenCalledTimes(1);
+});
+it('removes the whole private task when the review service confirms access loss first', async () => {
+  setup(`/delivery?view=reviews&task=${TASK_ID}`);
+  const user = userEvent.setup();
+  await user.type(screen.getByLabelText('Task draft'), 'Private task draft');
+  mockReviewUnavailable = true;
+  act(() => mockRefresh());
+  expect(screen.queryByLabelText('Task draft')).not.toBeInTheDocument();
+  expect(
+    screen.queryByText('PRIVATE_EXACT_DETAIL_ONLY'),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.getByRole('button', { name: 'Check current task access' }),
+  ).toHaveFocus();
+  expect(mockMutate).not.toHaveBeenCalled();
 });
 it('recovers an exact task through visible access checks after context-first native denial without reviving the old draft', async () => {
   setup(`/delivery?view=mine&taskTimezone=Asia%2FQatar&task=${TASK_ID}`);

@@ -1,5 +1,8 @@
 const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
+const {
+  createIsolatedNativeTaskAccess,
+} = require('./helpers/isolated-native-task-access.cjs');
 const creativeSupport = require('./check-delivery-creative-review-support.cjs');
 const NOW = new Date('2026-10-29T08:00:00.000Z');
 const TABLES = ['deliveryReviewAssignmentEvent', 'deliveryReviewAssignment'];
@@ -145,6 +148,7 @@ function buildReviewsServices(source, fixture) {
       source,
       services.delivery,
       services.access,
+      createIsolatedNativeTaskAccess(),
     ),
   };
 }

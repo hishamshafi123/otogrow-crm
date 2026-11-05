@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { type TaskReviewController } from '@/delivery/reviews/useTaskReview';
 import { ReviewAssignmentForm } from '@/delivery/reviews/ReviewAssignmentForm';
@@ -19,13 +19,42 @@ type DeliveryTaskReviewProps = {
 export const DeliveryTaskReview = ({
   controller,
   submissionVersion,
-}: DeliveryTaskReviewProps) => {
+}: DeliveryTaskReviewProps) => (
+  <TaskReviewWorkspace
+    key={controller.source}
+    controller={controller}
+    submissionVersion={submissionVersion}
+  />
+);
+type TaskReviewWorkspaceProps = DeliveryTaskReviewProps;
+const TaskReviewWorkspace = ({
+  controller,
+  submissionVersion,
+}: TaskReviewWorkspaceProps) => {
   const { t } = useLingui();
   const labels = useReviewLabels();
   const { requestAction } = useDeliveryDraftGuard();
   const [editing, setEditing] = useState(false);
   const [version, setVersion] = useState(0);
   const { data, retained } = controller;
+  // oxlint-disable-next-line twenty/no-state-useref -- Recover only focus lost when private review controls leave the document.
+  const focusState = useRef({ visible: false, pending: false });
+  // oxlint-disable-next-line twenty/no-state-useref -- The recovery control survives removal of the private assignment form.
+  const recoveryButton = useRef<HTMLButtonElement | null>(null);
+  const visible = Boolean(data);
+  useLayoutEffect(() => {
+    if (controller.unavailable) setEditing(false);
+    if (visible) focusState.current.pending = false;
+    else if (focusState.current.visible) focusState.current.pending = true;
+    focusState.current.visible = visible;
+    if (!focusState.current.pending || controller.loading) return;
+    focusState.current.pending = false;
+    if (
+      document.activeElement === document.body ||
+      document.activeElement === document.documentElement
+    )
+      recoveryButton.current?.focus();
+  }, [visible, controller.loading, controller.unavailable]);
   return (
     <StyledDeliveryCard aria-label={t`Submission review responsibility`}>
       <StyledDeliveryStack>
@@ -33,11 +62,19 @@ export const DeliveryTaskReview = ({
         {controller.notice && <p role="status">{controller.notice}</p>}
         {!data && (
           <p role={controller.readError ? 'alert' : 'status'}>
-            <Trans>
-              Current submission reviewer access could not be verified. Saved
-              evidence is hidden; your draft is kept.
-            </Trans>{' '}
+            {controller.unavailable ? (
+              <Trans>
+                Submission review access is unavailable. Private preparation was
+                cleared. Check access before reopening saved work.
+              </Trans>
+            ) : (
+              <Trans>
+                Current submission reviewer access could not be verified. Saved
+                evidence is hidden; your draft is kept.
+              </Trans>
+            )}{' '}
             <StyledDeliveryButton
+              ref={recoveryButton}
               disabled={controller.loading}
               onClick={() =>
                 void (controller.permission.ready
@@ -57,6 +94,7 @@ export const DeliveryTaskReview = ({
                   key={`${controller.permission.scope}:${data.taskId}:${data.pending?.submissionVersion}:${data.pending?.assignmentRevision}:${data.assignmentNotice.id}`}
                   snapshot={data}
                   onRefresh={controller.refresh}
+                  onUnavailable={controller.invalidate}
                 />
               )}
             {data.pending ? (
@@ -69,6 +107,11 @@ export const DeliveryTaskReview = ({
                 </p>
                 <small>{t`Primary manager for client delivery: ${data.pending.primaryReviewerName}`}</small>
                 <p>{labels.age(data.pending)}</p>
+                {data.pending.warnings.map((warning) => (
+                  <p role="status" key={warning}>
+                    {labels.warning(warning)}
+                  </p>
+                ))}
                 {data.pending.assignmentMode === 'BACKUP' &&
                   data.pending.reviewerState !== 'ACTIVE' && (
                     <p role="status">
@@ -130,6 +173,7 @@ export const DeliveryTaskReview = ({
             taskId={data.taskId}
             submissionVersion={submissionVersion}
             enabled
+            onUnavailable={controller.invalidate}
           />
         )}
       </StyledDeliveryStack>

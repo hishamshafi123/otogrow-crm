@@ -14,13 +14,16 @@ import { useWorkflowAccess } from '@/delivery/workflows/useWorkflowAccess';
 import { useVisibleChatMessages } from '@/delivery/chat/useVisibleChatMessages';
 import { hasOtogrowCapability } from '@/otogrow-access/otogrow-access.types';
 import { StyledDeliveryButton } from '@/delivery/deliveryStyles';
+import { isDeliveryTaskUnavailable } from '@/delivery/tasks/isDeliveryTaskUnavailable';
 type ReviewAssignmentNoticeProps = {
   snapshot: TaskReviewSnapshot;
   onRefresh: () => Promise<boolean>;
+  onUnavailable?: () => void;
 };
 export const ReviewAssignmentNotice = ({
   snapshot,
   onRefresh,
+  onUnavailable,
 }: ReviewAssignmentNoticeProps) => {
   const { t } = useLingui();
   const permission = useWorkflowAccess();
@@ -51,8 +54,8 @@ export const ReviewAssignmentNotice = ({
     pending.assignmentRevision === (snapshot.assignment?.revision ?? 0) &&
     pending.effectiveReviewerId === snapshot.memberId &&
     notice.recipientId === snapshot.memberId &&
-    pending.canReviewSubmission &&
-    snapshot.canReviewSubmission,
+    (pending.reviewerState === 'ACTIVE' ||
+      pending.warnings.includes('REVIEWER_NATIVE_ACCESS_UNAVAILABLE')),
   );
   const sourceKey = `${permission.scope}:${snapshot.taskId}:${snapshot.taskRevision}:${pending?.submissionVersion}:${pending?.assignmentRevision}:${notice?.id}`;
   // oxlint-disable-next-line twenty/no-state-useref -- Late receipts cannot publish after an assignment or access changes.
@@ -88,7 +91,6 @@ export const ReviewAssignmentNotice = ({
         result.pending?.submissionVersion !== pending.submissionVersion ||
         result.pending.assignmentRevision !== pending.assignmentRevision ||
         result.pending.effectiveReviewerId !== snapshot.memberId ||
-        !result.canReviewSubmission ||
         result.assignmentNotice?.id !== notice.id ||
         !result.assignmentNotice.seenAt
       )
@@ -97,7 +99,11 @@ export const ReviewAssignmentNotice = ({
       setError('');
       void onRefresh();
       return true;
-    } catch {
+    } catch (failure) {
+      if (started === epoch.current && isDeliveryTaskUnavailable(failure)) {
+        onUnavailable?.();
+        return false;
+      }
       if (started === epoch.current)
         setError(
           t`Your read receipt was not confirmed. You can retry or acknowledge this assignment.`,
@@ -114,6 +120,7 @@ export const ReviewAssignmentNotice = ({
     permission,
     recordSeen,
     onRefresh,
+    onUnavailable,
     t,
   ]);
   const unread =
@@ -134,10 +141,18 @@ export const ReviewAssignmentNotice = ({
           <Trans>You are assigned to review this submission.</Trans>
         </strong>
         <p>
-          <Trans>
-            Review the exact work below, then approve or request changes.
-            Production and client-delivery ownership stay separate.
-          </Trans>
+          {snapshot.canReviewSubmission ? (
+            <Trans>
+              Review the exact work below, then approve or request changes.
+              Production and client-delivery ownership stay separate.
+            </Trans>
+          ) : (
+            <Trans>
+              You can acknowledge this assignment and inspect the submission.
+              Ask a manager to check your task permissions before making a
+              review decision.
+            </Trans>
+          )}
         </p>
         <p role="status">
           {acknowledged || notice.acknowledgedAt
@@ -188,7 +203,14 @@ export const ReviewAssignmentNotice = ({
                   throw new Error();
                 setAcknowledged(true);
                 void onRefresh();
-              } catch {
+              } catch (failure) {
+                if (
+                  started === epoch.current &&
+                  isDeliveryTaskUnavailable(failure)
+                ) {
+                  onUnavailable?.();
+                  return;
+                }
                 if (started === epoch.current)
                   setError(
                     t`Acknowledgement was not confirmed. Your review work is unchanged; try again.`,

@@ -10,6 +10,8 @@ import { DataSource, type EntityManager } from 'typeorm';
 import { isValidUuid } from 'twenty-shared/utils';
 import { WorkspaceEntity } from 'src/engine/core-modules/workspace/workspace.entity';
 import { DeliveryService } from 'src/modules/delivery/delivery.service';
+import { DeliveryNativeTaskAccessService } from 'src/modules/delivery/delivery-native-task-access.service';
+import { type DeliveryNativeTaskVisibility } from 'src/modules/delivery/native-task-visibility';
 import { canAccessDeliveryProject } from 'src/modules/delivery/delivery-policy';
 import { DeliveryProjectEntity } from 'src/modules/delivery/entities/delivery-project.entity';
 import { DeliveryTaskEntity } from 'src/modules/delivery/entities/delivery-task.entity';
@@ -40,6 +42,8 @@ import {
   deliveryReviewAssignmentSchema,
   deliveryReviewCursor,
   deliveryReviewHistorySchema,
+  deliveryReviewHistoryCursor,
+  readDeliveryReviewHistoryCursor,
   deliveryReviewOffset,
   deliveryReviewQueueSchema,
   deliveryTaskReviewSchema,
@@ -67,6 +71,11 @@ type ReviewPeople = {
   members: Awaited<ReturnType<OtogrowAccessService['listActiveMembers']>>;
   access: OtogrowAccess[];
 };
+type NativeReviewCache = Map<
+  string,
+  Promise<DeliveryNativeTaskVisibility | null>
+>;
+type NativeReviewTasks = { fingerprint: string | null; taskIds: Set<string> };
 type ReviewRow = {
   taskId: string;
   title: string;
@@ -95,7 +104,76 @@ export class DeliveryReviewsService {
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly delivery: DeliveryService,
     private readonly access: OtogrowAccessService,
+    private readonly nativeTasks: DeliveryNativeTaskAccessService,
   ) {}
+
+  private async nativeReviewTasks(
+    manager: EntityManager,
+    workspace: WorkspaceEntity,
+    people: ReviewPeople,
+    memberId: string,
+    taskIds: string[],
+    cache: NativeReviewCache,
+  ): Promise<NativeReviewTasks> {
+    const person = people.members.find(
+      (member) => member.memberId === memberId,
+    );
+    if (!person) return { fingerprint: null, taskIds: new Set() };
+    const key = `${person.memberId}:${person.userWorkspaceId}`;
+    let pending = cache.get(key);
+    if (!pending) {
+      pending = this.nativeTasks
+        .visibility(manager, workspace, person, undefined, {
+          type: 'update',
+          updatedColumns: ['status'],
+        })
+        .catch((error: unknown) => {
+          if (
+            error instanceof ForbiddenException ||
+            error instanceof NotFoundException
+          )
+            return null;
+          throw error;
+        });
+      cache.set(key, pending);
+    }
+    const visibility = await pending;
+    if (!visibility) return { fingerprint: null, taskIds: new Set() };
+    const rows = await this.nativeTasks.query<{ id: string }[]>(
+      manager,
+      `SELECT task.id FROM ${this.delivery.schema(workspace)}.task task WHERE task.id=ANY($1::uuid[]) AND ${this.nativeTasks.predicate(workspace, visibility, 'task.id')}`,
+      [taskIds],
+      visibility,
+    );
+    return {
+      fingerprint: visibility.fingerprint,
+      taskIds: new Set(rows.map((row) => row.id)),
+    };
+  }
+
+  private withNativeReviewAccess(
+    item: DeliveryReviewQueueItemDTO,
+    access: Map<string, NativeReviewTasks>,
+    memberId: string,
+  ): DeliveryReviewQueueItemDTO {
+    const unavailable =
+      item.reviewerState === 'ACTIVE' &&
+      Boolean(item.effectiveReviewerId) &&
+      !access.get(item.effectiveReviewerId!)?.taskIds.has(item.taskId);
+    if (!unavailable) return item;
+    return {
+      ...item,
+      reviewerState: 'UNAVAILABLE',
+      canReviewSubmission: false,
+      warnings: [
+        ...item.warnings,
+        'REVIEWER_NATIVE_ACCESS_UNAVAILABLE',
+        ...(item.effectiveReviewerId === memberId
+          ? ['NATIVE_REVIEW_WRITE_UNAVAILABLE']
+          : []),
+      ],
+    };
+  }
 
   private async people(
     manager: EntityManager,
@@ -148,6 +226,13 @@ export class DeliveryReviewsService {
       userWorkspaceId,
       manager,
     );
+    const nativeVisibility = await this.nativeTasks.assert(
+      manager,
+      workspace,
+      { memberId, userWorkspaceId },
+      taskId,
+      ['id', 'title', 'assigneeId'],
+    );
     const task = await manager
       .getRepository(DeliveryTaskEntity)
       .findOneBy({ workspaceId: workspace.id, taskId });
@@ -168,7 +253,7 @@ export class DeliveryReviewsService {
         [taskId],
       );
     if (!native[0]) throw new NotFoundException();
-    return { actor, task, project, ...native[0] };
+    return { actor, task, project, nativeVisibility, ...native[0] };
   }
   private item(
     row: ReviewRow,
@@ -239,6 +324,12 @@ export class DeliveryReviewsService {
         );
         if (!actor.isManager && !actor.capabilities.includes('delivery.review'))
           throw new ForbiddenException('Assigned review access is required.');
+        const nativeVisibility = await this.nativeTasks.visibility(
+          manager,
+          workspace,
+          { memberId, userWorkspaceId },
+          ['id', 'title', 'assigneeId'],
+        );
         const projectQuery = manager
           .getRepository(DeliveryProjectEntity)
           .createQueryBuilder('project')
@@ -270,13 +361,15 @@ export class DeliveryReviewsService {
           (project) => !query.projectId || project.id === query.projectId,
         );
         const rows: ReviewRow[] = selectedProjects.length
-          ? await manager.query(
-              `SELECT task.id AS "taskId",task.title,task."assigneeId",delivery."projectId",delivery.revision AS "taskRevision",COALESCE(delivery.details->>'service','') AS service,delivery.details->>'reviewerId' AS "primaryReviewerId",delivery.details->'submissions'->-1->'version' AS "submissionVersion",delivery.details->'submissions'->-1->'submittedAt' AS "submittedAt",delivery.details->'submissions'->-1->'creativeVersion' AS "creativeVersion",delivery.details->'submissions'->-1->'finalAssetId' AS "finalAssetId",CASE WHEN delivery.details->'submissions'->-1->'workflow' IS NULL THEN 0 WHEN jsonb_typeof(delivery.details->'submissions'->-1->'workflow'->'definition'->'reviewChecks')='array' THEN (SELECT count(*)::integer FROM jsonb_array_elements(delivery.details->'submissions'->-1->'workflow'->'definition'->'reviewChecks') requirement WHERE requirement->>'required'='true') ELSE NULL END AS "requiredCheckCount" FROM core."deliveryTask" delivery JOIN ${this.delivery.schema(workspace)}.task task ON task.id=delivery."taskId" AND task."deletedAt" IS NULL WHERE delivery."workspaceId"=$1 AND delivery."projectId"=ANY($2::uuid[]) AND delivery.details->>'state'='IN_REVIEW' ORDER BY task.id LIMIT $3`,
+          ? await this.nativeTasks.query<ReviewRow[]>(
+              manager,
+              `SELECT task.id AS "taskId",task.title,task."assigneeId",delivery."projectId",delivery.revision AS "taskRevision",COALESCE(delivery.details->>'service','') AS service,delivery.details->>'reviewerId' AS "primaryReviewerId",delivery.details->'submissions'->-1->'version' AS "submissionVersion",delivery.details->'submissions'->-1->'submittedAt' AS "submittedAt",delivery.details->'submissions'->-1->'creativeVersion' AS "creativeVersion",delivery.details->'submissions'->-1->'finalAssetId' AS "finalAssetId",CASE WHEN delivery.details->'submissions'->-1->'workflow' IS NULL THEN 0 WHEN jsonb_typeof(delivery.details->'submissions'->-1->'workflow'->'definition'->'reviewChecks')='array' THEN (SELECT count(*)::integer FROM jsonb_array_elements(delivery.details->'submissions'->-1->'workflow'->'definition'->'reviewChecks') requirement WHERE requirement->>'required'='true') ELSE NULL END AS "requiredCheckCount" FROM core."deliveryTask" delivery JOIN ${this.delivery.schema(workspace)}.task task ON task.id=delivery."taskId" AND task."deletedAt" IS NULL WHERE delivery."workspaceId"=$1 AND delivery."projectId"=ANY($2::uuid[]) AND delivery.details->>'state'='IN_REVIEW' AND ${this.nativeTasks.predicate(workspace, nativeVisibility, 'task.id')} ORDER BY task.id LIMIT $3`,
               [
                 workspace.id,
                 selectedProjects.map((project) => project.id),
                 DELIVERY_REVIEW_SOURCE_LIMIT + 1,
               ],
+              nativeVisibility,
             )
           : [];
         if (rows.length > DELIVERY_REVIEW_SOURCE_LIMIT)
@@ -294,7 +387,7 @@ export class DeliveryReviewsService {
           }),
         );
         const people = await this.people(manager, workspace.id);
-        const all = rows.map((row) =>
+        const businessItems = rows.map((row) =>
           this.item(
             row,
             selectedProjects.find((project) => project.id === row.projectId)!,
@@ -303,6 +396,31 @@ export class DeliveryReviewsService {
             memberId,
             now,
           ),
+        );
+        const reviewerTasks = new Map<string, string[]>();
+        for (const item of businessItems) {
+          if (item.reviewerState !== 'ACTIVE' || !item.effectiveReviewerId)
+            continue;
+          const tasks = reviewerTasks.get(item.effectiveReviewerId) ?? [];
+          tasks.push(item.taskId);
+          reviewerTasks.set(item.effectiveReviewerId, tasks);
+        }
+        const nativeReviews = new Map<string, NativeReviewTasks>();
+        const nativeCache: NativeReviewCache = new Map();
+        for (const [reviewerId, taskIds] of reviewerTasks)
+          nativeReviews.set(
+            reviewerId,
+            await this.nativeReviewTasks(
+              manager,
+              workspace,
+              people,
+              reviewerId,
+              taskIds,
+              nativeCache,
+            ),
+          );
+        const all = businessItems.map((item) =>
+          this.withNativeReviewAccess(item, nativeReviews, memberId),
         );
         const items = all
           .filter(
@@ -329,6 +447,13 @@ export class DeliveryReviewsService {
           reviewerId: query.reviewerId,
           mine: query.mine,
           memberId,
+          userWorkspaceId,
+          nativeAccess: nativeVisibility.fingerprint,
+          reviewerAccess: [...nativeReviews]
+            .map(([id, access]) => [id, access.fingerprint])
+            .sort(([left], [right]) =>
+              String(left).localeCompare(String(right)),
+            ),
         };
         const sources = items.map(
           ({ ageSeconds: _ageSeconds, ...item }) => item,
@@ -393,6 +518,7 @@ export class DeliveryReviewsService {
     userWorkspaceId: string,
     taskId: string,
     now: Date,
+    nativeCache: NativeReviewCache = new Map(),
   ): Promise<DeliveryTaskReviewSnapshotDTO> {
     const scope = await this.scope(
       manager,
@@ -418,7 +544,7 @@ export class DeliveryReviewsService {
             ])
           ).get(taskId);
     const checks = latest?.workflow?.definition.reviewChecks;
-    const pending =
+    const businessPending =
       scope.task.details.state === 'IN_REVIEW'
         ? this.item(
             {
@@ -446,6 +572,48 @@ export class DeliveryReviewsService {
             now,
           )
         : null;
+    const eligibleMembers = scope.actor.isManager
+      ? people.members.filter(
+          (member) =>
+            scope.project.memberIds.includes(member.memberId) &&
+            member.memberId !== scope.assigneeId &&
+            people.access.some(
+              (access) =>
+                access.memberId === member.memberId &&
+                access.capabilities.some((capability) =>
+                  [
+                    'workspace.admin',
+                    'delivery.manage',
+                    'delivery.review',
+                  ].includes(capability),
+                ),
+            ),
+        )
+      : [];
+    const reviewerIds = new Set(
+      eligibleMembers.map((member) => member.memberId),
+    );
+    if (
+      businessPending?.reviewerState === 'ACTIVE' &&
+      businessPending.effectiveReviewerId
+    )
+      reviewerIds.add(businessPending.effectiveReviewerId);
+    const nativeReviews = new Map<string, NativeReviewTasks>();
+    for (const reviewerId of reviewerIds)
+      nativeReviews.set(
+        reviewerId,
+        await this.nativeReviewTasks(
+          manager,
+          workspace,
+          people,
+          reviewerId,
+          [taskId],
+          nativeCache,
+        ),
+      );
+    const pending = businessPending
+      ? this.withNativeReviewAccess(businessPending, nativeReviews, memberId)
+      : null;
     let canApprove = pending?.canReviewSubmission ?? false;
     if (canApprove && latest) {
       try {
@@ -463,26 +631,11 @@ export class DeliveryReviewsService {
         canApprove = false;
       }
     }
-    const eligibleReviewers = scope.actor.isManager
-      ? people.members
-          .filter(
-            (member) =>
-              scope.project.memberIds.includes(member.memberId) &&
-              member.memberId !== scope.assigneeId &&
-              people.access.some(
-                (access) =>
-                  access.memberId === member.memberId &&
-                  access.capabilities.some((capability) =>
-                    [
-                      'workspace.admin',
-                      'delivery.manage',
-                      'delivery.review',
-                    ].includes(capability),
-                  ),
-              ),
-          )
-          .map((member) => ({ id: member.memberId, name: member.name }))
-      : [];
+    const eligibleReviewers = eligibleMembers
+      .filter((member) =>
+        nativeReviews.get(member.memberId)?.taskIds.has(taskId),
+      )
+      .map((member) => ({ id: member.memberId, name: member.name }));
     return {
       workspaceId: workspace.id,
       memberId,
@@ -502,7 +655,7 @@ export class DeliveryReviewsService {
       assignmentNotice:
         pending &&
         version !== null &&
-        pending.reviewerState === 'ACTIVE' &&
+        businessPending?.reviewerState === 'ACTIVE' &&
         pending.effectiveReviewerId &&
         (scope.actor.isManager || pending.effectiveReviewerId === memberId)
           ? await readDeliveryReviewNotice(manager, workspace.id, {
@@ -625,6 +778,7 @@ export class DeliveryReviewsService {
           'The backup review assignment changed. Refresh before saving.',
         );
       const people = await this.people(manager, workspace.id);
+      const nativeCache: NativeReviewCache = new Map();
       const actorName = this.name(people, memberId),
         reviewerName = command.reviewerId
           ? this.name(people, command.reviewerId)
@@ -645,6 +799,18 @@ export class DeliveryReviewsService {
         if (!authority.canReview)
           throw new BadRequestException(
             'Choose an active independent reviewer with review access who already belongs to this project.',
+          );
+        const native = await this.nativeReviewTasks(
+          manager,
+          workspace,
+          people,
+          command.reviewerId!,
+          [command.taskId],
+          nativeCache,
+        );
+        if (!native.taskIds.has(command.taskId))
+          throw new BadRequestException(
+            'Choose a reviewer whose current CRM task access allows this review.',
           );
       }
       const saved = await repository.save({
@@ -702,6 +868,18 @@ export class DeliveryReviewsService {
             ? (saved.reviewerId ?? '')
             : scope.task.details.reviewerId,
       });
+      const assignedNative =
+        assignedAuthority.reviewerState === 'ACTIVE' &&
+        assignedAuthority.effectiveReviewerId
+          ? await this.nativeReviewTasks(
+              manager,
+              workspace,
+              people,
+              assignedAuthority.effectiveReviewerId,
+              [command.taskId],
+              nativeCache,
+            )
+          : null;
       await recordDeliveryReviewNotice(manager, workspace.id, {
         taskId: command.taskId,
         submissionVersion: command.submissionVersion,
@@ -712,7 +890,7 @@ export class DeliveryReviewsService {
             ? current.reviewerId
             : scope.task.details.reviewerId,
         recipientId: assignedAuthority.effectiveReviewerId,
-        eligible: assignedAuthority.reviewerState === 'ACTIVE',
+        eligible: assignedNative?.taskIds.has(command.taskId) === true,
         senderId: memberId,
         now,
       });
@@ -765,6 +943,7 @@ export class DeliveryReviewsService {
           userWorkspaceId,
           command.taskId,
           now,
+          nativeCache,
         ),
         replayed: false,
       };
@@ -781,12 +960,29 @@ export class DeliveryReviewsService {
       this.dataSource,
       workspace.id,
       async (manager) => {
-        await this.scope(
+        const scope = await this.scope(
           manager,
           workspace,
           memberId,
           userWorkspaceId,
           query.taskId,
+        );
+        const historyScope = {
+          workspaceId: workspace.id,
+          memberId,
+          userWorkspaceId,
+          taskId: query.taskId,
+          submissionVersion: query.submissionVersion,
+          nativeAccess: scope.nativeVisibility.fingerprint,
+          projectId: scope.project.id,
+          projectRevision: scope.project.revision,
+          projectMembers: [...scope.project.memberIds].sort(),
+          capabilities: [...scope.actor.capabilities].sort(),
+          roleIds: [...scope.actor.roleIds].sort(),
+        };
+        const beforeId = readDeliveryReviewHistoryCursor(
+          query.beforeId,
+          historyScope,
         );
         const events = manager
           .getRepository(DeliveryReviewAssignmentEventEntity)
@@ -799,10 +995,10 @@ export class DeliveryReviewsService {
               submissionVersion: query.submissionVersion,
             },
           );
-        if (query.beforeId) {
+        if (beforeId) {
           const cursor = await events
             .clone()
-            .andWhere('event.id=:cursorId', { cursorId: query.beforeId })
+            .andWhere('event.id=:cursorId', { cursorId: beforeId })
             .getOne();
           if (!cursor)
             throw new NotFoundException(
@@ -842,7 +1038,10 @@ export class DeliveryReviewsService {
           })),
           nextBeforeId:
             rows.length > DELIVERY_REVIEW_PAGE_SIZE
-              ? page[page.length - 1].id
+              ? deliveryReviewHistoryCursor(
+                  historyScope,
+                  page[page.length - 1].id,
+                )
               : null,
         };
       },

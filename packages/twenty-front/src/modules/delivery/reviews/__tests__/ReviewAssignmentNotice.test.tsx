@@ -1,4 +1,5 @@
 import { type DocumentNode } from 'graphql';
+import { CombinedGraphQLErrors } from '@apollo/client/errors';
 import { i18n } from '@lingui/core';
 import { I18nProvider } from '@lingui/react';
 import { act, render, screen } from '@testing-library/react';
@@ -15,6 +16,7 @@ let observerCallback: IntersectionObserverCallback;
 const mockSeen = jest.fn();
 const mockAcknowledge = jest.fn();
 const onRefresh = jest.fn();
+const onUnavailable = jest.fn();
 const disconnect = jest.fn();
 const observer: IntersectionObserver = {
   root: null,
@@ -81,7 +83,11 @@ const acknowledgementFixture = () => ({
 });
 const content = (snapshot = fixture()) => (
   <I18nProvider i18n={i18n}>
-    <ReviewAssignmentNotice snapshot={snapshot} onRefresh={onRefresh} />
+    <ReviewAssignmentNotice
+      snapshot={snapshot}
+      onRefresh={onRefresh}
+      onUnavailable={onUnavailable}
+    />
   </I18nProvider>
 );
 const visible = (isIntersecting = true) => {
@@ -280,6 +286,65 @@ it('offers explicit acknowledgement without deciding or resolving the submission
   expect(await screen.findByText('Assignment acknowledged')).toBeVisible();
   expect(mockSeen).not.toHaveBeenCalled();
 });
+it('allows a readable assigned reviewer to see and acknowledge work when final decisions are unavailable', async () => {
+  const snapshot = fixture();
+  snapshot.canReviewSubmission = false;
+  snapshot.canApprove = false;
+  snapshot.pending!.canReviewSubmission = false;
+  snapshot.pending!.reviewerState = 'UNAVAILABLE';
+  snapshot.pending!.warnings = ['REVIEWER_NATIVE_ACCESS_UNAVAILABLE'];
+  mockSeen.mockResolvedValueOnce({
+    data: {
+      seeDeliveryReviewAssignment: {
+        ...snapshot,
+        assignmentNotice: {
+          ...snapshot.assignmentNotice!,
+          seenAt: '2026-10-29T09:00:00Z',
+        },
+      },
+    },
+  });
+  render(content(snapshot));
+  expect(
+    screen.getByText(
+      /check your task permissions before making a review decision/,
+    ),
+  ).toBeVisible();
+  visible();
+  await advance();
+  expect(screen.getByText('Assignment seen')).toBeVisible();
+  const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+  await user.click(
+    screen.getByRole('button', { name: 'Acknowledge review assignment' }),
+  );
+  expect(await screen.findByText('Assignment acknowledged')).toBeVisible();
+  expect(onUnavailable).not.toHaveBeenCalled();
+});
+it.each(['seen', 'acknowledge'])(
+  'propagates a confirmed %s denial without offering a private retry',
+  async (operation) => {
+    const denied = new CombinedGraphQLErrors({
+      errors: [
+        { message: 'Task unavailable', extensions: { code: 'NOT_FOUND' } },
+      ],
+    });
+    render(content());
+    if (operation === 'seen') {
+      mockSeen.mockRejectedValueOnce(denied);
+      visible();
+      await advance();
+    } else {
+      mockAcknowledge.mockRejectedValueOnce(denied);
+      const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+      await user.click(
+        screen.getByRole('button', { name: 'Acknowledge review assignment' }),
+      );
+    }
+    expect(onUnavailable).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(onRefresh).not.toHaveBeenCalled();
+  },
+);
 it.each([
   { workspaceId: 'foreign' },
   { memberId: 'other' },

@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { type DocumentNode } from 'graphql';
 import { NetworkStatus } from '@apollo/client';
+import { CombinedGraphQLErrors } from '@apollo/client/errors';
 import { i18n } from '@lingui/core';
 import { I18nProvider } from '@lingui/react';
 import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Request } from 'cross-fetch';
-import { createMemoryRouter, RouterProvider } from 'react-router-dom';
+import { createMemoryRouter, Link, RouterProvider } from 'react-router-dom';
 import { DeliveryTaskReview } from '@/delivery/reviews/DeliveryTaskReview';
 import { DeliveryTaskJourney } from '@/delivery/lifecycle/DeliveryTaskJourney';
 import {
@@ -25,6 +26,7 @@ import {
 } from '@/delivery/reviews/__tests__/reviews.fixtures';
 let mockSnapshot: TaskReviewSnapshot;
 let mockError: Error | undefined;
+let mockHistoryError: Error | undefined;
 let mockLoading = false;
 let mockNetworkStatus = NetworkStatus.ready;
 let mockReady = true;
@@ -87,6 +89,7 @@ jest.mock('@apollo/client/react', () => ({
             },
           },
           loading: false,
+          error: mockHistoryError,
           refetch: mockRefetch,
         }
       : {
@@ -114,6 +117,7 @@ const setup = (withJourney = false) => {
             : 'Approval unavailable'}
         </p>
         <DeliveryTaskReview controller={controller} submissionVersion={3} />
+        <Link to="/away">Leave review</Link>
         {withJourney && (
           <DeliveryTaskJourney
             task={journeyTask}
@@ -137,11 +141,12 @@ const setup = (withJourney = false) => {
           </I18nProvider>
         ),
       },
+      { path: '/away', element: <p>Other work</p> },
     ],
     { initialEntries: ['/delivery?view=reviews'] },
   );
   render(<RouterProvider router={router} />);
-  return { refresh: () => act(() => mockRefresh()) };
+  return { router, refresh: () => act(() => mockRefresh()) };
 };
 beforeEach(() => {
   i18n.loadAndActivate({ locale: 'en', messages: {} });
@@ -155,6 +160,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockSnapshot = taskReviewFixture();
   mockError = undefined;
+  mockHistoryError = undefined;
   mockLoading = false;
   mockNetworkStatus = NetworkStatus.ready;
   mockReady = true;
@@ -472,4 +478,214 @@ it('hides review authority and history after a membership identity mismatch', ()
   expect(
     screen.queryByText('Submission 3 review owner'),
   ).not.toBeInTheDocument();
+});
+
+const nativeDenied = () =>
+  new CombinedGraphQLErrors({
+    errors: [
+      {
+        message: 'Task unavailable under current access.',
+        extensions: { code: 'NOT_FOUND' },
+      },
+    ],
+  });
+
+it('clears denied private preparation, restores lost focus and requires an explicit fresh check after regrant', async () => {
+  const view = setup();
+  const user = userEvent.setup();
+  await user.click(
+    screen.getByRole('button', {
+      name: 'Choose or change submission reviewer',
+    }),
+  );
+  await user.type(
+    screen.getByLabelText('Reason for reviewer assignment'),
+    'Private cover plan',
+  );
+  mockError = nativeDenied();
+  view.refresh();
+  expect(
+    screen.queryByLabelText('Reason for reviewer assignment'),
+  ).not.toBeInTheDocument();
+  expect(screen.queryByText('Scoped reviewer')).not.toBeInTheDocument();
+  const recovery = screen.getByRole('button', {
+    name: 'Retry submission review access',
+  });
+  expect(recovery).toHaveFocus();
+  expect(screen.getByText(/Private preparation was cleared/)).toBeVisible();
+  mockError = undefined;
+  view.refresh();
+  expect(screen.queryByText('Scoped reviewer')).not.toBeInTheDocument();
+  await user.click(recovery);
+  expect(await screen.findByText('Scoped reviewer')).toBeVisible();
+  expect(
+    screen.queryByLabelText('Reason for reviewer assignment'),
+  ).not.toBeInTheDocument();
+  await user.click(
+    screen.getByRole('button', {
+      name: 'Choose or change submission reviewer',
+    }),
+  );
+  expect(screen.getByLabelText('Reason for reviewer assignment')).toHaveValue(
+    '',
+  );
+  expect(mockAssign).not.toHaveBeenCalled();
+});
+
+it('cancels a pending leave action when native review access is denied', async () => {
+  const view = setup();
+  const user = userEvent.setup();
+  await user.click(
+    screen.getByRole('button', {
+      name: 'Choose or change submission reviewer',
+    }),
+  );
+  await user.type(
+    screen.getByLabelText('Reason for reviewer assignment'),
+    'Do not carry this reason',
+  );
+  await user.click(screen.getByRole('link', { name: 'Leave review' }));
+  expect(screen.getByRole('dialog')).toBeVisible();
+  mockError = nativeDenied();
+  view.refresh();
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  expect(view.router.state.location.pathname).toBe('/delivery');
+  expect(screen.queryByText('Other work')).not.toBeInTheDocument();
+  expect(
+    screen.queryByLabelText('Reason for reviewer assignment'),
+  ).not.toBeInTheDocument();
+});
+
+it('disposes a denied assignment request instead of offering to replay its private body', async () => {
+  setup();
+  mockAssign.mockRejectedValueOnce(nativeDenied());
+  const user = userEvent.setup();
+  await user.click(
+    screen.getByRole('button', {
+      name: 'Choose or change submission reviewer',
+    }),
+  );
+  await user.type(
+    screen.getByLabelText('Reason for reviewer assignment'),
+    'Permission changed before save',
+  );
+  await user.click(
+    screen.getByRole('button', { name: 'Save submission reviewer' }),
+  );
+  expect(
+    await screen.findByText(/Private preparation was cleared/),
+  ).toBeVisible();
+  expect(
+    screen.queryByLabelText('Reason for reviewer assignment'),
+  ).not.toBeInTheDocument();
+  expect(mockAssign).toHaveBeenCalledTimes(1);
+  expect(mockSummariesChanged).not.toHaveBeenCalled();
+});
+it('clears preparation when exact history confirms denial before the parent review refresh', async () => {
+  const view = setup();
+  const user = userEvent.setup();
+  await user.click(
+    screen.getByRole('button', {
+      name: 'Choose or change submission reviewer',
+    }),
+  );
+  await user.type(
+    screen.getByLabelText('Reason for reviewer assignment'),
+    'Private history context',
+  );
+  mockHistoryError = nativeDenied();
+  view.refresh();
+  expect(
+    screen.queryByLabelText('Reason for reviewer assignment'),
+  ).not.toBeInTheDocument();
+  expect(screen.queryByText('Scoped reviewer')).not.toBeInTheDocument();
+  expect(screen.getByText(/Private preparation was cleared/)).toBeVisible();
+});
+
+it('explains native review decision restrictions without concealing readable reviewer context', () => {
+  mockSnapshot.canApprove = false;
+  mockSnapshot.canReviewSubmission = false;
+  mockSnapshot.pending!.warnings = ['NATIVE_REVIEW_WRITE_UNAVAILABLE'];
+  setup();
+  expect(screen.getByText('Scoped reviewer')).toBeVisible();
+  expect(
+    screen.getByText(/permissions do not allow a review decision/),
+  ).toBeVisible();
+  expect(screen.getByText('Approval unavailable')).toBeVisible();
+});
+
+it('does not carry assignment preparation into a different task', async () => {
+  const view = setup();
+  const user = userEvent.setup();
+  await user.click(
+    screen.getByRole('button', {
+      name: 'Choose or change submission reviewer',
+    }),
+  );
+  await user.type(
+    screen.getByLabelText('Reason for reviewer assignment'),
+    'First task only',
+  );
+  mockSelectedTaskId = NEXT_REVIEW_TASK_ID;
+  mockSnapshot = {
+    ...taskReviewFixture(),
+    taskId: NEXT_REVIEW_TASK_ID,
+    pending: { ...taskReviewFixture().pending!, taskId: NEXT_REVIEW_TASK_ID },
+    assignment: {
+      ...taskReviewFixture().assignment!,
+      taskId: NEXT_REVIEW_TASK_ID,
+    },
+  };
+  view.refresh();
+  expect(
+    screen.queryByLabelText('Reason for reviewer assignment'),
+  ).not.toBeInTheDocument();
+  await user.click(
+    screen.getByRole('button', {
+      name: 'Choose or change submission reviewer',
+    }),
+  );
+  expect(screen.getByLabelText('Reason for reviewer assignment')).toHaveValue(
+    '',
+  );
+  expect(mockAssign).not.toHaveBeenCalled();
+});
+
+it('ignores a late assignment success after native access has been lost', async () => {
+  const view = setup();
+  const user = userEvent.setup();
+  let finish: (result: unknown) => void = () => undefined;
+  mockAssign.mockImplementationOnce(
+    () => new Promise((resolve) => (finish = resolve)),
+  );
+  await user.click(
+    screen.getByRole('button', {
+      name: 'Choose or change submission reviewer',
+    }),
+  );
+  await user.type(
+    screen.getByLabelText('Reason for reviewer assignment'),
+    'Pending private assignment',
+  );
+  await user.click(
+    screen.getByRole('button', { name: 'Save submission reviewer' }),
+  );
+  mockError = nativeDenied();
+  view.refresh();
+  await act(async () => {
+    finish({
+      data: {
+        assignDeliveryReview: {
+          taskReview: taskReviewFixture(),
+          assignment: taskReviewFixture().assignment,
+          replayed: false,
+        },
+      },
+    });
+  });
+  expect(screen.queryByText('Scoped reviewer')).not.toBeInTheDocument();
+  expect(
+    screen.queryByText(/Submission review assignment saved/),
+  ).not.toBeInTheDocument();
+  expect(mockSummariesChanged).not.toHaveBeenCalled();
 });

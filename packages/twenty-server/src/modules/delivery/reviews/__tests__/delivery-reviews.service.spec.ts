@@ -1,4 +1,8 @@
-import { ConflictException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { type DataSource, type EntityManager } from 'typeorm';
 import { type WorkspaceEntity } from 'src/engine/core-modules/workspace/workspace.entity';
 import { type DeliveryService } from 'src/modules/delivery/delivery.service';
@@ -7,6 +11,11 @@ import { DeliveryTaskEntity } from 'src/modules/delivery/entities/delivery-task.
 import { type OtogrowAccessService } from 'src/modules/otogrow-access/otogrow-access.service';
 import { recordOtogrowActivity } from 'src/modules/otogrow-activity/record-otogrow-activity';
 import { DeliveryReviewsService } from 'src/modules/delivery/reviews/delivery-reviews.service';
+import { DeliveryNativeTaskAccessService } from 'src/modules/delivery/delivery-native-task-access.service';
+import {
+  type DeliveryNativeTaskVisibility,
+  type DeliveryNativeTaskWriteOperation,
+} from 'src/modules/delivery/native-task-visibility';
 import { DeliveryReviewAssignmentEntity } from 'src/modules/delivery/reviews/entities/delivery-review-assignment.entity';
 import { DeliveryReviewAssignmentEventEntity } from 'src/modules/delivery/reviews/entities/delivery-review-assignment-event.entity';
 import { DeliveryOperationsEntity } from 'src/modules/delivery/entities/delivery-operations.entity';
@@ -37,6 +46,10 @@ const setup = () => {
   const details = reviewDetails();
   details.reviewerId = PRIMARY;
   const state = {
+    nativeDenied: new Set<string>(),
+    nativeHidden: new Map<string, Set<string>>(),
+    nativeWriteDenied: new Set<string>(),
+    nativeFingerprint: 'initial-policy',
     task: {
       taskId: REVIEW_TASK_ID,
       workspaceId: REVIEW_WORKSPACE_ID,
@@ -215,11 +228,70 @@ const setup = () => {
               : [],
       })),
   } as unknown as OtogrowAccessService;
+  const nativeVisibility = jest.fn(
+    async (
+      _manager: EntityManager,
+      _workspace: WorkspaceEntity,
+      identity: { memberId: string; userWorkspaceId: string },
+      _columns?: string[],
+      operation?: DeliveryNativeTaskWriteOperation,
+    ): Promise<DeliveryNativeTaskVisibility> => {
+      if (
+        state.nativeDenied.has(identity.memberId) ||
+        (operation && state.nativeWriteDenied.has(identity.memberId))
+      )
+        throw new ForbiddenException('Current native task permission denied.');
+      return {
+        sql: 'native-visible',
+        parameters: { memberId: identity.memberId },
+        fingerprint: state.nativeFingerprint,
+      };
+    },
+  );
+  const native = {
+    visibility: nativeVisibility,
+    assert: async (
+      manager: EntityManager,
+      workspace: WorkspaceEntity,
+      identity: { memberId: string; userWorkspaceId: string },
+      taskId: string,
+      columns?: string[],
+    ) => {
+      const visibility = await nativeVisibility(
+        manager,
+        workspace,
+        identity,
+        columns,
+      );
+      if (state.nativeHidden.get(identity.memberId)?.has(taskId))
+        throw new NotFoundException('Current native task unavailable.');
+      return visibility;
+    },
+    predicate: () => 'native_visible',
+    query: async (
+      queryManager: EntityManager,
+      sql: string,
+      parameters: unknown[],
+      visibility: DeliveryNativeTaskVisibility,
+    ) => {
+      if (sql.startsWith('SELECT task.id FROM'))
+        return (parameters[0] as string[])
+          .filter(
+            (id) =>
+              !state.nativeHidden
+                .get(String(visibility.parameters.memberId))
+                ?.has(id),
+          )
+          .map((id) => ({ id }));
+      return queryManager.query(sql, parameters);
+    },
+  } as unknown as DeliveryNativeTaskAccessService;
   return {
     state,
     project,
     manager,
-    service: new DeliveryReviewsService(dataSource, delivery, access),
+    nativeVisibility,
+    service: new DeliveryReviewsService(dataSource, delivery, access, native),
     command: {
       commandId: COMMAND,
       taskId: REVIEW_TASK_ID,
@@ -235,6 +307,129 @@ const setup = () => {
 beforeEach(() =>
   jest.mocked(recordOtogrowActivity).mockReset().mockResolvedValue(undefined),
 );
+it.each(['object', 'row'])(
+  'rejects native %s denial before hydrating exact private review history or creating assignment effects',
+  async (kind) => {
+    const { state, service, command, manager } = setup();
+    if (kind === 'object') state.nativeDenied.add(PRIMARY);
+    else state.nativeHidden.set(PRIMARY, new Set([REVIEW_TASK_ID]));
+    const repositories = jest.spyOn(manager, 'getRepository');
+    for (const operation of [
+      () =>
+        service.task(workspace, PRIMARY, REVIEW_MEMBERSHIP_ID, {
+          taskId: REVIEW_TASK_ID,
+        }),
+      () =>
+        service.history(workspace, PRIMARY, REVIEW_MEMBERSHIP_ID, {
+          taskId: REVIEW_TASK_ID,
+          submissionVersion: 1,
+        }),
+      () => service.assign(workspace, PRIMARY, REVIEW_MEMBERSHIP_ID, command),
+    ])
+      await expect(operation()).rejects.toThrow(/native task/i);
+    expect(repositories).not.toHaveBeenCalled();
+    expect(state.assignment).toBeNull();
+    expect(state.events).toEqual([]);
+    expect(state.operations.state.notices).toEqual([]);
+  },
+);
+it.each(['object', 'row', 'write'])(
+  'checks the selected reviewer’s own native %s access without borrowing the manager’s rights',
+  async (kind) => {
+    const { state, service, command, nativeVisibility } = setup();
+    const candidate = state.members.find(
+      (member) => member.memberId === REVIEW_MEMBER_ID,
+    )!;
+    candidate.userWorkspaceId = 'd20c4904-f7fb-4163-b548-b0ce22839c64';
+    if (kind === 'object') state.nativeDenied.add(REVIEW_MEMBER_ID);
+    else if (kind === 'write') state.nativeWriteDenied.add(REVIEW_MEMBER_ID);
+    else state.nativeHidden.set(REVIEW_MEMBER_ID, new Set([REVIEW_TASK_ID]));
+    await expect(
+      service.assign(workspace, PRIMARY, REVIEW_MEMBERSHIP_ID, command),
+    ).rejects.toThrow('current CRM task access');
+    expect(nativeVisibility).toHaveBeenCalledWith(
+      expect.anything(),
+      workspace,
+      expect.objectContaining({
+        memberId: REVIEW_MEMBER_ID,
+        userWorkspaceId: candidate.userWorkspaceId,
+      }),
+      undefined,
+      { type: 'update', updatedColumns: ['status'] },
+    );
+    expect(state.assignment).toBeNull();
+    expect(state.events).toEqual([]);
+    expect(state.operations.state.notices).toEqual([]);
+  },
+);
+it('keeps a native read-only manager’s review and delegation available while withholding final review actions', async () => {
+  const { state, service, command } = setup();
+  state.nativeWriteDenied.add(PRIMARY);
+  const task = await service.task(workspace, PRIMARY, REVIEW_MEMBERSHIP_ID, {
+    taskId: REVIEW_TASK_ID,
+  });
+  expect(task).toMatchObject({
+    canApprove: false,
+    canReviewSubmission: false,
+    canManageAssignment: true,
+    pending: {
+      reviewerState: 'UNAVAILABLE',
+      warnings: expect.arrayContaining(['NATIVE_REVIEW_WRITE_UNAVAILABLE']),
+    },
+  });
+  const assigned = await service.assign(
+    workspace,
+    PRIMARY,
+    REVIEW_MEMBERSHIP_ID,
+    command,
+  );
+  expect(assigned.assignment.reviewerId).toBe(REVIEW_MEMBER_ID);
+  expect(assigned.taskReview.pending?.reviewerState).toBe('ACTIVE');
+});
+it('preserves exact notice receipts for a readable reviewer who has lost native status-update access', async () => {
+  const { state, service, command } = setup();
+  await service.assign(workspace, PRIMARY, REVIEW_MEMBERSHIP_ID, command);
+  state.actorId = REVIEW_MEMBER_ID;
+  state.manager = false;
+  state.nativeWriteDenied.add(REVIEW_MEMBER_ID);
+  const notice = state.operations.state.notices[0];
+  const receipt = {
+    taskId: REVIEW_TASK_ID,
+    taskRevision: 7,
+    submissionVersion: 1,
+    assignmentRevision: 1,
+    noticeId: notice.id,
+  };
+  const seen = await service.seen(
+    workspace,
+    REVIEW_MEMBER_ID,
+    REVIEW_MEMBERSHIP_ID,
+    receipt,
+  );
+  expect(seen.canReviewSubmission).toBe(false);
+  expect(seen.canApprove).toBe(false);
+  expect(seen.assignmentNotice?.seenAt).toBeTruthy();
+  expect(
+    (
+      await service.acknowledge(
+        workspace,
+        REVIEW_MEMBER_ID,
+        REVIEW_MEMBERSHIP_ID,
+        receipt,
+      )
+    ).acknowledgedAt,
+  ).toBeTruthy();
+  expect(state.task.details.state).toBe('IN_REVIEW');
+});
+it('does not return a saved assignment receipt after native revocation', async () => {
+  const { state, service, command } = setup();
+  await service.assign(workspace, PRIMARY, REVIEW_MEMBERSHIP_ID, command);
+  state.nativeDenied.add(PRIMARY);
+  await expect(
+    service.assign(workspace, PRIMARY, REVIEW_MEMBERSHIP_ID, command),
+  ).rejects.toThrow('native task');
+  expect(state.events).toHaveLength(1);
+});
 it('delegates only the current submission and preserves exact canonical manager/source identity', async () => {
   const { state, service, command } = setup(),
     original = structuredClone(state.task);

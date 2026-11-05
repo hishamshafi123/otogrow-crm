@@ -14,6 +14,8 @@ export const useReviewLabels = () => {
     UNKNOWN_SUBMISSION_TIME: t`The submitted time is unknown; waiting time cannot be established.`,
     FUTURE_SUBMISSION_TIME: t`The recorded submitted time is in the future; waiting time cannot be established.`,
     REVIEWER_UNAVAILABLE: t`Review the current reviewer assignment.`,
+    REVIEWER_NATIVE_ACCESS_UNAVAILABLE: t`The assigned reviewer cannot currently access or update this task. A manager must choose an eligible reviewer or review their permissions.`,
+    NATIVE_REVIEW_WRITE_UNAVAILABLE: t`You can inspect this submission, but your task permissions do not allow a review decision. Ask a manager to check your access.`,
     SELF_REVIEW: t`The producer cannot approve their own work.`,
     SUBMISSION_IDENTITY_UNAVAILABLE: t`This submitted version cannot be established. Review the source before making a decision.`,
     WORKFLOW_REQUIREMENTS_UNAVAILABLE: t`The required review checks cannot be established. Refresh the submitted requirements before approval.`,

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { financeReviewToken } from 'src/modules/delivery/finance/delivery-finance-reconciliation.policy';
 export const DELIVERY_REVIEW_SOURCE_LIMIT = 2000;
 export const DELIVERY_REVIEW_PAGE_SIZE = 25;
+export const DELIVERY_REVIEW_HISTORY_CURSOR_LIMIT = 2048;
 const id = z.uuid().transform((value) => value.toLowerCase());
 const version = z.number().int().positive();
 const optionalId = id.nullish().transform((value) => value ?? null);
@@ -59,8 +60,53 @@ export const deliveryReviewAssignmentSchema = z
     'Choose an explicit backup or restore the primary reviewer.',
   );
 export const deliveryReviewHistorySchema = z
-  .object({ taskId: id, submissionVersion: version, beforeId: optionalId })
+  .object({
+    taskId: id,
+    submissionVersion: version,
+    beforeId: z
+      .string()
+      .min(1)
+      .max(DELIVERY_REVIEW_HISTORY_CURSOR_LIMIT)
+      .nullish(),
+  })
   .strict();
+const historyCursor = z
+  .object({
+    version: z.literal(1),
+    scope: z.string().regex(/^[a-f0-9]{64}$/),
+    id,
+  })
+  .strict();
+export const deliveryReviewHistoryCursor = (scope: unknown, eventId: string) =>
+  Buffer.from(
+    JSON.stringify({
+      version: 1,
+      scope: financeReviewToken(scope),
+      id: eventId,
+    }),
+  ).toString('base64url');
+export const readDeliveryReviewHistoryCursor = (
+  value: string | null | undefined,
+  scope: unknown,
+) => {
+  if (!value) return null;
+  try {
+    if (
+      value.length > DELIVERY_REVIEW_HISTORY_CURSOR_LIMIT ||
+      !/^[A-Za-z0-9_-]+$/.test(value)
+    )
+      throw new Error();
+    const parsed = historyCursor.parse(
+      JSON.parse(Buffer.from(value, 'base64url').toString('utf8')),
+    );
+    if (parsed.scope !== financeReviewToken(scope)) throw new Error();
+    return parsed.id;
+  } catch {
+    throw new ConflictException(
+      'This review history page no longer matches current access. Refresh its first page.',
+    );
+  }
+};
 export const parseDeliveryReview = <TOutput>(
   schema: z.ZodType<TOutput>,
   value: unknown,

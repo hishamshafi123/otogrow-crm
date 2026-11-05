@@ -458,6 +458,7 @@ const LegacyDeliveryWorkspacePage = ({
     enabled: Boolean(
       workspaceVerified && selectedTask && currentPage && !creating,
     ),
+    onUnavailable: onWorkspaceDenied,
     onChanged: async () => {
       await Promise.all([query.refetch(), refreshReviewQueues()]);
     },

@@ -1,7 +1,7 @@
+import { useLayoutEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@apollo/client/react';
 import { Trans, useLingui } from '@lingui/react/macro';
-import { isValidUuid } from 'twenty-shared/utils';
 import { type DeliveryReviewAssignmentHistoryQuery } from '~/generated-metadata/graphql';
 import { GET_REVIEW_ASSIGNMENT_HISTORY } from '@/delivery/reviews/delivery-reviews.graphql';
 import { reviewQueueDestination } from '@/delivery/reviews/review-navigation';
@@ -9,22 +9,25 @@ import { useReviewLabels } from '@/delivery/reviews/useReviewLabels';
 import { useWorkflowAccess } from '@/delivery/workflows/useWorkflowAccess';
 import { StyledDeliveryButton } from '@/delivery/deliveryStyles';
 import { StyledReviewQueueItem } from '@/delivery/reviews/reviewStyles';
+import { isDeliveryTaskUnavailable } from '@/delivery/tasks/isDeliveryTaskUnavailable';
 type ReviewAssignmentHistoryProps = {
   taskId: string;
   submissionVersion: number;
   enabled: boolean;
+  onUnavailable?: () => void;
 };
 export const ReviewAssignmentHistory = ({
   taskId,
   submissionVersion,
   enabled,
+  onUnavailable,
 }: ReviewAssignmentHistoryProps) => {
   const { t } = useLingui();
   const labels = useReviewLabels();
   const permission = useWorkflowAccess();
   const [params] = useSearchParams();
   const beforeId = params.get('reviewAssignmentBefore');
-  const valid = !beforeId || isValidUuid(beforeId);
+  const valid = !beforeId || /^[A-Za-z0-9_-]{1,2048}$/.test(beforeId);
   const query = useQuery<DeliveryReviewAssignmentHistoryQuery>(
     GET_REVIEW_ASSIGNMENT_HISTORY,
     {
@@ -37,6 +40,10 @@ export const ReviewAssignmentHistory = ({
     },
   );
   const candidate = query.data?.deliveryReviewAssignmentHistory;
+  const unavailable = enabled && isDeliveryTaskUnavailable(query.error);
+  useLayoutEffect(() => {
+    if (unavailable) onUnavailable?.();
+  }, [unavailable, onUnavailable]);
   const data =
     enabled &&
     valid &&

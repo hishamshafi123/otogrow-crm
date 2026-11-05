@@ -19,6 +19,7 @@ type ReviewerHistory =
   DeliveryReviewAssignmentHistoryQuery['deliveryReviewAssignmentHistory'];
 const EVENT_ID = '58cfaa8b-4dba-4917-bb18-d6040c4ab26f';
 const EARLIER_EVENT_ID = '38199d2c-f465-4cdc-adca-3db019b6c429';
+const HISTORY_CURSOR = 'opaque-review-history-page';
 const ORIGINAL_REASON =
   'Cover this exact submission while the primary is away.';
 const mockRefetch = jest.fn();
@@ -60,7 +61,7 @@ const historyFixture = (): ReviewerHistory => ({
   userWorkspaceId: 'membership',
   taskId: REVIEW_TASK_ID,
   submissionVersion: 3,
-  nextBeforeId: EARLIER_EVENT_ID,
+  nextBeforeId: HISTORY_CURSOR,
   events: [
     {
       id: EVENT_ID,
@@ -213,7 +214,7 @@ it('pages history with the exact task, submission, queue filters and guided batc
     screen.getByRole('link', { name: 'Older reviewer events' }),
   );
   const older = new URLSearchParams(page.router.state.location.search);
-  expect(older.get('reviewAssignmentBefore')).toBe(EARLIER_EVENT_ID);
+  expect(older.get('reviewAssignmentBefore')).toBe(HISTORY_CURSOR);
   expect(older.get('task')).toBe(REVIEW_TASK_ID);
   expect(older.get('creativeSubmission')).toBe('3');
   expect(older.get('reviewProject')).toBe(REVIEW_PROJECT_ID);
@@ -402,7 +403,7 @@ it('hides history and disables its retry when the parent revokes the read surfac
 
 it('rejects an invalid page link without exposing cached events and preserves a latest-events recovery link', async () => {
   const page = await setup({
-    initialRoute: `/delivery?view=reviews&reviewProject=${REVIEW_PROJECT_ID}&task=${REVIEW_TASK_ID}&creativeSubmission=3&reviewAssignmentBefore=not-a-uuid`,
+    initialRoute: `/delivery?view=reviews&reviewProject=${REVIEW_PROJECT_ID}&task=${REVIEW_TASK_ID}&creativeSubmission=3&reviewAssignmentBefore=invalid%20cursor`,
   });
   expect(screen.queryByText(ORIGINAL_REASON)).not.toBeInTheDocument();
   expect(screen.getByRole('alert')).toHaveTextContent(

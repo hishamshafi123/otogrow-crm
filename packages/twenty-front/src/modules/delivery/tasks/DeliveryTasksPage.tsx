@@ -173,6 +173,7 @@ export const DeliveryTasksPage = () => {
     taskRevision: task?.revision ?? 0,
     enabled: state.detailVerified && !creating,
     onChanged: state.refresh,
+    onUnavailable: state.invalidateDetail,
   });
   const close = () =>
     requestAction(() => {

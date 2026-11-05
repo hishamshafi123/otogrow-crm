@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { NetworkStatus } from '@apollo/client';
 import { useMutation, useQuery } from '@apollo/client/react';
 import { useLingui } from '@lingui/react/macro';
@@ -15,19 +15,26 @@ import {
 import { type TaskReviewSnapshot } from '@/delivery/reviews/review.types';
 import { useWorkflowAccess } from '@/delivery/workflows/useWorkflowAccess';
 import { hasOtogrowCapability } from '@/otogrow-access/otogrow-access.types';
+import { isDeliveryTaskUnavailable } from '@/delivery/tasks/isDeliveryTaskUnavailable';
+import { useDeliveryDraftGuard } from '@/delivery/drafts/DeliveryDraftGuard';
 export const useTaskReview = ({
   taskId,
   taskRevision,
   enabled = true,
   onChanged,
+  onUnavailable,
 }: {
   taskId: string;
   taskRevision: number;
   enabled?: boolean;
   onChanged?: () => Promise<unknown>;
+  onUnavailable?: () => void;
 }) => {
   const { t } = useLingui();
   const permission = useWorkflowAccess();
+  const { cancelPendingNavigation } = useDeliveryDraftGuard();
+  const source = `${permission.scope}:${taskId}`;
+  const [boundary, setBoundary] = useState({ source, denied: false });
   const query = useQuery<DeliveryTaskReviewQuery>(GET_TASK_REVIEW, {
     variables: { input: { taskId }, identity: permission.scope, taskRevision },
     fetchPolicy: 'no-cache',
@@ -35,6 +42,10 @@ export const useTaskReview = ({
     skip: !enabled || !permission.ready,
   });
   const [ownResult, setOwnResult] = useState<TaskReviewSnapshot | null>(null);
+  const knownAccessLoss =
+    permission.denied || isDeliveryTaskUnavailable(query.error);
+  const unavailable =
+    knownAccessLoss || (boundary.source === source && boundary.denied);
   const candidate = query.data?.deliveryTaskReview;
   const current =
     candidate &&
@@ -51,6 +62,7 @@ export const useTaskReview = ({
   const trusted =
     enabled &&
     permission.ready &&
+    !unavailable &&
     !query.error &&
     permission.matches(current) &&
     current?.taskId === taskId &&
@@ -88,11 +100,14 @@ export const useTaskReview = ({
       : null;
   const fresh =
     trusted && !query.loading ? withCurrentAuthority(current) : null;
-  const [lastVerified, setLastVerified] = useState<TaskReviewSnapshot | null>(
-    null,
-  );
+  const [evidence, setEvidence] = useState<{
+    source: string;
+    snapshot: TaskReviewSnapshot;
+  } | null>(null);
+  const lastVerified = evidence?.source === source ? evidence.snapshot : null;
   const [retainReading, setRetainReading] = useState(false);
-  if (fresh && !fastDeepEqual(fresh, lastVerified)) setLastVerified(fresh);
+  if (fresh && !fastDeepEqual(fresh, lastVerified))
+    setEvidence({ source, snapshot: fresh });
   const refreshing =
     query.loading &&
     [NetworkStatus.poll, NetworkStatus.refetch].includes(query.networkStatus);
@@ -131,6 +146,21 @@ export const useTaskReview = ({
   const [mutate] = useMutation<AssignDeliveryReviewMutation>(ASSIGN_REVIEW);
   // oxlint-disable-next-line twenty/no-state-useref -- A late assignment response cannot restore authority after scope changes.
   const epoch = useRef(0);
+  const invalidate = useCallback(() => {
+    epoch.current += 1;
+    setBoundary((currentBoundary) =>
+      currentBoundary.source === source && currentBoundary.denied
+        ? currentBoundary
+        : { source, denied: true },
+    );
+    setEvidence(null);
+    setOwnResult(null);
+    cancelPendingNavigation();
+    onUnavailable?.();
+  }, [source, cancelPendingNavigation, onUnavailable]);
+  useLayoutEffect(() => {
+    if (knownAccessLoss) invalidate();
+  }, [knownAccessLoss, invalidate]);
   useLayoutEffect(() => {
     epoch.current += 1;
     return () => {
@@ -138,15 +168,24 @@ export const useTaskReview = ({
     };
   }, [permission.scope, available, permission.manager, taskId, enabled]);
   const refresh = async () => {
+    const started = epoch.current;
     try {
       const result = await query.refetch();
       if (
+        started !== epoch.current ||
         !permission.matches(result.data?.deliveryTaskReview) ||
-        result.data?.deliveryTaskReview.taskId !== taskId
+        result.data?.deliveryTaskReview.taskId !== taskId ||
+        result.data.deliveryTaskReview.taskRevision < taskRevision
       )
         throw new Error();
+      setBoundary({ source, denied: false });
       return true;
-    } catch {
+    } catch (failure) {
+      if (started !== epoch.current) return false;
+      if (isDeliveryTaskUnavailable(failure)) {
+        invalidate();
+        return false;
+      }
       setError(
         t`Current review access could not refresh. Previous evidence is hidden and your draft is kept.`,
       );
@@ -178,6 +217,10 @@ export const useTaskReview = ({
       void onChanged?.().catch(() => undefined);
       return true;
     } catch (failure) {
+      if (started === epoch.current && isDeliveryTaskUnavailable(failure)) {
+        invalidate();
+        return false;
+      }
       if (started === epoch.current)
         setError(
           failure instanceof Error
@@ -190,8 +233,11 @@ export const useTaskReview = ({
     }
   };
   return {
+    source,
     data,
-    retained: withCurrentAuthority(fresh ?? lastVerified),
+    retained: unavailable ? null : withCurrentAuthority(fresh ?? lastVerified),
+    unavailable,
+    invalidate,
     available,
     refreshing,
     loading: query.loading,

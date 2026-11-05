@@ -520,6 +520,7 @@ export const useDeliveryTasks = (
         : null,
     detailQuery,
     taskUnavailable,
+    invalidateDetail,
     retryDetail,
     validSelection,
     busy,

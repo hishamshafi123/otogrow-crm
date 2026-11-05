@@ -71,6 +71,7 @@ function read() {
   );
   assert.equal(fixture.marker, `native-task-access-ui:${fixture.nonce}`);
   assert(['ALLOWED', 'DENIED'].includes(fixture.desired));
+  assert(['TASKS', 'REVIEWS'].includes(fixture.surface ?? 'TASKS'));
   return fixture;
 }
 function rowGroups(fixture) {
@@ -178,6 +179,7 @@ function print(fixture) {
       {
         status: fixture.status,
         desired: fixture.desired,
+        surface: fixture.surface ?? 'TASKS',
         projectId: fixture.projectId,
         title: fixture.title,
         taskIds: [fixture.firstTaskId, fixture.secondTaskId],
@@ -194,8 +196,11 @@ async function create() {
   assert.equal(process.env.OTOGROW_NATIVE_ACCESS_UI_SERVICES_STOPPED, '1');
   assert(!existsSync(FILE));
   const nonce = randomUUID();
+  const surface = process.env.OTOGROW_NATIVE_ACCESS_UI_SURFACE ?? 'TASKS';
+  assert(['TASKS', 'REVIEWS'].includes(surface));
   const fixture = {
     checker: CHECKER,
+    surface,
     workspaceId: WORKSPACE_ID,
     nonce,
     projectId: randomUUID(),
@@ -304,11 +309,22 @@ async function create() {
         priority: 'NORMAL',
         scheduledDate: null,
         reviewerId: fixture.actorId,
-        state: 'PLANNED',
+        state: surface === 'REVIEWS' ? 'IN_REVIEW' : 'PLANNED',
         blocker: '',
         checklist: [],
         evidence: [],
-        submissions: [],
+        submissions:
+          surface === 'REVIEWS'
+            ? [
+                {
+                  version: 1,
+                  submittedBy: fixture.actorId,
+                  submittedAt: new Date().toISOString(),
+                  description: `${fixture.marker}: private ${suffix} review evidence`,
+                  evidence: [],
+                },
+              ]
+            : [],
         events: [],
         creative,
       };
