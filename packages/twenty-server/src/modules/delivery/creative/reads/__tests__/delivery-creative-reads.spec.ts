@@ -1,7 +1,12 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { type DataSource, type EntityManager } from 'typeorm';
 import { type WorkspaceEntity } from 'src/engine/core-modules/workspace/workspace.entity';
 import { type DeliveryService } from 'src/modules/delivery/delivery.service';
+import { type DeliveryNativeTaskAccessService } from 'src/modules/delivery/delivery-native-task-access.service';
 import { newCreativeDocument } from 'src/modules/delivery/creative/delivery-creative.types';
 import {
   DeliveryCreativeReadsService,
@@ -47,6 +52,7 @@ const row = {
 };
 
 const fixture = (answers: unknown[]) => {
+  const permissions = { allowed: true, fingerprint: 'native-permissions' };
   const calls: { sql: string; parameters: unknown[] }[] = [];
   const query = jest.fn(async (sql: string, parameters: unknown[] = []) => {
     calls.push({ sql, parameters });
@@ -64,15 +70,60 @@ const fixture = (answers: unknown[]) => {
     actor: jest.fn(async () => actor),
     schema: () => '"workspace_test"',
   } as unknown as DeliveryService;
+  const nativeTasks = {
+    visibility: jest.fn(async () => {
+      if (!permissions.allowed) throw new ForbiddenException();
+      return {
+        sql: 'TRUE',
+        parameters: {},
+        fingerprint: permissions.fingerprint,
+      };
+    }),
+    predicate: () => 'native_task_is_visible',
+    query: (current: EntityManager, sql: string, values: unknown[]) =>
+      current.query(sql, values),
+  } as unknown as DeliveryNativeTaskAccessService;
   return {
     calls,
     delivery,
-    service: new DeliveryCreativeReadsService(source, delivery),
+    permissions,
+    service: new DeliveryCreativeReadsService(source, delivery, nativeTasks),
     workspace: { id: workspaceId } as WorkspaceEntity,
   };
 };
 
 describe('Creative production reads', () => {
+  it('does not expose counts, details or approved references after native read permission is revoked', async () => {
+    const { service, workspace, calls, permissions } = fixture([]);
+    permissions.allowed = false;
+    await expect(
+      service.tasks(workspace, memberId, userWorkspaceId, {}),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(
+      service.detail(workspace, memberId, userWorkspaceId, { taskId }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(
+      service.references(workspace, memberId, userWorkspaceId, { taskId }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(calls.every(({ sql }) => sql.includes('pg_advisory'))).toBe(true);
+  });
+  it('invalidates creative pages when native permissions change without a project or task edit', async () => {
+    const { service, workspace, permissions } = fixture([
+      [{ totalCount: 2, fingerprint: 'unchanged-tasks' }],
+      [row, { ...row, id: projectId }],
+      [{ totalCount: 2, fingerprint: 'unchanged-tasks' }],
+    ]);
+    const first = await service.tasks(workspace, memberId, userWorkspaceId, {
+      limit: 1,
+    });
+    permissions.fingerprint = 'changed-native-permissions';
+    await expect(
+      service.tasks(workspace, memberId, userWorkspaceId, {
+        limit: 1,
+        after: first.nextCursor,
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
   it('preserves the exact microsecond cursor and rejects identity, filter and kind changes', () => {
     const scope = creativeReadHash({ actor: memberId, filter: 'STARTED' });
     const cursor = creativeReadCursor(scope, 'TASK', row.createdAtKey, taskId);

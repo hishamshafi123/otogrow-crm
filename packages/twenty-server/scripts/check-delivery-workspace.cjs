@@ -1,4 +1,7 @@
 const {
+  createIsolatedNativeTaskAccess,
+} = require('./helpers/isolated-native-task-access.cjs');
+const {
   OtogrowAccessService,
 } = require('../dist/modules/otogrow-access/otogrow-access.service');
 // Runs against the local development database; all fixture writes roll back.
@@ -72,7 +75,11 @@ async function main() {
       userHasWorkspaceSettingPermission: async ({ userWorkspaceId }) =>
         userWorkspaceId === admin,
     });
-    const service = new DeliveryService(scopedDataSource, access);
+    const service = new DeliveryService(
+      scopedDataSource,
+      access,
+      createIsolatedNativeTaskAccess(),
+    );
     const command = (actor, input) =>
       service.command(workspace, actor, actor, input);
     await command(admin, {

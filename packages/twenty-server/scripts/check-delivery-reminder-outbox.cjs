@@ -1,3 +1,6 @@
+const {
+  createIsolatedNativeTaskAccess,
+} = require('./helpers/isolated-native-task-access.cjs');
 const noChat = { ownsReminder: async () => false, queueDue: async () => {} };
 // Commit only an isolated fixture so independent database sessions can verify lock release; remove it exactly in finally.
 const assert = require('node:assert/strict');
@@ -137,12 +140,18 @@ async function main() {
       new DeliveryService(
         source,
         new OtogrowAccessService(source, permissions),
+        createIsolatedNativeTaskAccess(),
       ),
   );
   const operations = new DeliveryOperationsService(
     scoped[0],
     deliveries[0],
-    new DeliveryCreativeService(scoped[0], deliveries[0], {}),
+    new DeliveryCreativeService(
+      scoped[0],
+      deliveries[0],
+      {},
+      createIsolatedNativeTaskAccess(),
+    ),
     {
       findByWorkspaceId: async () => ({
         isActive: botActive,

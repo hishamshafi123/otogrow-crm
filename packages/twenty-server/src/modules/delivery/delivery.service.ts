@@ -1,4 +1,6 @@
 import { getDeliveryLifecycle } from 'src/modules/delivery/lifecycle/delivery-lifecycle';
+import { DeliveryNativeTaskAccessService } from 'src/modules/delivery/delivery-native-task-access.service';
+import { type DeliveryNativeTaskWriteOperation } from 'src/modules/delivery/native-task-visibility';
 import { freezeCreativeSubmissionLearning } from 'src/modules/delivery/creative/learning/freeze-creative-submission-learning';
 import { assertDeliveryCreativeReview } from 'src/modules/delivery/creative/assert-delivery-creative-review';
 import { recordDeliveryRevision } from 'src/modules/delivery/revisions/record-delivery-revision';
@@ -88,6 +90,7 @@ export class DeliveryService {
   constructor(
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly access: OtogrowAccessService,
+    private readonly nativeTasks: DeliveryNativeTaskAccessService,
   ) {}
 
   schema(workspace: WorkspaceEntity): string {
@@ -161,14 +164,24 @@ export class DeliveryService {
           ),
         );
         const projectIds = projects.map((project) => project.id);
+        const visibility = projectIds.length
+          ? await this.nativeTasks.visibility(
+              manager,
+              workspace,
+              { memberId, userWorkspaceId },
+              ['id', 'title', 'assigneeId', 'dueAt', 'createdAt'],
+            )
+          : null;
         const tasks: (NativeTask & {
           projectId: string;
           details: DeliveryDetails;
           revision: number;
-        })[] = projectIds.length
-          ? await manager.query(
-              `SELECT t.id, t.title, t."assigneeId", t."dueAt", d."projectId", d.details, d.revision FROM "core"."deliveryTask" d JOIN ${this.schema(workspace)}."task" t ON t.id = d."taskId" WHERE d."workspaceId" = $1 AND d."projectId" = ANY($2::uuid[]) AND t."deletedAt" IS NULL ORDER BY t."dueAt" ASC NULLS LAST, t."createdAt" DESC`,
+        })[] = visibility
+          ? await this.nativeTasks.query(
+              manager,
+              `SELECT t.id, t.title, t."assigneeId", t."dueAt", d."projectId", d.details, d.revision FROM "core"."deliveryTask" d JOIN ${this.schema(workspace)}."task" t ON t.id = d."taskId" WHERE d."workspaceId" = $1 AND d."projectId" = ANY($2::uuid[]) AND t."deletedAt" IS NULL AND ${this.nativeTasks.predicate(workspace, visibility, 't.id')} ORDER BY t."dueAt" ASC NULLS LAST, t."createdAt" DESC`,
               [workspace.id, projectIds],
+              visibility,
             )
           : [];
         const profiles = await manager
@@ -434,6 +447,17 @@ export class DeliveryService {
       };
       if (command.action === 'create') {
         requireManager();
+        const createOperation: DeliveryNativeTaskWriteOperation = {
+          type: 'insert',
+          updatedColumns: ['title', 'assigneeId', 'dueAt', 'status'],
+        };
+        await this.nativeTasks.visibility(
+          manager,
+          workspace,
+          { memberId, userWorkspaceId },
+          undefined,
+          createOperation,
+        );
         const project = await projectRepository.findOneBy({
           id: command.projectId,
           workspaceId: workspace.id,
@@ -445,6 +469,14 @@ export class DeliveryService {
         await manager.query(
           `INSERT INTO ${this.schema(workspace)}."task" (id, title, "assigneeId", "dueAt", status) VALUES ($1, $2, $3, $4, 'TODO')`,
           [taskId, fields.title, fields.assigneeId, fields.dueAt],
+        );
+        await this.nativeTasks.assert(
+          manager,
+          workspace,
+          { memberId, userWorkspaceId },
+          taskId,
+          undefined,
+          createOperation,
         );
         const created = await taskRepository.save({
           workspaceId: workspace.id,
@@ -525,6 +557,21 @@ export class DeliveryService {
         !canAccessDeliveryProject(actor.isManager, memberId, project.memberIds)
       )
         throw new NotFoundException();
+      const writeOperation: DeliveryNativeTaskWriteOperation = {
+        type: 'update',
+        updatedColumns:
+          command.action === 'edit'
+            ? ['title', 'assigneeId', 'dueAt', 'status']
+            : ['status'],
+      };
+      await this.nativeTasks.assert(
+        manager,
+        workspace,
+        { memberId, userWorkspaceId },
+        command.taskId,
+        undefined,
+        writeOperation,
+      );
       const nativeTasks: NativeTask[] = await manager.query(
         `SELECT id, title, "assigneeId", "dueAt" FROM ${this.schema(workspace)}."task" WHERE id = $1 AND "deletedAt" IS NULL FOR UPDATE`,
         [command.taskId],
@@ -759,6 +806,14 @@ export class DeliveryService {
               ? 'TODO'
               : 'IN_PROGRESS',
         ],
+      );
+      await this.nativeTasks.assert(
+        manager,
+        workspace,
+        { memberId, userWorkspaceId },
+        task.id,
+        undefined,
+        writeOperation,
       );
       const after = {
         ...planningActivity(details),

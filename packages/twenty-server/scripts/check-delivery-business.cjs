@@ -1,4 +1,7 @@
 const {
+  createIsolatedNativeTaskAccess,
+} = require('./helpers/isolated-native-task-access.cjs');
+const {
   makeBudgetFixture,
 } = require('./helpers/otogrow-ai-budget-fixture.cjs');
 const {
@@ -75,7 +78,11 @@ const {
       userHasWorkspaceSettingPermission: async ({ userWorkspaceId }) =>
         userWorkspaceId === admin,
     });
-    const delivery = new DeliveryService(scoped, access);
+    const delivery = new DeliveryService(
+      scoped,
+      access,
+      createIsolatedNativeTaskAccess(),
+    );
     let modelCalls = 0;
     let modelHook = null;
     const model = new MockLanguageModelV3({

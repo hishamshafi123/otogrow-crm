@@ -1,3 +1,6 @@
+const {
+  createIsolatedNativeTaskAccess,
+} = require('./helpers/isolated-native-task-access.cjs');
 const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
 const {
@@ -166,7 +169,11 @@ function buildServices(source, fixture) {
       workspaceId === fixture.workspaceId &&
       userWorkspaceId === fixture.people.admin.userWorkspaceId,
   });
-  const delivery = new DeliveryService(source, access);
+  const delivery = new DeliveryService(
+    source,
+    access,
+    createIsolatedNativeTaskAccess(),
+  );
   const forbiddenProvider = new Proxy(
     {},
     {

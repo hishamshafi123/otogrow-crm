@@ -1,3 +1,6 @@
+const {
+  createIsolatedNativeTaskAccess,
+} = require('./helpers/isolated-native-task-access.cjs');
 const report = (message) => process.stdout.write(`${message}\n`);
 const {
   makeBudgetFixture,
@@ -78,7 +81,11 @@ async function main() {
       userHasWorkspaceSettingPermission: async ({ userWorkspaceId }) =>
         userWorkspaceId === admin,
     });
-    const delivery = new DeliveryService(scoped, access);
+    const delivery = new DeliveryService(
+      scoped,
+      access,
+      createIsolatedNativeTaskAccess(),
+    );
     const mutateTask = (actor, input) =>
       delivery.command(workspace, actor, actor, input);
     let state = await mutateTask(admin, {

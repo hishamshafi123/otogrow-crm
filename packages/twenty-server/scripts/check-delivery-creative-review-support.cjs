@@ -1,3 +1,6 @@
+const {
+  createIsolatedNativeTaskAccess,
+} = require('./helpers/isolated-native-task-access.cjs');
 const assert = require('node:assert/strict');
 const { createHash, randomUUID } = require('node:crypto');
 const {
@@ -230,13 +233,18 @@ function buildReviewServices(source, fixture) {
     DeliveryCreativeReviewService,
   } = require('../dist/modules/delivery/creative/review/delivery-creative-review.service');
   const services = buildServices(source, fixture);
-  const creative = new DeliveryCreativeService(source, services.delivery, {
-    getCurrentDriver: () => {
-      throw new Error(
-        'Review annotation checks must not load media or contact a provider.',
-      );
+  const creative = new DeliveryCreativeService(
+    source,
+    services.delivery,
+    {
+      getCurrentDriver: () => {
+        throw new Error(
+          'Review annotation checks must not load media or contact a provider.',
+        );
+      },
     },
-  });
+    createIsolatedNativeTaskAccess(),
+  );
   const review = new DeliveryCreativeReviewService(
     source,
     creative,

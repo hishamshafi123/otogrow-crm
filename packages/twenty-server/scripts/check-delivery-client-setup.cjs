@@ -1,3 +1,6 @@
+const {
+  createIsolatedNativeTaskAccess,
+} = require('./helpers/isolated-native-task-access.cjs');
 const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
 const { ForbiddenException } = require('@nestjs/common');
@@ -66,11 +69,16 @@ async function main() {
       );
     };
     services.delivery.snapshot = noSnapshot;
-    const creative = new DeliveryCreativeService(source, services.delivery, {
-      getCurrentDriver: () => {
-        throw new Error('Client setup must not load or write media.');
+    const creative = new DeliveryCreativeService(
+      source,
+      services.delivery,
+      {
+        getCurrentDriver: () => {
+          throw new Error('Client setup must not load or write media.');
+        },
       },
-    });
+      createIsolatedNativeTaskAccess(),
+    );
     const clients = new DeliveryClientsService(
       source,
       services.delivery,

@@ -1,4 +1,7 @@
 const {
+  createIsolatedNativeTaskAccess,
+} = require('./helpers/isolated-native-task-access.cjs');
+const {
   makeBudgetFixture,
 } = require('./helpers/otogrow-ai-budget-fixture.cjs');
 const {
@@ -106,7 +109,11 @@ async function main() {
       userHasWorkspaceSettingPermission: async ({ userWorkspaceId }) =>
         userWorkspaceId === admin,
     });
-    const delivery = new DeliveryService(scoped, access);
+    const delivery = new DeliveryService(
+      scoped,
+      access,
+      createIsolatedNativeTaskAccess(),
+    );
     const mutateTask = (actor, input) =>
       delivery.command(workspace, actor, actor, input);
     let state = await mutateTask(admin, {
@@ -174,7 +181,12 @@ async function main() {
         files.delete(`${folderPath}/${filename}`),
     };
     const storage = { getCurrentDriver: () => driver };
-    const creative = new DeliveryCreativeService(scoped, delivery, storage);
+    const creative = new DeliveryCreativeService(
+      scoped,
+      delivery,
+      storage,
+      createIsolatedNativeTaskAccess(),
+    );
     const controller = new DeliveryCreativeFilesController(creative, storage);
     const read = () => creative.read(workspace, editor, editor, task.id);
     const change = async (actor, input) =>

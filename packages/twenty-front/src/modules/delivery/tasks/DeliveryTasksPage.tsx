@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { styled } from '@linaria/react';
 import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import { Trans, useLingui } from '@lingui/react/macro';
@@ -92,7 +92,11 @@ export const DeliveryTasksPage = () => {
     listEnabled: !capacityView && !reviewView,
     reviewView,
   });
-  const { requestAction } = useDeliveryDraftGuard();
+  const { requestAction, cancelPendingNavigation } = useDeliveryDraftGuard();
+  useLayoutEffect(() => {
+    if (state.taskUnavailable || state.sourceUnavailable)
+      cancelPendingNavigation();
+  }, [state.taskUnavailable, state.sourceUnavailable, cancelPendingNavigation]);
   const context = state.context ?? state.retainedContext;
   const actor = context?.actor ?? {
     memberId: '',
@@ -123,7 +127,42 @@ export const DeliveryTasksPage = () => {
     (button: HTMLButtonElement | null) => button?.focus(),
     [],
   );
-  if (creating && state.permission.ready && !state.permission.manager)
+  // oxlint-disable-next-line twenty/no-state-useref -- These refs restore lost focus only after an explicit drawer close.
+  const taskPage = useRef<HTMLFieldSetElement | null>(null);
+  // oxlint-disable-next-line twenty/no-state-useref -- A closed recovery opener may no longer exist, so retain its logical task target.
+  const closedTask = useRef<string | null | undefined>(undefined);
+  useLayoutEffect(() => {
+    if (creating || selectedId !== null || closedTask.current === undefined)
+      return;
+    const taskId = closedTask.current;
+    closedTask.current = undefined;
+    if (
+      document.activeElement !== document.body &&
+      document.activeElement !== document.documentElement
+    )
+      return;
+    const target = taskId
+      ? Array.from(
+          taskPage.current?.querySelectorAll<HTMLAnchorElement>('a[href]') ??
+            [],
+        ).find(
+          (link) =>
+            new URLSearchParams(link.search).get('task') === taskId &&
+            !link.closest('[hidden], [inert]'),
+        )
+      : null;
+    const heading = Array.from(
+      taskPage.current?.parentElement?.querySelectorAll<HTMLHeadingElement>(
+        'h1',
+      ) ?? [],
+    ).find((element) => !element.closest('[hidden], [inert]'));
+    (target ?? heading)?.focus();
+  }, [creating, selectedId]);
+  if (
+    creating &&
+    (state.sourceUnavailable ||
+      (state.permission.ready && !state.permission.manager))
+  )
     setCreating(false);
   const task = state.detail ?? state.retainedDetail;
   const panel = params.get('panel') ?? 'task';
@@ -137,6 +176,7 @@ export const DeliveryTasksPage = () => {
   });
   const close = () =>
     requestAction(() => {
+      closedTask.current = selectedId;
       setCreating(false);
       update(deliveryTaskSelection(null));
     });
@@ -200,7 +240,7 @@ export const DeliveryTasksPage = () => {
       <PageContainer>
         <PageBody>
           <StyledDeliveryCard>
-            <h1>
+            <h1 tabIndex={-1}>
               <Trans>Workspace unavailable</Trans>
             </h1>
             <p>
@@ -238,13 +278,18 @@ export const DeliveryTasksPage = () => {
               <Trans>Otogrow workspace</Trans>
             </h1>
             <p role={state.contextQuery.error ? 'alert' : 'status'}>
-              {context
-                ? t`Current workspace access could not be verified. Saved information is hidden and your draft is kept.`
-                : state.contextQuery.error || state.permission.error
-                  ? t`Current workspace access could not be verified. Retry to load your work.`
-                  : t`Checking workspace access…`}
+              {state.contextUnavailable
+                ? t`Current task access is unavailable. Private drafts were cleared. Check workspace access before reopening your work.`
+                : context
+                  ? t`Current workspace access could not be verified. Saved information is hidden and your draft is kept.`
+                  : state.contextQuery.error || state.permission.error
+                    ? t`Current workspace access could not be verified. Retry to load your work.`
+                    : t`Checking workspace access…`}
             </p>
-            <StyledDeliveryButton onClick={retry}>
+            <StyledDeliveryButton
+              ref={state.contextUnavailable ? focusRecovery : undefined}
+              onClick={retry}
+            >
               <Trans>Retry workspace access</Trans>
             </StyledDeliveryButton>
           </StyledDeliveryStack>
@@ -252,6 +297,7 @@ export const DeliveryTasksPage = () => {
         {context && (
           <>
             <StyledTaskReadBoundary
+              ref={taskPage}
               key={state.permission.scope}
               hidden={!state.contextVerified}
               disabled={!state.contextVerified}
@@ -266,7 +312,7 @@ export const DeliveryTasksPage = () => {
                         <NavigationDrawerCollapseButton direction="right" />
                       )}
                       <div>
-                        <h1>{page?.label ?? t`My tasks`}</h1>
+                        <h1 tabIndex={-1}>{page?.label ?? t`My tasks`}</h1>
                         <p>{page?.description}</p>
                       </div>
                     </StyledDeliveryRow>
@@ -506,26 +552,41 @@ export const DeliveryTasksPage = () => {
                             : 'status'
                         }
                       >
-                        <Trans>
-                          The requested task could not be verified. No other
-                          task has been substituted; your draft is kept.
-                        </Trans>
+                        {state.taskUnavailable ? (
+                          <Trans>
+                            This task is unavailable under your current access.
+                            Private drafts were cleared. Check current access
+                            before reopening.
+                          </Trans>
+                        ) : state.detailQuery.loading ? (
+                          <Trans>Loading requested task…</Trans>
+                        ) : (
+                          <Trans>
+                            The requested task could not be verified. No other
+                            task has been substituted; your draft is kept.
+                          </Trans>
+                        )}
                       </p>
-                      <StyledDeliveryButton
-                        disabled={
-                          !state.validSelection || state.detailQuery.loading
-                        }
-                        onClick={() =>
-                          void state.detailQuery
-                            .refetch()
-                            .catch(() => undefined)
-                        }
-                      >
-                        <Trans>Retry requested task</Trans>
-                      </StyledDeliveryButton>
-                      <StyledDeliveryButton onClick={close}>
-                        <Trans>Dismiss task link</Trans>
-                      </StyledDeliveryButton>
+                      <StyledDeliveryRow>
+                        <StyledDeliveryButton
+                          ref={
+                            state.taskUnavailable ? focusRecovery : undefined
+                          }
+                          disabled={
+                            !state.validSelection || state.detailQuery.loading
+                          }
+                          onClick={() => void state.retryDetail()}
+                        >
+                          {state.taskUnavailable ? (
+                            <Trans>Check current task access</Trans>
+                          ) : (
+                            <Trans>Retry requested task</Trans>
+                          )}
+                        </StyledDeliveryButton>
+                        <StyledDeliveryButton onClick={close}>
+                          <Trans>Dismiss task link</Trans>
+                        </StyledDeliveryButton>
+                      </StyledDeliveryRow>
                     </StyledDeliveryCard>
                   )}
                 </StyledDeliveryStack>
@@ -647,11 +708,7 @@ export const DeliveryTasksPage = () => {
                                 </Trans>
                               </p>
                               <StyledDeliveryButton
-                                onClick={() =>
-                                  void state.detailQuery
-                                    .refetch()
-                                    .catch(() => undefined)
-                                }
+                                onClick={() => void state.retryDetail()}
                               >
                                 <Trans>Retry current task</Trans>
                               </StyledDeliveryButton>

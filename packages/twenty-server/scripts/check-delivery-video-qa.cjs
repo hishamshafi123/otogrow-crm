@@ -1,3 +1,6 @@
+const {
+  createIsolatedNativeTaskAccess,
+} = require('./helpers/isolated-native-task-access.cjs');
 const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
 const { execFile } = require('node:child_process');
@@ -437,7 +440,12 @@ async function main() {
       maxReasoningTokens: 8192,
     };
     await priceRepository.save(price);
-    const creative = new DeliveryCreativeService(scoped, delivery, storage);
+    const creative = new DeliveryCreativeService(
+      scoped,
+      delivery,
+      storage,
+      createIsolatedNativeTaskAccess(),
+    );
     const qa = new DeliveryVideoQaService(
       scoped,
       creative,

@@ -53,6 +53,21 @@ const ALLOWED_MEDIA = new Set([
   'audio/x-wav',
   'audio/mp4',
 ]);
+const CREATIVE_FILE_IDENTITY_FIELDS = [
+  'id',
+  'name',
+  'mimeType',
+  'size',
+  'createdAt',
+  'uploadedBy',
+  'briefVersion',
+  'productionVersion',
+  'assemblyVersion',
+  'shotId',
+  'shotVersion',
+  'kind',
+  'parentAssetId',
+] as const;
 
 @Controller('delivery-creative')
 @UseGuards(WorkspaceAuthGuard, CustomPermissionGuard)
@@ -141,13 +156,42 @@ export class DeliveryCreativeFilesController {
     const stream = await this.storage.getCurrentDriver().readFile({
       filePath: `${workspace.id}/delivery-creative/${taskId}/${asset.id}`,
     });
-    response.setHeader('Content-Type', asset.mimeType);
-    response.setHeader(
-      'Content-Disposition',
-      `attachment; filename*=UTF-8''${encodeURIComponent(asset.name)}`,
-    );
-    response.setHeader('Cache-Control', 'private, no-store');
-    response.setHeader('X-Content-Type-Options', 'nosniff');
-    await pipeline(stream, response);
+    let streamError: Error | undefined;
+    const captureError = (error: Error) => {
+      streamError = error;
+    };
+    stream.once('error', captureError);
+    try {
+      const current = await this.creative.read(
+        workspace,
+        memberId,
+        userWorkspaceId,
+        taskId,
+      );
+      const currentAsset = current.document?.assets.find(
+        (item) => item.id === assetId,
+      );
+      // Reviews may change while the selected file identity must remain fixed.
+      if (
+        !currentAsset ||
+        currentAsset.storageState !== 'READY' ||
+        CREATIVE_FILE_IDENTITY_FIELDS.some(
+          (field) => asset[field] !== currentAsset[field],
+        )
+      )
+        throw new BadRequestException('Asset changed. Open the file again.');
+      if (streamError) throw streamError;
+      response.setHeader('Content-Type', asset.mimeType);
+      response.setHeader(
+        'Content-Disposition',
+        `attachment; filename*=UTF-8''${encodeURIComponent(asset.name)}`,
+      );
+      response.setHeader('Cache-Control', 'private, no-store');
+      response.setHeader('X-Content-Type-Options', 'nosniff');
+      await pipeline(stream, response);
+    } catch (error) {
+      stream.destroy();
+      throw error;
+    }
   }
 }

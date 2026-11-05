@@ -256,6 +256,7 @@ export const CreativeProductionTask = ({
                 },
               }}
               actor={current.actor}
+              canEdit={current.task.canEdit}
               stage={creativeProductionStage(
                 params.get('creativeStage'),
                 params,

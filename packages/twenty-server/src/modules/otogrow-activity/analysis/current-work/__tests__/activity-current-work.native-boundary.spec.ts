@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import { ForbiddenException } from '@nestjs/common';
 import { type EntityManager } from 'typeorm';
 import { UserEntity } from 'src/engine/core-modules/user/user.entity';
 import { UserWorkspaceEntity } from 'src/engine/core-modules/user-workspace/user-workspace.entity';
@@ -156,6 +157,6 @@ describe('current native task visibility source boundary', () => {
     setup.data.rolesPermissions[setup.roleId][
       setup.taskObject.id
     ].restrictedFields[setup.taskFields[1].id] = { canRead: false };
-    await expect(setup.read()).rejects.toThrow('visibility cannot be verified');
+    await expect(setup.read()).rejects.toThrow(ForbiddenException);
   });
 });

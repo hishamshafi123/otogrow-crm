@@ -9,6 +9,7 @@ import { DataSource, type EntityManager } from 'typeorm';
 import { isDefined, isValidUuid } from 'twenty-shared/utils';
 import { WorkspaceEntity } from 'src/engine/core-modules/workspace/workspace.entity';
 import { DeliveryService } from 'src/modules/delivery/delivery.service';
+import { DeliveryNativeTaskAccessService } from 'src/modules/delivery/delivery-native-task-access.service';
 import { DeliveryOperationsService } from 'src/modules/delivery/operations/delivery-operations.service';
 import { DeliveryProjectEntity } from 'src/modules/delivery/entities/delivery-project.entity';
 import { DeliveryMemberEntity } from 'src/modules/delivery/entities/delivery-member.entity';
@@ -112,6 +113,7 @@ export class DeliveryTasksService {
     private readonly delivery: DeliveryService,
     private readonly access: OtogrowAccessService,
     private readonly operations: DeliveryOperationsService,
+    private readonly nativeTasks: DeliveryNativeTaskAccessService,
   ) {}
 
   private async projects(
@@ -168,6 +170,12 @@ export class DeliveryTasksService {
           userWorkspaceId,
           manager,
         );
+        const visibility = await this.nativeTasks.visibility(
+          manager,
+          workspace,
+          { memberId, userWorkspaceId },
+          ['id', 'assigneeId'],
+        );
         const projects = await this.projects(manager, workspace.id, actor);
         const people = await this.people(manager, workspace.id);
         const profiles = await manager
@@ -178,13 +186,15 @@ export class DeliveryTasksService {
           ...projects.flatMap((project) => project.memberIds),
         ]);
         if (!actor.isManager && projects.length) {
-          const owners: { id: string }[] = await manager.query(
-            `SELECT DISTINCT owners.id FROM core."deliveryTask" d JOIN ${this.delivery.schema(workspace)}."task" t ON t.id=d."taskId" CROSS JOIN LATERAL (VALUES (t."assigneeId"::text),(d.details->>'reviewerId')) owners(id) WHERE d."workspaceId"=$1 AND d."projectId"=ANY($2::uuid[]) AND t."deletedAt" IS NULL AND owners.id=ANY($3::text[])`,
+          const owners = await this.nativeTasks.query<{ id: string }[]>(
+            manager,
+            `SELECT DISTINCT owners.id FROM core."deliveryTask" d JOIN ${this.delivery.schema(workspace)}."task" t ON t.id=d."taskId" CROSS JOIN LATERAL (VALUES (t."assigneeId"::text),(d.details->>'reviewerId')) owners(id) WHERE d."workspaceId"=$1 AND d."projectId"=ANY($2::uuid[]) AND t."deletedAt" IS NULL AND owners.id=ANY($3::text[]) AND ${this.nativeTasks.predicate(workspace, visibility, 't.id')}`,
             [
               workspace.id,
               projects.map((project) => project.id),
               people.members.map((person) => person.memberId),
             ],
+            visibility,
           );
           for (const owner of owners) visibleIds.add(owner.id);
         }
@@ -321,6 +331,11 @@ export class DeliveryTasksService {
           throw new ForbiddenException(
             'A delivery manager is required to open the team planner.',
           );
+        const visibility = await this.nativeTasks.visibility(
+          manager,
+          workspace,
+          { memberId, userWorkspaceId },
+        );
         const projects = await this.projects(manager, workspace.id, actor);
         const people = await this.people(manager, workspace.id);
         const businessDate = deliveryTaskBusinessDate(now, query.timezone);
@@ -329,6 +344,7 @@ export class DeliveryTasksService {
           memberId,
           userWorkspaceId,
           capabilities: [...actor.capabilities].sort(),
+          nativeVisibility: visibility.fingerprint,
           projects: projects.map((project) => [project.id, project.revision]),
           query: {
             view: query.view,
@@ -383,19 +399,21 @@ export class DeliveryTasksService {
           COALESCE(to_char(t."dueAt" AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US'),'9999') AS "dueSort",COALESCE(d.details->>'scheduledDate','9999') AS "scheduleSort"
         FROM core."deliveryTask" d JOIN ${this.delivery.schema(workspace)}."task" t ON t.id=d."taskId"
         JOIN core."deliveryProject" p ON p.id=d."projectId" AND p."workspaceId"=d."workspaceId"
-        WHERE d."workspaceId"=$1 AND d."projectId"=ANY($2::uuid[]) AND t."deletedAt" IS NULL AND ($6::boolean OR t."assigneeId"=$7::uuid)
+        WHERE d."workspaceId"=$1 AND d."projectId"=ANY($2::uuid[]) AND t."deletedAt" IS NULL AND ($6::boolean OR t."assigneeId"=$7::uuid) AND ${this.nativeTasks.predicate(workspace, visibility, 't.id')}
       ), grouped AS (SELECT *,CASE "workGroup" WHEN 'revisions' THEN 0 WHEN 'blocked' THEN 1 WHEN 'overdue' THEN 2 WHEN 'today' THEN 3 WHEN 'upcoming' THEN 4 WHEN 'unscheduled' THEN 5 WHEN 'review' THEN 6 ELSE 7 END AS "groupRank" FROM source),
       filtered AS (SELECT * FROM grouped WHERE ($8::uuid IS NULL OR "projectId"=$8::uuid) AND ($9::uuid IS NULL OR "assigneeId"=$9::uuid)
         AND ($10::text IS NULL OR service=$10) AND ($11::text IS NULL OR state=$11) AND strpos(lower(title),lower($12))>0
         AND ($13::text IS NULL OR "scheduledDate" BETWEEN $13 AND $14)
         AND ($15::text IS NULL OR state<>'APPROVED' AND CASE $15 WHEN 'OVERDUE' THEN "dueAt"<$3::timestamptz ELSE "scheduledDate"=$5 OR to_char("dueAt" AT TIME ZONE $4,'YYYY-MM-DD')=$5 END))`;
-        const counts: TaskCounts[] = await manager.query(
+        const counts = await this.nativeTasks.query<TaskCounts[]>(
+          manager,
           `${source} SELECT (SELECT count(*)::int FROM filtered) AS "totalCount",
         COALESCE((SELECT jsonb_agg(jsonb_build_object('key',state,'count',amount) ORDER BY state) FROM (SELECT state,count(*)::int amount FROM filtered GROUP BY state) counts),'[]') AS "byState",
         COALESCE((SELECT jsonb_agg(jsonb_build_object('key',"workGroup",'count',amount) ORDER BY "workGroup") FROM (SELECT "workGroup",count(*)::int amount FROM filtered GROUP BY "workGroup") counts),'[]') AS "byWorkGroup",
         (SELECT jsonb_build_object('totalCount',count(*),'blockedCount',count(*) FILTER(WHERE state='BLOCKED'),'approvedCount',count(*) FILTER(WHERE state='APPROVED'),'reviewCount',count(*) FILTER(WHERE state='IN_REVIEW'),'overdueCount',count(*) FILTER(WHERE state<>'APPROVED' AND "dueAt"<$3::timestamptz),'dueTodayCount',count(*) FILTER(WHERE state<>'APPROVED' AND ("scheduledDate"=$5 OR to_char("dueAt" AT TIME ZONE $4,'YYYY-MM-DD')=$5))) FROM source) AS overview,
         ARRAY(SELECT DISTINCT service FROM source WHERE service<>'' ORDER BY service LIMIT ${DELIVERY_TASK_DIRECTORY_LIMIT + 1}) AS "serviceOptions"`,
           parameters,
+          visibility,
         );
         const count = counts[0];
         ensureDirectoryBound(count.serviceOptions.length);
@@ -405,7 +423,8 @@ export class DeliveryTasksService {
           ...(cursor?.sort ?? [null, null, null, null, null, null]),
           limit + 1,
         ];
-        const rows: TaskRow[] = await manager.query(
+        const rows = await this.nativeTasks.query<TaskRow[]>(
+          manager,
           `${source}, page AS MATERIALIZED (
         SELECT * FROM filtered WHERE $16::integer IS NULL OR ("groupRank","priorityRank","dueSort","scheduleSort",title COLLATE "C",id) > ($16::integer,$17::integer,$18::text,$19::text,$20::text COLLATE "C",$21::uuid)
         ORDER BY "groupRank","priorityRank","dueSort","scheduleSort",title COLLATE "C",id LIMIT $22)
@@ -416,6 +435,7 @@ export class DeliveryTasksService {
           left(COALESCE(d.details->>'blocker',''),180) AS "blockerPreview",length(COALESCE(d.details->>'blocker',''))>180 AS "blockerTruncated"
         FROM page JOIN core."deliveryTask" d ON d."workspaceId"=$1 AND d."taskId"=page.id ORDER BY "groupRank","priorityRank","dueSort","scheduleSort",title COLLATE "C",id`,
           pageParameters,
+          visibility,
         );
         const page = rows.slice(0, limit);
         const assignments = await readCurrentDeliveryReviewAssignments(
@@ -540,6 +560,12 @@ export class DeliveryTasksService {
           memberId,
           userWorkspaceId,
           manager,
+        );
+        await this.nativeTasks.assert(
+          manager,
+          workspace,
+          { memberId, userWorkspaceId },
+          query.taskId,
         );
         const record = await manager
           .getRepository(DeliveryTaskEntity)

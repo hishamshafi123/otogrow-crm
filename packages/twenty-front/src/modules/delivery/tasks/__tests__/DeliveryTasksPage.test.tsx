@@ -3,6 +3,7 @@ import { type DocumentNode } from 'graphql';
 import { Request } from 'cross-fetch';
 import { createStore, Provider } from 'jotai';
 import { NetworkStatus } from '@apollo/client';
+import { CombinedGraphQLErrors } from '@apollo/client/errors';
 import { i18n } from '@lingui/core';
 import { I18nProvider } from '@lingui/react';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
@@ -33,6 +34,9 @@ let mockManager = true;
 let mockMobile = false;
 let mockAccess: OtogrowAccess;
 let mockError: Error | undefined;
+let mockContextError: Error | undefined;
+let mockDetailError: Error | undefined;
+let mockDetailLoading = false;
 let mockRefresh: () => void;
 const mockMutate = jest.fn();
 const mockSeen = jest.fn();
@@ -219,11 +223,20 @@ jest.mock('@apollo/client/react', () => ({
       client: { refetchQueries: mockRefetchQueries },
     };
     if (name === 'DeliveryWorkspaceContext')
-      return { ...common, data: { deliveryWorkspaceContext: mockContext } };
+      return {
+        ...common,
+        error: mockContextError ?? mockError,
+        data: { deliveryWorkspaceContext: mockContext },
+      };
     if (name === 'DeliveryTaskList')
       return { ...common, data: { deliveryTaskList: mockList } };
     if (name === 'DeliveryTaskDetail')
-      return { ...common, data: { deliveryTaskDetail: mockDetail } };
+      return {
+        ...common,
+        loading: mockDetailLoading,
+        error: mockDetailError ?? mockError,
+        data: { deliveryTaskDetail: mockDetail },
+      };
     throw new Error(`Unexpected legacy or domain query: ${name}`);
   },
 }));
@@ -280,6 +293,9 @@ beforeEach(() => {
   mockManager = true;
   mockMobile = false;
   mockError = undefined;
+  mockContextError = undefined;
+  mockDetailError = undefined;
+  mockDetailLoading = false;
   mockAccess = {
     workspaceId: 'workspace',
     memberId: MANAGER_ID,
@@ -760,6 +776,157 @@ it('retains a same-identity task draft hidden during failed reads and restores i
   expect(screen.getByLabelText('Task draft')).toBe(draft);
   expect(draft).toHaveValue('Keep this work');
   expect(draft).toBeVisible();
+});
+it('describes the first exact task read as loading without falsely claiming a failed check', () => {
+  mockDetailLoading = true;
+  setup(`/delivery?view=mine&taskTimezone=Asia%2FQatar&task=${TASK_ID}`);
+  expect(screen.getByText('Loading requested task…')).toBeVisible();
+  expect(
+    screen.queryByText(/The requested task could not be verified/),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.getByRole('button', { name: 'Retry requested task' }),
+  ).toBeDisabled();
+  expect(screen.queryByLabelText('Task draft')).not.toBeInTheDocument();
+  mockDetailLoading = false;
+  act(mockRefresh);
+  expect(screen.getByLabelText('Task draft')).toBeVisible();
+});
+it.each(['FORBIDDEN', 'NOT_FOUND'])(
+  'discards a private task draft and pending navigation on %s, then reopens a fresh editor only after checking access',
+  async (code) => {
+    setup(`/delivery?view=mine&taskTimezone=Asia%2FQatar&task=${TASK_ID}`);
+    const user = userEvent.setup();
+    await user.type(
+      screen.getByLabelText('Task draft'),
+      'PRIVATE_REVOKED_NOTE',
+    );
+    const previousEditor = screen.getByLabelText('Task draft');
+    await user.click(screen.getByRole('button', { name: 'Close' }));
+    expect(screen.getByRole('button', { name: 'Keep editing' })).toBeVisible();
+    mockDetailError = new CombinedGraphQLErrors({
+      errors: [{ message: 'Unavailable', extensions: { code } }],
+    });
+    act(mockRefresh);
+    expect(screen.queryByLabelText('Task draft')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('PRIVATE_EXACT_DETAIL_ONLY'),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Keep editing' }),
+    ).not.toBeInTheDocument();
+    const retry = screen.getByRole('button', {
+      name: 'Check current task access',
+    });
+    expect(retry).toHaveFocus();
+    mockDetailError = undefined;
+    act(mockRefresh);
+    expect(screen.queryByLabelText('Task draft')).not.toBeInTheDocument();
+    mockRefetch.mockResolvedValueOnce({
+      data: { deliveryTaskDetail: mockDetail },
+    });
+    await user.click(retry);
+    expect(screen.getByLabelText('Task draft')).not.toBe(previousEditor);
+    expect(screen.getByLabelText('Task draft')).toHaveValue('');
+    expect(mockMutate).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Close' }));
+    expect(
+      screen.getByRole('link', { name: 'Current product edit' }),
+    ).toHaveFocus();
+  },
+);
+it('returns focus to the page heading when a closed exact task is not in the current list', async () => {
+  mockDetail = taskDetailFixture(OFF_PAGE_TASK_ID);
+  setup(
+    `/delivery?view=mine&taskTimezone=Asia%2FQatar&task=${OFF_PAGE_TASK_ID}`,
+  );
+  const user = userEvent.setup();
+  await user.click(screen.getByRole('button', { name: 'Close' }));
+  expect(
+    screen.getByRole('heading', { level: 1, name: 'My tasks' }),
+  ).toHaveFocus();
+});
+it('removes the task editor immediately when its attempted save is denied', async () => {
+  setup(`/delivery?view=mine&taskTimezone=Asia%2FQatar&task=${TASK_ID}`);
+  const user = userEvent.setup();
+  await user.type(screen.getByLabelText('Task draft'), 'PRIVATE_DENIED_SAVE');
+  mockMutate.mockRejectedValueOnce(
+    new CombinedGraphQLErrors({
+      errors: [{ message: 'Update denied', extensions: { code: 'FORBIDDEN' } }],
+    }),
+  );
+  await user.click(screen.getByRole('button', { name: 'Save task note' }));
+  expect(screen.queryByLabelText('Task draft')).not.toBeInTheDocument();
+  expect(
+    screen.queryByText('PRIVATE_EXACT_DETAIL_ONLY'),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.getByRole('button', { name: 'Check current task access' }),
+  ).toHaveFocus();
+  expect(mockMutate).toHaveBeenCalledTimes(1);
+});
+it('recovers an exact task through visible access checks after context-first native denial without reviving the old draft', async () => {
+  setup(`/delivery?view=mine&taskTimezone=Asia%2FQatar&task=${TASK_ID}`);
+  const user = userEvent.setup();
+  await user.type(
+    screen.getByLabelText('Task draft'),
+    'PRIVATE_CONTEXT_DENIAL',
+  );
+  mockContextError = new CombinedGraphQLErrors({
+    errors: [
+      {
+        message: 'Native object access denied',
+        extensions: { code: 'FORBIDDEN' },
+      },
+    ],
+  });
+  act(mockRefresh);
+  expect(screen.queryByLabelText('Task draft')).not.toBeInTheDocument();
+  expect(
+    screen.queryByText('PRIVATE_EXACT_DETAIL_ONLY'),
+  ).not.toBeInTheDocument();
+  const workspaceRetry = screen.getByRole('button', {
+    name: 'Retry workspace access',
+  });
+  expect(workspaceRetry).toBeEnabled();
+  expect(workspaceRetry).toHaveFocus();
+  await user.click(workspaceRetry);
+  expect(mockRefetch).toHaveBeenCalled();
+  mockContextError = undefined;
+  act(mockRefresh);
+  expect(screen.queryByLabelText('Task draft')).not.toBeInTheDocument();
+  mockRefetch.mockResolvedValueOnce({
+    data: { deliveryTaskDetail: mockDetail },
+  });
+  await user.click(
+    screen.getByRole('button', { name: 'Check current task access' }),
+  );
+  expect(screen.getByLabelText('Task draft')).toHaveValue('');
+  expect(mockMutate).not.toHaveBeenCalled();
+});
+it('disposes create preparation on confirmed native context denial', async () => {
+  setup();
+  const user = userEvent.setup();
+  await user.click(screen.getByRole('button', { name: 'New task' }));
+  await user.type(
+    screen.getByLabelText('Title'),
+    'PRIVATE_CREATE_CONTEXT_DENIAL',
+  );
+  mockContextError = new CombinedGraphQLErrors({
+    errors: [
+      {
+        message: 'Native object access denied',
+        extensions: { code: 'FORBIDDEN' },
+      },
+    ],
+  });
+  act(mockRefresh);
+  expect(screen.queryByLabelText('Title')).not.toBeInTheDocument();
+  mockContextError = undefined;
+  act(mockRefresh);
+  expect(screen.queryByLabelText('Title')).not.toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'New task' }));
+  expect(screen.getByLabelText('Title')).toHaveValue('');
 });
 it('keeps native-modal recovery accessible while hiding a retained create draft on context-source failure', async () => {
   setup();

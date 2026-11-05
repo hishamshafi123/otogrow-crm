@@ -1,3 +1,6 @@
+const {
+  createIsolatedNativeTaskAccess,
+} = require('./helpers/isolated-native-task-access.cjs');
 const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
 const {
@@ -206,7 +209,12 @@ async function main() {
     const operations = new DeliveryOperationsService(
       source,
       services.delivery,
-      new DeliveryCreativeService(source, services.delivery, {}),
+      new DeliveryCreativeService(
+        source,
+        services.delivery,
+        {},
+        createIsolatedNativeTaskAccess(),
+      ),
       services.telegram,
       services.config,
       { add: async () => {} },

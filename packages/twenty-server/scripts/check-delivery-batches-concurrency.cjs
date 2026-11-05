@@ -1,3 +1,6 @@
+const {
+  createIsolatedNativeTaskAccess,
+} = require('./helpers/isolated-native-task-access.cjs');
 const { DeliveryBatchesService } = require('../dist/modules/delivery/batches/delivery-batches.service');
 // Independent transactions use only a committed disposable workspace, removed with exact sentinel checks.
 const assert = require('node:assert/strict');
@@ -146,7 +149,12 @@ async function main() {
     (source) => new OtogrowAccessService(source, permissions),
   );
   const deliveries = scoped.map(
-    (source, index) => new DeliveryService(source, access[index]),
+    (source, index) =>
+      new DeliveryService(
+        source,
+        access[index],
+        createIsolatedNativeTaskAccess(),
+      ),
   );
   const commitments = scoped.map(
     (source, index) =>
@@ -154,7 +162,12 @@ async function main() {
   );
   const creatives = scoped.map(
     (source, index) =>
-      new DeliveryCreativeService(source, deliveries[index], {}),
+      new DeliveryCreativeService(
+        source,
+        deliveries[index],
+        {},
+        createIsolatedNativeTaskAccess(),
+      ),
   );
   const clients = scoped.map(
     (source, index) =>

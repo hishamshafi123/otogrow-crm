@@ -1,3 +1,6 @@
+const {
+  createIsolatedNativeTaskAccess,
+} = require('./helpers/isolated-native-task-access.cjs');
 // Fixtures, business changes and their audit rows roll back together.
 const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
@@ -104,7 +107,11 @@ async function main() {
         nativeAdministrators.has(userWorkspaceId),
     });
     const activity = new OtogrowActivityService(scoped, access);
-    const delivery = new DeliveryService(scoped, access);
+    const delivery = new DeliveryService(
+      scoped,
+      access,
+      createIsolatedNativeTaskAccess(),
+    );
     const feed = (input = {}, member = founder, targetWorkspace = workspace) =>
       activity.feed(
         targetWorkspace,

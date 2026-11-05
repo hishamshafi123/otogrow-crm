@@ -1,3 +1,5 @@
+import { DeliveryNativeTaskAccessService } from 'src/modules/delivery/delivery-native-task-access.service';
+import { WorkspaceCacheModule } from 'src/engine/workspace-cache/workspace-cache.module';
 import { DeliveryKnowledgeAssetEntity } from 'src/modules/delivery/knowledge/assets/entities/delivery-knowledge-asset.entity';
 import { DeliveryKnowledgeAssetsService } from 'src/modules/delivery/knowledge/assets/delivery-knowledge-assets.service';
 import { DeliveryKnowledgeAssetsResolver } from 'src/modules/delivery/knowledge/assets/delivery-knowledge-assets.resolver';
@@ -174,6 +176,7 @@ import { DeliveryCreativeReadsResolver } from 'src/modules/delivery/creative/rea
 
 @Module({
   imports: [
+    WorkspaceCacheModule,
     MessagingSendManagerModule,
     DeliverySeoResultsModule,
     DeliveryReleaseModule,
@@ -262,6 +265,7 @@ import { DeliveryCreativeReadsResolver } from 'src/modules/delivery/creative/rea
     DeliveryClientFilesController,
   ],
   providers: [
+    DeliveryNativeTaskAccessService,
     DeliveryInboxService,
     DeliveryInboxGmailService,
     DeliveryInboxReplyService,

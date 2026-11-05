@@ -1,3 +1,6 @@
+const {
+  createIsolatedNativeTaskAccess,
+} = require('./helpers/isolated-native-task-access.cjs');
 const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
 const { existsSync, lstatSync, readFileSync, unlinkSync } = require('node:fs');
@@ -770,7 +773,7 @@ async function race(fixture) {
       });
       return new DeliveryKnowledgeService(
         source,
-        new DeliveryService(source, access),
+        new DeliveryService(source, access, createIsolatedNativeTaskAccess()),
       );
     });
     fixture.race.status = 'RUNNING';

@@ -1,4 +1,7 @@
 const {
+  createIsolatedNativeTaskAccess,
+} = require('./helpers/isolated-native-task-access.cjs');
+const {
   DeliveryWorkflowsService,
 } = require('../dist/modules/delivery/workflows/delivery-workflows.service');
 const assert = require('node:assert/strict');
@@ -103,8 +106,17 @@ const {
       userHasWorkspaceSettingPermission: async ({ userWorkspaceId }) =>
         userWorkspaceId === founder,
     });
-    const delivery = new DeliveryService(source, access);
-    const creative = new DeliveryCreativeService(source, delivery, {});
+    const delivery = new DeliveryService(
+      source,
+      access,
+      createIsolatedNativeTaskAccess(),
+    );
+    const creative = new DeliveryCreativeService(
+      source,
+      delivery,
+      {},
+      createIsolatedNativeTaskAccess(),
+    );
     const commitments = new DeliveryCommitmentsService(source, delivery);
     const clients = new DeliveryClientsService(
       source,

@@ -1,3 +1,6 @@
+const {
+  createIsolatedNativeTaskAccess,
+} = require('./helpers/isolated-native-task-access.cjs');
 const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
 const {
@@ -181,7 +184,11 @@ async function main() {
     services.delivery.snapshot = () => {
       throw new Error('Legacy workspace hydration is forbidden.');
     };
-    const reads = new DeliveryCreativeReadsService(source, services.delivery);
+    const reads = new DeliveryCreativeReadsService(
+      source,
+      services.delivery,
+      createIsolatedNativeTaskAccess(),
+    );
     const storage = new Proxy(
       {},
       {
@@ -194,6 +201,7 @@ async function main() {
       source,
       services.delivery,
       storage,
+      createIsolatedNativeTaskAccess(),
     );
     const call = (method, input = {}, person = fixture.people.reader) =>
       method === 'context'

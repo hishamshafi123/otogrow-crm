@@ -1,3 +1,6 @@
+const {
+  createIsolatedNativeTaskAccess,
+} = require('./helpers/isolated-native-task-access.cjs');
 const noChat = { ownsReminder: async () => false, queueDue: async () => {} };
 const {
   OtogrowAccessService,
@@ -87,8 +90,17 @@ const {
       userHasWorkspaceSettingPermission: async ({ userWorkspaceId }) =>
         userWorkspaceId === admin,
     });
-    const delivery = new DeliveryService(scoped, access);
-    const creative = new DeliveryCreativeService(scoped, delivery, {});
+    const delivery = new DeliveryService(
+      scoped,
+      access,
+      createIsolatedNativeTaskAccess(),
+    );
+    const creative = new DeliveryCreativeService(
+      scoped,
+      delivery,
+      {},
+      createIsolatedNativeTaskAccess(),
+    );
     const queuedReminders = [];
     const operations = new DeliveryOperationsService(
       scoped,

@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { NetworkStatus } from '@apollo/client';
 import { CombinedGraphQLErrors } from '@apollo/client/errors';
 import { useMutation, useQuery } from '@apollo/client/react';
@@ -23,6 +23,7 @@ import {
 import { taskCommandSchema } from '@/delivery/tasks/task-command';
 import { useWorkflowAccess } from '@/delivery/workflows/useWorkflowAccess';
 import { hasOtogrowCapability } from '@/otogrow-access/otogrow-access.types';
+import { isDeliveryTaskUnavailable } from '@/delivery/tasks/isDeliveryTaskUnavailable';
 type TaskCommandAttempt = {
   scope: string;
   instance: string;
@@ -76,6 +77,8 @@ export const useDeliveryTasks = (
     skip: !permission.ready,
   });
   const candidate = contextQuery.data?.deliveryWorkspaceContext;
+  const contextUnavailable =
+    permission.denied || isDeliveryTaskUnavailable(contextQuery.error);
   const [contextEvidence, setContextEvidence] = useState<{
     scope: string;
     context: TaskWorkspaceContext;
@@ -92,6 +95,7 @@ export const useDeliveryTasks = (
       [...(permission.access?.roleIds ?? [])].sort(),
     );
   const contextTrusted =
+    !contextUnavailable &&
     !contextQuery.error &&
     permission.matches(candidate) &&
     candidate !== undefined &&
@@ -139,13 +143,26 @@ export const useDeliveryTasks = (
       ));
   const directory = current ?? contextEvidence?.context;
   const dataScope = `${contextScope}:${JSON.stringify(directory?.projects.map((project) => ({ id: project.id, revision: project.revision, memberIds: [...project.memberIds].sort() })) ?? [])}`;
+  const detailSource = `${permission.scope}:${selectedId ?? ''}`;
+  const [detailBoundary, setDetailBoundary] = useState({
+    source: detailSource,
+    denied: false,
+    readRevision: 0,
+  });
+  if (detailBoundary.source !== detailSource)
+    setDetailBoundary({
+      source: detailSource,
+      denied: false,
+      readRevision: detailBoundary.readRevision,
+    });
+  const listReadScope = `${dataScope}:${detailBoundary.readRevision}`;
   const listQuery = useQuery<DeliveryTaskListQuery>(GET_TASK_LIST, {
-    variables: { input, identity: dataScope },
+    variables: { input, identity: listReadScope },
     fetchPolicy: 'no-cache',
     pollInterval: 30000,
     skip: !listEnabled || !verified || !input || !viewAllowed,
   });
-  const listScope = `${dataScope}:${JSON.stringify(input)}`;
+  const listScope = `${listReadScope}:${JSON.stringify(input)}`;
   const listTrusted =
     listEnabled &&
     verified &&
@@ -194,10 +211,19 @@ export const useDeliveryTasks = (
   const [attempt, setAttempt] = useState<TaskCommandAttempt | null>(null);
   const receipt = attempt?.scope === permission.scope ? attempt.receipt : null;
   const detailCandidate = detailQuery.data?.deliveryTaskDetail;
+  const knownDetailLoss =
+    contextUnavailable ||
+    (listEnabled && isDeliveryTaskUnavailable(listQuery.error)) ||
+    isDeliveryTaskUnavailable(detailQuery.error);
+  const taskUnavailable =
+    validSelection &&
+    (knownDetailLoss ||
+      (detailBoundary.source === detailSource && detailBoundary.denied));
   const detailTrusted = Boolean(
     verified &&
     viewAllowed &&
     validSelection &&
+    !taskUnavailable &&
     !detailQuery.error &&
     permission.matches(detailCandidate) &&
     detailCandidate?.task.id === selectedId &&
@@ -210,6 +236,7 @@ export const useDeliveryTasks = (
   );
   const [detailEvidence, setDetailEvidence] = useState<{
     scope: string;
+    ownerScope: string;
     snapshot: TaskDetailSnapshot;
   } | null>(null);
   if (
@@ -219,7 +246,11 @@ export const useDeliveryTasks = (
     (detailEvidence?.scope !== dataScope ||
       !fastDeepEqual(detailCandidate, detailEvidence.snapshot))
   )
-    setDetailEvidence({ scope: dataScope, snapshot: detailCandidate });
+    setDetailEvidence({
+      scope: dataScope,
+      ownerScope: permission.scope,
+      snapshot: detailCandidate,
+    });
   const refreshingDetail =
     detailQuery.loading &&
     [NetworkStatus.poll, NetworkStatus.refetch].includes(
@@ -262,6 +293,59 @@ export const useDeliveryTasks = (
       epoch.current += 1;
     };
   }, [dataScope, verified, selectedId]);
+  const invalidateDetail = useCallback(() => {
+    epoch.current += 1;
+    setDetailBoundary((currentBoundary) =>
+      currentBoundary.source === detailSource && currentBoundary.denied
+        ? currentBoundary
+        : {
+            source: detailSource,
+            denied: true,
+            readRevision: currentBoundary.readRevision + 1,
+          },
+    );
+    setDetailEvidence(null);
+  }, [detailSource]);
+  useLayoutEffect(() => {
+    if (knownDetailLoss) invalidateDetail();
+  }, [knownDetailLoss, invalidateDetail]);
+  useLayoutEffect(() => {
+    if (contextUnavailable) setContextEvidence(null);
+  }, [contextUnavailable]);
+  const retryDetail = async () => {
+    if (!verified || !validSelection || !viewAllowed || busy) return false;
+    const started = epoch.current;
+    try {
+      const snapshot = (await detailQuery.refetch()).data?.deliveryTaskDetail;
+      if (started !== epoch.current) return false;
+      if (
+        !snapshot ||
+        !permission.matches(snapshot) ||
+        snapshot.task.id !== selectedId ||
+        !current?.projects.some(
+          (project) => project.id === snapshot.task.projectId,
+        ) ||
+        (receipt?.taskId === selectedId &&
+          snapshot.task.revision < receipt.revision)
+      )
+        return false;
+      setDetailBoundary((currentBoundary) => ({
+        source: detailSource,
+        denied: false,
+        readRevision: currentBoundary.readRevision,
+      }));
+      setDetailEvidence({
+        scope: dataScope,
+        ownerScope: permission.scope,
+        snapshot,
+      });
+      return true;
+    } catch (failure) {
+      if (started === epoch.current && isDeliveryTaskUnavailable(failure))
+        invalidateDetail();
+      return false;
+    }
+  };
   const refresh = async () => {
     const reads = [
       contextQuery.refetch(),
@@ -370,6 +454,15 @@ export const useDeliveryTasks = (
         );
       return true;
     } catch (failure) {
+      if (
+        !create &&
+        started === epoch.current &&
+        isDeliveryTaskUnavailable(failure)
+      ) {
+        invalidateDetail();
+        setError('');
+        return false;
+      }
       const unknown = create && !CombinedGraphQLErrors.is(failure);
       if (unknown)
         setAttempt({
@@ -408,7 +501,11 @@ export const useDeliveryTasks = (
     readScope: dataScope,
     permission,
     context: current,
-    retainedContext: contextEvidence?.context ?? null,
+    retainedContext: contextUnavailable
+      ? null
+      : (contextEvidence?.context ?? null),
+    contextUnavailable,
+    sourceUnavailable: knownDetailLoss,
     contextVerified: verified,
     contextQuery,
     list,
@@ -416,10 +513,14 @@ export const useDeliveryTasks = (
     detail,
     detailVerified,
     retainedDetail:
+      !taskUnavailable &&
+      detailEvidence?.ownerScope === permission.scope &&
       detailEvidence?.snapshot.task.id === selectedId
         ? detailEvidence.snapshot.task
         : null,
     detailQuery,
+    taskUnavailable,
+    retryDetail,
     validSelection,
     busy,
     error: messages.source === source ? messages.error : '',

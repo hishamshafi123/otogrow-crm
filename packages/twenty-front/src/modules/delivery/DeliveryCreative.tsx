@@ -58,6 +58,7 @@ type DeliveryCreativeProps = {
   task: CreativeProductionTask;
   workspace?: DeliveryWorkspace;
   actor?: CreativeProductionActor;
+  canEdit?: boolean;
   stage?: string;
   onStageChange?: (stage: string) => void;
   onAuthorityLost?: () => void;
@@ -73,6 +74,7 @@ export const DeliveryCreative = ({
   task,
   workspace,
   actor: currentActor,
+  canEdit: currentCanEdit,
   stage: currentStage,
   onStageChange,
   onAuthorityLost,
@@ -101,7 +103,10 @@ export const DeliveryCreative = ({
   const document = task.details.creative;
   const manager = actor?.isManager === true;
   const locked = ['IN_REVIEW', 'APPROVED'].includes(task.details.state);
-  const canEdit = !locked && (manager || task.assigneeId === actor?.memberId);
+  const canEdit =
+    currentCanEdit !== false &&
+    !locked &&
+    (manager || task.assigneeId === actor?.memberId);
   const [changing, setChanging] = useState(false);
   const busy = changing || mutation.loading || uploading || rendering.loading;
   const referenceDraft = useDeliveryDraft({

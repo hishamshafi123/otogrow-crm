@@ -1,3 +1,6 @@
+const {
+  createIsolatedNativeTaskAccess,
+} = require('./helpers/isolated-native-task-access.cjs');
 // Independent transactions need visible fixtures; commit only this disposable workspace, then verify exact cleanup.
 const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
@@ -288,7 +291,11 @@ async function main() {
       }),
     ]);
     assert(revocationReady);
-    const delivery = new DeliveryService(scoped[1], services[1]);
+    const delivery = new DeliveryService(
+      scoped[1],
+      services[1],
+      createIsolatedNativeTaskAccess(),
+    );
     const projectName = `Must not commit after revocation ${WORKSPACE_ID}`;
     const deliveryOutcome = settle(
       delivery.command(

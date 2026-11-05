@@ -1,7 +1,3 @@
-import { CombinedGraphQLErrors } from '@apollo/client/errors';
-import { isOtogrowAccessDenied } from '@/otogrow-access/isOtogrowAccessDenied';
+import { isDeliveryTaskUnavailable } from '@/delivery/tasks/isDeliveryTaskUnavailable';
 
-export const isCreativeSourceUnavailable = (error: unknown) =>
-  isOtogrowAccessDenied(error) ||
-  (CombinedGraphQLErrors.is(error) &&
-    error.errors.some((item) => item.extensions?.code === 'NOT_FOUND'));
+export const isCreativeSourceUnavailable = isDeliveryTaskUnavailable;

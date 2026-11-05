@@ -376,6 +376,14 @@ describe('Canonical creative production journey', () => {
       expect(mockCalls).not.toHaveBeenCalledWith('DeliveryWorkspace');
     },
   );
+  it('passes current read-only authority to the production editor', async () => {
+    mockCanEdit = false;
+    renderPage(`/delivery?view=creative&task=${TASK}`);
+    await screen.findByText('Current stage: brief');
+    expect(mockLegacyProps.mock.calls.at(-1)?.[0]).toMatchObject({
+      canEdit: false,
+    });
+  });
   it('shows complete counts, paginates, and opens an off-page task without broad workspace hydration', async () => {
     const user = userEvent.setup();
     const router = renderPage();
@@ -498,6 +506,54 @@ describe('Canonical creative production journey', () => {
     );
     expect(await screen.findByLabelText('Production notes')).toHaveValue('');
   });
+  it.each([false, true])(
+    'requires an explicit context recheck after native denial and recovers lost focus without stealing an external focus (%s)',
+    async (keepExternalFocus) => {
+      const user = userEvent.setup();
+      renderPage(`/delivery?view=creative&task=${TASK}`);
+      await user.type(
+        await screen.findByLabelText('Production notes'),
+        'PRIVATE_CONTEXT_NOTE',
+      );
+      const learning = screen.getByRole('link', {
+        name: 'Inspect creative and ad learning',
+      });
+      if (keepExternalFocus) {
+        await user.tab({ shift: true });
+        await user.tab({ shift: true });
+        await user.tab({ shift: true });
+        expect(learning).toHaveFocus();
+      }
+      act(() => {
+        mockContextError = new CombinedGraphQLErrors({
+          errors: [
+            {
+              message: 'Native task object denied',
+              extensions: { code: 'FORBIDDEN' },
+            },
+          ],
+        });
+        emit();
+      });
+      expect(
+        screen.queryByLabelText('Production notes'),
+      ).not.toBeInTheDocument();
+      const check = screen.getByRole('button', {
+        name: 'Check creative access',
+      });
+      expect(keepExternalFocus ? learning : check).toHaveFocus();
+      act(() => {
+        mockContextError = undefined;
+        emit();
+      });
+      expect(
+        screen.queryByLabelText('Production notes'),
+      ).not.toBeInTheDocument();
+      expect(keepExternalFocus ? learning : check).toHaveFocus();
+      await user.click(check);
+      expect(await screen.findByLabelText('Production notes')).toHaveValue('');
+    },
+  );
   it('does not poll the production document and marks changed revisions for explicit refresh', async () => {
     renderPage(`/delivery?view=creative&task=${TASK}`);
     expect(await screen.findByLabelText('Production notes')).toBeVisible();

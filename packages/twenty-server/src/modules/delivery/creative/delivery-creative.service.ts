@@ -15,6 +15,7 @@ import { v4 } from 'uuid';
 import { z } from 'zod';
 import { WorkspaceEntity } from 'src/engine/core-modules/workspace/workspace.entity';
 import { DeliveryService } from 'src/modules/delivery/delivery.service';
+import { DeliveryNativeTaskAccessService } from 'src/modules/delivery/delivery-native-task-access.service';
 import { DeliveryTaskEntity } from 'src/modules/delivery/entities/delivery-task.entity';
 import { DeliveryProjectEntity } from 'src/modules/delivery/entities/delivery-project.entity';
 import { canAccessDeliveryProject } from 'src/modules/delivery/delivery-policy';
@@ -123,6 +124,7 @@ export class DeliveryCreativeService {
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly delivery: DeliveryService,
     private readonly storage: FileStorageDriverFactory,
+    private readonly nativeTasks: DeliveryNativeTaskAccessService,
   ) {}
 
   async scope(
@@ -144,6 +146,13 @@ export class DeliveryCreativeService {
       memberId,
       userWorkspaceId,
       manager,
+    );
+    await this.nativeTasks.assert(
+      manager,
+      workspace,
+      { memberId, userWorkspaceId },
+      taskId,
+      ['id', 'assigneeId'],
     );
     const task = await manager
       .getRepository(DeliveryTaskEntity)

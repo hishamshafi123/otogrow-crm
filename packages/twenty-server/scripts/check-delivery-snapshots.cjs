@@ -1,4 +1,7 @@
 const {
+  createIsolatedNativeTaskAccess,
+} = require('./helpers/isolated-native-task-access.cjs');
+const {
   DeliveryCommitmentsService,
 } = require('../dist/modules/delivery/commitments/delivery-commitments.service');
 // Two real sessions need a committed disposable workspace; exact sentinel cleanup runs even on failure.
@@ -149,14 +152,24 @@ async function main() {
     (source) => new OtogrowAccessService(source, permissions),
   );
   const deliveries = scoped.map(
-    (source, index) => new DeliveryService(source, access[index]),
+    (source, index) =>
+      new DeliveryService(
+        source,
+        access[index],
+        createIsolatedNativeTaskAccess(),
+      ),
   );
   const capacity = scoped.map(
     (source, index) =>
       new DeliveryCapacityService(source, deliveries[index], access[index]),
   );
   const revisions = scoped.map((source,index)=>new DeliveryRevisionsService(source,deliveries[index]));
-  const creative = new DeliveryCreativeService(scoped[0], deliveries[0], {});
+  const creative = new DeliveryCreativeService(
+    scoped[0],
+    deliveries[0],
+    {},
+    createIsolatedNativeTaskAccess(),
+  );
   const operations = new DeliveryOperationsService(
     scoped[0],
     deliveries[0],

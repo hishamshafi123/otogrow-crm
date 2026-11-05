@@ -1,3 +1,6 @@
+const {
+  createIsolatedNativeTaskAccess,
+} = require('./helpers/isolated-native-task-access.cjs');
 const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
 const {
@@ -143,7 +146,11 @@ const MAX_ENTRY_AMOUNT = '9223372036854775807';
         targetWorkspace === workspaceId &&
         nativeAdministrators.has(userWorkspaceId),
     });
-    const delivery = new DeliveryService(source, access);
+    const delivery = new DeliveryService(
+      source,
+      access,
+      createIsolatedNativeTaskAccess(),
+    );
     const finance = new DeliveryFinanceService(source, delivery, access);
     let failedActivitySourceId = null;
     let failPreparationAfter = 0;

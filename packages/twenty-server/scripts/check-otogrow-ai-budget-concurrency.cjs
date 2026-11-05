@@ -1,3 +1,6 @@
+const {
+  createIsolatedNativeTaskAccess,
+} = require('./helpers/isolated-native-task-access.cjs');
 // Independent sessions require committed fixtures; only this sentinel workspace and its users/schema are removed.
 const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
@@ -165,7 +168,12 @@ async function main() {
     (source, index) => new OtogrowAiBudgetService(source, access[index]),
   );
   const deliveries = scoped.map(
-    (source, index) => new DeliveryService(source, access[index]),
+    (source, index) =>
+      new DeliveryService(
+        source,
+        access[index],
+        createIsolatedNativeTaskAccess(),
+      ),
   );
   const sourceOf = (spend) => ({
     workspaceId: WORKSPACE_ID,

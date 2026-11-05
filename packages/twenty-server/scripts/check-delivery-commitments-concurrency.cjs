@@ -1,3 +1,6 @@
+const {
+  createIsolatedNativeTaskAccess,
+} = require('./helpers/isolated-native-task-access.cjs');
 // Independent transactions use only a committed disposable workspace, removed with exact sentinel checks.
 const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
@@ -145,7 +148,12 @@ async function main() {
     (source) => new OtogrowAccessService(source, permissions),
   );
   const deliveries = scoped.map(
-    (source, index) => new DeliveryService(source, access[index]),
+    (source, index) =>
+      new DeliveryService(
+        source,
+        access[index],
+        createIsolatedNativeTaskAccess(),
+      ),
   );
   const commitments = scoped.map(
     (source, index) =>
@@ -153,7 +161,12 @@ async function main() {
   );
   const creatives = scoped.map(
     (source, index) =>
-      new DeliveryCreativeService(source, deliveries[index], {}),
+      new DeliveryCreativeService(
+        source,
+        deliveries[index],
+        {},
+        createIsolatedNativeTaskAccess(),
+      ),
   );
   const clients = scoped.map(
     (source, index) =>

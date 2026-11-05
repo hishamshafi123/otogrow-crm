@@ -1,3 +1,6 @@
+const {
+  createIsolatedNativeTaskAccess,
+} = require('./helpers/isolated-native-task-access.cjs');
 const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
 const {
@@ -100,8 +103,17 @@ const {
       userHasWorkspaceSettingPermission: async ({ userWorkspaceId }) =>
         userWorkspaceId === founder,
     });
-    const delivery = new DeliveryService(source, access);
-    const creative = new DeliveryCreativeService(source, delivery, {});
+    const delivery = new DeliveryService(
+      source,
+      access,
+      createIsolatedNativeTaskAccess(),
+    );
+    const creative = new DeliveryCreativeService(
+      source,
+      delivery,
+      {},
+      createIsolatedNativeTaskAccess(),
+    );
     const commitments = new DeliveryCommitmentsService(source, delivery);
     const clients = new DeliveryClientsService(
       source,

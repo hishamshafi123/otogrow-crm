@@ -1,3 +1,6 @@
+const {
+  createIsolatedNativeTaskAccess,
+} = require('./helpers/isolated-native-task-access.cjs');
 const assert = require('node:assert/strict');
 const { randomUUID, randomBytes } = require('node:crypto');
 const {
@@ -109,6 +112,7 @@ async function main() {
       source,
       services.delivery,
       storage,
+      createIsolatedNativeTaskAccess(),
     );
     const budget = new OtogrowAiBudgetService(source, services.access);
     const key = randomBytes(32).toString('hex');

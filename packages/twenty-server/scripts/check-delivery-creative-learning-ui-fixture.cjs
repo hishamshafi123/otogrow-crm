@@ -1,3 +1,6 @@
+const {
+  createIsolatedNativeTaskAccess,
+} = require('./helpers/isolated-native-task-access.cjs');
 const assert = require('node:assert/strict');
 const { createHash, randomUUID } = require('node:crypto');
 const { execFileSync } = require('node:child_process');
@@ -529,6 +532,7 @@ async function servicesFor(manager, fixture) {
     scoped,
     services.delivery,
     storage,
+    createIsolatedNativeTaskAccess(),
   );
   const learning = new DeliveryCreativeLearningService(
     scoped,

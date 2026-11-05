@@ -1,3 +1,6 @@
+const {
+  createIsolatedNativeTaskAccess,
+} = require('./helpers/isolated-native-task-access.cjs');
 const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
 const {
@@ -188,11 +191,16 @@ async function main() {
         transaction: (callback) => runner.manager.transaction(callback),
       },
       services = buildServices(source, fixture),
-      creative = new DeliveryCreativeService(source, services.delivery, {
-        getCurrentDriver: () => {
-          throw new Error('Task-read acceptance cannot access media storage.');
+      creative = new DeliveryCreativeService(
+        source,
+        services.delivery,
+        {
+          getCurrentDriver: () => {
+            throw new Error('Task-read acceptance cannot access media storage.');
+          },
         },
-      }),
+        createIsolatedNativeTaskAccess(),
+      ),
       operations = new DeliveryOperationsService(
         source,
         services.delivery,
@@ -219,6 +227,7 @@ async function main() {
         services.delivery,
         services.access,
         operations,
+        createIsolatedNativeTaskAccess(),
       ),
       { people } = fixture;
     const nativeQuery = runner.query.bind(runner);

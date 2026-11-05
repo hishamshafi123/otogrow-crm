@@ -3,6 +3,7 @@ import { type DataSource, type EntityManager } from 'typeorm';
 import { type WorkspaceEntity } from 'src/engine/core-modules/workspace/workspace.entity';
 import { type DeliveryService } from 'src/modules/delivery/delivery.service';
 import { type DeliveryOperationsService } from 'src/modules/delivery/operations/delivery-operations.service';
+import { type DeliveryNativeTaskAccessService } from 'src/modules/delivery/delivery-native-task-access.service';
 import { type OtogrowAccessService } from 'src/modules/otogrow-access/otogrow-access.service';
 import { DeliveryProjectEntity } from 'src/modules/delivery/entities/delivery-project.entity';
 import { DeliveryTaskEntity } from 'src/modules/delivery/entities/delivery-task.entity';
@@ -28,6 +29,9 @@ const setup = () => {
     manager: true,
     finance: false,
     nativeExists: true,
+    nativeAllowed: true,
+    nativeVisible: true,
+    nativeFingerprint: 'initial-native-permissions',
     commandCommitted: false,
     projectMembers: [REVIEW_ASSIGNEE_ID],
     projectRevision: 1,
@@ -199,19 +203,44 @@ const setup = () => {
       { memberId: REVIEW_MEMBER_ID, capabilities: ['delivery.manage'] },
     ],
   } as unknown as OtogrowAccessService;
+  const visibility = jest.fn(async () => {
+    if (!state.nativeAllowed) throw new ForbiddenException();
+    return {
+      sql: 'TRUE',
+      parameters: {},
+      fingerprint: state.nativeFingerprint,
+    };
+  });
+  const nativeTasks = {
+    visibility,
+    predicate: () => 'native_task_is_visible',
+    query: (current: EntityManager, sql: string, values: unknown[]) =>
+      current.query(sql, values),
+    assert: async () => {
+      await visibility();
+      if (!state.nativeVisible) throw new NotFoundException();
+    },
+  } as unknown as DeliveryNativeTaskAccessService;
   return {
     state,
     queries,
     manager,
     command,
     snapshot,
-    service: new DeliveryTasksService(dataSource, delivery, access, {
-      seeAssignment: async () => {
-        throw new Error(
-          'This read test must not create an assignment receipt.',
-        );
-      },
-    } as unknown as DeliveryOperationsService),
+    visibility,
+    service: new DeliveryTasksService(
+      dataSource,
+      delivery,
+      access,
+      {
+        seeAssignment: async () => {
+          throw new Error(
+            'This read test must not create an assignment receipt.',
+          );
+        },
+      } as unknown as DeliveryOperationsService,
+      nativeTasks,
+    ),
   };
 };
 
@@ -236,6 +265,62 @@ it('returns verified task-free context with companies and current permitted owne
   expect(
     queries.every(({ sql }) => !/^\s*(UPDATE|INSERT|DELETE)\b/i.test(sql)),
   ).toBe(true);
+});
+
+it('does not return task counts, context or saved details when native reading is denied', async () => {
+  const { service, state, queries } = setup();
+  state.nativeAllowed = false;
+  await expect(
+    service.context(workspace, REVIEW_MEMBER_ID, REVIEW_MEMBERSHIP_ID),
+  ).rejects.toBeInstanceOf(ForbiddenException);
+  await expect(
+    service.list(workspace, REVIEW_MEMBER_ID, REVIEW_MEMBERSHIP_ID, {
+      view: 'HOME',
+      timezone: 'UTC',
+    }),
+  ).rejects.toBeInstanceOf(ForbiddenException);
+  await expect(
+    service.detail(workspace, REVIEW_MEMBER_ID, REVIEW_MEMBERSHIP_ID, {
+      taskId: REVIEW_TASK_ID,
+    }),
+  ).rejects.toBeInstanceOf(ForbiddenException);
+  expect(queries.every(({ sql }) => sql.includes('pg_advisory'))).toBe(true);
+});
+
+it('does not expose an off-page task hidden by the current native row policy', async () => {
+  const { service, state, queries } = setup();
+  state.nativeVisible = false;
+  await expect(
+    service.detail(workspace, REVIEW_MEMBER_ID, REVIEW_MEMBERSHIP_ID, {
+      taskId: REVIEW_TASK_ID,
+    }),
+  ).rejects.toBeInstanceOf(NotFoundException);
+  expect(queries.every(({ sql }) => sql.includes('pg_advisory'))).toBe(true);
+});
+
+it('invalidates a task page when native permissions change without a project revision', async () => {
+  const { service, state } = setup();
+  state.rows.push({ ...state.rows[0], id: REVIEW_ASSIGNEE_ID });
+  const now = new Date('2026-10-29T10:00:00Z');
+  const first = await service.list(
+    workspace,
+    REVIEW_MEMBER_ID,
+    REVIEW_MEMBERSHIP_ID,
+    { view: 'HOME', timezone: 'UTC', limit: 1 },
+    undefined,
+    now,
+  );
+  state.nativeFingerprint = 'changed-native-permissions';
+  await expect(
+    service.list(
+      workspace,
+      REVIEW_MEMBER_ID,
+      REVIEW_MEMBERSHIP_ID,
+      { view: 'HOME', timezone: 'UTC', limit: 1, after: first.nextCursor },
+      undefined,
+      now,
+    ),
+  ).rejects.toThrow('first page');
 });
 
 it('returns complete counts independently of the bounded page and never projects private history', async () => {

@@ -1,6 +1,7 @@
 import { type ReactNode } from 'react';
 import { type DocumentNode } from 'graphql';
 import { NetworkStatus } from '@apollo/client';
+import { CombinedGraphQLErrors } from '@apollo/client/errors';
 import { i18n } from '@lingui/core';
 import { I18nProvider } from '@lingui/react';
 import { act, renderHook } from '@testing-library/react';
@@ -169,6 +170,166 @@ it('uses task-free context and a genuine summary list, skipping exact detail wit
     expect.objectContaining({ skip: true }),
   );
   expect(mockMutate).not.toHaveBeenCalled();
+});
+it.each(['FORBIDDEN', 'NOT_FOUND'])(
+  'clears private detail on %s and requires an explicit current read after access returns',
+  async (code) => {
+    const view = renderHook(() => useDeliveryTasks(input(), TASK_ID), {
+      wrapper,
+    });
+    expect(view.result.current.detail?.details.brief).toBe(
+      'PRIVATE_EXACT_DETAIL_ONLY',
+    );
+    mockDetailError = new CombinedGraphQLErrors({
+      errors: [{ message: 'Task unavailable', extensions: { code } }],
+    });
+    view.rerender();
+    expect(view.result.current.taskUnavailable).toBe(true);
+    expect(view.result.current.detail).toBeNull();
+    expect(view.result.current.retainedDetail).toBeNull();
+    mockDetailError = undefined;
+    view.rerender();
+    expect(view.result.current.detail).toBeNull();
+    expect(view.result.current.retainedDetail).toBeNull();
+    await act(async () => {
+      expect(await view.result.current.retryDetail()).toBe(true);
+    });
+    expect(view.result.current.taskUnavailable).toBe(false);
+    expect(view.result.current.detail?.details.brief).toBe(
+      'PRIVATE_EXACT_DETAIL_ONLY',
+    );
+    expect(mockMutate).not.toHaveBeenCalled();
+  },
+);
+it('immediately clears private detail after a denied task write without waiting for polling', async () => {
+  const view = renderHook(() => useDeliveryTasks(input(), TASK_ID), {
+    wrapper,
+  });
+  mockMutate.mockRejectedValueOnce(
+    new CombinedGraphQLErrors({
+      errors: [
+        {
+          message: 'Current update access denied',
+          extensions: { code: 'FORBIDDEN' },
+        },
+      ],
+    }),
+  );
+  await act(async () => {
+    expect(
+      await view.result.current.run({
+        action: 'comment',
+        taskId: TASK_ID,
+        revision: 4,
+        text: 'Private unsent note',
+      }),
+    ).toBe(false);
+  });
+  expect(view.result.current.taskUnavailable).toBe(true);
+  expect(view.result.current.detail).toBeNull();
+  expect(view.result.current.retainedDetail).toBeNull();
+  expect(mockMutate).toHaveBeenCalledTimes(1);
+  expect(mockDetailRefetch).not.toHaveBeenCalled();
+});
+it.each(['context', 'list'])(
+  'clears private detail when the native %s read denies access before exact detail has failed',
+  async (source) => {
+    const view = renderHook(() => useDeliveryTasks(input(), TASK_ID), {
+      wrapper,
+    });
+    const denied = new CombinedGraphQLErrors({
+      errors: [
+        {
+          message: 'Native task access denied',
+          extensions: { code: 'FORBIDDEN' },
+        },
+      ],
+    });
+    if (source === 'context') mockContextError = denied;
+    else mockListError = denied;
+    view.rerender();
+    expect(view.result.current.taskUnavailable).toBe(true);
+    expect(view.result.current.detail).toBeNull();
+    expect(view.result.current.retainedDetail).toBeNull();
+    if (source === 'context') {
+      expect(view.result.current.retainedContext).toBeNull();
+      await act(async () => {
+        expect(await view.result.current.retryDetail()).toBe(false);
+      });
+      expect(mockDetailRefetch).not.toHaveBeenCalled();
+    }
+    mockContextError = undefined;
+    mockListError = undefined;
+    view.rerender();
+    expect(view.result.current.contextVerified).toBe(true);
+    expect(view.result.current.detail).toBeNull();
+    await act(async () => {
+      expect(await view.result.current.retryDetail()).toBe(true);
+    });
+    expect(view.result.current.detail?.id).toBe(TASK_ID);
+    expect(mockMutate).not.toHaveBeenCalled();
+  },
+);
+it.each([
+  new Error('Network unavailable'),
+  new CombinedGraphQLErrors({
+    errors: [
+      {
+        message: 'Permissions are refreshing',
+        extensions: { code: 'CONFLICT' },
+      },
+    ],
+  }),
+])(
+  'preserves hidden private detail for uncertain or refreshable reads',
+  (failure) => {
+    const view = renderHook(() => useDeliveryTasks(input(), TASK_ID), {
+      wrapper,
+    });
+    mockDetailError = failure;
+    view.rerender();
+    expect(view.result.current.taskUnavailable).toBe(false);
+    expect(view.result.current.detail).toBeNull();
+    expect(view.result.current.retainedDetail?.details.brief).toBe(
+      'PRIVATE_EXACT_DETAIL_ONLY',
+    );
+    mockDetailError = undefined;
+    view.rerender();
+    expect(view.result.current.detail?.details.brief).toBe(
+      'PRIVATE_EXACT_DETAIL_ONLY',
+    );
+  },
+);
+it('rejects a recovery result from a replaced membership without restoring its private evidence', async () => {
+  const view = renderHook(() => useDeliveryTasks(input(), TASK_ID), {
+    wrapper,
+  });
+  mockDetailError = new CombinedGraphQLErrors({
+    errors: [{ message: 'Unavailable', extensions: { code: 'NOT_FOUND' } }],
+  });
+  view.rerender();
+  mockDetailError = undefined;
+  view.rerender();
+  let resolveRead:
+    | ((value: { data: { deliveryTaskDetail: typeof mockDetail } }) => void)
+    | undefined;
+  mockDetailRefetch.mockReturnValueOnce(
+    new Promise((resolve) => {
+      resolveRead = resolve;
+    }),
+  );
+  let recovery: Promise<boolean> | undefined;
+  act(() => {
+    recovery = view.result.current.retryDetail();
+  });
+  mockMembership = 'replacement-membership';
+  view.rerender();
+  await act(async () => {
+    resolveRead?.({ data: { deliveryTaskDetail: mockDetail } });
+    expect(await recovery).toBe(false);
+  });
+  expect(view.result.current.detail).toBeNull();
+  expect(view.result.current.retainedDetail).toBeNull();
 });
 it.each([NetworkStatus.poll, NetworkStatus.refetch])(
   'retains verified reading context during same-scope refresh %s but hides it on source failure',

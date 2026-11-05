@@ -7,6 +7,7 @@ import { fromUserEntityToFlat } from 'src/engine/core-modules/user/utils/from-us
 import { fromWorkspaceEntityToFlat } from 'src/engine/core-modules/workspace/utils/from-workspace-entity-to-flat.util';
 import { type WorkspaceEntity } from 'src/engine/core-modules/workspace/workspace.entity';
 import { findFlatEntityByIdInFlatEntityMaps } from 'src/engine/metadata-modules/flat-entity/utils/find-flat-entity-by-id-in-flat-entity-maps.util';
+import { PermissionsException } from 'src/engine/metadata-modules/permissions/permissions.exception';
 import { type GlobalWorkspaceOrmManager } from 'src/engine/twenty-orm/global-workspace-datasource/global-workspace-orm.manager';
 import { validateOperationIsPermittedOrThrow } from 'src/engine/twenty-orm/repository/permissions.utils';
 import {
@@ -42,6 +43,7 @@ export const deliveryNativeTaskSchema = (workspace: WorkspaceEntity) => {
 export const buildDeliveryNativeTaskVisibility = (
   context: ORMWorkspaceContext,
   selectedColumns: string[] = ['id', 'title', 'assigneeId', 'dueAt'],
+  operation?: DeliveryNativeTaskWriteOperation,
 ) => {
   const { authContext } = context;
   if (authContext.type !== 'user')
@@ -77,6 +79,19 @@ export const buildDeliveryNativeTaskVisibility = (
     updatedColumns: [],
     authContext,
   });
+  if (operation)
+    validateOperationIsPermittedOrThrow({
+      entityName: 'task',
+      operationType: operation.type,
+      objectsPermissions,
+      flatObjectMetadataMaps: context.flatObjectMetadataMaps,
+      flatFieldMetadataMaps: context.flatFieldMetadataMaps,
+      objectIdByNameSingular: context.objectIdByNameSingular,
+      selectedColumns,
+      allFieldsSelected: false,
+      updatedColumns: operation.updatedColumns,
+      authContext,
+    });
   // Missing member-dependent predicate values must not turn a restricted task read into an unrestricted one.
   for (const predicate of Object.values(
     context.flatRowLevelPermissionPredicateMaps.byUniversalIdentifier,
@@ -185,6 +200,7 @@ export const buildDeliveryNativeTaskVisibility = (
       ),
       permissions: objectsPermissions[objectMetadata.id],
       selectedColumns,
+      operation: operation ?? null,
       recordFilter,
     }),
   };
@@ -196,6 +212,7 @@ export const readDeliveryNativeTaskVisibility = async (
   workspaceOrm: GlobalWorkspaceOrmManager,
   cache: WorkspaceCacheService,
   selectedColumns?: string[],
+  operation?: DeliveryNativeTaskWriteOperation,
 ) => {
   const membership = await manager.getRepository(UserWorkspaceEntity).findOne({
     where: { id: identity.userWorkspaceId, workspaceId: workspace.id },
@@ -262,6 +279,7 @@ export const readDeliveryNativeTaskVisibility = async (
         const visibility = buildDeliveryNativeTaskVisibility(
           context,
           selectedColumns,
+          operation,
         );
         const after = await cache.getCacheHashes(workspace.id, [
           ...DELIVERY_NATIVE_TASK_CACHE_KEYS,
@@ -303,6 +321,12 @@ export const readDeliveryNativeTaskVisibility = async (
       error instanceof ForbiddenException
     )
       throw error;
+    if (error instanceof PermissionsException)
+      throw new ForbiddenException(
+        operation
+          ? 'Your CRM task permissions do not allow this change. Ask an administrator to check task and field access.'
+          : 'Your CRM task permissions do not allow this view. Ask an administrator to check task and field access.',
+      );
     throw new ForbiddenException(
       'Native task visibility cannot be verified. Refresh permissions before continuing.',
     );
@@ -312,4 +336,8 @@ export type DeliveryNativeTaskVisibility = {
   fingerprint: string;
   sql: string;
   parameters: ObjectLiteral;
+};
+export type DeliveryNativeTaskWriteOperation = {
+  type: 'insert' | 'update';
+  updatedColumns: string[];
 };

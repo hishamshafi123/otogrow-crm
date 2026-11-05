@@ -125,7 +125,7 @@ const workspace: DeliveryWorkspace = {
   ],
   members: [],
 };
-const Harness = () => {
+const Harness = ({ canEdit }: { canEdit?: boolean }) => {
   const [revision, setRevision] = useState(3);
   return (
     <>
@@ -133,20 +133,21 @@ const Harness = () => {
       <DeliveryCreative
         task={{ ...task, revision }}
         workspace={workspace}
+        canEdit={canEdit}
         onChanged={changed}
         onOpenTask={jest.fn()}
       />
     </>
   );
 };
-const setup = () => {
+const setup = (canEdit?: boolean) => {
   const router = createMemoryRouter(
     [
       {
         path: '/delivery',
         element: (
           <DeliveryDraftGuardProvider>
-            <Harness />
+            <Harness canEdit={canEdit} />
           </DeliveryDraftGuardProvider>
         ),
       },
@@ -173,6 +174,18 @@ beforeEach(() => {
   i18n.loadAndActivate({ locale: 'en', messages: {} });
   mockMutate.mockReset().mockResolvedValue({ data: {} });
   changed.mockReset().mockResolvedValue(undefined);
+});
+
+it('keeps production changes disabled when the current source denies editing even for a manager', async () => {
+  const user = setup(false);
+  expect(screen.getByLabelText('Final deliverable')).toBeDisabled();
+  const save = screen.getByRole('button', { name: 'Save new brief version' });
+  expect(save).toBeDisabled();
+  await user.click(save);
+  await user.click(screen.getByRole('button', { name: 'References' }));
+  expect(screen.getByLabelText('Title')).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Add reference' })).toBeDisabled();
+  expect(mockMutate).not.toHaveBeenCalled();
 });
 
 it('keeps legacy video briefs and supports an explicit still-image deliverable without duration or music inputs', async () => {

@@ -1,3 +1,6 @@
+const {
+  createIsolatedNativeTaskAccess,
+} = require('./helpers/isolated-native-task-access.cjs');
 const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
 const { Readable } = require('node:stream');
@@ -67,6 +70,7 @@ function learningServices(source, fixture) {
     source,
     services.delivery,
     storage,
+    createIsolatedNativeTaskAccess(),
   );
   const learning = new DeliveryCreativeLearningService(
     source,

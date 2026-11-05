@@ -1,3 +1,6 @@
+const {
+  createIsolatedNativeTaskAccess,
+} = require('./helpers/isolated-native-task-access.cjs');
 const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
 const {
@@ -79,7 +82,11 @@ const {
       userHasWorkspaceSettingPermission: async ({ userWorkspaceId }) =>
         userWorkspaceId === founder,
     });
-    const delivery = new DeliveryService(source, access);
+    const delivery = new DeliveryService(
+      source,
+      access,
+      createIsolatedNativeTaskAccess(),
+    );
 
     const companyId = randomUUID();
     await runner.query(

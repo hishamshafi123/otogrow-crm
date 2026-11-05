@@ -4,6 +4,8 @@ import { DataSource, type EntityManager } from 'typeorm';
 import { escapeForIlike } from 'twenty-shared/utils';
 import { WorkspaceEntity } from 'src/engine/core-modules/workspace/workspace.entity';
 import { DeliveryService } from 'src/modules/delivery/delivery.service';
+import { DeliveryNativeTaskAccessService } from 'src/modules/delivery/delivery-native-task-access.service';
+import { type DeliveryNativeTaskVisibility } from 'src/modules/delivery/native-task-visibility';
 import { readDeliverySnapshot } from 'src/modules/delivery/read-delivery-snapshot';
 import { type CreativeDocument } from 'src/modules/delivery/creative/delivery-creative.types';
 import {
@@ -33,6 +35,7 @@ type ReadScope = {
   manager: EntityManager;
   actor: CreativeActor;
   identity: DeliveryCreativeContextDTO;
+  visibility: DeliveryNativeTaskVisibility;
 };
 type Metadata = { totalCount: number; fingerprint: string };
 type TaskRow = DeliveryCreativeTaskSummaryDTO & {
@@ -84,6 +87,7 @@ export class DeliveryCreativeReadsService {
   constructor(
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly delivery: DeliveryService,
+    private readonly nativeTasks: DeliveryNativeTaskAccessService,
   ) {}
 
   private read<TResult>(
@@ -102,6 +106,11 @@ export class DeliveryCreativeReadsService {
           memberId,
           userWorkspaceId,
           manager,
+        );
+        const visibility = await this.nativeTasks.visibility(
+          manager,
+          workspace,
+          { memberId, userWorkspaceId },
         );
         const [projects]: { fingerprint: string }[] = await manager.query(
           `SELECT md5(COALESCE(jsonb_agg(jsonb_build_array(p.id,p.revision) ORDER BY p.id)::text,'[]')) AS fingerprint FROM core."deliveryProject" p WHERE ${PROJECT_SCOPE}`,
@@ -122,16 +131,20 @@ export class DeliveryCreativeReadsService {
             isManager: actor.isManager,
             isAdmin: actor.isAdmin,
             projects: projects.fingerprint,
+            nativeVisibility: visibility.fingerprint,
           }),
         };
-        return read({ manager, actor, identity });
+        return read({ manager, actor, identity, visibility });
       },
       transactionManager,
     );
   }
-  private taskFrom(workspace: WorkspaceEntity) {
+  private taskFrom(
+    workspace: WorkspaceEntity,
+    visibility: DeliveryNativeTaskVisibility,
+  ) {
     const schema = this.delivery.schema(workspace);
-    return `FROM core."deliveryTask" d JOIN core."deliveryProject" p ON p."workspaceId"=d."workspaceId" AND p.id=d."projectId" JOIN ${schema}.task n ON n.id=d."taskId" AND n."deletedAt" IS NULL LEFT JOIN ${schema}."workspaceMember" m ON m.id=n."assigneeId" AND m."deletedAt" IS NULL WHERE ${PROJECT_SCOPE} AND d."workspaceId"=$1`;
+    return `FROM core."deliveryTask" d JOIN core."deliveryProject" p ON p."workspaceId"=d."workspaceId" AND p.id=d."projectId" JOIN ${schema}.task n ON n.id=d."taskId" AND n."deletedAt" IS NULL LEFT JOIN ${schema}."workspaceMember" m ON m.id=n."assigneeId" AND m."deletedAt" IS NULL WHERE ${PROJECT_SCOPE} AND d."workspaceId"=$1 AND ${this.nativeTasks.predicate(workspace, visibility, 'n.id')}`;
   }
   private async exact(
     scope: ReadScope,
@@ -139,14 +152,16 @@ export class DeliveryCreativeReadsService {
     taskId: string,
     document: boolean,
   ) {
-    const rows: TaskRow[] = await scope.manager.query(
-      `SELECT ${TASK_FIELDS}${document ? ",d.details->'creative' AS document" : ''} ${this.taskFrom(workspace)} AND d."taskId"=$4`,
+    const rows = await this.nativeTasks.query<TaskRow[]>(
+      scope.manager,
+      `SELECT ${TASK_FIELDS}${document ? ",d.details->'creative' AS document" : ''} ${this.taskFrom(workspace, scope.visibility)} AND d."taskId"=$4`,
       [
         workspace.id,
         scope.actor.isManager,
         JSON.stringify([scope.actor.memberId]),
         taskId,
       ],
+      scope.visibility,
     );
     if (!rows[0])
       throw new NotFoundException('This creative task is unavailable.');
@@ -229,7 +244,7 @@ export class DeliveryCreativeReadsService {
       workspace,
       memberId,
       userWorkspaceId,
-      async ({ manager, actor, identity }) => {
+      async ({ manager, actor, identity, visibility }) => {
         let selectedProject: DeliveryCreativeProjectDTO | null = null;
         if (input.projectId) {
           const projects: DeliveryCreativeProjectDTO[] = await manager.query(
@@ -264,10 +279,12 @@ export class DeliveryCreativeReadsService {
           filters.mine ? memberId : null,
           filters.production,
         ];
-        const from = `${this.taskFrom(workspace)} AND ($4::uuid IS NULL OR d."projectId"=$4) AND ($5::text IS NULL OR n.title ILIKE $5) AND ($6::text IS NULL OR d.details->>'state'=$6) AND ($7::uuid IS NULL OR n."assigneeId"=$7) AND ($8='ALL' OR ($8='STARTED' AND d.details->'creative' IS NOT NULL AND d.details->'creative'<>'null'::jsonb) OR ($8='NOT_STARTED' AND (d.details->'creative' IS NULL OR d.details->'creative'='null'::jsonb)))`;
-        const [metadata]: Metadata[] = await manager.query(
+        const from = `${this.taskFrom(workspace, visibility)} AND ($4::uuid IS NULL OR d."projectId"=$4) AND ($5::text IS NULL OR n.title ILIKE $5) AND ($6::text IS NULL OR d.details->>'state'=$6) AND ($7::uuid IS NULL OR n."assigneeId"=$7) AND ($8='ALL' OR ($8='STARTED' AND d.details->'creative' IS NOT NULL AND d.details->'creative'<>'null'::jsonb) OR ($8='NOT_STARTED' AND (d.details->'creative' IS NULL OR d.details->'creative'='null'::jsonb)))`;
+        const [metadata] = await this.nativeTasks.query<Metadata[]>(
+          manager,
           `SELECT count(*)::int AS "totalCount",md5(COALESCE(jsonb_agg(jsonb_build_array(d."taskId",d.revision,n.title,n."assigneeId",n."dueAt") ORDER BY d."taskId")::text,'[]')) AS fingerprint ${from}`,
           parameters,
+          visibility,
         );
         const scope = creativeReadHash({
           authority: identity.scope,
@@ -276,9 +293,11 @@ export class DeliveryCreativeReadsService {
         });
         const cursor = readCreativeCursor(input.after, scope, 'TASK');
         const limit = input.limit ?? 25;
-        const rows: TaskRow[] = await manager.query(
+        const rows = await this.nativeTasks.query<TaskRow[]>(
+          manager,
           `SELECT ${TASK_FIELDS} ${from} AND ($9::timestamptz IS NULL OR (d."createdAt",d."taskId")<($9::timestamptz,$10::uuid)) ORDER BY d."createdAt" DESC,d."taskId" DESC LIMIT $11`,
           [...parameters, cursor?.key ?? null, cursor?.id ?? null, limit + 1],
+          visibility,
         );
         const selected = rows.slice(0, limit);
         const last = selected[selected.length - 1];
@@ -364,10 +383,12 @@ export class DeliveryCreativeReadsService {
           task.id,
           search ? `%${escapeForIlike(search)}%` : null,
         ];
-        const from = `${this.taskFrom(workspace).replace(' WHERE ', ` CROSS JOIN LATERAL jsonb_array_elements(COALESCE(d.details->'creative'->'references','[]'::jsonb)) reference(value) WHERE `)} AND d."projectId"=$4 AND d."taskId"<>$5 AND reference.value->>'url' ~ '^https?://' AND reference.value->'reviews'->-1->>'decision'='APPROVED' AND ($6::text IS NULL OR reference.value->>'title' ILIKE $6 OR n.title ILIKE $6)`;
-        const [metadata]: Metadata[] = await scope.manager.query(
+        const from = `${this.taskFrom(workspace, scope.visibility).replace(' WHERE ', ` CROSS JOIN LATERAL jsonb_array_elements(COALESCE(d.details->'creative'->'references','[]'::jsonb)) reference(value) WHERE `)} AND d."projectId"=$4 AND d."taskId"<>$5 AND reference.value->>'url' ~ '^https?://' AND reference.value->'reviews'->-1->>'decision'='APPROVED' AND ($6::text IS NULL OR reference.value->>'title' ILIKE $6 OR n.title ILIKE $6)`;
+        const [metadata] = await this.nativeTasks.query<Metadata[]>(
+          scope.manager,
           `SELECT count(*)::int AS "totalCount",md5(COALESCE(jsonb_agg(jsonb_build_array(d."taskId",d.revision,reference.value->>'id',reference.value->>'version') ORDER BY d."taskId",reference.value->>'id')::text,'[]')) AS fingerprint ${from}`,
           parameters,
+          scope.visibility,
         );
         const pageScope = creativeReadHash({
           authority: scope.identity.scope,
@@ -378,11 +399,14 @@ export class DeliveryCreativeReadsService {
         });
         const cursor = readCreativeCursor(input.after, pageScope, 'REFERENCE');
         const limit = input.limit ?? 25;
-        const rows: DeliveryCreativeApprovedReferenceDTO[] =
-          await scope.manager.query(
-            `SELECT reference.value->>'id' AS id,(reference.value->>'version')::int AS version,reference.value->>'title' AS title,reference.value->>'url' AS url,left(reference.value->>'summary',300) AS "summaryPreview",length(reference.value->>'summary')>300 AS "summaryTruncated",d."taskId" AS "sourceTaskId",n.title AS "sourceTaskTitle",d.revision AS "sourceTaskRevision",reference.value->'reviews'->-1->>'at' AS "approvedAt" ${from} AND ($7::uuid IS NULL OR (d."taskId",(reference.value->>'id')::uuid)>($7::uuid,$8::uuid)) ORDER BY d."taskId",(reference.value->>'id')::uuid LIMIT $9`,
-            [...parameters, cursor?.key ?? null, cursor?.id ?? null, limit + 1],
-          );
+        const rows = await this.nativeTasks.query<
+          DeliveryCreativeApprovedReferenceDTO[]
+        >(
+          scope.manager,
+          `SELECT reference.value->>'id' AS id,(reference.value->>'version')::int AS version,reference.value->>'title' AS title,reference.value->>'url' AS url,left(reference.value->>'summary',300) AS "summaryPreview",length(reference.value->>'summary')>300 AS "summaryTruncated",d."taskId" AS "sourceTaskId",n.title AS "sourceTaskTitle",d.revision AS "sourceTaskRevision",reference.value->'reviews'->-1->>'at' AS "approvedAt" ${from} AND ($7::uuid IS NULL OR (d."taskId",(reference.value->>'id')::uuid)>($7::uuid,$8::uuid)) ORDER BY d."taskId",(reference.value->>'id')::uuid LIMIT $9`,
+          [...parameters, cursor?.key ?? null, cursor?.id ?? null, limit + 1],
+          scope.visibility,
+        );
         const items = rows.slice(0, limit);
         const last = items[items.length - 1];
         return {

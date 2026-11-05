@@ -1,4 +1,7 @@
 const {
+  createIsolatedNativeTaskAccess,
+} = require('./helpers/isolated-native-task-access.cjs');
+const {
   OtogrowAccessService,
 } = require('../dist/modules/otogrow-access/otogrow-access.service');
 const {
@@ -85,7 +88,11 @@ const {
       userHasWorkspaceSettingPermission: async ({ userWorkspaceId }) =>
         userWorkspaceId === admin,
     });
-    const delivery = new DeliveryService(scoped, access);
+    const delivery = new DeliveryService(
+      scoped,
+      access,
+      createIsolatedNativeTaskAccess(),
+    );
     const roleDirectory = await access.directory(workspace.id, admin, admin);
     const managerRole = roleDirectory.roles.find(
       (role) =>
@@ -200,7 +207,12 @@ const {
     const operations = new DeliveryOperationsService(
       scoped,
       delivery,
-      new DeliveryCreativeService(scoped, delivery, {}),
+      new DeliveryCreativeService(
+        scoped,
+        delivery,
+        {},
+        createIsolatedNativeTaskAccess(),
+      ),
       { findByWorkspaceId: async () => null },
       { get: () => null },
     );

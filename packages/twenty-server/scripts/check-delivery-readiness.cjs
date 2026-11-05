@@ -1,3 +1,6 @@
+const {
+  createIsolatedNativeTaskAccess,
+} = require('./helpers/isolated-native-task-access.cjs');
 const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
 const {
@@ -85,7 +88,11 @@ const PRIVATE_PROVIDER_ERROR = 'private-provider-response-with-credential';
         workspaceId === workspace.id &&
         nativeAdministrators.has(userWorkspaceId),
     });
-    const delivery = new DeliveryService(source, access);
+    const delivery = new DeliveryService(
+      source,
+      access,
+      createIsolatedNativeTaskAccess(),
+    );
     const project = (
       await delivery.command(workspace, admin, admin, {
         action: 'project',
