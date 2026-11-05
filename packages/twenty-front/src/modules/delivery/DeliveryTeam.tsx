@@ -3,8 +3,9 @@ import { ClientSetupLink } from '@/delivery/onboarding/ClientSetupLink';
 import { useDeliveryNativeDraft } from '@/delivery/drafts/useDeliveryNativeDraft';
 import { DeliveryDraftConflict } from '@/delivery/drafts/DeliveryDraftConflict';
 import { OtogrowTeamRoles } from '@/otogrow-access/OtogrowTeamRoles';
-import { useState } from 'react';
-import { Trans, useLingui } from '@lingui/react/macro';
+import { useId, useState } from 'react';
+import { isNonEmptyString } from '@sniptt/guards';
+import { Plural, Trans, useLingui } from '@lingui/react/macro';
 import {
   type DeliveryCommandRunner,
   type DeliveryProject,
@@ -73,6 +74,8 @@ const DeliveryProjectForm = ({
 }: DeliveryTeamProps & { project?: DeliveryProject }) => {
   const { t } = useLingui();
   const [name, setName] = useState(project?.name ?? '');
+  const nameHelpId = useId();
+  const validName = isNonEmptyString(name.trim());
   const [companyId, setCompanyId] = useState(project?.companyId ?? '');
   const [memberIds, setMemberIds] = useState(project?.memberIds ?? []);
   const { requestAction } = useDeliveryDraftGuard();
@@ -108,122 +111,164 @@ const DeliveryProjectForm = ({
     });
   return (
     <StyledDeliveryCard>
-      <form
-        aria-label={
-          project ? t`Edit project ${project.name}` : t`Create a project`
-        }
-        ref={draft.formRef}
-        onChange={draft.onChange}
-        onSubmit={async (event) => {
-          event.preventDefault();
-          if (busy || saving || stale || !draft.dirty) return;
-          setSaving(true);
-          setRefreshFailed(false);
-          const savedProject = { name: name.trim(), companyId, memberIds };
-          try {
-            if (
-              await run({
-                action: 'project',
-                ...(project
-                  ? { id: project.id, revision: openedRevision }
-                  : {}),
-                name: savedProject.name,
-                companyId: companyId || null,
-                memberIds,
-              })
-            ) {
-              if (project) {
-                setOpenedRevision(project.revision + 1);
-                setName(savedProject.name);
-                setOpenedProject(JSON.stringify(savedProject));
-                draft.markSaved(savedProject);
-              } else {
-                setName('');
-                setCompanyId('');
-                setMemberIds([]);
-                draft.markSaved({ name: '', companyId: '', memberIds: [] });
-              }
-            } else if (project && onChanged) {
-              try {
-                await onChanged();
-              } catch {
-                setRefreshFailed(true);
-              }
-            }
-          } finally {
-            setSaving(false);
+      <details>
+        <summary>
+          {project ? (
+            <>
+              <strong>{project.name}</strong>
+              {' · '}
+              {project.companyId
+                ? (workspace.companies.find(
+                    (company) => company.id === project.companyId,
+                  )?.name ?? t`Client unavailable`)
+                : t`Internal work`}
+              {' · '}
+              <Plural
+                value={project.memberIds.length}
+                one="# team member"
+                other="# team members"
+              />
+            </>
+          ) : (
+            <Trans>Create project</Trans>
+          )}
+          {draft.dirty && (
+            <>
+              {' · '}
+              <Trans>Unsaved changes</Trans>
+            </>
+          )}
+          {(stale || refreshFailed) && (
+            <>
+              {' · '}
+              <Trans>Check latest version</Trans>
+            </>
+          )}
+        </summary>
+        <form
+          aria-label={
+            project ? t`Edit project ${project.name}` : t`Create a project`
           }
-        }}
-      >
-        {stale && (
-          <DeliveryDraftConflict onReload={reload} busy={busy || saving} />
-        )}
-        {refreshFailed && (
-          <p role="alert">
-            <Trans>
-              Your draft is preserved. Use Refresh page to check the latest
-              project before retrying.
-            </Trans>
-          </p>
-        )}
-        <fieldset disabled={busy || saving}>
-          <StyledDeliveryStack>
-            <h3>{project ? project.name : t`Create a project`}</h3>
-            <StyledDeliveryGrid>
-              <label>
-                <Trans>Project name</Trans>
-                <input
-                  required
-                  maxLength={200}
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                />
-              </label>
-              <label>
-                <Trans>Client</Trans>
-                <select
-                  value={companyId}
-                  onChange={(event) => setCompanyId(event.target.value)}
-                >
-                  <option value="">{t`Internal work`}</option>
-                  {workspace.companies.map((company) => (
-                    <option key={company.id} value={company.id}>
-                      {company.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </StyledDeliveryGrid>
-            <strong>
-              <Trans>Project members</Trans>
-            </strong>
-            <StyledDeliveryGrid>
-              {workspace.members.map((member) => (
-                <label key={member.id} style={{ flexDirection: 'row' }}>
+          ref={draft.formRef}
+          onChange={draft.onChange}
+          onSubmit={async (event) => {
+            event.preventDefault();
+            if (busy || saving || stale || !draft.dirty || !validName) return;
+            setSaving(true);
+            setRefreshFailed(false);
+            const savedProject = { name: name.trim(), companyId, memberIds };
+            try {
+              if (
+                await run({
+                  action: 'project',
+                  ...(project
+                    ? { id: project.id, revision: openedRevision }
+                    : {}),
+                  name: savedProject.name,
+                  companyId: companyId || null,
+                  memberIds,
+                })
+              ) {
+                if (project) {
+                  setOpenedRevision(project.revision + 1);
+                  setName(savedProject.name);
+                  setOpenedProject(JSON.stringify(savedProject));
+                  draft.markSaved(savedProject);
+                } else {
+                  setName('');
+                  setCompanyId('');
+                  setMemberIds([]);
+                  draft.markSaved({ name: '', companyId: '', memberIds: [] });
+                }
+              } else if (project && onChanged) {
+                try {
+                  await onChanged();
+                } catch {
+                  setRefreshFailed(true);
+                }
+              }
+            } finally {
+              setSaving(false);
+            }
+          }}
+        >
+          {stale && (
+            <DeliveryDraftConflict onReload={reload} busy={busy || saving} />
+          )}
+          {refreshFailed && (
+            <p role="alert">
+              <Trans>
+                Your draft is preserved. Use Refresh page to check the latest
+                project before retrying.
+              </Trans>
+            </p>
+          )}
+          <fieldset disabled={busy || saving}>
+            <StyledDeliveryStack>
+              <h3>{project ? project.name : t`Create a project`}</h3>
+              <StyledDeliveryGrid>
+                <label>
+                  <Trans>Project name</Trans>
                   <input
-                    type="checkbox"
-                    checked={memberIds.includes(member.id)}
-                    onChange={(event) =>
-                      setMemberIds(
-                        event.target.checked
-                          ? [...memberIds, member.id]
-                          : memberIds.filter((id) => id !== member.id),
-                      )
-                    }
+                    required
+                    maxLength={200}
+                    aria-invalid={(draft.dirty && !validName) || undefined}
+                    aria-describedby={!validName ? nameHelpId : undefined}
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
                   />
-                  {member.name}
                 </label>
-              ))}
-            </StyledDeliveryGrid>
-            <StyledDeliveryButton
-              disabled={busy || saving || stale || !draft.dirty}
-              type="submit"
-            >
-              {project ? t`Save project access` : t`Create project`}
-            </StyledDeliveryButton>
-          </StyledDeliveryStack>
-        </fieldset>
-      </form>
+                <label>
+                  <Trans>Client</Trans>
+                  <select
+                    value={companyId}
+                    onChange={(event) => setCompanyId(event.target.value)}
+                  >
+                    <option value="">{t`Internal work`}</option>
+                    {workspace.companies.map((company) => (
+                      <option key={company.id} value={company.id}>
+                        {company.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </StyledDeliveryGrid>
+              {!validName && (
+                <p id={nameHelpId} role="status">
+                  <Trans>Add a project name before saving.</Trans>
+                </p>
+              )}
+              <strong>
+                <Trans>Project members</Trans>
+              </strong>
+              <StyledDeliveryGrid>
+                {workspace.members.map((member) => (
+                  <label key={member.id} style={{ flexDirection: 'row' }}>
+                    <input
+                      type="checkbox"
+                      checked={memberIds.includes(member.id)}
+                      onChange={(event) =>
+                        setMemberIds(
+                          event.target.checked
+                            ? [...memberIds, member.id]
+                            : memberIds.filter((id) => id !== member.id),
+                        )
+                      }
+                    />
+                    {member.name}
+                  </label>
+                ))}
+              </StyledDeliveryGrid>
+              <StyledDeliveryButton
+                disabled={busy || saving || stale || !draft.dirty || !validName}
+                type="submit"
+              >
+                {project ? t`Save project access` : t`Create project`}
+              </StyledDeliveryButton>
+            </StyledDeliveryStack>
+          </fieldset>
+        </form>
+      </details>
     </StyledDeliveryCard>
   );
 };

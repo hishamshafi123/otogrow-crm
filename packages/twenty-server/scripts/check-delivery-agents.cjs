@@ -234,6 +234,7 @@ async function main() {
       },
       budget,
       access,
+      createIsolatedNativeTaskAccess(),
     );
     const command = (actor, input) =>
       service.command(workspace, actor, actor, input);
@@ -654,6 +655,7 @@ async function main() {
       },
       budget,
       access,
+      createIsolatedNativeTaskAccess(),
     );
     const handler = new DeliveryAgentJob(queuedService);
     const worker = new Worker(queueName, (job) => handler.handle(job.data), {
@@ -1064,24 +1066,62 @@ async function main() {
     assert.equal((await ledger(stale)).state, 'RELEASED');
     assert.equal((await ledger(revoke)).state, 'RELEASED');
     // Named roles narrow run rights without widening project access or administrator run rights.
-    const makeRole = async (name) => (await access.saveRole(workspace.id, admin, admin, {
-      name, description: '', capabilities: [],
-    })).roles.find((role) => role.name === name);
+    const makeRole = async (name) =>
+      (
+        await access.saveRole(workspace.id, admin, admin, {
+          name,
+          description: '',
+          capabilities: [],
+        })
+      ).roles.find((role) => role.name === name);
     const productionRole = await makeRole('Agent production fixture');
     const seoRole = await makeRole('Agent SEO fixture');
     const assign = async (memberId, roleIds) => {
       const directory = await access.directory(workspace.id, admin, admin);
       return access.assignRoles(workspace.id, admin, admin, {
-        memberId, roleIds,
-        revision: directory.members.find((member) => member.memberId === memberId).revision,
-        roleRevisions: directory.roles.filter((role) => roleIds.includes(role.id)).map(({ id, revision }) => ({ id, revision })),
+        memberId,
+        roleIds,
+        revision: directory.members.find(
+          (member) => member.memberId === memberId,
+        ).revision,
+        roleRevisions: directory.roles
+          .filter((role) => roleIds.includes(role.id))
+          .map(({ id, revision }) => ({ id, revision })),
       });
     };
-    const namedConfiguration = { ...configuration, name: 'Named role assistant fixture', roleIds: [productionRole.id], dailyRunLimit: 50 };
-    await assert.rejects(command(admin, { type: 'save', configuration: {...namedConfiguration, roleIds: [randomUUID()]}}), /unique roles/);
-    await assert.rejects(command(admin, { type: 'save', configuration: {...namedConfiguration, roleIds: [productionRole.id, productionRole.id]}}), /unique roles/);
-    await assert.rejects(command(admin, { type: 'save', configuration: {...namedConfiguration, roleIds: []}}));
-    const namedAgent = await command(admin, { type: 'save', configuration: namedConfiguration });
+    const namedConfiguration = {
+      ...configuration,
+      name: 'Named role assistant fixture',
+      roleIds: [productionRole.id],
+      dailyRunLimit: 50,
+    };
+    await assert.rejects(
+      command(admin, {
+        type: 'save',
+        configuration: { ...namedConfiguration, roleIds: [randomUUID()] },
+      }),
+      /unique roles/,
+    );
+    await assert.rejects(
+      command(admin, {
+        type: 'save',
+        configuration: {
+          ...namedConfiguration,
+          roleIds: [productionRole.id, productionRole.id],
+        },
+      }),
+      /unique roles/,
+    );
+    await assert.rejects(
+      command(admin, {
+        type: 'save',
+        configuration: { ...namedConfiguration, roleIds: [] },
+      }),
+    );
+    const namedAgent = await command(admin, {
+      type: 'save',
+      configuration: namedConfiguration,
+    });
     const namedPreview = { ...previewInput, agentId: namedAgent.saved };
     await assert.rejects(command(admin, namedPreview), /role and project/);
     await assign(editor, [seoRole.id]);
@@ -1095,12 +1135,26 @@ async function main() {
     assert(!adminCatalog.runnableAgentIds.includes(namedAgent.saved));
     const editorCatalog = await service.snapshot(workspace, editor, editor);
     assert(editorCatalog.runnableAgentIds.includes(namedAgent.saved));
-    assert.deepEqual(editorCatalog.actor, { workspaceId: workspace.id, memberId: editor, userWorkspaceId: editor });
-    const currentNamedAgent = () => runner.manager.getRepository(DeliveryAgentEntity).findOneByOrFail({ id: namedAgent.saved });
-    const startNamed = async () => command(editor, { ...makeStart(), agentId: namedAgent.saved,
-      agentVersion: (await currentNamedAgent()).version,
-      taskRevision: (await runner.manager.getRepository(DeliveryTaskEntity).findOneByOrFail({ id: storedTask.id })).revision,
+    assert.deepEqual(editorCatalog.actor, {
+      workspaceId: workspace.id,
+      memberId: editor,
+      userWorkspaceId: editor,
     });
+    const currentNamedAgent = () =>
+      runner.manager
+        .getRepository(DeliveryAgentEntity)
+        .findOneByOrFail({ id: namedAgent.saved });
+    const startNamed = async () =>
+      command(editor, {
+        ...makeStart(),
+        agentId: namedAgent.saved,
+        agentVersion: (await currentNamedAgent()).version,
+        taskRevision: (
+          await runner.manager
+            .getRepository(DeliveryTaskEntity)
+            .findOneByOrFail({ id: storedTask.id })
+        ).revision,
+      });
     const queuedRevocation = await startNamed();
     await assign(editor, [seoRole.id]);
     const callsBeforeQueuedRevocation = providerCalls;
@@ -1108,13 +1162,25 @@ async function main() {
     assert.equal(providerCalls, callsBeforeQueuedRevocation);
     assert.equal((await ledger(queuedRevocation)).state, 'RELEASED');
     const revokedCatalog = await service.snapshot(workspace, editor, editor);
-    assert(!revokedCatalog.agents.some((agent) => agent.id === namedAgent.saved));
-    assert(revokedCatalog.runs.some((run) => run.id === queuedRevocation.runId), 'Keep permitted task history for accountability');
+    assert(
+      !revokedCatalog.agents.some((agent) => agent.id === namedAgent.saved),
+    );
+    assert(
+      revokedCatalog.runs.some((run) => run.id === queuedRevocation.runId),
+      'Keep permitted task history for accountability',
+    );
     await assign(editor, [productionRole.id]);
     const dispatchRevocation = await startNamed();
     const namedRoleDispatch = budget.dispatch.bind(budget);
-    budget.dispatch = async (...args) => { await assign(editor, []); return namedRoleDispatch(...args); };
-    try { await service.execute(dispatchRevocation.runId); } finally { budget.dispatch = namedRoleDispatch; }
+    budget.dispatch = async (...args) => {
+      await assign(editor, []);
+      return namedRoleDispatch(...args);
+    };
+    try {
+      await service.execute(dispatchRevocation.runId);
+    } finally {
+      budget.dispatch = namedRoleDispatch;
+    }
     assert.equal(providerCalls, callsBeforeQueuedRevocation);
     assert.equal((await ledger(dispatchRevocation)).state, 'RELEASED');
     await assign(editor, [productionRole.id]);
@@ -1123,7 +1189,9 @@ async function main() {
     modelHook = () => assign(editor, []);
     await service.execute(completionRevocation.runId);
     modelHook = null;
-    const completionRun = await runner.manager.getRepository(DeliveryAgentRunEntity).findOneByOrFail({ id: completionRevocation.runId });
+    const completionRun = await runner.manager
+      .getRepository(DeliveryAgentRunEntity)
+      .findOneByOrFail({ id: completionRevocation.runId });
     assert.equal(completionRun.status, 'FAILED');
     assert.equal(completionRun.result, null);
     assert.equal((await ledger(completionRevocation)).state, 'SETTLED');
@@ -1131,45 +1199,174 @@ async function main() {
     const reviewRevocation = await startNamed();
     await service.execute(reviewRevocation.runId);
     await assign(editor, []);
-    await assert.rejects(command(editor, { type: 'decide', runId: reviewRevocation.runId, action: 'ACCEPT', field: 'copy' }), /role and project/);
-    await assert.rejects(command(admin, { type: 'decide', runId: reviewRevocation.runId, action: 'ACCEPT', field: null }), /role and project/);
-    await command(admin, { type: 'decide', runId: reviewRevocation.runId, action: 'REJECT', field: null });
-    await command(admin, { type: 'save', id: namedAgent.saved, version: 1, configuration: { ...configuration, name: namedConfiguration.name } });
-    assert.deepEqual((await currentNamedAgent()).configuration.roleIds, [productionRole.id], 'Older saves preserve named role boundaries');
-    const namedEvents = await runner.query(`SELECT changes FROM core."otogrowActivityEvent" WHERE "sourceType"='agent' AND "sourceId"=$1`, [namedAgent.saved]);
-    assert(namedEvents.some((event) => event.changes.some((change) => change.field === 'agentRoles' && change.after === productionRole.name)));
-    await command(admin, { type: 'save', id: namedAgent.saved, version: 2, configuration: { ...namedConfiguration, roleIds: null } });
-    assert((await command(editor, namedPreview)).context, 'Explicit legacy mode remains supported');
-    const { DeliveryKnowledgeService } = require('../dist/modules/delivery/knowledge/delivery-knowledge.service');
+    await assert.rejects(
+      command(editor, {
+        type: 'decide',
+        runId: reviewRevocation.runId,
+        action: 'ACCEPT',
+        field: 'copy',
+      }),
+      /role and project/,
+    );
+    await assert.rejects(
+      command(admin, {
+        type: 'decide',
+        runId: reviewRevocation.runId,
+        action: 'ACCEPT',
+        field: null,
+      }),
+      /role and project/,
+    );
+    await command(admin, {
+      type: 'decide',
+      runId: reviewRevocation.runId,
+      action: 'REJECT',
+      field: null,
+    });
+    await command(admin, {
+      type: 'save',
+      id: namedAgent.saved,
+      version: 1,
+      configuration: { ...configuration, name: namedConfiguration.name },
+    });
+    assert.deepEqual(
+      (await currentNamedAgent()).configuration.roleIds,
+      [productionRole.id],
+      'Older saves preserve named role boundaries',
+    );
+    const namedEvents = await runner.query(
+      `SELECT changes FROM core."otogrowActivityEvent" WHERE "sourceType"='agent' AND "sourceId"=$1`,
+      [namedAgent.saved],
+    );
+    assert(
+      namedEvents.some((event) =>
+        event.changes.some(
+          (change) =>
+            change.field === 'agentRoles' &&
+            change.after === productionRole.name,
+        ),
+      ),
+    );
+    await command(admin, {
+      type: 'save',
+      id: namedAgent.saved,
+      version: 2,
+      configuration: { ...namedConfiguration, roleIds: null },
+    });
+    assert(
+      (await command(editor, namedPreview)).context,
+      'Explicit legacy mode remains supported',
+    );
+    const {
+      DeliveryKnowledgeService,
+    } = require('../dist/modules/delivery/knowledge/delivery-knowledge.service');
     const knowledge = new DeliveryKnowledgeService(scoped, delivery);
-    const meeting = { id: randomUUID(), projectId: project.id, revision: 0, title: 'Meeting fixture', meetingDate: '2026-10-26', sourceUrl: 'https://fathom.video/share/synthetic', transcript: 'Raw private meeting evidence', knowledge: 'Approved brand decision: focus on booked calls.' };
+    const meeting = {
+      id: randomUUID(),
+      projectId: project.id,
+      revision: 0,
+      title: 'Meeting fixture',
+      meetingDate: '2026-10-26',
+      sourceUrl: 'https://fathom.video/share/synthetic',
+      transcript: 'Raw private meeting evidence',
+      knowledge: 'Approved brand decision: focus on booked calls.',
+    };
     await knowledge.save(workspace, admin, admin, meeting);
-    await knowledge.publish(workspace, admin, admin, { projectId: project.id, id: meeting.id, revision: 1, publish: true });
+    await knowledge.publish(workspace, admin, admin, {
+      projectId: project.id,
+      id: meeting.id,
+      revision: 1,
+      publish: true,
+    });
     const meetingPreview = await command(editor, namedPreview);
-    assert.equal(meetingPreview.context.brandKnowledge.sources[0].sourceId, meeting.id);
-    assert(!JSON.stringify(meetingPreview.context).includes(meeting.transcript));
+    assert.equal(
+      meetingPreview.context.brandKnowledge.sources[0].sourceId,
+      meeting.id,
+    );
+    assert(
+      !JSON.stringify(meetingPreview.context).includes(meeting.transcript),
+    );
     const startWithKnowledge = async () => {
       const fresh = await command(editor, namedPreview);
-      return command(editor, { ...makeStart(), agentId: namedAgent.saved, taskRevision: fresh.taskRevision, agentVersion: fresh.agentVersion, knowledgeFingerprint: fresh.context.brandKnowledge.fingerprint });
+      return command(editor, {
+        ...makeStart(),
+        agentId: namedAgent.saved,
+        taskRevision: fresh.taskRevision,
+        agentVersion: fresh.agentVersion,
+        knowledgeFingerprint: fresh.context.brandKnowledge.fingerprint,
+      });
     };
     const queuedKnowledge = await startWithKnowledge();
-    await knowledge.save(workspace, admin, admin, { ...meeting, revision: 2, knowledge: 'Approved new decision: webinar registration.' });
-    await knowledge.publish(workspace, admin, admin, { projectId: project.id, id: meeting.id, revision: 3, publish: true });
-    await assert.rejects(command(editor, { ...makeStart(), agentId: namedAgent.saved, taskRevision: meetingPreview.taskRevision, agentVersion: meetingPreview.agentVersion, knowledgeFingerprint: meetingPreview.context.brandKnowledge.fingerprint }), /knowledge changed after preview/);
+    await knowledge.save(workspace, admin, admin, {
+      ...meeting,
+      revision: 2,
+      knowledge: 'Approved new decision: webinar registration.',
+    });
+    await knowledge.publish(workspace, admin, admin, {
+      projectId: project.id,
+      id: meeting.id,
+      revision: 3,
+      publish: true,
+    });
+    await assert.rejects(
+      command(editor, {
+        ...makeStart(),
+        agentId: namedAgent.saved,
+        taskRevision: meetingPreview.taskRevision,
+        agentVersion: meetingPreview.agentVersion,
+        knowledgeFingerprint: meetingPreview.context.brandKnowledge.fingerprint,
+      }),
+      /knowledge changed after preview/,
+    );
     const beforeKnowledgeCalls = providerCalls;
     await service.execute(queuedKnowledge.runId);
     assert.equal(providerCalls, beforeKnowledgeCalls);
     assert.equal((await ledger(queuedKnowledge)).state, 'RELEASED');
     const reviewKnowledge = await startWithKnowledge();
     await service.execute(reviewKnowledge.runId);
-    await knowledge.publish(workspace, admin, admin, { projectId: project.id, id: meeting.id, revision: 4, publish: false });
-    await assert.rejects(command(editor, { type: 'decide', runId: reviewKnowledge.runId, action: 'ACCEPT', field: 'copy' }), /brand knowledge changed/);
-    await command(editor, { type: 'decide', runId: reviewKnowledge.runId, action: 'REJECT', field: null });
-    await knowledge.publish(workspace, admin, admin, { projectId: project.id, id: meeting.id, revision: 5, publish: true });
+    await knowledge.publish(workspace, admin, admin, {
+      projectId: project.id,
+      id: meeting.id,
+      revision: 4,
+      publish: false,
+    });
+    await assert.rejects(
+      command(editor, {
+        type: 'decide',
+        runId: reviewKnowledge.runId,
+        action: 'ACCEPT',
+        field: 'copy',
+      }),
+      /brand knowledge changed/,
+    );
+    await command(editor, {
+      type: 'decide',
+      runId: reviewKnowledge.runId,
+      action: 'REJECT',
+      field: null,
+    });
+    await knowledge.publish(workspace, admin, admin, {
+      projectId: project.id,
+      id: meeting.id,
+      revision: 5,
+      publish: true,
+    });
     const inFlightKnowledge = await startWithKnowledge();
-    modelHook = () => knowledge.publish(workspace, admin, admin, { projectId: project.id, id: meeting.id, revision: 6, publish: false });
-    try { await service.execute(inFlightKnowledge.runId); } finally { modelHook = null; }
-    const discardedKnowledge = await runner.manager.getRepository(DeliveryAgentRunEntity).findOneByOrFail({ id: inFlightKnowledge.runId });
+    modelHook = () =>
+      knowledge.publish(workspace, admin, admin, {
+        projectId: project.id,
+        id: meeting.id,
+        revision: 6,
+        publish: false,
+      });
+    try {
+      await service.execute(inFlightKnowledge.runId);
+    } finally {
+      modelHook = null;
+    }
+    const discardedKnowledge = await runner.manager
+      .getRepository(DeliveryAgentRunEntity)
+      .findOneByOrFail({ id: inFlightKnowledge.runId });
     assert.equal(discardedKnowledge.status, 'FAILED');
     assert.equal(discardedKnowledge.result, null);
     assert.equal((await ledger(inFlightKnowledge)).state, 'SETTLED');

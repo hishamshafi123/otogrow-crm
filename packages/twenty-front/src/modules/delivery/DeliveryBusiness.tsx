@@ -516,42 +516,52 @@ const BusinessWorkspace = ({
                 <p>{t`You have view-only finance access. You can inspect reports and export entries.`}</p>
               )}
               {view === 'finance' && canReadFinance && (
-                <p>
-                  <Trans>
-                    Raw records include receivables, opening balances and voided
-                    entries. For a reviewed accountant CSV, use
-                  </Trans>{' '}
-                  <Link to="/delivery?view=finance&financeView=exports">
-                    <Trans>Accounting exports</Trans>
-                  </Link>
-                  .
-                </p>
-              )}
-              {view === 'finance' && (
-                <p>
-                  <Trans>
-                    Historical estimates use only entered cash records, by
-                    currency. Missing opening balances, receipts, expenses or
-                    salary make them incomplete; they do not confirm available
-                    cash. Unpaid receivables and advertising-platform spend are
-                    excluded from agency cash.
-                  </Trans>
-                </p>
-              )}
-              {view === 'finance' && (
-                <p>
-                  <Trans>
-                    Date cutoffs use UTC and trailing 30-day comparisons,
-                    independently of the forecast's reviewed balance and
-                    reporting calendar.
-                  </Trans>{' '}
-                  <Link to="/delivery?view=finance&financeView=forecast">
-                    <Trans>Open reviewed cash forecast</Trans>
-                  </Link>{' '}
-                  <Trans>
-                    to confirm starting cash and review dated expectations.
-                  </Trans>
-                </p>
+                <>
+                  <p>
+                    <Trans>
+                      Estimates use entered cash records only, by currency. They
+                      may be incomplete and do not confirm available cash.
+                    </Trans>
+                  </p>
+                  <StyledDeliveryRow>
+                    <Link to="/delivery?view=finance&financeView=forecast">
+                      <Trans>Open reviewed cash forecast</Trans>
+                    </Link>
+                    <Link to="/delivery?view=finance&financeView=exports">
+                      <Trans>Accounting exports</Trans>
+                    </Link>
+                  </StyledDeliveryRow>
+                  <details>
+                    <summary>
+                      <Trans>How these figures are calculated</Trans>
+                    </summary>
+                    <StyledDeliveryStack>
+                      <p>
+                        <Trans>
+                          Raw records include receivables, opening balances and
+                          voided entries. Use Accounting exports for a reviewed
+                          accountant CSV.
+                        </Trans>
+                      </p>
+                      <p>
+                        <Trans>
+                          Missing opening balances, receipts, expenses or salary
+                          make historical estimates incomplete. Unpaid
+                          receivables and advertising-platform spend are
+                          excluded from agency cash.
+                        </Trans>
+                      </p>
+                      <p>
+                        <Trans>
+                          Date cutoffs use UTC and trailing 30-day comparisons,
+                          independently of the forecast's reviewed balance and
+                          reporting calendar. Use the reviewed cash forecast to
+                          confirm starting cash and dated expectations.
+                        </Trans>
+                      </p>
+                    </StyledDeliveryStack>
+                  </details>
+                </>
               )}
             </StyledDeliveryStack>
           </StyledDeliveryCard>

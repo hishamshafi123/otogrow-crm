@@ -1,6 +1,7 @@
-import { useState } from 'react';
 import { useQuery } from '@apollo/client/react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
+import { z } from 'zod';
+import { useDeliveryDraftGuard } from '@/delivery/drafts/DeliveryDraftGuard';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { type DeliveryWorkspace } from '@/delivery/delivery.types';
 import { useWorkflowAccess } from '@/delivery/workflows/useWorkflowAccess';
@@ -13,6 +14,8 @@ import {
 import { GET_REVISION_COSTS } from '@/delivery/revisions/delivery-revisions.graphql';
 import { useRevisionLabels } from '@/delivery/revisions/useRevisionLabels';
 import { type DeliveryRevisionCostsQuery } from '~/generated-metadata/graphql';
+const REVISION_COST_DATE_SCHEMA = z.iso.date();
+
 type DeliveryRevisionCostsProps = { workspace: DeliveryWorkspace };
 export const DeliveryRevisionCosts = ({
   workspace,
@@ -26,20 +29,35 @@ const RevisionCosts = ({ workspace }: RevisionCostsProps) => {
   const access = useWorkflowAccess();
   const { label, money } = useRevisionLabels();
   const today = new Date().toISOString().slice(0, 10);
-  const [startDate, setStartDate] = useState(today.slice(0, 8) + '01');
-  const [endDate, setEndDate] = useState(today);
-  const [projectId, setProjectId] = useState('');
+  const [params, setParams] = useSearchParams();
+  const { requestAction } = useDeliveryDraftGuard();
+  const startDate = params.get('revisionCostsFrom') ?? today.slice(0, 8) + '01';
+  const endDate = params.get('revisionCostsThrough') ?? today;
+  const projectId = params.get('revisionCostsProject') ?? '';
+  const update = (changes: Record<string, string | null>) =>
+    requestAction(() => {
+      const next = new URLSearchParams(params);
+      for (const [key, value] of Object.entries(changes)) {
+        if (value === null) next.delete(key);
+        else next.set(key, value);
+      }
+      setParams(next);
+    });
   const canRead =
     access.ready &&
     (access.access?.capabilities.includes('finance.read') === true ||
       access.access?.capabilities.includes('workspace.admin') === true ||
       access.access?.capabilities.includes('finance.manage') === true);
-  const valid = Boolean(
-    startDate &&
-    endDate &&
+  const datesValid = Boolean(
+    REVISION_COST_DATE_SCHEMA.safeParse(startDate).success &&
+    REVISION_COST_DATE_SCHEMA.safeParse(endDate).success &&
     startDate <= endDate &&
     (Date.parse(endDate) - Date.parse(startDate)) / 86400000 <= 366,
   );
+  const projectValid =
+    !projectId ||
+    workspace.projects.some((project) => project.id === projectId);
+  const valid = datesValid && projectValid;
   const query = useQuery<DeliveryRevisionCostsQuery>(GET_REVISION_COSTS, {
     variables: {
       input: { startDate, endDate, projectId: projectId || null },
@@ -81,7 +99,9 @@ const RevisionCosts = ({ workspace }: RevisionCostsProps) => {
             <input
               type="date"
               value={startDate}
-              onChange={(event) => setStartDate(event.target.value)}
+              onChange={(event) =>
+                update({ revisionCostsFrom: event.target.value })
+              }
             />
           </label>
           <label>
@@ -89,16 +109,25 @@ const RevisionCosts = ({ workspace }: RevisionCostsProps) => {
             <input
               type="date"
               value={endDate}
-              onChange={(event) => setEndDate(event.target.value)}
+              onChange={(event) =>
+                update({ revisionCostsThrough: event.target.value })
+              }
             />
           </label>
           <label>
             <Trans>Revision project</Trans>
             <select
               value={projectId}
-              onChange={(event) => setProjectId(event.target.value)}
+              onChange={(event) =>
+                update({ revisionCostsProject: event.target.value || null })
+              }
             >
               <option value="">{t`All projects`}</option>
+              {!projectValid && (
+                <option
+                  value={projectId}
+                >{t`Selected project unavailable`}</option>
+              )}
               {workspace.projects.map((project) => (
                 <option key={project.id} value={project.id}>
                   {project.name}
@@ -106,13 +135,33 @@ const RevisionCosts = ({ workspace }: RevisionCostsProps) => {
               ))}
             </select>
           </label>
+          <StyledDeliveryButton
+            type="button"
+            onClick={() =>
+              update({
+                revisionCostsFrom: null,
+                revisionCostsThrough: null,
+                revisionCostsProject: null,
+              })
+            }
+          >
+            <Trans>Clear revision filters</Trans>
+          </StyledDeliveryButton>
         </StyledDeliveryRow>
-        {!valid && (
+        {!datesValid && (
           <p role="alert">
             <Trans>Choose a valid date range of at most 366 days.</Trans>
           </p>
         )}
-        {query.error && (
+        {!projectValid && (
+          <p role="alert">
+            <Trans>
+              The selected revision project is unavailable. Choose an available
+              project or clear the filters.
+            </Trans>
+          </p>
+        )}
+        {valid && query.error && (
           <div role="alert">
             <p>
               <Trans>

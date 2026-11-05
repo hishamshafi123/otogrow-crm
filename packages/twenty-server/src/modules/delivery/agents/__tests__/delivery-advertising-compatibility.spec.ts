@@ -2,6 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { type DataSource, type EntityManager } from 'typeorm';
 import { type WorkspaceEntity } from 'src/engine/core-modules/workspace/workspace.entity';
 import { type DeliveryService } from 'src/modules/delivery/delivery.service';
+import { type DeliveryNativeTaskAccessService } from 'src/modules/delivery/delivery-native-task-access.service';
 import { type AiModelRegistryService } from 'src/engine/metadata-modules/ai/ai-models/services/ai-model-registry.service';
 import { type MessageQueueService } from 'src/engine/core-modules/message-queue/services/message-queue.service';
 import { type OtogrowAiBudgetService } from 'src/modules/otogrow-ai-budget/otogrow-ai-budget.service';
@@ -168,6 +169,7 @@ it.each([
       queue as unknown as MessageQueueService,
       budget as unknown as OtogrowAiBudgetService,
       {} as OtogrowAccessService,
+      { assert: jest.fn() } as unknown as DeliveryNativeTaskAccessService,
     );
     const input = {
       type,

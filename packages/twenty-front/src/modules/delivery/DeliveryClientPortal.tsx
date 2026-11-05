@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { styled } from '@linaria/react';
 import { useLocation } from 'react-router-dom';
@@ -88,6 +88,24 @@ const ClientPortalWorkspace = ({ token }: { token: string }) => {
       data.advertising.period !== portal.budgetForm.period),
   );
   const [budgetError, setBudgetError] = useState('');
+  const privateVisible = Boolean(data && verified);
+  // oxlint-disable-next-line twenty/no-state-useref -- Restore only focus lost as private portal content is removed, after recovery controls become enabled.
+  const recoveryFocus = useRef({ visible: false, pending: false });
+  // oxlint-disable-next-line twenty/no-state-useref -- This is the surviving native recovery target, not rendered business state.
+  const recoveryButton = useRef<HTMLButtonElement | null>(null);
+  useLayoutEffect(() => {
+    if (privateVisible) recoveryFocus.current.pending = false;
+    else if (recoveryFocus.current.visible)
+      recoveryFocus.current.pending = true;
+    recoveryFocus.current.visible = privateVisible;
+    if (!recoveryFocus.current.pending || busy) return;
+    recoveryFocus.current.pending = false;
+    if (
+      document.activeElement === document.body ||
+      document.activeElement === document.documentElement
+    )
+      recoveryButton.current?.focus();
+  }, [privateVisible, busy]);
   return (
     <StyledPortal>
       <PortalLeaveGuard
@@ -132,7 +150,11 @@ const ClientPortalWorkspace = ({ token }: { token: string }) => {
                     }
                   />
                 </label>
-                <StyledDeliveryButton disabled={busy || !token} type="submit">
+                <StyledDeliveryButton
+                  ref={recoveryButton}
+                  disabled={busy || !token}
+                  type="submit"
+                >
                   <Trans>Open workspace</Trans>
                 </StyledDeliveryButton>
                 {!token && (
@@ -164,6 +186,7 @@ const ClientPortalWorkspace = ({ token }: { token: string }) => {
                 </p>
               )}
               <StyledDeliveryButton
+                ref={recoveryButton}
                 disabled={busy}
                 onClick={() => void portal.refresh()}
               >

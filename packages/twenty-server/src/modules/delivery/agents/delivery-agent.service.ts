@@ -42,6 +42,7 @@ import { MessageQueue } from 'src/engine/core-modules/message-queue/message-queu
 import { MessageQueueService } from 'src/engine/core-modules/message-queue/services/message-queue.service';
 import { AiModelRegistryService } from 'src/engine/metadata-modules/ai/ai-models/services/ai-model-registry.service';
 import { DeliveryService } from 'src/modules/delivery/delivery.service';
+import { DeliveryNativeTaskAccessService } from 'src/modules/delivery/delivery-native-task-access.service';
 import { DeliveryAgentEntity } from 'src/modules/delivery/entities/delivery-agent.entity';
 import { DeliveryAgentRunEntity } from 'src/modules/delivery/entities/delivery-agent-run.entity';
 import { DeliveryTaskEntity } from 'src/modules/delivery/entities/delivery-task.entity';
@@ -127,6 +128,7 @@ export class DeliveryAgentService {
     private readonly queue: MessageQueueService,
     private readonly budget: OtogrowAiBudgetService,
     private readonly roleAccess: OtogrowAccessService,
+    private readonly nativeTasks: DeliveryNativeTaskAccessService,
   ) {}
 
   private async lock(manager: EntityManager, workspaceId: string) {
@@ -223,6 +225,30 @@ export class DeliveryAgentService {
       userWorkspaceId,
     );
     if (!taskId) return { actor, task: null } as const;
+    await this.nativeTasks.assert(
+      manager,
+      workspace,
+      { memberId, userWorkspaceId },
+      taskId,
+      ['id', 'title', 'assigneeId'],
+    );
+    const task = await this.businessTaskScope(
+      manager,
+      workspace,
+      actor,
+      memberId,
+      taskId,
+    );
+    return { actor, task } as const;
+  }
+
+  private async businessTaskScope(
+    manager: EntityManager,
+    workspace: WorkspaceEntity,
+    actor: DeliveryAgentActor,
+    memberId: string,
+    taskId: string,
+  ) {
     const task = await manager
       .getRepository(DeliveryTaskEntity)
       .findOneBy({ workspaceId: workspace.id, taskId });
@@ -237,7 +263,7 @@ export class DeliveryAgentService {
       !canAccessDeliveryAgentProject(actor, memberId, project.memberIds)
     )
       throw new ForbiddenException('Task is unavailable.');
-    return { actor, task } as const;
+    return task;
   }
 
   private assertAgent(
@@ -337,7 +363,7 @@ export class DeliveryAgentService {
         const projectIds = new Set(
           visible.projects.map((project) => project.id),
         );
-        const taskIds = new Set(visible.tasks.map((task) => task.id));
+        const taskIds = visible.tasks.map((task) => task.id);
         const canRun = (agent: DeliveryAgentEntity) =>
           ['BRIEF', 'COPY', 'SEO'].includes(agent.configuration.kind) &&
           agent.configuration.enabled &&
@@ -348,16 +374,17 @@ export class DeliveryAgentService {
             .getRepository(DeliveryAgentEntity)
             .findBy({ workspaceId: workspace.id })
         ).filter((agent) => actor.isAdmin || canRun(agent));
-        const runs = (
-          await manager.getRepository(DeliveryAgentRunEntity).find({
-            where: { workspaceId: workspace.id },
-            order: { createdAt: 'DESC' },
-            take: 500,
-          })
-        ).filter(
-          (run) =>
-            taskIds.has(run.taskId) &&
-            (actor.isManager || run.initiatorId === memberId),
+        const visibility = await this.nativeTasks.visibility(
+          manager,
+          workspace,
+          { memberId, userWorkspaceId },
+          ['id', 'title'],
+        );
+        const runs = await this.nativeTasks.query<DeliveryAgentRunEntity[]>(
+          manager,
+          `SELECT run.* FROM core."deliveryAgentRun" run WHERE run."workspaceId"=$1 AND run."taskId"=ANY($2::uuid[]) AND ($3::boolean OR run."initiatorId"=$4::uuid) AND ${this.nativeTasks.predicate(workspace, visibility, 'run."taskId"')} ORDER BY run."createdAt" DESC,run.id DESC LIMIT 500`,
+          [workspace.id, taskIds, actor.isManager, memberId],
+          visibility,
         );
         const models = this.models
           .getAdminFilteredModels()
@@ -726,7 +753,16 @@ export class DeliveryAgentService {
           initiatorId: memberId,
           requestId: command.requestId,
         });
-        if (previous) return { runId: previous.id };
+        if (previous) {
+          await this.scope(
+            manager,
+            workspace,
+            memberId,
+            userWorkspaceId,
+            previous.taskId,
+          );
+          return { runId: previous.id };
+        }
         if (
           command.taskRevision !== task.revision ||
           command.agentVersion !== agent.version
@@ -811,13 +847,26 @@ export class DeliveryAgentService {
         id: command.runId,
       });
       if (!run) throw new NotFoundException();
-      const { task, actor: scopedActor } = await this.scope(
-        manager,
-        workspace,
-        memberId,
-        userWorkspaceId,
-        run.taskId,
-      );
+      // Terminating a known run must remain possible after its native task becomes unreadable.
+      const { task, actor: scopedActor } =
+        command.type === 'cancel'
+          ? {
+              actor,
+              task: await this.businessTaskScope(
+                manager,
+                workspace,
+                actor,
+                memberId,
+                run.taskId,
+              ),
+            }
+          : await this.scope(
+              manager,
+              workspace,
+              memberId,
+              userWorkspaceId,
+              run.taskId,
+            );
       if (!task || !canReadDeliveryAgentRun(actor, memberId, run.initiatorId))
         throw new ForbiddenException();
       const previousStatus = run.status;
@@ -1039,29 +1088,45 @@ export class DeliveryAgentService {
       const workspace = await this.dataSource
         .getRepository(WorkspaceEntity)
         .findOneByOrFail({ id: run.workspaceId });
-      const { task, actor: scopedActor } = await this.scope(
-        this.dataSource.manager,
-        workspace,
-        run.initiatorId,
-        run.userWorkspaceId,
-        run.taskId,
-      );
-      const agent = await this.dataSource
-        .getRepository(DeliveryAgentEntity)
-        .findOneByOrFail({ workspaceId: workspace.id, id: run.agentId });
-      if (
-        !task ||
-        task.revision !== run.taskRevision ||
-        agent.version !== run.agentVersion
-      )
-        throw new ConflictException(
-          'Task or agent changed before execution. Preview and start again.',
-        );
-      this.assertAgent(
-        agent.configuration,
-        scopedActor,
-        task.projectId,
-        workspace,
+      await readDeliverySnapshot(
+        this.dataSource,
+        workspace.id,
+        async (manager) => {
+          const { task, actor } = await this.scope(
+            manager,
+            workspace,
+            run.initiatorId,
+            run.userWorkspaceId,
+            run.taskId,
+          );
+          const agent = await manager
+            .getRepository(DeliveryAgentEntity)
+            .findOneByOrFail({ workspaceId: workspace.id, id: run.agentId });
+          const current = await manager
+            .getRepository(DeliveryAgentRunEntity)
+            .findOneBy({ workspaceId: workspace.id, id: run.id });
+          if (
+            !task ||
+            task.revision !== run.taskRevision ||
+            agent.version !== run.agentVersion ||
+            current?.status !== 'RUNNING'
+          )
+            throw new ConflictException(
+              'Task, agent or run changed before execution. Preview and start again.',
+            );
+          this.assertAgent(
+            agent.configuration,
+            actor,
+            task.projectId,
+            workspace,
+          );
+          await assertDeliveryKnowledgeCurrent(
+            manager,
+            workspace.id,
+            task.projectId,
+            run.context.brandKnowledge,
+          );
+        },
       );
       if (run.configuration.kind === 'ADVERTISING')
         throw new BadRequestException(
@@ -1256,6 +1321,7 @@ export class DeliveryAgentService {
       const message =
         error instanceof ConflictException ||
         error instanceof ForbiddenException ||
+        error instanceof NotFoundException ||
         error instanceof BadRequestException
           ? error.message
           : 'Execution failed or timed out. Provider usage may be unknown. Check the connection and inputs before retrying.';

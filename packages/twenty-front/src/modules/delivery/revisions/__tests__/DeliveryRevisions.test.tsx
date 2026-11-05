@@ -1,11 +1,14 @@
-import { type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { i18n } from '@lingui/core';
 import { I18nProvider } from '@lingui/react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Request } from 'cross-fetch';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
-import { DeliveryDraftGuardProvider } from '@/delivery/drafts/DeliveryDraftGuard';
+import {
+  DeliveryDraftGuardProvider,
+  useDeliveryDraftStatus,
+} from '@/delivery/drafts/DeliveryDraftGuard';
 import { RevisionEditor } from '@/delivery/revisions/RevisionEditor';
 import { DeliveryRevisions } from '@/delivery/revisions/DeliveryRevisions';
 import { DeliveryRevisionCosts } from '@/delivery/revisions/DeliveryRevisionCosts';
@@ -47,6 +50,7 @@ let queryError: Error | undefined;
 let finance = true;
 let verified = true;
 const refetch = jest.fn();
+const queryCalls = jest.fn();
 const mutate = jest.fn();
 jest.mock('@/delivery/workflows/useWorkflowAccess', () => ({
   useWorkflowAccess: () => ({
@@ -57,14 +61,17 @@ jest.mock('@/delivery/workflows/useWorkflowAccess', () => ({
   }),
 }));
 jest.mock('@apollo/client/react', () => ({
-  useQuery: (document: unknown) => ({
-    data:
-      document === GET_REVISION_COSTS
-        ? { deliveryRevisionCosts: costs }
-        : { deliveryRevisions: history },
-    error: queryError,
-    refetch,
-  }),
+  useQuery: (document: unknown, options: unknown) => {
+    queryCalls(options);
+    return {
+      data:
+        document === GET_REVISION_COSTS
+          ? { deliveryRevisionCosts: costs }
+          : { deliveryRevisions: history },
+      error: queryError,
+      refetch,
+    };
+  },
   useMutation: () => [mutate],
 }));
 const task: DeliveryTask = {
@@ -103,26 +110,46 @@ const workspace: DeliveryWorkspace = {
   tasks: [task],
   companies: [],
 };
-const wrapper = (content: ReactNode) => (
-  <I18nProvider i18n={i18n}>
-    <RouterProvider
-      router={createMemoryRouter([
-        {
-          path: '/',
-          element: (
-            <DeliveryDraftGuardProvider>{content}</DeliveryDraftGuardProvider>
-          ),
-        },
-      ])}
-    />
-  </I18nProvider>
-);
-const show = (content: ReactNode) => render(wrapper(content));
+const show = (content: ReactNode, entry = '/') => {
+  const router = createMemoryRouter(
+    [
+      {
+        path: '*',
+        element: (
+          <DeliveryDraftGuardProvider>{content}</DeliveryDraftGuardProvider>
+        ),
+      },
+    ],
+    { initialEntries: [entry] },
+  );
+  return {
+    ...render(
+      <I18nProvider i18n={i18n}>
+        <RouterProvider router={router} />
+      </I18nProvider>,
+    ),
+    router,
+  };
+};
+const CashDraft = () => {
+  const [note, setNote] = useState('');
+  useDeliveryDraftStatus({ dirty: note !== '', saving: false });
+  return (
+    <label>
+      Unsent cash note
+      <input
+        value={note}
+        onChange={(event) => setNote(event.currentTarget.value)}
+      />
+    </label>
+  );
+};
 beforeEach(() => {
   finance = true;
   verified = true;
   queryError = undefined;
   refetch.mockReset();
+  queryCalls.mockClear();
   mutate.mockReset();
   history = {
     workspaceId: 'workspace',
@@ -394,4 +421,149 @@ it('does not expose cost summaries without finance access', () => {
   finance = false;
   show(<DeliveryRevisionCosts workspace={workspace} />);
   expect(screen.queryByText('Revision costs by cause')).not.toBeInTheDocument();
+});
+
+it('restores revision-cost dates and project from a bookmark, history and reload while preserving other finance navigation', async () => {
+  const user = userEvent.setup();
+  const entry =
+    '/delivery?view=finance&financeView=cash&task=selected-task&financeCurrency=USD&revisionCostsFrom=2026-10-01&revisionCostsThrough=2026-10-31&revisionCostsProject=project';
+  const view = show(<DeliveryRevisionCosts workspace={workspace} />, entry);
+  expect(screen.getByLabelText('Rounds opened from (UTC)')).toHaveValue(
+    '2026-10-01',
+  );
+  expect(screen.getByLabelText('Through (UTC)')).toHaveValue('2026-10-31');
+  expect(screen.getByLabelText('Revision project')).toHaveValue('project');
+  expect(queryCalls).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      variables: expect.objectContaining({
+        input: {
+          startDate: '2026-10-01',
+          endDate: '2026-10-31',
+          projectId: 'project',
+        },
+      }),
+      skip: false,
+    }),
+  );
+  await user.selectOptions(screen.getByLabelText('Revision project'), '');
+  const allProjects = view.router.state.location.search;
+  expect(new URLSearchParams(allProjects).get('task')).toBe('selected-task');
+  expect(new URLSearchParams(allProjects).get('financeCurrency')).toBe('USD');
+  expect(new URLSearchParams(allProjects).get('revisionCostsFrom')).toBe(
+    '2026-10-01',
+  );
+  await act(async () => {
+    await view.router.navigate(-1);
+  });
+  expect(screen.getByLabelText('Revision project')).toHaveValue('project');
+  await act(async () => {
+    await view.router.navigate(1);
+  });
+  expect(screen.getByLabelText('Revision project')).toHaveValue('');
+  view.unmount();
+  show(
+    <DeliveryRevisionCosts workspace={workspace} />,
+    `/delivery${allProjects}`,
+  );
+  expect(screen.getByLabelText('Rounds opened from (UTC)')).toHaveValue(
+    '2026-10-01',
+  );
+  expect(screen.getByLabelText('Through (UTC)')).toHaveValue('2026-10-31');
+  expect(screen.getByLabelText('Revision project')).toHaveValue('');
+});
+
+it.each(['bad-date', '2026-02-30'])(
+  'does not substitute all-project totals for invalid date %s or an unavailable project and clears only revision filters',
+  async (invalidDate) => {
+    const user = userEvent.setup();
+    const view = show(
+      <DeliveryRevisionCosts workspace={workspace} />,
+      `/delivery?view=finance&financeView=cash&task=selected-task&revisionCostsFrom=${invalidDate}&revisionCostsThrough=2026-10-31&revisionCostsProject=unavailable`,
+    );
+    expect(
+      screen.getByText('Choose a valid date range of at most 366 days.'),
+    ).toBeVisible();
+    expect(
+      screen.getByText(
+        'The selected revision project is unavailable. Choose an available project or clear the filters.',
+      ),
+    ).toBeVisible();
+    expect(
+      screen.getByRole('option', { name: 'Selected project unavailable' }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText('Revision project')).toHaveValue(
+      'unavailable',
+    );
+    expect(screen.queryByText(/USD 12.50/)).not.toBeInTheDocument();
+    expect(queryCalls).toHaveBeenLastCalledWith(
+      expect.objectContaining({ skip: true }),
+    );
+    await user.click(
+      screen.getByRole('button', { name: 'Clear revision filters' }),
+    );
+    const params = new URLSearchParams(view.router.state.location.search);
+    expect(params.get('view')).toBe('finance');
+    expect(params.get('financeView')).toBe('cash');
+    expect(params.get('task')).toBe('selected-task');
+    expect(params.has('revisionCostsFrom')).toBe(false);
+    expect(params.has('revisionCostsThrough')).toBe(false);
+    expect(params.has('revisionCostsProject')).toBe(false);
+    expect(screen.getByLabelText('Rounds opened from (UTC)')).toHaveValue(
+      new Date().toISOString().slice(0, 8) + '01',
+    );
+    expect(screen.getByLabelText('Through (UTC)')).toHaveValue(
+      new Date().toISOString().slice(0, 10),
+    );
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  },
+);
+
+it('keeps an explicitly emptied date invalid instead of silently restoring a default range', async () => {
+  const user = userEvent.setup();
+  const view = show(
+    <DeliveryRevisionCosts workspace={workspace} />,
+    '/delivery?view=finance&revisionCostsFrom=2026-10-01&revisionCostsThrough=2026-10-31',
+  );
+  await user.clear(screen.getByLabelText('Rounds opened from (UTC)'));
+  expect(screen.getByLabelText('Rounds opened from (UTC)')).toHaveValue('');
+  expect(
+    new URLSearchParams(view.router.state.location.search).get(
+      'revisionCostsFrom',
+    ),
+  ).toBe('');
+  expect(
+    screen.getByText('Choose a valid date range of at most 366 days.'),
+  ).toBeVisible();
+  expect(queryCalls).toHaveBeenLastCalledWith(
+    expect.objectContaining({ skip: true }),
+  );
+});
+
+it('protects another cash draft when changing URL filters is declined', async () => {
+  const user = userEvent.setup();
+  const view = show(
+    <>
+      <CashDraft />
+      <DeliveryRevisionCosts workspace={workspace} />
+    </>,
+    '/delivery?view=finance',
+  );
+  await user.type(
+    screen.getByLabelText('Unsent cash note'),
+    'Keep this cash preparation',
+  );
+  await user.selectOptions(
+    screen.getByLabelText('Revision project'),
+    'project',
+  );
+  await user.click(screen.getByRole('button', { name: 'Keep editing' }));
+  expect(screen.getByLabelText('Unsent cash note')).toHaveValue(
+    'Keep this cash preparation',
+  );
+  expect(screen.getByLabelText('Revision project')).toHaveValue('');
+  expect(
+    new URLSearchParams(view.router.state.location.search).has(
+      'revisionCostsProject',
+    ),
+  ).toBe(false);
 });

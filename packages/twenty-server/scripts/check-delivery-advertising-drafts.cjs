@@ -1,3 +1,6 @@
+const {
+  createIsolatedNativeTaskAccess,
+} = require('./helpers/isolated-native-task-access.cjs');
 const assert = require('node:assert/strict');
 const { randomUUID, createHash } = require('node:crypto');
 const { BadRequestException } = require('@nestjs/common');
@@ -1104,6 +1107,7 @@ async function main() {
       { add: async () => failure('Quota denial must not enqueue a task run.') },
       budget,
       services.access,
+      createIsolatedNativeTaskAccess(),
     );
     const taskPreview = await taskAgents.command(
       fixture.workspace,

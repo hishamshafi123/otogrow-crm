@@ -36,6 +36,9 @@ it('preserves project membership selection and replaces free-text authority with
   );
   expect(screen.getByText('Business role management')).toBeInTheDocument();
   expect(screen.queryByLabelText('Role label')).not.toBeInTheDocument();
+  await userEvent.click(
+    screen.getByText('Create project', { selector: 'summary' }),
+  );
   await userEvent.type(screen.getByLabelText('Project name'), 'Brand launch');
   await userEvent.click(screen.getByRole('checkbox', { name: 'Editor' }));
   await userEvent.click(screen.getByRole('button', { name: 'Create project' }));
@@ -131,6 +134,9 @@ const setupProjectEditor = () => {
 
 it('retains a rejected project draft and requires explicit reload before using the new revision', async () => {
   const user = setupProjectEditor();
+  await user.click(
+    screen.getByText('Original project', { selector: 'strong' }),
+  );
   const form = within(
     screen.getByRole('form', { name: 'Edit project Original project' }),
   );
@@ -177,6 +183,9 @@ it('retains a rejected project draft and requires explicit reload before using t
 it('detects an intervening version even when project fields have the same values', async () => {
   const user = setupProjectEditor();
   await user.click(
+    screen.getByText('Original project', { selector: 'strong' }),
+  );
+  await user.click(
     screen.getByRole('button', { name: 'Another manager saved' }),
   );
   expect(screen.getByRole('alert')).toHaveTextContent('This record changed');
@@ -196,6 +205,9 @@ it('detects an intervening version even when project fields have the same values
 
 it('keeps the draft and explains recovery when both save and refresh fail', async () => {
   const user = setupProjectEditor();
+  await user.click(
+    screen.getByText('Original project', { selector: 'strong' }),
+  );
   refreshProjectFails = true;
   const form = within(
     screen.getByRole('form', { name: 'Edit project Original project' }),

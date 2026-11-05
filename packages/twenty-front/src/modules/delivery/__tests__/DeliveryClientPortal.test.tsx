@@ -59,6 +59,7 @@ const setup = () => {
               element: (
                 <>
                   <Link to="/outside">Leave workspace</Link>
+                  <button type="button">Outside portal control</button>
                   <DeliveryClientPortal />
                 </>
               ),
@@ -606,3 +607,59 @@ it('cannot download an old portal response after its mounted credential owner is
     URL.createObjectURL = original;
   }
 });
+
+it('does not move initial page focus into an unchecked portal', () => {
+  setup();
+  expect(
+    screen.getByRole('button', { name: 'Open workspace' }),
+  ).not.toHaveFocus();
+  expect(screen.getByLabelText('Access code')).not.toHaveFocus();
+});
+
+it.each([
+  ['outage', 'Check access and saved responses'],
+  ['denied', 'Open workspace'],
+] as const)(
+  'restores lost focus to the enabled recovery action when %s removes private content',
+  async (failure, label) => {
+    await openPortal();
+    if (failure === 'outage')
+      mockFetch.mockRejectedValueOnce(new Error('Offline'));
+    else mockFetch.mockResolvedValueOnce({ ok: false, status: 403 });
+    await userEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+    const recovery = await screen.findByRole('button', { name: label });
+    await waitFor(() => expect(recovery).toHaveFocus());
+    expect(recovery).toBeEnabled();
+    expect(screen.queryByText('Approved report')).not.toBeInTheDocument();
+  },
+);
+
+it.each([
+  ['outage', 'Check access and saved responses'],
+  ['denied', 'Open workspace'],
+] as const)(
+  'preserves focus deliberately moved outside while a pending %s removes private content',
+  async (failure, label) => {
+    await openPortal();
+    let finish: () => void = () => undefined;
+    mockFetch.mockImplementationOnce(
+      () =>
+        new Promise((resolve, reject) => {
+          finish = () =>
+            failure === 'outage'
+              ? reject(new Error('Offline'))
+              : resolve({ ok: false, status: 403 });
+        }),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+    const outside = screen.getByRole('button', {
+      name: 'Outside portal control',
+    });
+    await userEvent.click(outside);
+    expect(outside).toHaveFocus();
+    await act(async () => finish());
+    await screen.findByRole('button', { name: label });
+    expect(outside).toHaveFocus();
+    expect(screen.queryByText('Approved report')).not.toBeInTheDocument();
+  },
+);

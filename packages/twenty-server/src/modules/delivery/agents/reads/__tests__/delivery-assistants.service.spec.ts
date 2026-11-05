@@ -1,4 +1,8 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { type DataSource, type EntityManager } from 'typeorm';
 import { type WorkspaceEntity } from 'src/engine/core-modules/workspace/workspace.entity';
 import { type AiModelRegistryService } from 'src/engine/metadata-modules/ai/ai-models/services/ai-model-registry.service';
@@ -7,6 +11,7 @@ import { type DeliveryAgentService } from 'src/modules/delivery/agents/delivery-
 import { DeliveryAgentEntity } from 'src/modules/delivery/entities/delivery-agent.entity';
 import { DeliveryAgentRunEntity } from 'src/modules/delivery/entities/delivery-agent-run.entity';
 import { DeliveryAssistantsService } from 'src/modules/delivery/agents/reads/delivery-assistants.service';
+import { type DeliveryNativeTaskAccessService } from 'src/modules/delivery/delivery-native-task-access.service';
 
 const workspaceId = '10000000-0000-4000-8000-000000000001';
 const projectId = '10000000-0000-4000-8000-000000000002';
@@ -26,6 +31,9 @@ const setup = () => {
     roleIds: [] as string[],
     count: 53,
     historyVisible: true,
+    nativeAccess: 'ALLOW' as 'ALLOW' | 'DENY' | 'HIDDEN' | 'STALE',
+    nativeRevision: 1,
+    catalogItems: 1,
   };
   const queries: { sql: string; parameters: unknown[] }[] = [];
   const configuration = {
@@ -174,7 +182,12 @@ const setup = () => {
           },
         ];
       if (sql.includes('AS "totalCount"'))
-        return [{ totalCount: state.count, items: [catalogRow] }];
+        return [
+          {
+            totalCount: state.count,
+            items: Array.from({ length: state.catalogItems }, () => catalogRow),
+          },
+        ];
       if (sql.startsWith('SELECT run.id FROM'))
         return state.historyVisible ? [{ id: runId }] : [];
       if (sql.includes('run."initiatorId"'))
@@ -222,11 +235,41 @@ const setup = () => {
     ],
     validateModelAvailability: () => undefined,
   } as unknown as AiModelRegistryService;
+  const nativeChecks = jest.fn(async () => {
+    if (state.nativeAccess === 'DENY')
+      throw new ForbiddenException('Native task access denied.');
+    if (state.nativeAccess === 'STALE')
+      throw new ConflictException('Refresh native access.');
+    return {
+      fingerprint: String(state.nativeRevision),
+      sql: 'true',
+      parameters: {},
+    };
+  });
+  const nativeTasks = {
+    visibility: nativeChecks,
+    predicate: (_workspace: unknown, _visibility: unknown, task: string) =>
+      `native_policy(${task})`,
+    query: async (
+      transaction: EntityManager,
+      sql: string,
+      parameters: unknown[],
+    ) => {
+      if (state.nativeAccess === 'HIDDEN') {
+        queries.push({ sql, parameters });
+        return sql.includes('AS "byStatus"')
+          ? [{ totalCount: 0, byStatus: [], items: [] }]
+          : [];
+      }
+      return transaction.query(sql, parameters);
+    },
+  } as unknown as DeliveryNativeTaskAccessService;
   const service = new DeliveryAssistantsService(
     dataSource,
     delivery,
     agents,
     models,
+    nativeTasks,
   );
   const workspace = { id: workspaceId } as WorkspaceEntity;
   return {
@@ -239,9 +282,131 @@ const setup = () => {
     manager,
     run,
     summary,
+    nativeChecks,
   };
 };
 describe('focused assistant reads', () => {
+  it('keeps taskless setup available while native task access is denied', async () => {
+    const fixture = setup();
+    fixture.state.nativeAccess = 'DENY';
+    await expect(
+      fixture.service.context(fixture.workspace, memberId, userWorkspaceId, {}),
+    ).resolves.toMatchObject({ selectedTask: null, canConfigure: true });
+    await expect(
+      fixture.service.catalog(fixture.workspace, memberId, userWorkspaceId, {}),
+    ).resolves.toHaveProperty('items');
+    await expect(
+      fixture.service.configuration(
+        fixture.workspace,
+        memberId,
+        userWorkspaceId,
+        { agentId },
+      ),
+    ).resolves.toHaveProperty('configuration');
+    expect(fixture.nativeChecks).not.toHaveBeenCalled();
+    await expect(
+      fixture.service.context(fixture.workspace, memberId, userWorkspaceId, {
+        taskId,
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(
+      fixture.queries.some(({ sql }) => sql.includes('AS "draftCopy"')),
+    ).toBe(false);
+  });
+  it('applies native row visibility before run counts, paging and exact receipts', async () => {
+    const fixture = setup();
+    fixture.state.nativeAccess = 'HIDDEN';
+    await expect(
+      fixture.service.runs(fixture.workspace, memberId, userWorkspaceId, {}),
+    ).resolves.toMatchObject({
+      totalCount: 0,
+      byStatus: [],
+      items: [],
+      nextCursor: null,
+    });
+    await expect(
+      fixture.service.run(fixture.workspace, memberId, userWorkspaceId, {
+        runId,
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    await expect(
+      fixture.service.request(fixture.workspace, memberId, userWorkspaceId, {
+        requestId,
+      }),
+    ).resolves.toMatchObject({ receipt: null });
+    expect(fixture.repositoryReads).not.toHaveBeenCalled();
+    const countSql =
+      fixture.queries.find(({ sql }) => sql.includes('AS "byStatus"'))?.sql ??
+      '';
+    expect(countSql.split('selected AS MATERIALIZED')[0]).toContain(
+      'native_policy(run."taskId")',
+    );
+    expect(
+      fixture.queries
+        .filter(({ sql }) => sql.includes('run."initiatorId"'))
+        .every(({ sql }) => sql.includes('native_policy(run."taskId")')),
+    ).toBe(true);
+  });
+  it('invalidates both run and task-bound catalog cursors when native policy changes', async () => {
+    const fixture = setup();
+    const page = await fixture.service.runs(
+      fixture.workspace,
+      memberId,
+      userWorkspaceId,
+      { limit: 25 },
+    );
+    fixture.state.catalogItems = 26;
+    const catalog = await fixture.service.catalog(
+      fixture.workspace,
+      memberId,
+      userWorkspaceId,
+      { taskId, limit: 25 },
+    );
+    fixture.state.nativeRevision++;
+    await expect(
+      fixture.service.runs(fixture.workspace, memberId, userWorkspaceId, {
+        limit: 25,
+        after: page.nextCursor,
+      }),
+    ).rejects.toThrow('Open the first page');
+    await expect(
+      fixture.service.catalog(fixture.workspace, memberId, userWorkspaceId, {
+        taskId,
+        limit: 25,
+        after: catalog.nextCursor,
+      }),
+    ).rejects.toThrow('Open the first page');
+  });
+  it.each(['DENY', 'STALE'] as const)(
+    'does not turn native %s into an empty history or an accessible mutation receipt',
+    async (access) => {
+      const fixture = setup();
+      fixture.state.nativeAccess = access;
+      const failure =
+        access === 'DENY' ? ForbiddenException : ConflictException;
+      await expect(
+        fixture.service.runs(fixture.workspace, memberId, userWorkspaceId, {}),
+      ).rejects.toBeInstanceOf(failure);
+      await expect(
+        fixture.service.request(fixture.workspace, memberId, userWorkspaceId, {
+          requestId,
+        }),
+      ).rejects.toBeInstanceOf(failure);
+      await expect(
+        fixture.service.cancel(fixture.workspace, memberId, userWorkspaceId, {
+          runId,
+        }),
+      ).rejects.toBeInstanceOf(failure);
+      expect(fixture.command).toHaveBeenCalledTimes(1);
+      expect(fixture.repositoryReads).not.toHaveBeenCalled();
+      expect(
+        fixture.queries.some(
+          ({ sql }) =>
+            sql.includes('AS "byStatus"') || sql.includes('run."initiatorId"'),
+        ),
+      ).toBe(false);
+    },
+  );
   it('provides one light task and complete admin choices without task/history hydration', async () => {
     const fixture = setup();
     const result = await fixture.service.context(

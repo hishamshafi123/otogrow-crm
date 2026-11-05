@@ -252,7 +252,7 @@ it('does not offer self-approval of a release', async () => {
   ).toBeInTheDocument();
 });
 
-it('distinguishes historical cash estimates from reviewed forecasts and accountant exports', () => {
+it('distinguishes historical cash estimates from reviewed forecasts and accountant exports', async () => {
   mockData.finance = [
     {
       currency: 'USD',
@@ -295,12 +295,20 @@ it('distinguishes historical cash estimates from reviewed forecasts and accounta
   expect(
     screen.getByText(/Recorded cash contribution · trailing 30 days:/),
   ).toHaveTextContent('Recorded cash contribution margin: -66.7%');
+  await userEvent.click(
+    screen.getByText('How these figures are calculated', {
+      selector: 'summary',
+    }),
+  );
   expect(
     screen.getByText(/Date cutoffs use UTC and trailing 30-day comparisons/),
   ).toBeVisible();
   expect(
     screen.getByText(/Missing opening balances, receipts, expenses or salary/),
-  ).toHaveTextContent('they do not confirm available cash');
+  ).toHaveTextContent('make historical estimates incomplete');
+  expect(
+    screen.getByText(/Estimates use entered cash records only/),
+  ).toHaveTextContent('do not confirm available cash');
   expect(
     screen.getByRole('link', { name: 'Open reviewed cash forecast' }),
   ).toHaveAttribute('href', '/delivery?view=finance&financeView=forecast');

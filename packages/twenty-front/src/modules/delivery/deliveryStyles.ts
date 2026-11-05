@@ -5,12 +5,16 @@ import { MOBILE_VIEWPORT, themeCssVariables } from 'twenty-ui/theme-constants';
 export const StyledDeliveryCanvas = styled.div`
   background: ${themeCssVariables.background.secondary};
   box-sizing: border-box;
+  color-scheme: light;
   color: ${themeCssVariables.font.color.primary};
   font-size: 14px;
   line-height: 1.5;
   min-height: 100%;
   overflow: auto;
   padding: 32px 32px 96px;
+  .dark & {
+    color-scheme: dark;
+  }
   h1,
   h2,
   h3,
@@ -67,7 +71,7 @@ export const StyledDeliveryCanvas = styled.div`
   select,
   textarea {
     background: ${themeCssVariables.background.primary};
-    border: 1px solid ${themeCssVariables.border.color.medium};
+    border: 1px solid ${themeCssVariables.color.gray10};
     border-radius: 8px;
     box-sizing: border-box;
     color: inherit;

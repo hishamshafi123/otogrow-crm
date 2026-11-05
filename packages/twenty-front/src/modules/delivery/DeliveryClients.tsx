@@ -340,9 +340,11 @@ const ClientWorkspace = ({
                   </p>
                 </div>
                 <StyledDeliveryRow>
-                  <ClientSetupLink>
-                    <Trans>Set up client work</Trans>
-                  </ClientSetupLink>
+                  {selected && (
+                    <ClientSetupLink>
+                      <Trans>Set up another client</Trans>
+                    </ClientSetupLink>
+                  )}
                   <ClientSetupLink
                     companyId={selected?.companyId}
                     projectId={selected?.projectId}
@@ -354,7 +356,7 @@ const ClientWorkspace = ({
               {!workspace.projects.some((project) => project.companyId) && (
                 <p>
                   <Trans>
-                    Use Set up client work to choose a client, prepare its
+                    Use New client service plan to choose a client, prepare its
                     project team and review a service plan together.
                   </Trans>
                 </p>

@@ -9,6 +9,7 @@ import { DataSource, type EntityManager } from 'typeorm';
 import { type WorkspaceEntity } from 'src/engine/core-modules/workspace/workspace.entity';
 import { AiModelRegistryService } from 'src/engine/metadata-modules/ai/ai-models/services/ai-model-registry.service';
 import { DeliveryService } from 'src/modules/delivery/delivery.service';
+import { DeliveryNativeTaskAccessService } from 'src/modules/delivery/delivery-native-task-access.service';
 import { DeliveryAgentService } from 'src/modules/delivery/agents/delivery-agent.service';
 import { DeliveryAgentEntity } from 'src/modules/delivery/entities/delivery-agent.entity';
 import { DeliveryAgentRunEntity } from 'src/modules/delivery/entities/delivery-agent-run.entity';
@@ -89,6 +90,7 @@ export class DeliveryAssistantsService {
     private readonly delivery: DeliveryService,
     private readonly agents: DeliveryAgentService,
     private readonly models: AiModelRegistryService,
+    private readonly nativeTasks: DeliveryNativeTaskAccessService,
   ) {}
   private async scope(
     manager: EntityManager,
@@ -118,10 +120,20 @@ export class DeliveryAssistantsService {
         'There are too many project choices to load safely. Narrow the workspace project directory before continuing.',
       );
     let task: DeliveryAssistantTaskDTO | null = null;
+    let taskAccess: string | null = null;
     if (taskId) {
-      const rows: DeliveryAssistantTaskDTO[] = await manager.query(
-        `SELECT task."taskId" AS id,native.title,task."projectId",task.revision,COALESCE(NULLIF(task.details->>'state',''),'UNAVAILABLE') AS state,native."assigneeId",left(COALESCE(task.details->>'brief',''),20000) AS brief,left(COALESCE(task.details->>'draftCopy',''),20000) AS "draftCopy" ${this.taskFrom(workspace)} WHERE task."workspaceId"=$1 AND ${deliveryAgentProjectScopeSql('$2', '$3')} AND task."taskId"=$4`,
+      const visibility = await this.nativeTasks.visibility(
+        manager,
+        workspace,
+        { memberId, userWorkspaceId },
+        ['id', 'title', 'assigneeId'],
+      );
+      taskAccess = visibility.fingerprint;
+      const rows = await this.nativeTasks.query<DeliveryAssistantTaskDTO[]>(
+        manager,
+        `SELECT task."taskId" AS id,native.title,task."projectId",task.revision,COALESCE(NULLIF(task.details->>'state',''),'UNAVAILABLE') AS state,native."assigneeId",left(COALESCE(task.details->>'brief',''),20000) AS brief,left(COALESCE(task.details->>'draftCopy',''),20000) AS "draftCopy" ${this.taskFrom(workspace)} WHERE task."workspaceId"=$1 AND ${deliveryAgentProjectScopeSql('$2', '$3')} AND task."taskId"=$4 AND ${this.nativeTasks.predicate(workspace, visibility, 'task."taskId"')}`,
         [workspace.id, actor.isManager, JSON.stringify([memberId]), taskId],
+        visibility,
       );
       task = rows[0] ?? null;
       if (!task)
@@ -137,6 +149,7 @@ export class DeliveryAssistantsService {
         workspaceId: workspace.id,
         memberId,
         userWorkspaceId,
+        taskAccess,
         actor: {
           isAdmin: actor.isAdmin,
           isManager: actor.isManager,
@@ -485,8 +498,15 @@ export class DeliveryAssistantsService {
           status: parsed.status ?? null,
           limit,
         };
+        const visibility = await this.nativeTasks.visibility(
+          manager,
+          workspace,
+          { memberId, userWorkspaceId },
+          ['id', 'title'],
+        );
         const fingerprint = deliveryAssistantScopeHash({
           scope: scope.fingerprint,
+          nativeAccess: visibility.fingerprint,
           filters,
           kind: 'RUNS',
         });
@@ -504,6 +524,7 @@ export class DeliveryAssistantsService {
           deliveryAgentProjectScopeSql('$2', '$3'),
           '($2::boolean OR run."initiatorId"=$4::uuid)',
           'run."createdAt"<=$5::timestamptz',
+          this.nativeTasks.predicate(workspace, visibility, 'run."taskId"'),
         ];
         const add = (value: unknown) => {
           parameters.push(value);
@@ -524,9 +545,11 @@ export class DeliveryAssistantsService {
           totalCount: number;
           byStatus: { status: string; count: number }[];
           items: AssistantRunRow[];
-        }[] = await manager.query(
+        }[] = await this.nativeTasks.query(
+          manager,
           `WITH source AS MATERIALIZED (SELECT run.id,run.status,run."createdAt" ${this.runFrom(workspace)} WHERE ${where.join(' AND ')}),selected AS MATERIALIZED (SELECT source.id,source."createdAt" FROM source WHERE ${pageWhere} ORDER BY source."createdAt" DESC,source.id DESC LIMIT ${take}),page AS MATERIALIZED (SELECT ${this.runProjection()} ${this.runFrom(workspace)} JOIN selected ON selected.id=run.id WHERE run."workspaceId"=$1) SELECT (SELECT count(*)::int FROM source) AS "totalCount",COALESCE((SELECT jsonb_agg(to_jsonb(counts) ORDER BY counts.status) FROM (SELECT status,count(*)::int AS count FROM source GROUP BY status) counts),'[]'::jsonb) AS "byStatus",COALESCE((SELECT jsonb_agg(to_jsonb(page) ORDER BY page."createdAt" DESC,page.id DESC) FROM page),'[]'::jsonb) AS items`,
           parameters,
+          visibility,
         );
         const result = rows[0];
         const items = (result?.items ?? []).slice(0, limit);
@@ -556,10 +579,18 @@ export class DeliveryAssistantsService {
     workspace: WorkspaceEntity,
     scope: AssistantReadScope,
     memberId: string,
+    userWorkspaceId: string,
     runId: string,
   ) {
-    const rows: AssistantRunRow[] = await manager.query(
-      `SELECT ${this.runProjection()} ${this.runFrom(workspace)} WHERE run."workspaceId"=$1 AND ${deliveryAgentProjectScopeSql('$2', '$3')} AND ($2::boolean OR run."initiatorId"=$4::uuid) AND run.id=$5`,
+    const visibility = await this.nativeTasks.visibility(
+      manager,
+      workspace,
+      { memberId, userWorkspaceId },
+      ['id', 'title'],
+    );
+    const rows = await this.nativeTasks.query<AssistantRunRow[]>(
+      manager,
+      `SELECT ${this.runProjection()} ${this.runFrom(workspace)} WHERE run."workspaceId"=$1 AND ${deliveryAgentProjectScopeSql('$2', '$3')} AND ($2::boolean OR run."initiatorId"=$4::uuid) AND run.id=$5 AND ${this.nativeTasks.predicate(workspace, visibility, 'run."taskId"')}`,
       [
         workspace.id,
         scope.actor.isManager,
@@ -567,6 +598,7 @@ export class DeliveryAssistantsService {
         memberId,
         runId,
       ],
+      visibility,
     );
     if (!rows[0])
       throw new NotFoundException(
@@ -600,6 +632,7 @@ export class DeliveryAssistantsService {
           workspace,
           scope,
           memberId,
+          userWorkspaceId,
           parsed.runId,
         );
         const exactScope = await this.scope(
@@ -664,6 +697,7 @@ export class DeliveryAssistantsService {
       workspace,
       scope,
       memberId,
+      userWorkspaceId,
       runId,
     );
     return {
@@ -696,8 +730,15 @@ export class DeliveryAssistantsService {
           memberId,
           userWorkspaceId,
         );
-        const rows: { id: string }[] = await manager.query(
-          `SELECT run.id ${this.runFrom(workspace)} WHERE run."workspaceId"=$1 AND ${deliveryAgentProjectScopeSql('$2', '$3')} AND run."initiatorId"=$4::uuid AND run."requestId"=$5`,
+        const visibility = await this.nativeTasks.visibility(
+          manager,
+          workspace,
+          { memberId, userWorkspaceId },
+          ['id', 'title'],
+        );
+        const rows = await this.nativeTasks.query<{ id: string }[]>(
+          manager,
+          `SELECT run.id ${this.runFrom(workspace)} WHERE run."workspaceId"=$1 AND ${deliveryAgentProjectScopeSql('$2', '$3')} AND run."initiatorId"=$4::uuid AND run."requestId"=$5 AND ${this.nativeTasks.predicate(workspace, visibility, 'run."taskId"')}`,
           [
             workspace.id,
             scope.actor.isManager,
@@ -705,6 +746,7 @@ export class DeliveryAssistantsService {
             memberId,
             parsed.requestId,
           ],
+          visibility,
         );
         return {
           ...identity(workspace, memberId, userWorkspaceId),

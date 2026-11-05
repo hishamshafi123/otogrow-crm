@@ -4,6 +4,7 @@ import { type WorkspaceEntity } from 'src/engine/core-modules/workspace/workspac
 import { type AiModelRegistryService } from 'src/engine/metadata-modules/ai/ai-models/services/ai-model-registry.service';
 import { type MessageQueueService } from 'src/engine/core-modules/message-queue/services/message-queue.service';
 import { type DeliveryService } from 'src/modules/delivery/delivery.service';
+import { type DeliveryNativeTaskAccessService } from 'src/modules/delivery/delivery-native-task-access.service';
 import { type OtogrowAiBudgetService } from 'src/modules/otogrow-ai-budget/otogrow-ai-budget.service';
 import { type OtogrowAccessService } from 'src/modules/otogrow-access/otogrow-access.service';
 import { type DeliveryAgentConfiguration } from 'src/modules/delivery/agents/delivery-agent.types';
@@ -122,6 +123,7 @@ const setup = () => {
     {} as MessageQueueService,
     {} as OtogrowAiBudgetService,
     { directory } as unknown as OtogrowAccessService,
+    {} as DeliveryNativeTaskAccessService,
   );
   const workspace = { id: workspaceId } as WorkspaceEntity;
   const save = (extra: Record<string, unknown> = {}) =>
