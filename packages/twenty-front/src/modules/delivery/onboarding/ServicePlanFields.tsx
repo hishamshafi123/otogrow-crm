@@ -1,3 +1,4 @@
+import { ClientServicePicker } from '@/delivery/onboarding/ClientServicePicker';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { styled } from '@linaria/react';
 import {
@@ -13,23 +14,6 @@ import {
   StyledDeliveryRow,
   StyledDeliveryStack,
 } from '@/delivery/deliveryStyles';
-const StyledClientServiceChoices = styled.div`
-  display: grid;
-  gap: 4px 12px;
-  grid-template-columns: repeat(auto-fit, minmax(min(160px, 100%), 1fr));
-  margin-bottom: 12px;
-  > label {
-    align-items: center;
-    cursor: pointer;
-    display: flex;
-    gap: 8px;
-    min-height: 44px;
-  }
-  input[type='checkbox'] {
-    flex: 0 0 auto;
-    margin: 0;
-  }
-`;
 const StyledServicePlanFields = styled.div`
   display: flex;
   flex-direction: column;
@@ -77,55 +61,10 @@ export const ServicePlanFields = ({
     <StyledServicePlanFields>
       {' '}
       <StyledDeliveryGrid>
-        <fieldset>
-          <legend>
-            <Trans>Client services</Trans>
-          </legend>
-          <StyledClientServiceChoices>
-            {[
-              ['AI video', t`AI video`],
-              ['Static ads', t`Static ads`],
-              ['Performance marketing', t`Performance marketing`],
-              ['SEO', t`SEO`],
-              ['Website', t`Website`],
-              ['SaaS', t`SaaS`],
-              ['Mobile app', t`Mobile app`],
-            ].map(([value, label]) => (
-              <label key={value}>
-                <input
-                  type="checkbox"
-                  checked={services.some(
-                    (service) =>
-                      service.toLowerCase().replace(/[_-]+/g, ' ') ===
-                      value.toLowerCase(),
-                  )}
-                  onChange={(event) =>
-                    changeServices(
-                      (event.target.checked
-                        ? [...services, value]
-                        : services.filter(
-                            (service) =>
-                              service.toLowerCase().replace(/[_-]+/g, ' ') !==
-                              value.toLowerCase(),
-                          )
-                      ).join(', '),
-                    )
-                  }
-                />
-                {label}
-              </label>
-            ))}
-          </StyledClientServiceChoices>
-          <label>
-            <Trans>Services, separated by commas</Trans>
-            <input
-              name="services"
-              required
-              value={values.services}
-              onChange={(event) => changeServices(event.target.value)}
-            />
-          </label>
-        </fieldset>
+        <ClientServicePicker
+          services={services}
+          onChange={(next) => changeServices(next.join(', '))}
+        />
         <label>
           <Trans>Billing arrangement</Trans>
           <select

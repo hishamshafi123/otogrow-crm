@@ -1005,3 +1005,14 @@ it('clears native company private inputs after a native denial without replacing
   ).toBeVisible();
   expect(mockCoreCreate).toHaveBeenCalledTimes(1);
 });
+
+jest.mock('@/delivery/onboarding/useServiceCatalog', () => ({
+  useServiceCatalog: () => ({
+    services: [],
+    loading: false,
+    unavailable: false,
+    canAdd: true,
+    retry: jest.fn(),
+    add: jest.fn(),
+  }),
+}));

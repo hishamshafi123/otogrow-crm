@@ -86,6 +86,7 @@ export type DeliveryAlert = {
   resolvedAt: string | null;
 };
 export type DeliveryOperations = {
+  serviceCatalog?: string[];
   founderEscalationRouting?: {
     mode: 'RULES';
     revision: number;

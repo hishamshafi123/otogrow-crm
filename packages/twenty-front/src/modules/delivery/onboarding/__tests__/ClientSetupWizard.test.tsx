@@ -484,3 +484,14 @@ it('returns to a retained draft after a fresh absent receipt and keeps its origi
     firstTask: { title: 'Corrected prepared creative' },
   });
 });
+
+jest.mock('@/delivery/onboarding/useServiceCatalog', () => ({
+  useServiceCatalog: () => ({
+    services: [],
+    loading: false,
+    unavailable: false,
+    canAdd: true,
+    retry: jest.fn(),
+    add: jest.fn(),
+  }),
+}));
