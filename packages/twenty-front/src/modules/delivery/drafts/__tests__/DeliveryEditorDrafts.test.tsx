@@ -47,6 +47,12 @@ jest.mock('@apollo/client/react', () => ({
   useMutation: () => [mockMutate, { loading: false }],
   useQuery: () => ({
     data: {
+      deliveryClientServiceCatalog: {
+        workspaceId: 'workspace',
+        memberId: 'admin',
+        userWorkspaceId: 'membership',
+        services: [],
+      },
       deliveryClients: mockClients,
       deliveryBusiness: mockBusiness,
       deliveryAgents: {
@@ -153,7 +159,7 @@ const editServicePlan = async () => {
     screen.getByRole('button', { name: 'Edit client service plan' }),
   );
   await user.clear(screen.getByLabelText('Service plan name'));
-  await user.clear(screen.getByLabelText('Services, separated by commas'));
+  await user.click(screen.getByRole('button', { name: 'Clear selection' }));
   await user.clear(screen.getByLabelText('Client-visible scope'));
   return user;
 };
@@ -441,21 +447,13 @@ it('shows only applicable engagement settings and blocks missing basics before s
   expect(screen.getByLabelText('Project')).toBeDisabled();
   expect(screen.getByLabelText('Project')).toHaveValue('project');
   await user.type(
-    screen.getByLabelText('Services, separated by commas'),
-    ' , , ',
-  );
-  await user.type(
     screen.getByLabelText('Client-visible scope'),
     'Improve site visibility',
   );
   expect(
     screen.getByRole('button', { name: 'Save client service plan' }),
   ).toBeDisabled();
-  await user.clear(screen.getByLabelText('Services, separated by commas'));
-  await user.type(
-    screen.getByLabelText('Services, separated by commas'),
-    'SEO',
-  );
+  await user.click(screen.getByRole('checkbox', { name: 'SEO' }));
   expect(
     screen.getByRole('button', { name: 'Save client service plan' }),
   ).toBeEnabled();
@@ -482,9 +480,8 @@ it('shows only applicable engagement settings and blocks missing basics before s
 it('retains advertising choices across disclosure toggles and requires different eligible manager and marketer', async () => {
   const user = await editServicePlan();
   await user.type(screen.getByLabelText('Service plan name'), 'Ad management');
-  await user.type(
-    screen.getByLabelText('Services, separated by commas'),
-    'Performance marketing',
+  await user.click(
+    screen.getByRole('checkbox', { name: 'Performance marketing' }),
   );
   await user.type(
     screen.getByLabelText('Client-visible scope'),
