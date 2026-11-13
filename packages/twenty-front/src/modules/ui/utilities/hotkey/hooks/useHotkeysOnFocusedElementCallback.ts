@@ -1,3 +1,4 @@
+import { shouldIgnoreTypingShortcut } from '@/ui/utilities/hotkey/utils/shouldIgnoreTypingShortcut';
 import { useCallback } from 'react';
 
 import { DEBUG_FOCUS_STACK } from '@/ui/utilities/focus/constants/DebugFocusStack';
@@ -30,6 +31,8 @@ export const useHotkeysOnFocusedElementCallback = (
       focusId: string;
       preventDefault?: boolean;
     }) => {
+      if (shouldIgnoreTypingShortcut(keyboardEvent)) return;
+
       const currentFocusId = store.get(currentFocusIdSelector.atom);
 
       if (currentFocusId !== focusId) {

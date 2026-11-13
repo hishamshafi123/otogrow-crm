@@ -1,7 +1,9 @@
+import { shouldIgnoreTypingShortcut } from '@/ui/utilities/hotkey/utils/shouldIgnoreTypingShortcut';
 import { useCallback } from 'react';
 
 import { DEBUG_FOCUS_STACK } from '@/ui/utilities/focus/constants/DebugFocusStack';
 import { currentGlobalHotkeysConfigSelector } from '@/ui/utilities/focus/states/currentGlobalHotkeysConfigSelector';
+import { pendingHotkeyState } from '@/ui/utilities/hotkey/states/internal/pendingHotkeysState';
 import { useStore } from 'jotai';
 import {
   type Hotkey,
@@ -30,6 +32,22 @@ export const useGlobalHotkeysCallback = (
       callback: (keyboardEvent: KeyboardEvent, hotkeysEvent: Hotkey) => void;
       preventDefault?: boolean;
     }) => {
+      const target = keyboardEvent.target;
+      const isEditing =
+        target instanceof Element &&
+        target.closest(
+          'input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"]',
+        ) !== null;
+
+      // Native delivery fields do not register with the CRM focus stack.
+      if (
+        shouldIgnoreTypingShortcut(keyboardEvent) ||
+        (!containsModifier && isEditing)
+      ) {
+        store.set(pendingHotkeyState.atom, null);
+        return;
+      }
+
       const currentGlobalHotkeysConfig = store.get(
         currentGlobalHotkeysConfigSelector.atom,
       );

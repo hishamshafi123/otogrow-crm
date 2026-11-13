@@ -12,11 +12,4 @@ export const KEYBOARD_SHORTCUTS_GENERAL: Shortcut[] = [
     secondHotKey: 'K',
     areSimultaneous: false,
   },
-  {
-    label: 'Mark as favourite',
-    type: ShortcutType.General,
-    firstHotKey: '⇧',
-    secondHotKey: 'F',
-    areSimultaneous: false,
-  },
 ];

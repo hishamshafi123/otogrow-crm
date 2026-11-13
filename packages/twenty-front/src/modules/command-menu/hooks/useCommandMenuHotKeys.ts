@@ -30,26 +30,26 @@ export const useCommandMenuHotKeys = () => {
   });
 
   useGlobalHotkeys({
-    keys: ['/'],
+    keys: ['ctrl+/', 'meta+/'],
     callback: () => {
       openRecordsSearchPage();
     },
-    containsModifier: false,
+    containsModifier: true,
     dependencies: [openRecordsSearchPage],
     options: {
-      ignoreModifiers: true,
+      ignoreModifiers: false,
     },
   });
 
   useGlobalHotkeys({
-    keys: ['@'],
+    keys: ['ctrl+shift+a', 'meta+shift+a'],
     callback: () => {
       openAskAiPage({ resetNavigationStack: true });
     },
-    containsModifier: false,
+    containsModifier: true,
     dependencies: [openAskAiPage],
     options: {
-      ignoreModifiers: true,
+      ignoreModifiers: false,
     },
   });
 

@@ -85,7 +85,7 @@ describe('Meta lead form connection typing', () => {
     },
   );
 
-  it('keeps navigation shortcuts inactive in both text fields and restores them after blur', async () => {
+  it('keeps legacy letter navigation inactive in text fields and after blur', async () => {
     render(
       <Provider store={createStore()}>
         <MemoryRouter initialEntries={['/meta-lead-forms']}>
@@ -118,6 +118,8 @@ describe('Meta lead form connection typing', () => {
     );
     await user.click(screen.getByRole('button', { name: /Cancel/ }));
     await user.keyboard('gn');
-    expect(screen.getByLabelText('Current route')).toHaveTextContent('/notes');
+    expect(screen.getByLabelText('Current route')).toHaveTextContent(
+      '/meta-lead-forms',
+    );
   });
 });
