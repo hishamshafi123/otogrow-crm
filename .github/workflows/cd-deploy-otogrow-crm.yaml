@@ -45,6 +45,17 @@ jobs:
         with:
           persist-credentials: false
 
+      # This Node build needs room for both the Yarn cache and expanded monorepo.
+      - name: Free runner disk space
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          df -h /
+          df -i /
+          sudo rm -rf -- /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup
+          df -h /
+          df -i /
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
