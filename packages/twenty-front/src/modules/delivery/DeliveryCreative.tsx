@@ -1,3 +1,7 @@
+import {
+  StyledCreativeStageButtons,
+  StyledCreativeStageSelect,
+} from '@/delivery/creative/production/creative-production-styles';
 import { DeliveryGuardedForm } from '@/delivery/drafts/DeliveryGuardedForm';
 import { useDeliveryDraft } from '@/delivery/drafts/useDeliveryDraft';
 import { DeliveryDraftConflict } from '@/delivery/drafts/DeliveryDraftConflict';
@@ -330,41 +334,42 @@ export const DeliveryCreative = ({
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
+  const selectStage = (nextStage: string) => {
+    if (nextStage === stage) return;
+    requestAction(() => {
+      referenceDraft.markSaved([]);
+      if (onStageChange) onStageChange(nextStage);
+      else setStage(nextStage);
+    });
+  };
   return (
     <StyledDeliveryStack>
-      <StyledDeliveryRow>
-        <div>
-          <h3>
-            <Trans>Creative production</Trans>
-          </h3>
-          <small>
-            <Trans>One unique concept</Trans> · {selectedCount}{' '}
-            <Trans>selected variants</Trans> · v{document.version}
-          </small>
-        </div>
-        <StyledDeliveryButton onClick={exportManifest}>
-          <Trans>Export edit manifest</Trans>
-        </StyledDeliveryButton>
-      </StyledDeliveryRow>
       <nav aria-label={t`Creative stages`}>
-        <StyledDeliveryRow>
+        <StyledCreativeStageButtons>
           {Object.entries(labels).map(([id, label]) => (
             <StyledDeliveryButton
               key={id}
+              type="button"
               aria-current={stage === id ? 'step' : undefined}
-              onClick={() => {
-                if (id !== stage)
-                  requestAction(() => {
-                    referenceDraft.markSaved([]);
-                    if (onStageChange) onStageChange(id);
-                    else setStage(id);
-                  });
-              }}
+              onClick={() => selectStage(id)}
             >
               {label}
             </StyledDeliveryButton>
           ))}
-        </StyledDeliveryRow>
+        </StyledCreativeStageButtons>
+        <StyledCreativeStageSelect>
+          <Trans>Production stage</Trans>
+          <select
+            value={stage}
+            onChange={(event) => selectStage(event.target.value)}
+          >
+            {Object.entries(labels).map(([id, label]) => (
+              <option key={id} value={id}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </StyledCreativeStageSelect>
       </nav>
       {error && <p role="alert">{error}</p>}
       {params.has('creativeAsset') && (
@@ -1159,6 +1164,15 @@ export const DeliveryCreative = ({
           </StyledDeliveryStack>
         </StyledDeliveryCard>
       )}
+      <StyledDeliveryRow>
+        <small>
+          <Trans>One unique concept</Trans>, {selectedCount}{' '}
+          <Trans>selected variants</Trans> · v{document.version}
+        </small>
+        <StyledDeliveryButton onClick={exportManifest} data-variant="quiet">
+          <Trans>Export edit manifest</Trans>
+        </StyledDeliveryButton>
+      </StyledDeliveryRow>
     </StyledDeliveryStack>
   );
 };

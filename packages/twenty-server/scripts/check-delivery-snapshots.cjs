@@ -197,7 +197,7 @@ async function main() {
         source,
         deliveries[index],
         creative,
-        new DeliveryCommitmentsService(source, deliveries[index]),
+        new DeliveryCommitmentsService(source, deliveries[index], createIsolatedNativeTaskAccess()),
       ),
   );
   let providerCalls = 0;

@@ -1,4 +1,6 @@
 import { Trans, useLingui } from '@lingui/react/macro';
+import { styled } from '@linaria/react';
+import { themeCssVariables } from 'twenty-ui/theme-constants';
 import { type useDeliveryNavigationPreferences } from '@/delivery/navigation/useDeliveryNavigationPreferences';
 import { MAX_PINNED_DELIVERY_PAGES } from '@/delivery/navigation/delivery-navigation-preferences';
 import {
@@ -12,6 +14,21 @@ type DeliveryNavigationPreferencesProps = {
   personalNavigation: ReturnType<typeof useDeliveryNavigationPreferences>;
 };
 
+const StyledPreferences = styled.details`
+  border-top: 1px solid ${themeCssVariables.border.color.light};
+  margin-top: 8px;
+  padding-top: 16px;
+  > summary {
+    color: ${themeCssVariables.font.color.secondary};
+    font-size: 13px;
+    padding: 8px 0;
+    width: fit-content;
+  }
+  > summary:hover {
+    color: ${themeCssVariables.font.color.primary};
+  }
+`;
+
 export const DeliveryNavigationPreferences = ({
   personalNavigation,
 }: DeliveryNavigationPreferencesProps) => {
@@ -19,7 +36,7 @@ export const DeliveryNavigationPreferences = ({
   const { ready, preferences, pages, change, reset, error } =
     personalNavigation;
   return (
-    <details>
+    <StyledPreferences>
       <summary>
         <Trans>Personalize workspace</Trans>
       </summary>
@@ -94,6 +111,6 @@ export const DeliveryNavigationPreferences = ({
           </fieldset>
         </StyledDeliveryStack>
       </StyledDeliveryCard>
-    </details>
+    </StyledPreferences>
   );
 };

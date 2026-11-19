@@ -2,6 +2,7 @@ import { useLayoutEffect } from 'react';
 import { useApolloClient } from '@apollo/client/react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Trans, useLingui } from '@lingui/react/macro';
+import { DeliveryPageHeader } from '@/delivery/DeliveryPageHeader';
 import { PageBody } from '@/ui/layout/page/components/PageBody';
 import { PageContainer } from '@/ui/layout/page/components/PageContainer';
 import { NavigationDrawerCollapseButton } from '@/ui/navigation/navigation-drawer/components/NavigationDrawerCollapseButton';
@@ -24,7 +25,6 @@ import {
 import {
   StyledDeliveryButton,
   StyledDeliveryCanvas,
-  StyledDeliveryRow,
   StyledDeliveryStack,
 } from '@/delivery/deliveryStyles';
 
@@ -78,25 +78,22 @@ const AdvertisingWorkspace = () => {
   };
   return (
     <StyledDeliveryStack>
-      <StyledDeliveryRow>
-        <StyledDeliveryRow>
-          {!expanded && <NavigationDrawerCollapseButton direction="right" />}
-          <div>
-            <h1>
-              <Trans>Advertising</Trans>
-            </h1>
-            <p>
-              <Trans>
-                Review evidence, agree recommendations and follow the work
-                through to observed results.
-              </Trans>
-            </p>
-          </div>
-        </StyledDeliveryRow>
-        <StyledDeliveryButton type="button" onClick={() => void refresh()}>
-          <Trans>Refresh page</Trans>
-        </StyledDeliveryButton>
-      </StyledDeliveryRow>
+      <DeliveryPageHeader
+        title={t`Advertising`}
+        description={t`Review evidence, agree recommendations and follow the work through to observed results.`}
+        navigation={
+          !expanded && <NavigationDrawerCollapseButton direction="right" />
+        }
+        actions={
+          <StyledDeliveryButton
+            data-variant="quiet"
+            type="button"
+            onClick={() => void refresh()}
+          >
+            <Trans>Refresh page</Trans>
+          </StyledDeliveryButton>
+        }
+      />
       {mobile && (
         <label>
           <Trans>Go to</Trans>

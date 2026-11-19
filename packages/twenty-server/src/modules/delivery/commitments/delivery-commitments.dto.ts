@@ -5,7 +5,10 @@ export class DeliveryCommitmentsInput {
   @Field(() => ID) engagementId: string;
   @Field(() => ID, { nullable: true }) periodId?: string;
   @Field(() => String, { nullable: true }) taskSearch?: string;
+  @Field(() => ID, { nullable: true }) selectedTaskId?: string;
+  @Field(() => ID, { nullable: true }) selectedParentTaskId?: string;
   @Field(() => String, { nullable: true }) allocationCursor?: string;
+  @Field(() => String, { nullable: true }) orphanAllocationCursor?: string;
   @Field(() => String, { nullable: true }) historyCursor?: string;
   @Field(() => Int, { nullable: true }) limit?: number;
 }
@@ -67,6 +70,35 @@ export class DeliveryCommitmentTaskRemoveInput {
   @Field() reason: string;
 }
 
+@InputType('DeliveryCommitmentOrphanCleanupInput')
+export class DeliveryCommitmentOrphanCleanupInput {
+  @Field(() => ID) requestId: string;
+  @Field(() => ID) engagementId: string;
+  @Field(() => ID) periodId: string;
+  @Field(() => Int) periodRevision: number;
+  @Field(() => ID) allocationId: string;
+  @Field(() => Int) allocationRevision: number;
+  @Field() confirm: boolean;
+}
+
+@ObjectType('DeliveryCommitmentOrphanCleanupResult')
+export class DeliveryCommitmentOrphanCleanupResultDTO {
+  @Field(() => ID) workspaceId: string;
+  @Field(() => ID) memberId: string;
+  @Field(() => ID) userWorkspaceId: string;
+  @Field(() => ID) engagementId: string;
+  @Field(() => ID) periodId: string;
+  @Field(() => ID) requestId: string;
+  @Field(() => ID) allocationId: string;
+  @Field(() => Int) requestedAllocationRevision: number;
+  @Field(() => Int) periodRevision: number;
+  @Field() state: string;
+  @Field(() => Int, { nullable: true }) removedAllocationRevision:
+    | number
+    | null;
+  @Field(() => String, { nullable: true }) occurredAt: string | null;
+}
+
 @ObjectType('DeliveryCommitmentPeriod')
 export class DeliveryCommitmentPeriodDTO {
   @Field(() => ID) id: string;
@@ -123,6 +155,19 @@ export class DeliveryCommitmentTaskOptionDTO {
   @Field(() => String, { nullable: true }) allocatedUnit: string | null;
 }
 
+@ObjectType('DeliveryCommitmentOrphanAllocation')
+export class DeliveryCommitmentOrphanAllocationDTO {
+  @Field(() => ID) allocationId: string;
+  @Field(() => ID) periodId: string;
+  @Field(() => ID) lineId: string;
+  @Field(() => Int) revision: number;
+  @Field() state: string;
+  @Field() createdAt: string;
+  @Field() updatedAt: string;
+  @Field() canRemove: boolean;
+  @Field(() => String, { nullable: true }) removalBlockReason: string | null;
+}
+
 @ObjectType('DeliveryCommitmentChange')
 export class DeliveryCommitmentChangeDTO {
   @Field() field: string;
@@ -153,6 +198,7 @@ export class DeliveryCommitmentsDTO {
   @Field() engagementName: string;
   @Field(() => ID) projectId: string;
   @Field() canManage: boolean;
+  @Field() taskDetailsAvailable: boolean;
   @Field(() => String, { nullable: true }) legacyAllowance: string | null;
   @Field(() => ID, { nullable: true }) selectedPeriodId: string | null;
   @Field(() => [DeliveryCommitmentPeriodDTO])
@@ -162,10 +208,19 @@ export class DeliveryCommitmentsDTO {
   allocations: DeliveryCommitmentAllocationDTO[];
   @Field(() => [DeliveryCommitmentTaskOptionDTO])
   taskOptions: DeliveryCommitmentTaskOptionDTO[];
+  @Field(() => DeliveryCommitmentTaskOptionDTO, { nullable: true })
+  selectedTask: DeliveryCommitmentTaskOptionDTO | null;
+  @Field(() => DeliveryCommitmentTaskOptionDTO, { nullable: true })
+  selectedParent: DeliveryCommitmentTaskOptionDTO | null;
+  @Field(() => [DeliveryCommitmentOrphanAllocationDTO])
+  orphanAllocations: DeliveryCommitmentOrphanAllocationDTO[];
   @Field() moreTaskOptions: boolean;
   @Field(() => [DeliveryCommitmentEventDTO])
   history: DeliveryCommitmentEventDTO[];
   @Field(() => String, { nullable: true }) nextAllocationCursor: string | null;
+  @Field(() => String, { nullable: true }) nextOrphanAllocationCursor:
+    | string
+    | null;
   @Field(() => String, { nullable: true }) nextHistoryCursor: string | null;
 }
 

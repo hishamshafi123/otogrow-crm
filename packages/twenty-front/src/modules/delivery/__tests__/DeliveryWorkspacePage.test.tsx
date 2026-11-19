@@ -83,6 +83,15 @@ jest.mock('@/delivery/advertising/workbench/DeliveryAdvertisingPage', () => ({
     </>
   ),
 }));
+jest.mock('@/delivery/client-workspace/DeliveryClientWorkspacePage', () => ({
+  DeliveryClientWorkspacePage: () => <p>Unified client workspace</p>,
+}));
+jest.mock('@/delivery/commitments/DeliveryCommitmentsPage', () => ({
+  DeliveryCommitmentsPage: () => <p>Typed client commitments</p>,
+}));
+jest.mock('@/delivery/DeliveryClients', () => ({
+  DeliveryClients: () => <p>Service agreements and client portals</p>,
+}));
 jest.mock('@/delivery/tasks/DeliveryTasksPage', () => ({
   DeliveryTasksPage: () => <p>Primary task workspace</p>,
 }));
@@ -1336,4 +1345,63 @@ it.each([
     screen.queryByText('Platform-specific content planner'),
   ).not.toBeInTheDocument();
   expect(mockReadWorkspace).toHaveBeenCalled();
+});
+
+it.each([
+  '/delivery?view=clients&clientView=commitments&clientEngagement=engagement&commitmentPeriod=period',
+  '/delivery?view=clients&clientView=unrecognized&clientEngagement=engagement',
+])(
+  'opens typed client commitments without any native workspace read: %s',
+  (entry) => {
+    mockWorkspace = undefined;
+    mockWorkspaceError = new CombinedGraphQLErrors({
+      errors: [
+        {
+          message: 'Native task read denied',
+          extensions: { code: 'FORBIDDEN' },
+        },
+      ],
+    });
+    setup(entry);
+    expect(screen.getByText('Typed client commitments')).toBeVisible();
+    expect(mockReadWorkspace).not.toHaveBeenCalled();
+    expect(mockMarkSeen).not.toHaveBeenCalled();
+  },
+);
+it.each([
+  '/delivery?view=clients&clientView=agreements&clientEngagement=engagement',
+  '/delivery?view=clients&clientView=legacy',
+  '/delivery?view=clients&task=launch',
+])('preserves explicit agreement and exact task routes: %s', (entry) => {
+  setup(entry);
+  expect(mockReadWorkspace).toHaveBeenCalled();
+  expect(
+    screen.queryByText('Typed client commitments'),
+  ).not.toBeInTheDocument();
+});
+it('offers a task-free commitments escape from a denied agreements route without losing the selected contract', () => {
+  mockWorkspace = undefined;
+  mockWorkspaceError = new CombinedGraphQLErrors({
+    errors: [
+      { message: 'Native task read denied', extensions: { code: 'FORBIDDEN' } },
+    ],
+  });
+  setup(
+    '/delivery?view=clients&clientView=agreements&clientEngagement=engagement&commitmentPeriod=period',
+  );
+  expect(
+    screen.getByRole('link', { name: 'Open delivery commitments' }),
+  ).toHaveAttribute(
+    'href',
+    '/delivery?view=clients&clientEngagement=engagement&commitmentPeriod=period',
+  );
+});
+
+it.each([
+  '/delivery?view=clients',
+  '/delivery?view=clients&clientView=workspace',
+])('opens unified clients without legacy task read: %s', (entry) => {
+  setup(entry);
+  expect(screen.getByText('Unified client workspace')).toBeVisible();
+  expect(mockReadWorkspace).not.toHaveBeenCalled();
 });

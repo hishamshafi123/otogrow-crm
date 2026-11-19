@@ -186,6 +186,10 @@ const Route = () => {
         <DeliveryOperationalPage view="competitors">
           <p>Current competitor sources</p>
         </DeliveryOperationalPage>
+      ) : params.get('view') === 'clients' ? (
+        <DeliveryOperationalPage view="clients">
+          <p>Current client commitments</p>
+        </DeliveryOperationalPage>
       ) : params.get('view') === 'content' ? (
         <DeliveryOperationalPage view="content">
           <p>Current content posting packages</p>
@@ -300,7 +304,14 @@ it.each([
   },
 );
 
-it.each(['chat', 'health', 'development', 'competitors', 'content'] as const)(
+it.each([
+  'chat',
+  'health',
+  'development',
+  'competitors',
+  'content',
+  'clients',
+] as const)(
   'refreshes only active typed %s queries and verifies current access',
   async (view) => {
     const queries = [
@@ -310,6 +321,9 @@ it.each(['chat', 'health', 'development', 'competitors', 'content'] as const)(
       'DeliveryFounderEscalations',
       'PreviewDeliveryFounderEscalationRule',
       'DeliveryWorkspace',
+      'DeliveryCommitmentEngagements',
+      'DeliveryCommitments',
+      'DeliveryClients',
       'DeliveryOperations',
       'DeliveryBusiness',
       'DeliveryReleaseProjects',
@@ -358,22 +372,28 @@ it.each(['chat', 'health', 'development', 'competitors', 'content'] as const)(
     expect(mockAccessRefetch).toHaveBeenCalledTimes(1);
     for (const [queryName, refetch] of refetches)
       expect(refetch).toHaveBeenCalledTimes(
-        view === 'chat'
-          ? Number(queryName === 'DeliveryChat')
-          : view === 'content'
-            ? Number(queryName.includes('DeliveryContent'))
-            : view === 'competitors'
-              ? Number(queryName.includes('Competitor'))
-              : view === 'development'
-                ? Number(queryName.startsWith('DeliveryRelease'))
-                : Number(
-                    [
-                      'DeliveryFounderExceptions',
-                      'DeliveryReadiness',
-                      'DeliveryFounderEscalations',
-                      'PreviewDeliveryFounderEscalationRule',
-                    ].includes(queryName),
-                  ),
+        view === 'clients'
+          ? Number(
+              ['DeliveryCommitments', 'DeliveryCommitmentEngagements'].includes(
+                queryName,
+              ),
+            )
+          : view === 'chat'
+            ? Number(queryName === 'DeliveryChat')
+            : view === 'content'
+              ? Number(queryName.includes('DeliveryContent'))
+              : view === 'competitors'
+                ? Number(queryName.includes('Competitor'))
+                : view === 'development'
+                  ? Number(queryName.startsWith('DeliveryRelease'))
+                  : Number(
+                      [
+                        'DeliveryFounderExceptions',
+                        'DeliveryReadiness',
+                        'DeliveryFounderEscalations',
+                        'PreviewDeliveryFounderEscalationRule',
+                      ].includes(queryName),
+                    ),
       );
   },
 );

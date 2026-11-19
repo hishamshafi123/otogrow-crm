@@ -1,4 +1,9 @@
 import { useState } from 'react';
+import {
+  StyledCreativeBriefFields,
+  StyledCreativeFormSection,
+  StyledCreativeToolbar,
+} from '@/delivery/creative/production/creative-production-styles';
 import { Trans, useLingui } from '@lingui/react/macro';
 import {
   type CreativeBrief,
@@ -61,6 +66,21 @@ export const DeliveryCreativeBriefForm = ({
     cta: t`Call to action`,
     music: t`Music notes`,
   };
+  const textFields = (fields: BriefTextField[]) =>
+    fields.map((field) => (
+      <label key={field}>
+        {labels[field]}
+        <textarea
+          maxLength={6000}
+          rows={field === 'format' ? 1 : 3}
+          data-compact={field === 'format' || undefined}
+          value={draft.values[field]}
+          onChange={(event) =>
+            draft.update({ ...draft.values, [field]: event.target.value })
+          }
+        />
+      </label>
+    ));
   return (
     <form
       onSubmit={async (event) => {
@@ -83,9 +103,9 @@ export const DeliveryCreativeBriefForm = ({
     >
       <StyledDeliveryStack>
         <StyledDeliveryRow>
-          <h4>
+          <h3>
             <Trans>Brief</Trans> · v{document.briefVersion}
-          </h4>
+          </h3>
           <StyledDeliveryBadge>
             {document.approvedBriefVersion === document.briefVersion
               ? t`Approved`
@@ -103,108 +123,130 @@ export const DeliveryCreativeBriefForm = ({
         )}
         <fieldset disabled={!manager || !canEdit || draft.saving}>
           <StyledDeliveryStack>
-            <StyledDeliveryGrid>
-              <label>
-                <Trans>Final deliverable</Trans>
-                <select
-                  value={draft.values.outputKind ?? 'VIDEO'}
-                  onChange={(event) =>
-                    draft.update({
-                      ...draft.values,
-                      outputKind:
-                        event.target.value === 'IMAGE' ? 'IMAGE' : 'VIDEO',
-                    })
-                  }
-                >
-                  <option value="VIDEO">{t`Video`}</option>
-                  <option value="IMAGE">{t`Still image / static ad`}</option>
-                </select>
-              </label>
-              <label>
-                <Trans>Objective</Trans>
-                <select
-                  value={draft.values.objective}
-                  onChange={(event) =>
-                    draft.update({
-                      ...draft.values,
-                      objective: event.target.value as 'ADS' | 'ORGANIC',
-                    })
-                  }
-                >
-                  <option value="ADS">{t`Performance ad`}</option>
-                  <option value="ORGANIC">{t`Organic brand content`}</option>
-                </select>
-              </label>
-              {draft.values.outputKind !== 'IMAGE' && (
+            <StyledCreativeFormSection>
+              <h4>
+                <Trans>Deliverable</Trans>
+              </h4>
+              <StyledCreativeBriefFields>
                 <label>
-                  <Trans>Duration in seconds</Trans>
-                  <input
-                    required
-                    type="number"
-                    min={1}
-                    max={300}
-                    value={draft.values.duration}
+                  <Trans>Final deliverable</Trans>
+                  <select
+                    value={draft.values.outputKind ?? 'VIDEO'}
                     onChange={(event) =>
                       draft.update({
                         ...draft.values,
-                        duration: Number(event.target.value),
+                        outputKind:
+                          event.target.value === 'IMAGE' ? 'IMAGE' : 'VIDEO',
                       })
                     }
-                  />
+                  >
+                    <option value="VIDEO">{t`Video`}</option>
+                    <option value="IMAGE">{t`Still image / static ad`}</option>
+                  </select>
                 </label>
-              )}
-              {(Object.entries(labels) as [BriefTextField, string][])
-                .filter(
-                  ([field]) =>
-                    draft.values.outputKind !== 'IMAGE' || field !== 'music',
-                )
-                .map(([field, label]) => (
-                  <label key={field}>
-                    {label}
-                    <textarea
-                      maxLength={6000}
-                      rows={3}
-                      value={draft.values[field]}
+                <label>
+                  <Trans>Objective</Trans>
+                  <select
+                    value={draft.values.objective}
+                    onChange={(event) =>
+                      draft.update({
+                        ...draft.values,
+                        objective: event.target.value as 'ADS' | 'ORGANIC',
+                      })
+                    }
+                  >
+                    <option value="ADS">{t`Performance ad`}</option>
+                    <option value="ORGANIC">{t`Organic brand content`}</option>
+                  </select>
+                </label>
+                {textFields(['format'])}
+                {draft.values.outputKind !== 'IMAGE' && (
+                  <label>
+                    <Trans>Duration in seconds</Trans>
+                    <input
+                      required
+                      type="number"
+                      min={1}
+                      max={300}
+                      value={draft.values.duration}
                       onChange={(event) =>
                         draft.update({
                           ...draft.values,
-                          [field]: event.target.value,
+                          duration: Number(event.target.value),
                         })
                       }
                     />
                   </label>
-                ))}
-            </StyledDeliveryGrid>
-            <label>
-              <Trans>Brand assets</Trans>
-              <select
-                multiple
-                value={draft.values.brandAssets}
-                onChange={(event) =>
-                  draft.update({
-                    ...draft.values,
-                    brandAssets: Array.from(
-                      event.target.selectedOptions,
-                      (option) => option.value,
-                    ),
-                  })
-                }
+                )}
+              </StyledCreativeBriefFields>
+            </StyledCreativeFormSection>
+            <StyledCreativeFormSection>
+              <h4>
+                <Trans>Audience and message</Trans>
+              </h4>
+              <StyledCreativeBriefFields>
+                {textFields([
+                  'audience',
+                  'painPoint',
+                  'angle',
+                  'concept',
+                  'hook',
+                  'cta',
+                ])}
+              </StyledCreativeBriefFields>
+            </StyledCreativeFormSection>
+            <StyledCreativeFormSection>
+              <h4>
+                <Trans>Product and brand</Trans>
+              </h4>
+              <StyledCreativeBriefFields>
+                {textFields(['productFacts', 'mandatoryClaims'])}
+              </StyledCreativeBriefFields>
+              <label>
+                <Trans>Brand assets</Trans>
+                <select
+                  multiple
+                  value={draft.values.brandAssets}
+                  onChange={(event) =>
+                    draft.update({
+                      ...draft.values,
+                      brandAssets: Array.from(
+                        event.target.selectedOptions,
+                        (option) => option.value,
+                      ),
+                    })
+                  }
+                >
+                  {document.assets
+                    .filter((asset) => asset.kind === 'REFERENCE')
+                    .map((asset) => (
+                      <option key={asset.id} value={asset.id}>
+                        {asset.name}
+                      </option>
+                    ))}
+                </select>
+              </label>
+            </StyledCreativeFormSection>
+            <StyledCreativeFormSection>
+              <h4>
+                <Trans>Creative direction</Trans>
+              </h4>
+              <StyledCreativeBriefFields>
+                {textFields(
+                  draft.values.outputKind === 'IMAGE'
+                    ? ['visualDirection']
+                    : ['visualDirection', 'music'],
+                )}
+              </StyledCreativeBriefFields>
+            </StyledCreativeFormSection>
+            <StyledCreativeToolbar>
+              <StyledDeliveryButton
+                type="submit"
+                disabled={!draft.dirty || draft.stale}
               >
-                {document.assets
-                  .filter((asset) => asset.kind === 'REFERENCE')
-                  .map((asset) => (
-                    <option key={asset.id} value={asset.id}>
-                      {asset.name}
-                    </option>
-                  ))}
-              </select>
-            </label>
-            <StyledDeliveryButton
-              type="submit"
-              disabled={!draft.dirty || draft.stale}
-            >
-              <Trans>Save new brief version</Trans>
-            </StyledDeliveryButton>
+                <Trans>Save new brief version</Trans>
+              </StyledDeliveryButton>
+            </StyledCreativeToolbar>
           </StyledDeliveryStack>
         </fieldset>
         {notice && !draft.dirty && <p role="status">{notice}</p>}

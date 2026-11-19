@@ -23,7 +23,6 @@ let mockError: Error | undefined;
 let mockEnabled = true;
 let mockReadScope = 'verified-context-v1';
 let mockLoading = false;
-let mockMobile = false;
 let mockNetworkStatus = NetworkStatus.ready;
 let mockRefresh: () => void;
 const mockRefetch = jest.fn();
@@ -39,9 +38,12 @@ jest.mock('@/delivery/reviews/reviewStyles', () => ({
   StyledReviewQueueStack: 'div',
   StyledReviewQueueCard: 'section',
   StyledReviewQueueHeading: 'div',
-}));
-jest.mock('@/ui/utilities/responsive/hooks/useIsMobile', () => ({
-  useIsMobile: () => mockMobile,
+  StyledReviewQueueSummary: 'div',
+  StyledReviewQueueEntry: 'article',
+  StyledReviewQueueAction: 'div',
+  StyledReviewQueueFacts: 'dl',
+  StyledReviewQueueDetails: 'details',
+  StyledReviewQueueEmpty: 'div',
 }));
 jest.mock('@/delivery/workflows/useWorkflowAccess', () => ({
   useWorkflowAccess: () => ({
@@ -112,7 +114,6 @@ beforeEach(() => {
   mockEnabled = true;
   mockReadScope = 'verified-context-v1';
   mockLoading = false;
-  mockMobile = false;
   mockNetworkStatus = NetworkStatus.ready;
   mockRefetch.mockResolvedValue({});
 });
@@ -135,8 +136,89 @@ it('keeps the queue counts and work visible without an empty selection panel or 
   await userEvent.click(screen.getByText('About approvals'));
   expect(screen.getByText(/Checked at:/)).toBeVisible();
 });
-it('collapses mobile filters with their active count while recovery and current work remain reachable', async () => {
-  mockMobile = true;
+it('explains an empty unfiltered queue without zero attention counters or implied approval', () => {
+  mockSnapshot = {
+    ...mockSnapshot,
+    totalCount: 0,
+    unknownAgeCount: 0,
+    unavailableReviewerCount: 0,
+    items: [],
+    nextCursor: null,
+  };
+  setup();
+  expect(
+    screen.getByRole('heading', { name: 'No submissions awaiting review' }),
+  ).toBeVisible();
+  expect(
+    screen.getByText(/Approval and client fulfilment are tracked separately/),
+  ).toBeVisible();
+  expect(
+    screen.queryByText(/Unknown or future waiting time/),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByText(/Reviewer needs attention/),
+  ).not.toBeInTheDocument();
+});
+it.each([
+  [
+    '&reviewsMine=1',
+    'No submissions match these filters',
+    'Clear approval filters',
+  ],
+  [
+    '&reviewsAfter=last-page',
+    'No submissions on this page',
+    'First approval page',
+  ],
+])(
+  'offers the correct empty selection recovery for %s',
+  (query, heading, recovery) => {
+    mockSnapshot = {
+      ...mockSnapshot,
+      totalCount: 0,
+      items: [],
+      nextCursor: null,
+    };
+    setup(query);
+    expect(screen.getByRole('heading', { name: heading })).toBeVisible();
+    expect(screen.getByRole('link', { name: recovery })).toBeVisible();
+    expect(
+      screen.queryByText('No submissions awaiting review'),
+    ).not.toBeInTheDocument();
+  },
+);
+it('keeps a blocked review reason visible while exact selection remains disabled', () => {
+  mockSnapshot.items = [
+    {
+      ...reviewItemFixture(),
+      canReviewSubmission: false,
+      warnings: ['NATIVE_REVIEW_WRITE_UNAVAILABLE'],
+    },
+  ];
+  setup();
+  const review = screen.getByRole('article', { name: 'Oldest product edit' });
+  expect(
+    within(review)
+      .getByText('Source and reviewer checks (1)')
+      .closest('details'),
+  ).toHaveAttribute('open');
+  expect(
+    within(review).getByText(
+      /your task permissions do not allow a review decision/,
+    ),
+  ).toBeVisible();
+  expect(
+    within(review).getByRole('link', {
+      name: 'View submission and responsibility',
+    }),
+  ).toHaveAttribute('href', expect.stringContaining('creativeSubmission=3'));
+  expect(
+    within(review).getByRole('checkbox', {
+      name: 'Select for review: Oldest product edit, submission 3',
+    }),
+  ).toBeDisabled();
+});
+it('collapses filters with their active count while recovery and current work remain reachable', async () => {
   const { router } = setup(
     `&reviewProject=${REVIEW_PROJECT_ID}&reviewsMine=1&reviewsAfter=current-page`,
   );
@@ -158,7 +240,7 @@ it('collapses mobile filters with their active count while recovery and current 
   expect(screen.getByText('Pending in this selection: 54')).toBeVisible();
   await userEvent.click(
     screen.getByRole('checkbox', {
-      name: 'Select Oldest product edit submission 3',
+      name: 'Select for review: Oldest product edit, submission 3',
     }),
   );
   expect(
@@ -176,7 +258,6 @@ it('collapses mobile filters with their active count while recovery and current 
   ).toBe(`${REVIEW_TASK_ID}:3`);
 });
 it('keeps invalid-page recovery outside collapsed mobile disclosures and preserves pinned review context', async () => {
-  mockMobile = true;
   mockError = new Error('The approval page changed');
   const selected = `${REVIEW_TASK_ID}:3`;
   const { router } = setup(
@@ -201,6 +282,7 @@ it('keeps unavailable selected project and reviewer filters explicit until a del
   const { router } = setup(
     `&reviewProject=${REVIEW_TASK_ID}&reviewReviewer=${NEXT_REVIEW_TASK_ID}`,
   );
+  await userEvent.click(screen.getByText(/Filter approvals/));
   const project = screen.getByRole('combobox', {
     name: 'Approval client / project',
   });
@@ -250,7 +332,12 @@ it('hides old queue evidence until a changed current project scope has been fres
   mockLoading = false;
   mockNetworkStatus = NetworkStatus.ready;
   view.refresh();
-  expect(screen.getByText('Pending in this selection: 0')).toBeVisible();
+  expect(
+    screen.getByRole('heading', { name: 'No submissions awaiting review' }),
+  ).toBeVisible();
+  expect(
+    screen.queryByText('Pending in this selection: 0'),
+  ).not.toBeInTheDocument();
   expect(screen.queryByRole('article')).not.toBeInTheDocument();
 });
 it('does not request or reveal the queue while its current context boundary is unavailable', () => {
@@ -354,7 +441,7 @@ it('persists filters and explicit exact selections through paging, with no blank
   const { router } = setup();
   await userEvent.click(
     screen.getByRole('checkbox', {
-      name: 'Select Oldest product edit submission 3',
+      name: 'Select for review: Oldest product edit, submission 3',
     }),
   );
   expect(
@@ -365,11 +452,13 @@ it('persists filters and explicit exact selections through paging, with no blank
   );
   expect(
     screen.getByRole('checkbox', {
-      name: 'Select Oldest product edit submission 3',
+      name: 'Select for review: Oldest product edit, submission 3',
     }),
   ).toBeChecked();
   await userEvent.click(
-    screen.getByRole('checkbox', { name: 'Select Newer image submission 1' }),
+    screen.getByRole('checkbox', {
+      name: 'Select for review: Newer image, submission 1',
+    }),
   );
   await userEvent.click(
     screen.getByRole('link', { name: 'Start selected reviews' }),
@@ -386,9 +475,10 @@ it('changes URL-backed project filters and clears the old selection explicitly',
   const { router } = setup();
   await userEvent.click(
     screen.getByRole('checkbox', {
-      name: 'Select Oldest product edit submission 3',
+      name: 'Select for review: Oldest product edit, submission 3',
     }),
   );
+  await userEvent.click(screen.getByText(/Filter approvals/));
   await userEvent.selectOptions(
     screen.getByLabelText('Approval client / project', { exact: true }),
     REVIEW_PROJECT_ID,
@@ -407,25 +497,31 @@ it('uses URL selection as the single source of truth through Back and Forward be
   const { router } = setup();
   await userEvent.click(
     screen.getByRole('checkbox', {
-      name: 'Select Oldest product edit submission 3',
+      name: 'Select for review: Oldest product edit, submission 3',
     }),
   );
   await userEvent.click(
-    screen.getByRole('checkbox', { name: 'Select Newer image submission 1' }),
+    screen.getByRole('checkbox', {
+      name: 'Select for review: Newer image, submission 1',
+    }),
   );
   await act(async () => {
     await router.navigate(-1);
   });
   expect(screen.getByText('Selected 1 submissions')).toBeInTheDocument();
   expect(
-    screen.getByRole('checkbox', { name: 'Select Newer image submission 1' }),
+    screen.getByRole('checkbox', {
+      name: 'Select for review: Newer image, submission 1',
+    }),
   ).not.toBeChecked();
   await act(async () => {
     await router.navigate(1);
   });
   expect(screen.getByText('Selected 2 submissions')).toBeInTheDocument();
   expect(
-    screen.getByRole('checkbox', { name: 'Select Newer image submission 1' }),
+    screen.getByRole('checkbox', {
+      name: 'Select for review: Newer image, submission 1',
+    }),
   ).toBeChecked();
   await act(async () => {
     await router.navigate(-1);

@@ -15,7 +15,10 @@ import { useAssistantAccess } from '@/delivery/assistants/useAssistantAccess';
 import { isOtogrowAccessDenied } from '@/otogrow-access/isOtogrowAccessDenied';
 import { fastDeepEqual } from 'twenty-shared/utils';
 import { useFinanceExportRequestGuard } from '@/delivery/finance/export/useFinanceExportRequestGuard';
-import { clientEngagementParams } from '@/delivery/commitments/clientCommitmentParams';
+import {
+  clientCommitmentsParams,
+  clientEngagementParams,
+} from '@/delivery/commitments/clientCommitmentParams';
 import { useDeliveryNativeDraft } from '@/delivery/drafts/useDeliveryNativeDraft';
 import { DeliveryDraftConflict } from '@/delivery/drafts/DeliveryDraftConflict';
 import { useStore } from 'jotai';
@@ -32,7 +35,7 @@ import {
   useState,
   type FormEvent,
 } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { styled } from '@linaria/react';
 import { type DeliveryWorkspace } from '@/delivery/delivery.types';
 import {
@@ -340,6 +343,11 @@ const ClientWorkspace = ({
                   </p>
                 </div>
                 <StyledDeliveryRow>
+                  <Link
+                    to={`/delivery?${clientCommitmentsParams(params).toString()}`}
+                  >
+                    <Trans>Delivery commitments</Trans>
+                  </Link>
                   {selected && (
                     <ClientSetupLink>
                       <Trans>Set up another client</Trans>
@@ -599,7 +607,6 @@ const ClientWorkspace = ({
                     <DeliveryClientShareForm
                       key={selected.id}
                       engagement={selected}
-                      tasks={workspace.tasks}
                       busy={mutation.loading}
                       run={run}
                     />

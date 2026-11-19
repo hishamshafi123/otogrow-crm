@@ -89,6 +89,7 @@ jest.mock('@/delivery/deliveryStyles', () => ({
   StyledDeliveryButton: 'button',
 }));
 jest.mock('@/delivery/finance/financeStyles', () => ({
+  StyledFinanceWorkspace: 'div',
   StyledFinanceNavigation: 'nav',
   StyledFinanceDesktopNavigation: 'nav',
   StyledFinanceMobileNavigation: 'label',

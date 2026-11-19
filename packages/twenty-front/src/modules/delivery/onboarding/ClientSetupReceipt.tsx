@@ -59,6 +59,7 @@ export const ClientSetupReceipt = ({
             to={taskPageDestination(params, {
               ...deliveryTaskSelection(null),
               view: 'clients',
+              clientView: 'agreements',
               clientEngagement: receipt.engagementId,
             })}
           >

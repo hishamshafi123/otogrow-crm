@@ -7,7 +7,10 @@ import { fromUserEntityToFlat } from 'src/engine/core-modules/user/utils/from-us
 import { fromWorkspaceEntityToFlat } from 'src/engine/core-modules/workspace/utils/from-workspace-entity-to-flat.util';
 import { type WorkspaceEntity } from 'src/engine/core-modules/workspace/workspace.entity';
 import { findFlatEntityByIdInFlatEntityMaps } from 'src/engine/metadata-modules/flat-entity/utils/find-flat-entity-by-id-in-flat-entity-maps.util';
-import { PermissionsException } from 'src/engine/metadata-modules/permissions/permissions.exception';
+import {
+  PermissionsException,
+  PermissionsExceptionCode,
+} from 'src/engine/metadata-modules/permissions/permissions.exception';
 import { type GlobalWorkspaceOrmManager } from 'src/engine/twenty-orm/global-workspace-datasource/global-workspace-orm.manager';
 import { validateOperationIsPermittedOrThrow } from 'src/engine/twenty-orm/repository/permissions.utils';
 import {
@@ -32,6 +35,8 @@ export const DELIVERY_NATIVE_TASK_CACHE_KEYS = [
   'flatRowLevelPermissionPredicateMaps',
   'flatRowLevelPermissionPredicateGroupMaps',
 ] as const;
+export class DeliveryNativeTaskPermissionDeniedException extends ForbiddenException {}
+
 export const deliveryNativeTaskSchema = (workspace: WorkspaceEntity) => {
   if (
     !workspace.databaseSchema ||
@@ -54,6 +59,14 @@ export const buildDeliveryNativeTaskVisibility = (
   if (!rolePermissionConfig || !('intersectionOf' in rolePermissionConfig))
     throw new ForbiddenException(
       'Current native task permissions are unavailable.',
+    );
+  if (
+    rolePermissionConfig.intersectionOf.some(
+      (roleId) => !isDefined(context.permissionsPerRoleId[roleId]),
+    )
+  )
+    throw new ForbiddenException(
+      'Current native task role permissions are incomplete. Refresh permissions before continuing.',
     );
   const objectsPermissions = getObjectsPermissionsFromRolePermissionConfig({
     rolesPermissions: context.permissionsPerRoleId,
@@ -276,11 +289,26 @@ export const readDeliveryNativeTaskVisibility = async (
           throw new ConflictException(
             'Native task permissions changed. Refresh current work.',
           );
-        const visibility = buildDeliveryNativeTaskVisibility(
-          context,
-          selectedColumns,
-          operation,
-        );
+        let observed:
+          | { visibility: DeliveryNativeTaskVisibility }
+          | { denial: PermissionsException };
+        try {
+          observed = {
+            visibility: buildDeliveryNativeTaskVisibility(
+              context,
+              selectedColumns,
+              operation,
+            ),
+          };
+        } catch (error) {
+          if (
+            !(error instanceof PermissionsException) ||
+            error.code !== PermissionsExceptionCode.PERMISSION_DENIED
+          )
+            throw error;
+          // Contract-only actions may continue after a denial, so its policy must be just as current as an allowed read.
+          observed = { denial: error };
+        }
         const after = await cache.getCacheHashes(workspace.id, [
           ...DELIVERY_NATIVE_TASK_CACHE_KEYS,
         ]);
@@ -310,7 +338,8 @@ export const readDeliveryNativeTaskVisibility = async (
           throw new ConflictException(
             'Native task permissions changed. Refresh current work.',
           );
-        return visibility;
+        if ('denial' in observed) throw observed.denial;
+        return observed.visibility;
       },
       authContext,
       { skipEntityMetadatas: true },
@@ -321,8 +350,11 @@ export const readDeliveryNativeTaskVisibility = async (
       error instanceof ForbiddenException
     )
       throw error;
-    if (error instanceof PermissionsException)
-      throw new ForbiddenException(
+    if (
+      error instanceof PermissionsException &&
+      error.code === PermissionsExceptionCode.PERMISSION_DENIED
+    )
+      throw new DeliveryNativeTaskPermissionDeniedException(
         operation
           ? 'Your CRM task permissions do not allow this change. Ask an administrator to check task and field access.'
           : 'Your CRM task permissions do not allow this view. Ask an administrator to check task and field access.',

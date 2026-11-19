@@ -1,3 +1,4 @@
+import { ClientWorkspaceReturnLink } from '@/delivery/client-workspace/ClientWorkspaceReturnLink';
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { useApolloClient } from '@apollo/client/react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
@@ -154,6 +155,7 @@ export const DeliveryKnowledgeWorkspace = () => {
         <StyledDeliveryRow>
           {!expanded && <NavigationDrawerCollapseButton direction="right" />}
           <div>
+            <ClientWorkspaceReturnLink />
             <h1>
               <Trans>Brand knowledge</Trans>
             </h1>

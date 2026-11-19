@@ -105,11 +105,6 @@ const CreativeProductionWorkspace = () => {
   return (
     <StyledCreativeText>
       <StyledDeliveryStack>
-        <Link
-          to={`/delivery?view=creative&creativeView=learning${params.get('creativeProject') ? `&learningProject=${encodeURIComponent(params.get('creativeProject') ?? '')}` : ''}`}
-        >
-          <Trans>Inspect creative and ad learning</Trans>
-        </Link>
         {!available && (
           <div
             role={
@@ -180,6 +175,11 @@ const CreativeProductionWorkspace = () => {
             </div>
           )}
         </StyledCreativeBoundary>
+        <Link
+          to={`/delivery?view=creative&creativeView=learning${params.get('creativeProject') ? `&learningProject=${encodeURIComponent(params.get('creativeProject') ?? '')}` : ''}`}
+        >
+          <Trans>Open creative learning</Trans>
+        </Link>
       </StyledDeliveryStack>
     </StyledCreativeText>
   );

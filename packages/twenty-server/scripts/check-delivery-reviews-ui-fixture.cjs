@@ -16,6 +16,16 @@ const { dirname } = require('node:path');
 const {
   connectionSource,
 } = require('../dist/database/typeorm/core/core.datasource');
+const {
+  noNativeAutomation,
+} = require('./check-delivery-assistants-ui-fixture.cjs');
+const {
+  captureCache,
+  recomputeCache,
+  restoreCache,
+  verifyCache,
+  withRedis,
+} = require('./check-delivery-native-task-access-ui-support.cjs');
 const FILE = '/tmp/otogrow-reviews-ui-fixture.json';
 const WORKSPACE_ID = '0a420537-0122-45c3-a2f5-18298b636227';
 const PREFIX = 'Disposable review queue';
@@ -30,6 +40,7 @@ const IDS = [
   'backupId',
   'backupUserId',
   'backupMembershipId',
+  'backupNativeRoleTargetId',
   'roleId',
   'roleAssignmentId',
   'memberAccessId',
@@ -81,13 +92,6 @@ const isAuthenticationLifecycleTable = (table) =>
   table.schema === 'core' &&
   ['appToken', 'userSession'].includes(table.name) &&
   table.scope === 'WORKSPACE';
-const withoutHeartbeat = (state) => {
-  const value = copy(state);
-  // The reporting worker may advance its heartbeat during read-only inspection.
-  if (value.metaReporting && typeof value.metaReporting === 'object')
-    delete value.metaReporting.workerSeenAt;
-  return value;
-};
 function syncDirectory(path) {
   const descriptor = openSync(dirname(path), 'r');
   try {
@@ -125,7 +129,7 @@ function readJournal() {
     'The ownership journal must be a private regular file.',
   );
   const fixture = JSON.parse(readFileSync(FILE, 'utf8'));
-  assert.equal(fixture.version, 1);
+  assert.equal(fixture.version, 2);
   assert.equal(fixture.workspaceId, WORKSPACE_ID);
   for (const key of IDS) assert.match(fixture[key], UUID);
   assert.equal(fixture.marker, markerFor(fixture.nonce));
@@ -136,6 +140,7 @@ function readJournal() {
     ),
   );
   assert(Array.isArray(fixture.cleanupAttempts));
+  assert(Array.isArray(fixture.cacheIntents));
   if (fixture.primaryNoticeId) {
     assert.match(fixture.primaryNoticeId, UUID);
     assert.match(fixture.primaryNoticeImmutableHash, HASH);
@@ -162,8 +167,26 @@ function readJournal() {
     quote(fixture.schema);
     assert.match(fixture.actorId, UUID);
     assert.match(fixture.userWorkspaceId, UUID);
+    assert.match(fixture.nativeRoleId, UUID);
+    assert.match(fixture.nativeApplicationId, UUID);
+    assert.match(fixture.taskObjectId, UUID);
     assert.match(fixture.baseline.operations.id, UUID);
     assert.match(fixture.baseline.operations.hash, HASH);
+    assert.match(fixture.baseline.operations.rowHash, HASH);
+    assert.equal(
+      fixture.baseline.operations.row.id,
+      fixture.baseline.operations.id,
+    );
+    assert.equal(fixture.baseline.operations.row.workspaceId, WORKSPACE_ID);
+    assert.equal(
+      fingerprint(fixture.baseline.operations.row),
+      fixture.baseline.operations.rowHash,
+    );
+    assert.equal(
+      fingerprint(fixture.baseline.operations.row.state),
+      fixture.baseline.operations.hash,
+    );
+    assert(fixture.cacheOriginal);
     for (const table of fixture.baseline.tables) {
       quote(table.schema);
       quote(table.name);
@@ -188,7 +211,7 @@ async function locked(manager) {
 }
 async function readOperations(manager) {
   const rows = await manager.query(
-    'SELECT id,state FROM core."deliveryOperations" WHERE "workspaceId"=$1 FOR UPDATE',
+    'SELECT to_jsonb(operations) AS row FROM core."deliveryOperations" operations WHERE "workspaceId"=$1 FOR UPDATE',
     [WORKSPACE_ID],
   );
   assert.equal(
@@ -196,7 +219,7 @@ async function readOperations(manager) {
     1,
     'Use the exact initialized local dev workspace.',
   );
-  const state = rows[0].state;
+  const state = rows[0].row.state;
   assert(
     Array.isArray(state.business?.records) &&
       Array.isArray(state.clients?.engagements) &&
@@ -205,7 +228,48 @@ async function readOperations(manager) {
       state.assignments &&
       typeof state.assignments === 'object',
   );
-  return rows[0];
+  return rows[0].row;
+}
+async function prepareNativeBackup(manager, fixture) {
+  const metadata = await manager.query(
+    'SELECT id,"isSystem" FROM core."objectMetadata" WHERE "workspaceId"=$1 AND "nameSingular"=\'task\'',
+    [WORKSPACE_ID],
+  );
+  assert.equal(metadata.length, 1);
+  fixture.taskObjectId = metadata[0].id;
+  const candidates = await manager.query(
+    `SELECT role.id,role."applicationId" FROM core.role role
+    LEFT JOIN core."objectPermission" permission ON permission."workspaceId"=$1 AND permission."roleId"=role.id AND permission."objectMetadataId"=$2
+    WHERE role."workspaceId"=$1 AND role."canUpdateAllSettings"=false AND role."canBeAssignedToUsers"=true
+      AND COALESCE(permission."canReadObjectRecords",$3 OR role."canReadAllObjectRecords")=true
+      AND COALESCE(permission."canUpdateObjectRecords",$3 OR role."canUpdateAllObjectRecords")=true
+      AND NOT EXISTS(SELECT 1 FROM core."fieldPermission" restriction WHERE restriction."workspaceId"=$1 AND restriction."roleId"=role.id AND restriction."objectMetadataId"=$2 AND (restriction."canReadFieldValue"=false OR restriction."canUpdateFieldValue"=false))
+      AND NOT EXISTS(SELECT 1 FROM core."rowLevelPermissionPredicate" restriction WHERE restriction."workspaceId"=$1 AND restriction."roleId"=role.id AND restriction."objectMetadataId"=$2)
+      AND NOT EXISTS(SELECT 1 FROM core."rowLevelPermissionPredicateGroup" restriction WHERE restriction."workspaceId"=$1 AND restriction."roleId"=role.id AND restriction."objectMetadataId"=$2)
+    ORDER BY (role.label='Member') DESC,role.id`,
+    [WORKSPACE_ID, fixture.taskObjectId, metadata[0].isSystem],
+  );
+  assert(
+    candidates.length > 0,
+    'A preexisting non-admin native role with unrestricted task read/update is required; never broaden a real role for this fixture.',
+  );
+  fixture.nativeRoleId = candidates[0].id;
+  fixture.nativeApplicationId = candidates[0].applicationId;
+  await noNativeAutomation(manager, fixture, ['roletarget']);
+  fixture.cacheOriginal = await captureCache();
+}
+async function publishNativeBackupCache(fixture) {
+  // The shared cache verifier must target the synthetic membership, never the authenticated primary reviewer.
+  const cacheFixture = {
+    ...fixture,
+    userWorkspaceId: fixture.backupMembershipId,
+    desired: 'ALLOWED',
+  };
+  await recomputeCache(connectionSource.manager, cacheFixture, (current) => {
+    fixture.cacheIntents = current.cacheIntents;
+    if (current.cacheReceipt) fixture.cacheReceipt = current.cacheReceipt;
+    writeJournal(fixture);
+  });
 }
 async function tableDescriptors(manager, schema) {
   const rows = await manager.query(
@@ -293,7 +357,7 @@ function additions(tables, fixture, preserveAuthenticationLifecycle = false) {
 }
 
 const withoutAssignments = (state, fixture) => {
-  const result = withoutHeartbeat(state);
+  const result = copy(state);
   for (const item of fixture.tasks) delete result.assignments[item.taskId];
   const owned = new Set(fixture.tasks.map((item) => item.taskId));
   result.notices = result.notices.filter(
@@ -485,6 +549,7 @@ async function validateOwned(
   fixture,
   preserveAuthenticationLifecycle = false,
 ) {
+  await noNativeAutomation(manager, fixture, ['roletarget']);
   const extra = additions(tables, fixture, preserveAuthenticationLifecycle);
   assert.equal(operations.id, fixture.baseline.operations.id);
   for (const item of fixture.tasks) {
@@ -494,10 +559,23 @@ async function validateOwned(
   assert.equal(
     fingerprint(withoutAssignments(operations.state, fixture)),
     fixture.baseline.operations.hash,
-    'Only exact owned assignment markers/review notices and the existing reporting heartbeat may differ; unrelated notices, fulfilment, routing and finance stay exact.',
+    'Only exact owned assignment markers/review notices may differ; heartbeat, unrelated notices, fulfilment, routing and finance stay exact.',
+  );
+  const normalizedOperations = {
+    ...operations,
+    state: withoutAssignments(operations.state, fixture),
+    updatedAt: fixture.baseline.operations.row.updatedAt,
+  };
+  assert.equal(
+    fingerprint(normalizedOperations),
+    fixture.baseline.operations.rowHash,
+    'Only the timestamp of an exact owned notice/assignment update may differ from the full Operations row.',
   );
   const hasSeed = extra.some((table) => table.rows.length > 0);
-  if (!hasSeed) return { extra, hasSeed };
+  if (!hasSeed) {
+    assert.equal(fingerprint(operations), fixture.baseline.operations.rowHash);
+    return { extra, hasSeed };
+  }
   for (const seed of fixture.immutable) {
     const [row] = await manager.query(
       `SELECT * FROM ${quote(seed.schema)}.${quote(seed.name)} WHERE id=$1`,
@@ -792,6 +870,7 @@ async function validateOwned(
     deliveryTask: fixture.tasks.map((item) => item.deliveryTaskId),
     user: [fixture.editorUserId, fixture.backupUserId],
     userWorkspace: [fixture.editorMembershipId, fixture.backupMembershipId],
+    roleTarget: [fixture.backupNativeRoleTargetId],
     otogrowRole: [fixture.roleId],
     otogrowRoleAssignment: [fixture.roleAssignmentId],
     otogrowMemberAccess: [fixture.memberAccessId],
@@ -1003,15 +1082,17 @@ function printFixture(fixture) {
   );
 }
 async function createFixture() {
+  assert.equal(process.env.OTOGROW_REVIEWS_UI_SERVICES_STOPPED, '1');
   assert(!existsSync(FILE), 'Recover the existing reviews UI fixture first.');
   const fixture = {
-    version: 1,
+    version: 2,
     status: 'CREATING',
     workspaceId: WORKSPACE_ID,
     ...Object.fromEntries(IDS.map((key) => [key, randomUUID()])),
     createdAt: new Date().toISOString(),
     baseline: null,
     cleanupAttempts: [],
+    cacheIntents: [],
     immutable: [],
     paged: process.env.OTOGROW_REVIEWS_UI_PAGED === '1',
     tasks: [
@@ -1093,11 +1174,14 @@ async function createFixture() {
     );
     for (const item of fixture.tasks)
       assert(!Object.hasOwn(operations.state.assignments, item.taskId));
+    await prepareNativeBackup(manager, fixture);
     fixture.baseline = {
       tables: await readTables(manager, descriptors),
       operations: {
         id: operations.id,
-        hash: fingerprint(withoutHeartbeat(operations.state)),
+        hash: fingerprint(operations.state),
+        row: copy(operations),
+        rowHash: fingerprint(operations),
       },
     };
     fixture.status = 'PREPARED';
@@ -1125,6 +1209,16 @@ async function createFixture() {
         ],
       );
     }
+    await manager.query(
+      'INSERT INTO core."roleTarget" (id,"workspaceId","roleId","userWorkspaceId","universalIdentifier","applicationId") VALUES($1,$2,$3,$4,$1,$5)',
+      [
+        fixture.backupNativeRoleTargetId,
+        WORKSPACE_ID,
+        fixture.nativeRoleId,
+        fixture.backupMembershipId,
+        fixture.nativeApplicationId,
+      ],
+    );
     await manager.query(
       'INSERT INTO core."otogrowRole" (id,"workspaceId",name,description,capabilities,revision) VALUES($1,$2,$3,$4,$5,1)',
       [
@@ -1294,6 +1388,7 @@ async function createFixture() {
         [fixture.editorMembershipId, fixture.backupMembershipId],
       ],
       [fixture.schema, 'workspaceMember', [fixture.editorId, fixture.backupId]],
+      ['core', 'roleTarget', [fixture.backupNativeRoleTargetId]],
       ['core', 'otogrowRole', [fixture.roleId]],
       ['core', 'otogrowRoleAssignment', [fixture.roleAssignmentId]],
       ['core', 'otogrowMemberAccess', [fixture.memberAccessId]],
@@ -1324,6 +1419,9 @@ async function createFixture() {
   });
   if (process.env.OTOGROW_REVIEWS_UI_TEST_FAILURE === 'create-after-commit')
     throw new Error('Injected reviews UI create failure after commit');
+  await publishNativeBackupCache(fixture);
+  if (process.env.OTOGROW_REVIEWS_UI_TEST_FAILURE === 'create-after-cache')
+    throw new Error('Injected reviews UI create failure after cache publish');
   fixture.status = 'READY';
   writeJournal(fixture);
   printFixture(fixture);
@@ -1332,7 +1430,10 @@ async function createFixture() {
   );
 }
 async function cleanupFixture() {
+  assert.equal(process.env.OTOGROW_REVIEWS_UI_SERVICES_STOPPED, '1');
   const fixture = readJournal();
+  if (fixture.cacheOriginal)
+    await withRedis((client) => verifyCache(fixture, client));
   await connectionSource.transaction(async (manager) => {
     await locked(manager);
     if (!fixture.baseline) {
@@ -1341,6 +1442,7 @@ async function cleanupFixture() {
         ['deliveryTask', fixture.tasks.map((item) => item.deliveryTaskId)],
         ['otogrowRole', [fixture.roleId]],
         ['user', [fixture.editorUserId, fixture.backupUserId]],
+        ['roleTarget', [fixture.backupNativeRoleTargetId]],
         ['deliveryFounderEscalationRule', [fixture.ruleId]],
       ])
         assert.equal(
@@ -1407,6 +1509,7 @@ async function cleanupFixture() {
           .filter((table) => table.rows.length)
           .map(({ schema, name, rows }) => ({ schema, name, rows })),
         authenticationLifecycle: observations,
+        operationsBefore: copy(operations),
       });
       fixture.status = 'CLEANUP_PREPARED';
       writeJournal(fixture);
@@ -1424,6 +1527,7 @@ async function cleanupFixture() {
         ['core', 'otogrowRoleAssignment'],
         ['core', 'otogrowMemberAccess'],
         ['core', 'otogrowRole'],
+        ['core', 'roleTarget'],
         [fixture.schema, 'workspaceMember'],
         ['core', 'userWorkspace'],
         ['core', 'user'],
@@ -1446,9 +1550,11 @@ async function cleanupFixture() {
           notice.kind !== 'REVIEW_ASSIGNMENT' ||
           !ownedTaskIds.has(notice.taskId),
       );
+      assert.equal(fingerprint(state), fixture.baseline.operations.hash);
+      // Read receipts update this existing row's timestamp; restore it only after proving that all state changes belong to this fixture.
       await manager.query(
-        'UPDATE core."deliveryOperations" SET state=$2 WHERE id=$1',
-        [operations.id, state],
+        'UPDATE core."deliveryOperations" SET state=$2,"updatedAt"=$3::timestamptz WHERE id=$1',
+        [operations.id, state, fixture.baseline.operations.row.updatedAt],
       );
     } else
       fixture.cleanupRecoveredAfterCommit = fixture.cleanupAttempts.length > 0;
@@ -1471,8 +1577,8 @@ async function cleanupFixture() {
       observation.afterHash = current.hash;
     }
     assert.equal(
-      fingerprint(withoutHeartbeat((await readOperations(manager)).state)),
-      fixture.baseline.operations.hash,
+      fingerprint(await readOperations(manager)),
+      fixture.baseline.operations.rowHash,
     );
     fixture.recoveryAuthenticationLifecycle = observations;
     writeJournal(fixture);
@@ -1481,6 +1587,7 @@ async function cleanupFixture() {
   });
   if (process.env.OTOGROW_REVIEWS_UI_TEST_FAILURE === 'cleanup-after-commit')
     throw new Error('Injected reviews UI cleanup failure after commit');
+  if (fixture.cacheOriginal) await restoreCache(fixture, writeJournal);
   fixture.status = 'CLEANED';
   writeJournal(fixture);
   const receipt = `${FILE}.${fixture.nonce}.cleaned.json`;
@@ -1493,7 +1600,7 @@ async function cleanupFixture() {
   unlinkSync(FILE);
   syncDirectory(FILE);
   console.log(
-    `Removed only ownership-verified review tasks/project/synthetic staff/scoped role/delegation/history/revision/activity, exact unattempted owned review notices/jobs and never-enabled paused wait rule. All preexisting native/core/source/finance/access/routing/bot/outbox baselines match. Current appToken/userSession lifecycle preserved with locked exact before/after IDs/digests. Private receipt: ${receipt}`,
+    `Removed only ownership-verified review tasks/project/synthetic staff/scoped role/native backup target/delegation/history/revision/activity, exact unattempted owned review notices/jobs and never-enabled paused wait rule. All preexisting native/core/source/finance/access/routing/bot/outbox baselines and the full Operations row match. Native policy cache bytes and absolute expiry restored. Current appToken/userSession lifecycle preserved with locked exact before/after IDs/digests. Private receipt: ${receipt}`,
   );
 }
 async function main() {
@@ -1506,7 +1613,10 @@ async function main() {
     ),
   );
   if (command === 'inspect') {
-    printFixture(readJournal());
+    const fixture = readJournal();
+    if (fixture.cacheOriginal)
+      await withRedis((client) => verifyCache(fixture, client));
+    printFixture(fixture);
     return;
   }
   await connectionSource.initialize();

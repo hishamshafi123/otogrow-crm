@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Trans, useLingui } from '@lingui/react/macro';
+import { DeliveryPageHeader } from '@/delivery/DeliveryPageHeader';
 import { isValidUuid, fastDeepEqual } from 'twenty-shared/utils';
 import { useWorkflowAccess } from '@/delivery/workflows/useWorkflowAccess';
 import { useClientSetup } from '@/delivery/onboarding/useClientSetup';
@@ -14,7 +15,6 @@ import { taskPageDestination } from '@/delivery/tasks/task-navigation';
 import {
   StyledDeliveryButton,
   StyledDeliveryCanvas,
-  StyledDeliveryRow,
   StyledDeliveryStack,
 } from '@/delivery/deliveryStyles';
 
@@ -105,22 +105,15 @@ const ClientSetupWorkspace = () => {
       <PageBody>
         <StyledDeliveryCanvas>
           <StyledDeliveryStack>
-            <StyledDeliveryRow>
-              <div>
-                <h1>
-                  <Trans>Set up client work</Trans>
-                </h1>
-                <p>
-                  <Trans>
-                    Choose the client, review its project and service plan, then
-                    optionally prepare the first task.
-                  </Trans>
-                </p>
-              </div>
-              <Link to={taskPageDestination(params, { view: 'clients' })}>
-                <Trans>Back to Clients</Trans>
-              </Link>
-            </StyledDeliveryRow>
+            <DeliveryPageHeader
+              title={t`Set up client work`}
+              description={t`Choose the client, review its project and service plan, then optionally prepare the first task.`}
+              actions={
+                <Link to={taskPageDestination(params, { view: 'clients' })}>
+                  <Trans>Back to Clients</Trans>
+                </Link>
+              }
+            />
             {!valid && (
               <>
                 <p role="alert">

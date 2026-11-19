@@ -11,22 +11,70 @@ import { styled } from '@linaria/react';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
 import { IconChevronDown } from 'twenty-ui/icon';
 
+const StyledNavigation = styled.nav`
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-block: 4px;
+
+  .navigation-drawer-item {
+    border-radius: 8px;
+    height: 38px;
+    margin-top: 2px;
+    transition:
+      background-color 120ms ease,
+      color 120ms ease;
+  }
+  .navigation-drawer-item:hover {
+    background: ${themeCssVariables.grayScale.gray3};
+  }
+  .navigation-drawer-item[aria-current='page'] {
+    background: ${themeCssVariables.grayScale.gray4};
+    color: ${themeCssVariables.font.color.primary};
+  }
+  .navigation-drawer-item[aria-current='page'] svg {
+    color: ${themeCssVariables.color.blue11};
+  }
+  .navigation-drawer-item:focus-visible {
+    outline: 2px solid ${themeCssVariables.color.blue11};
+    outline-offset: -2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .navigation-drawer-item {
+      transition: none;
+    }
+  }
+`;
+const StyledSectionLabel = styled.small`
+  color: ${themeCssVariables.font.color.secondary};
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+  padding: 8px 4px 4px;
+`;
 const StyledGroup = styled.details`
   summary {
     align-items: center;
-    border-radius: 6px;
+    border-radius: 8px;
+    box-sizing: border-box;
     color: ${themeCssVariables.font.color.secondary};
     cursor: pointer;
     display: flex;
+    font-size: 12px;
+    font-weight: 500;
     gap: 8px;
-    min-height: 24px;
-    padding: 6px 8px;
+    line-height: 16px;
+    min-height: 36px;
+    padding: 8px 4px;
+    user-select: none;
   }
   summary::-webkit-details-marker {
     display: none;
   }
   summary:hover {
     background: ${themeCssVariables.background.transparent.light};
+    color: ${themeCssVariables.font.color.primary};
   }
   summary:focus-visible {
     outline: 2px solid ${themeCssVariables.color.blue11};
@@ -35,14 +83,23 @@ const StyledGroup = styled.details`
   summary > svg {
     flex-shrink: 0;
   }
-  &[open] summary {
-    color: ${themeCssVariables.font.color.primary};
+  summary span svg {
+    transform: rotate(-90deg);
+    transition: transform 120ms ease;
+  }
+  &[open] summary span svg {
+    transform: rotate(0deg);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    summary span svg {
+      transition: none;
+    }
   }
 `;
 const StyledGroupLabel = styled.span`
   align-items: center;
   display: flex;
-  gap: 6px;
+  gap: 8px;
 `;
 
 export const DeliveryNavigation = () => {
@@ -68,10 +125,10 @@ export const DeliveryNavigation = () => {
     <>
       {personalNavigation.ready &&
         personalNavigation.pinnedPages.length > 0 && (
-          <nav aria-label={t`Pinned workspace pages`}>
+          <StyledNavigation aria-label={t`Pinned workspace pages`}>
             <NavigationDrawerSection>
               <NavigationDrawerAnimatedCollapseWrapper>
-                <small>{t`Pinned`}</small>
+                <StyledSectionLabel>{t`Pinned`}</StyledSectionLabel>
               </NavigationDrawerAnimatedCollapseWrapper>
               {personalNavigation.pinnedPages.map((page) => (
                 <NavigationDrawerItem
@@ -83,9 +140,9 @@ export const DeliveryNavigation = () => {
                 />
               ))}
             </NavigationDrawerSection>
-          </nav>
+          </StyledNavigation>
         )}
-      <nav aria-label={t`Otogrow navigation`}>
+      <StyledNavigation aria-label={t`Otogrow navigation`}>
         {groups.map((group) => {
           const items = group.items.filter(
             (item) =>
@@ -122,7 +179,6 @@ export const DeliveryNavigation = () => {
                       Icon={item.Icon}
                       to={`/delivery?view=${item.view}`}
                       active={item.view === view}
-                      indentationLevel={2}
                     />
                   ))}
                 </StyledGroup>
@@ -130,7 +186,7 @@ export const DeliveryNavigation = () => {
             </NavigationDrawerSection>
           );
         })}
-      </nav>
+      </StyledNavigation>
     </>
   );
 };

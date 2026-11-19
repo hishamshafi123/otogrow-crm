@@ -47,6 +47,7 @@ const mockOperation = (document: DocumentNode) =>
   )?.name?.value;
 jest.mock('@/delivery/deliveryStyles', () => ({
   StyledDeliveryStack: 'div',
+  StyledDeliverySectionStack: 'div',
   StyledDeliveryButton: 'button',
   StyledDeliveryCard: 'section',
   StyledDeliveryRow: 'div',

@@ -1,6 +1,7 @@
 import {
   StyledFinanceDesktopNavigation,
   StyledFinanceMobileNavigation,
+  StyledFinanceWorkspace,
 } from '@/delivery/finance/financeStyles';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useLingui } from '@lingui/react/macro';
@@ -11,7 +12,6 @@ import { DeliveryReconciliation } from '@/delivery/finance/DeliveryReconciliatio
 import { DeliveryFinanceAiCosts } from '@/delivery/finance/DeliveryFinanceAiCosts';
 import { DeliveryFinanceForecast } from '@/delivery/finance/DeliveryFinanceForecast';
 import { DeliveryFinanceExports } from '@/delivery/finance/export/DeliveryFinanceExports';
-import { StyledDeliveryStack } from '@/delivery/deliveryStyles';
 
 type DeliveryFinanceProps = {
   workspace: DeliveryWorkspace;
@@ -46,7 +46,7 @@ export const DeliveryFinance = ({
     return `/delivery?${next.toString()}`;
   };
   return (
-    <StyledDeliveryStack>
+    <StyledFinanceWorkspace>
       <StyledFinanceDesktopNavigation aria-label={t`Finance views`}>
         {views.map((option) => (
           <Link
@@ -103,6 +103,6 @@ export const DeliveryFinance = ({
           onChanged={onChanged}
         />
       )}
-    </StyledDeliveryStack>
+    </StyledFinanceWorkspace>
   );
 };

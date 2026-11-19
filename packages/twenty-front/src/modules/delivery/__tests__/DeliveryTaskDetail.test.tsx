@@ -274,8 +274,11 @@ describe('delivery task review', () => {
   it('identifies the canonical delivery manager without claiming an undecided submission was reviewed', () => {
     renderDetail();
     expect(
-      screen.getByText(/Primary manager for client delivery/),
-    ).toHaveTextContent('Project manager');
+      screen.getByText('Primary manager for client delivery'),
+    ).toBeVisible();
+    expect(
+      screen.getByText('Project manager', { selector: 'dd' }),
+    ).toBeVisible();
     expect(screen.queryByText(/Reviewed by/)).not.toBeInTheDocument();
   });
   it.each([
@@ -429,6 +432,82 @@ describe('delivery task review', () => {
         ],
       },
     },
+  });
+  it('puts an unsubmitted creative brief before optional tools without an empty submitted-media review', () => {
+    const candidate = creativeTask();
+    renderDetail({
+      ...candidate,
+      details: { ...candidate.details, state: 'PLANNED', submissions: [] },
+    });
+    expect(screen.getByText('Accurate logo; calm music')).toBeVisible();
+    expect(screen.queryByText('Exact creative review')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Approve submission' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText('Brief and notes').closest('details'),
+    ).toHaveAttribute('open');
+    expect(
+      screen
+        .getByText('Capacity planning', { selector: 'summary' })
+        .closest('details'),
+    ).not.toHaveAttribute('open');
+  });
+  it('retains explicit creative review recovery when the selected submission is missing', () => {
+    const candidate = creativeTask();
+    renderDetail(
+      {
+        ...candidate,
+        details: { ...candidate.details, state: 'PLANNED', submissions: [] },
+      },
+      workspace,
+      '?creativeSubmission=9',
+    );
+    expect(screen.getByText('Exact creative review')).toBeVisible();
+    expect(
+      screen.getByRole('link', { name: 'Review latest submission' }),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole('button', { name: 'Approve submission' }),
+    ).not.toBeInTheDocument();
+  });
+  it('keeps exact submitted creative work prominent while the production brief remains available on demand', async () => {
+    renderDetail(creativeTask());
+    expect(screen.getByText('Exact creative review')).toBeVisible();
+    expect(screen.getByText('Accurate logo; calm music')).not.toBeVisible();
+    const user = userEvent.setup();
+    await user.click(screen.getByText('Brief and notes'));
+    expect(screen.getByText('Accurate logo; calm music')).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'Approve submission' }),
+    ).toBeVisible();
+  });
+  it('preserves a capacity draft when its disclosure is closed and reopened', async () => {
+    const run = renderDetail({
+      ...task,
+      details: { ...task.details, state: 'PLANNED', submissions: [] },
+    });
+    const user = userEvent.setup();
+    const disclosure = screen.getByText('Capacity planning', {
+      selector: 'summary',
+    });
+    await user.click(disclosure);
+    await user.click(
+      screen.getByRole('button', { name: 'Plan remaining effort' }),
+    );
+    await user.type(
+      screen.getByRole('spinbutton', { name: 'Remaining production minutes' }),
+      '45',
+    );
+    await user.click(disclosure);
+    expect(
+      screen.getByLabelText('Remaining production minutes'),
+    ).not.toBeVisible();
+    await user.click(disclosure);
+    expect(
+      screen.getByRole('spinbutton', { name: 'Remaining production minutes' }),
+    ).toHaveValue(45);
+    expect(run).not.toHaveBeenCalled();
   });
   it('requires feedback before requesting changes and submits the current revision', async () => {
     const run = renderDetail();

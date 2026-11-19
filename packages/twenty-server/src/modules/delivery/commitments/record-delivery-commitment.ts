@@ -19,6 +19,7 @@ export const recordDeliveryCommitment = async (
   period: DeliveryCommitmentPeriodEntity,
   actor: CommitmentActor,
   input: {
+    eventId?: string;
     action: string;
     reason: string;
     changes: CommitmentChange[];
@@ -44,6 +45,7 @@ export const recordDeliveryCommitment = async (
     : [];
   const repository = manager.getRepository(DeliveryCommitmentEventEntity);
   await repository.insert({
+    ...(input.eventId ? { id: input.eventId } : {}),
     workspaceId: period.workspaceId,
     periodId: period.id,
     ...actor,

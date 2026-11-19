@@ -32,6 +32,15 @@ const {
   recomputeCache,
   restoreCache,
 } = require('./check-delivery-native-task-access-ui-support.cjs');
+const {
+  checkCommitmentJournal,
+  commitmentGroups,
+  initializeCommitments,
+  normalizeCommitmentGroup,
+  seedCommitments,
+  validateCommitmentMutation,
+  verifyCommitmentOperations,
+} = require('./check-delivery-native-commitments-ui-support.cjs');
 
 const FILE = '/tmp/otogrow-native-task-access-ui-fixture.json';
 const CHECKER = 'native-task-access-ui-v1';
@@ -71,7 +80,12 @@ function read() {
   );
   assert.equal(fixture.marker, `native-task-access-ui:${fixture.nonce}`);
   assert(['ALLOWED', 'DENIED', 'READ_ONLY'].includes(fixture.desired));
-  assert(['TASKS', 'REVIEWS', 'SERVICE'].includes(fixture.surface ?? 'TASKS'));
+  assert(
+    ['TASKS', 'REVIEWS', 'SERVICE', 'COMMITMENTS'].includes(
+      fixture.surface ?? 'TASKS',
+    ),
+  );
+  if (fixture.surface === 'COMMITMENTS') checkCommitmentJournal(fixture);
   if (fixture.surface === 'SERVICE') {
     assert.equal(fixture.revisionIds.length, 2);
     assert.equal(new Set(fixture.revisionIds).size, 2);
@@ -83,22 +97,43 @@ function read() {
 function rowGroups(fixture) {
   return [
     ['core', 'deliveryProject', [fixture.projectId]],
-    [fixture.schema, 'task', [fixture.firstTaskId, fixture.secondTaskId]],
-    ['core', 'deliveryTask', [fixture.firstManagedId, fixture.secondManagedId]],
+    [
+      fixture.schema,
+      'task',
+      [
+        fixture.firstTaskId,
+        fixture.secondTaskId,
+        ...(fixture.surface === 'COMMITMENTS' ? [fixture.deletedTaskId] : []),
+      ],
+    ],
+    [
+      'core',
+      'deliveryTask',
+      [
+        fixture.firstManagedId,
+        fixture.secondManagedId,
+        ...(fixture.surface === 'COMMITMENTS'
+          ? [fixture.deletedManagedId]
+          : []),
+      ],
+    ],
     ['core', 'role', [fixture.nativeRoleId]],
     ['core', 'objectPermission', [fixture.permissionId]],
     ...(fixture.surface === 'SERVICE'
       ? [['core', 'deliveryRevision', fixture.revisionIds]]
       : []),
+    ...(fixture.surface === 'COMMITMENTS' ? commitmentGroups(fixture) : []),
   ];
 }
 async function validate(manager, fixture) {
   assert(fixture.baseline);
   assert.equal(await schemaFingerprint(manager), fixture.baseline.schema);
-  assert.equal(
-    fingerprint(withoutHeartbeat((await operations(manager)).state)),
-    fixture.baseline.operations.hash,
-  );
+  const currentOperations = await operations(manager);
+  if (fixture.surface !== 'COMMITMENTS')
+    assert.equal(
+      fingerprint(withoutHeartbeat(currentOperations.state)),
+      fixture.baseline.operations.hash,
+    );
   await noNativeAutomation(manager, fixture, [
     'objectpermission',
     'role',
@@ -113,6 +148,12 @@ async function validate(manager, fixture) {
     groups.push({ schema, name, rows });
   }
   const present = groups[0].rows.length === 1;
+  if (fixture.surface === 'COMMITMENTS')
+    verifyCommitmentOperations(currentOperations.state, fixture, present);
+  const commitmentMutation =
+    fixture.surface === 'COMMITMENTS'
+      ? await validateCommitmentMutation(manager, fixture, groups, present)
+      : null;
   for (const group of groups) {
     const expected = fixture.seeds?.[`${group.schema}.${group.name}`] ?? [];
     if (!present)
@@ -122,11 +163,18 @@ async function validate(manager, fixture) {
         'Partial owned database state must be preserved for investigation.',
       );
     else {
-      exactIds(
-        group.rows,
-        expected.map((row) => row.id),
-      );
-      const actual = copy(group.rows);
+      exactIds(group.rows, [
+        ...expected.map((row) => row.id),
+        ...(group.name === 'deliveryCommitmentEvent'
+          ? (commitmentMutation?.extraEventIds ?? [])
+          : []),
+        ...(group.name === 'otogrowActivityEvent'
+          ? (commitmentMutation?.activityIds ?? [])
+          : []),
+      ]);
+      const actual = commitmentMutation
+        ? normalizeCommitmentGroup(group, fixture, commitmentMutation, expected)
+        : copy(group.rows);
       // The assignment observer writes a receipt for the current assignee even for legacy tasks.
       if (group.schema === fixture.schema && group.name === 'task')
         for (const task of actual) assert.equal(task.assigneeId, null);
@@ -183,6 +231,13 @@ async function validate(manager, fixture) {
     );
   }
   await withRedis((client) => verifyCache(fixture, client));
+  if (
+    commitmentMutation?.extraEventIds.length &&
+    !fixture.cleanupPermit.requestId
+  ) {
+    fixture.cleanupPermit.requestId = commitmentMutation.extraEventIds[0];
+    write(fixture);
+  }
   return { groups, tables, present };
 }
 function print(fixture) {
@@ -195,9 +250,23 @@ function print(fixture) {
         projectId: fixture.projectId,
         title: fixture.title,
         taskIds: [fixture.firstTaskId, fixture.secondTaskId],
-        controls: ['inspect', 'deny', 'read-only', 'allow', 'cleanup'],
+        ...(fixture.surface === 'COMMITMENTS'
+          ? { engagementId: fixture.engagementId, periodId: fixture.periodId }
+          : {}),
+        controls: [
+          'inspect',
+          'deny',
+          'read-only',
+          'allow',
+          ...(fixture.surface === 'COMMITMENTS'
+            ? ['permit-cleanup', 'permit-cancel']
+            : []),
+          'cleanup',
+        ],
         boundary:
-          'Read-only browser acceptance only. No task edits, assignment acknowledgements, comments, sends, approvals or other product writes.',
+          fixture.surface === 'COMMITMENTS'
+            ? 'Read/draft acceptance, plus at most one exact disposable orphan removal OR cancellation after its explicit fixture permit. No other product writes.'
+            : 'Read-only browser acceptance only. No task edits, assignment acknowledgements, comments, sends, approvals or other product writes.',
       },
       null,
       2,
@@ -209,7 +278,7 @@ async function create() {
   assert(!existsSync(FILE));
   const nonce = randomUUID();
   const surface = process.env.OTOGROW_NATIVE_ACCESS_UI_SURFACE ?? 'TASKS';
-  assert(['TASKS', 'REVIEWS', 'SERVICE'].includes(surface));
+  assert(['TASKS', 'REVIEWS', 'SERVICE', 'COMMITMENTS'].includes(surface));
   const fixture = {
     checker: CHECKER,
     surface,
@@ -230,6 +299,7 @@ async function create() {
     seeds: {},
     cacheIntents: [],
     cleanupAttempts: [],
+    ...(surface === 'COMMITMENTS' ? initializeCommitments() : {}),
     ...(surface === 'SERVICE'
       ? {
           revisionIds: [randomUUID(), randomUUID()],
@@ -412,6 +482,8 @@ async function create() {
       'UPDATE core."roleTarget" SET "roleId"=$2 WHERE id=$1',
       [target.id, fixture.nativeRoleId],
     );
+    if (surface === 'COMMITMENTS')
+      await seedCommitments(manager, fixture, originalOperations);
     for (const [schema, name, ids] of rowGroups(fixture))
       fixture.seeds[`${schema}.${name}`] = copy(
         await manager.query(
@@ -466,6 +538,14 @@ async function cleanup(fixture) {
         'deliveryProject',
         'deliveryTask',
         ...(fixture.surface === 'SERVICE' ? ['deliveryRevision'] : []),
+        ...(fixture.surface === 'COMMITMENTS'
+          ? [
+              'deliveryCommitmentPeriod',
+              'deliveryCommitmentLine',
+              'deliveryCommitmentAllocation',
+              'deliveryCommitmentEvent',
+            ]
+          : []),
       ])
         assert.equal(
           (
@@ -479,6 +559,9 @@ async function cleanup(fixture) {
                   fixture.firstManagedId,
                   fixture.secondManagedId,
                   ...(fixture.revisionIds ?? []),
+                  ...(fixture.surface === 'COMMITMENTS'
+                    ? commitmentGroups(fixture).flatMap((group) => group[2])
+                    : []),
                 ],
               ],
             )
@@ -503,10 +586,24 @@ async function cleanup(fixture) {
         [fixture.targetOriginal.id, fixture.targetOriginal.roleId],
       );
       for (const name of [
+        ...(observed.groups.some(
+          (group) => group.name === 'otogrowActivityEvent',
+        )
+          ? ['otogrowActivityEvent']
+          : []),
+        ...(fixture.surface === 'COMMITMENTS'
+          ? [
+              'deliveryCommitmentEvent',
+              'deliveryCommitmentAllocation',
+              'deliveryCommitmentLine',
+              'deliveryCommitmentPeriod',
+            ]
+          : []),
         ...(fixture.surface === 'SERVICE' ? ['deliveryRevision'] : []),
         'deliveryTask',
         'task',
         'deliveryProject',
+        ...(fixture.surface === 'COMMITMENTS' ? ['company'] : []),
         'objectPermission',
         'role',
       ]) {
@@ -520,8 +617,18 @@ async function cleanup(fixture) {
           group.rows.map((row) => row.id),
         );
       }
+      if (fixture.surface === 'COMMITMENTS')
+        await manager.query(
+          'UPDATE core."deliveryOperations" SET state=$2 WHERE id=$1',
+          [fixture.baseline.operations.id, fixture.operationsOriginal],
+        );
     }
     const after = await readTables(manager, fixture);
+    if (fixture.surface === 'COMMITMENTS')
+      assert.equal(
+        fingerprint(withoutHeartbeat((await operations(manager)).state)),
+        fixture.baseline.operations.hash,
+      );
     for (const [index, table] of after.entries())
       assert.equal(
         table.hash,
@@ -557,14 +664,42 @@ async function main() {
   const mode = process.argv[2];
   assert.equal(process.argv.length, 3);
   assert(
-    ['create', 'inspect', 'allow', 'deny', 'read-only', 'cleanup'].includes(
-      mode,
-    ),
+    [
+      'create',
+      'inspect',
+      'allow',
+      'deny',
+      'read-only',
+      'permit-cleanup',
+      'permit-cancel',
+      'cleanup',
+    ].includes(mode),
   );
   await connectionSource.initialize();
   try {
     if (mode === 'create') return await create();
     const fixture = read();
+    if (['permit-cleanup', 'permit-cancel'].includes(mode)) {
+      assert.equal(fixture.surface, 'COMMITMENTS');
+      assert.equal(fixture.cleanupPermit, undefined);
+      const databaseAt = await connectionSource.transaction(async (manager) => {
+        await locked(manager);
+        assert((await validate(manager, fixture)).present);
+        const [{ now }] = await manager.query(
+          'SELECT clock_timestamp() AS now',
+        );
+        return now.toISOString();
+      });
+      fixture.cleanupPermit = {
+        action: mode === 'permit-cleanup' ? 'REMOVED' : 'CANCELLED',
+        at: new Date().toISOString(),
+        databaseAt,
+        allocationId: fixture.orphanAllocationId,
+        requestId: null,
+      };
+      write(fixture);
+      return print(fixture);
+    }
     if (mode === 'cleanup') return await cleanup(fixture);
     if (['allow', 'deny', 'read-only'].includes(mode))
       return await transition(

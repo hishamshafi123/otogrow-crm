@@ -217,6 +217,67 @@ it('shows complete all-project totals, distinct zero/unknown/invalid availabilit
   expect(screen.getByText('Selected seven-day availability')).toBeVisible();
   expect(mockSave).not.toHaveBeenCalled();
 });
+it('leads with incomplete capacity and keeps availability editable on days without assignments', async () => {
+  mockSummary = {
+    ...mockSummary,
+    totalMemberCount: 1,
+    warnings: [],
+    members: mockSummary.members.map((member) => ({
+      ...member,
+      overloadDays: 0,
+      incompleteDays: 7,
+      needsPlanningCount: 0,
+      days: member.days.map((day) => ({
+        ...day,
+        availableMinutes: null,
+        availabilityInvalid: false,
+        assignmentCount: 0,
+        workMinutes: 0,
+        productionMinutes: 0,
+        revisionMinutes: 0,
+        reviewMinutes: 0,
+        waitMinutes: 0,
+        unknownCount: 0,
+        overloadMinutes: 0,
+        unavailableReviewCount: 0,
+      })),
+    })),
+  };
+  setup();
+  const user = userEvent.setup();
+  expect(screen.getByText('Capacity incomplete')).toBeVisible();
+  expect(screen.queryByText('No known overload')).not.toBeInTheDocument();
+  expect(screen.queryByText(/Showing 1 teammates/)).not.toBeInTheDocument();
+  await user.click(screen.getByText('Producer').closest('summary')!);
+  const day = within(
+    screen.getByRole('region', { name: 'Producer · 2026-10-29' }),
+  );
+  expect(day.getByText('Availability unknown')).toBeVisible();
+  expect(day.getByText('No assignments')).toBeVisible();
+  expect(day.queryByRole('link', { name: /Review 0/ })).not.toBeInTheDocument();
+  await user.click(day.getByRole('button', { name: /Set availability/ }));
+  expect(
+    screen.getByRole('spinbutton', { name: 'Available working minutes' }),
+  ).toHaveValue(null);
+  expect(mockSave).not.toHaveBeenCalled();
+});
+it('keeps workload risks visible while disclosing the working and waiting breakdown', async () => {
+  setup();
+  const user = userEvent.setup();
+  await user.click(screen.getByText('Producer').closest('summary')!);
+  const day = within(
+    screen.getByRole('region', { name: 'Producer · 2026-10-29' }),
+  );
+  expect(day.getByText('Over capacity by at least 120 min.')).toBeVisible();
+  expect(day.getByText(/estimates are incomplete/)).toBeVisible();
+  expect(day.getByText('Generation waiting 60 min')).not.toBeVisible();
+  await user.click(day.getByText('Work and waiting breakdown'));
+  expect(day.getByText('Generation waiting 60 min')).toBeVisible();
+  expect(
+    day.getByText('Production 90 · Revisions 30 · Review 0 min'),
+  ).toBeVisible();
+  expect(mockSave).not.toHaveBeenCalled();
+});
 it('keeps teammate and assignment pages URL-backed and distinguishes assignment rows from unique tasks', async () => {
   const router = setup(
     `&capacityAfter=member-page-two&capacityMember=${ASSIGNEE_ID}&capacityBucket=DAY&capacityDate=2026-10-29`,

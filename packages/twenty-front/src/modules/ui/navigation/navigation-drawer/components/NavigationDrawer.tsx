@@ -50,6 +50,10 @@ const StyledAnimatedContainer = styled.div<{
     width: ${({ isExpanded }) =>
       isExpanded ? 'calc(100vw / var(--t-zoom, 1))' : '0'};
   }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
 `;
 
 const StyledContainer = styled.div<{

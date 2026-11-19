@@ -33,6 +33,9 @@ let mockContextError: Error | undefined;
 let mockStateError: Error | undefined;
 let mockDetailError: Error | undefined;
 let mockVersion = 0;
+let mockEmptyQueue = false;
+let mockDueAt: string | null = null;
+let mockHasProduction = true;
 const mockSubscribers = new Set<() => void>();
 const mockCalls = jest.fn();
 const mockLegacyProps = jest.fn();
@@ -59,10 +62,10 @@ const task = (id = TASK) => ({
   assigneeId: mockCanEdit ? IDENTITY.memberId : 'new-editor',
   assigneeName: 'Editor',
   assignmentKey: `${mockCanEdit ? IDENTITY.memberId : 'new-editor'}:legacy`,
-  dueAt: null,
+  dueAt: mockDueAt,
   state: 'IN_PROGRESS',
   service: 'VIDEO',
-  hasProduction: true,
+  hasProduction: mockHasProduction,
   canEdit: mockCanEdit,
 });
 const document = () => ({
@@ -114,6 +117,15 @@ jest.mock('@/delivery/deliveryStyles', () => ({
 jest.mock('@/delivery/creative/production/creative-production-styles', () => ({
   StyledCreativeBoundary: 'fieldset',
   StyledCreativeText: 'div',
+  StyledCreativeAppliedFilters: 'p',
+  StyledCreativeFacts: 'dl',
+  StyledCreativeFilterFields: 'div',
+  StyledCreativeFilters: 'details',
+  StyledCreativeQueue: 'ul',
+  StyledCreativeQueueItem: 'li',
+  StyledCreativeSearch: 'div',
+  StyledCreativeTaskHeading: 'header',
+  StyledCreativeToolbar: 'div',
 }));
 jest.mock('@/delivery/tasks/DeliveryTaskAssignmentRead', () => ({
   DeliveryTaskAssignmentRead: ({ enabled }: { enabled: boolean }) =>
@@ -183,10 +195,12 @@ jest.mock('@apollo/client/react', () => ({
           return {
             deliveryCreativeTasks: {
               ...identity(),
-              items: [task(input.after ? OTHER_TASK : TASK)],
+              items: mockEmptyQueue
+                ? []
+                : [task(input.after ? OTHER_TASK : TASK)],
               selectedProject: null,
-              totalCount: 51,
-              nextCursor: input.after ? null : 'next-page',
+              totalCount: mockEmptyQueue ? 0 : 51,
+              nextCursor: mockEmptyQueue || input.after ? null : 'next-page',
             },
           };
         case 'DeliveryCreativeProjects':
@@ -354,6 +368,9 @@ beforeEach(() => {
   mockDetailRevision = 1;
   mockCanEdit = true;
   mockReady = true;
+  mockEmptyQueue = false;
+  mockDueAt = null;
+  mockHasProduction = true;
   mockContextError = undefined;
   mockStateError = undefined;
   mockDetailError = undefined;
@@ -412,7 +429,7 @@ describe('Canonical creative production journey', () => {
     const user = userEvent.setup();
     const router = renderPage();
     await user.type(screen.getByLabelText('Search tasks'), 'product');
-    await user.click(screen.getByRole('button', { name: 'Apply filters' }));
+    await user.click(screen.getByRole('button', { name: /^Search$/ }));
     expect(router.state.location.search).toContain('creativeSearch=product');
     await user.click(screen.getByRole('button', { name: 'Open production' }));
     await user.click(
@@ -429,6 +446,113 @@ describe('Canonical creative production journey', () => {
     });
     expect(await screen.findByText('Current stage: references')).toBeVisible();
     expect(router.state.location.search).toContain('creativeSearch=product');
+  });
+  it('gives a new workspace a real work destination without claiming filters hid tasks', async () => {
+    mockEmptyQueue = true;
+    renderPage();
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Your creative queue is ready',
+      }),
+    ).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Open Today' })).toHaveAttribute(
+      'href',
+      '/delivery?view=home',
+    );
+    expect(
+      screen.queryByRole('button', { name: 'Clear filters' }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('No matching tasks')).not.toBeInTheDocument();
+  });
+  it('recovers an empty filtered queue by clearing its URL selection', async () => {
+    mockEmptyQueue = true;
+    const user = userEvent.setup();
+    const router = renderPage(
+      '/delivery?view=creative&creativeSearch=missing&creativeMine=1',
+    );
+    expect(
+      await screen.findByRole('heading', { name: 'No matching tasks' }),
+    ).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Clear filters' }));
+    expect(router.state.location.search).not.toContain('creativeSearch');
+    expect(router.state.location.search).not.toContain('creativeMine');
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Your creative queue is ready',
+      }),
+    ).toBeVisible();
+  });
+  it('keeps collapsed filter values when searching, and exposes selected filters beside the queue', async () => {
+    const user = userEvent.setup();
+    const router = renderPage(
+      '/delivery?view=creative&creativeState=IN_PROGRESS&creativeMine=1',
+    );
+    expect(
+      await screen.findByText('Showing: In progress, Assigned to me'),
+    ).toHaveTextContent('Showing: In progress, Assigned to me');
+    await user.type(screen.getByLabelText('Search tasks'), 'launch');
+    await user.click(screen.getByRole('button', { name: /^Search$/ }));
+    expect(router.state.location.search).toContain('creativeState=IN_PROGRESS');
+    expect(router.state.location.search).toContain('creativeMine=1');
+    expect(router.state.location.search).toContain('creativeSearch=launch');
+    await user.click(screen.getByText('Filters (2 active)'));
+    await user.selectOptions(screen.getByLabelText('Work status'), 'PLANNED');
+    await user.click(screen.getByRole('button', { name: 'Apply filters' }));
+    expect(router.state.location.search).toContain('creativeState=PLANNED');
+    expect(router.state.location.search).toContain('creativeSearch=launch');
+    expect(router.state.location.search).toContain('creativeMine=1');
+  });
+  it('uses neutral production state when a task has no production document', async () => {
+    mockHasProduction = false;
+    renderPage();
+    expect(
+      await screen.findByText('Not started', { selector: 'small' }),
+    ).toBeVisible();
+    expect(
+      screen.queryByText('Ready to start production'),
+    ).not.toBeInTheDocument();
+  });
+  it.each(['Asia/Qatar', 'America/Los_Angeles'])(
+    'keeps the requested calendar timezone across the queue and detail near midnight (%s)',
+    async (timezone) => {
+      mockDueAt = '2026-11-06T23:30:00.000Z';
+      const user = userEvent.setup();
+      const router = renderPage(
+        `/delivery?view=creative&taskTimezone=${encodeURIComponent(timezone)}`,
+      );
+      const expected = new Date(mockDueAt).toLocaleString(undefined, {
+        timeZone: timezone,
+        timeZoneName: 'short',
+      });
+      expect(
+        await screen.findByText(expected, { selector: 'time' }),
+      ).toBeVisible();
+      await user.click(screen.getByRole('button', { name: 'Open production' }));
+      expect(
+        await screen.findByText(expected, { selector: 'time' }),
+      ).toBeVisible();
+      expect(
+        new URLSearchParams(router.state.location.search).get('taskTimezone'),
+      ).toBe(timezone);
+    },
+  );
+  it('labels an invalid calendar timezone explicitly instead of silently changing the due date', async () => {
+    mockDueAt = '2026-11-06T23:30:00.000Z';
+    renderPage('/delivery?view=creative&taskTimezone=invalid');
+    expect(
+      await screen.findByText(
+        'The calendar timezone is invalid. This due time uses UTC.',
+      ),
+    ).toBeVisible();
+    expect(
+      screen.getByText(
+        new Date(mockDueAt).toLocaleString(undefined, {
+          timeZone: 'UTC',
+          timeZoneName: 'short',
+        }),
+        { selector: 'time' },
+      ),
+    ).toBeVisible();
   });
   it('keeps an owned dirty body through an ordinary outage, hidden until current reads recover', async () => {
     const user = userEvent.setup();
@@ -516,12 +640,10 @@ describe('Canonical creative production journey', () => {
         'PRIVATE_CONTEXT_NOTE',
       );
       const learning = screen.getByRole('link', {
-        name: 'Inspect creative and ad learning',
+        name: 'Open creative learning',
       });
       if (keepExternalFocus) {
-        await user.tab({ shift: true });
-        await user.tab({ shift: true });
-        await user.tab({ shift: true });
+        for (let index = 0; index < 5; index += 1) await user.tab();
         expect(learning).toHaveFocus();
       }
       act(() => {
@@ -554,6 +676,28 @@ describe('Canonical creative production journey', () => {
       expect(await screen.findByLabelText('Production notes')).toHaveValue('');
     },
   );
+  it('keeps production refresh in task details until current production needs recovery', async () => {
+    const user = userEvent.setup();
+    renderPage(`/delivery?view=creative&task=${TASK}`);
+    await screen.findByLabelText('Production notes');
+    expect(screen.getByText('Refresh production')).not.toBeVisible();
+    await user.click(screen.getByText('Task details'));
+    expect(
+      screen.getByRole('button', { name: 'Refresh production' }),
+    ).toBeVisible();
+    await user.click(screen.getByText('Task details'));
+    act(() => {
+      mockRevision = 2;
+      emit();
+    });
+    expect(
+      screen.getByRole('button', { name: 'Refresh production' }),
+    ).toBeVisible();
+    await user.click(
+      screen.getByRole('button', { name: 'Refresh production' }),
+    );
+    expect(await screen.findByLabelText('Production notes')).toBeVisible();
+  });
   it('does not poll the production document and marks changed revisions for explicit refresh', async () => {
     renderPage(`/delivery?view=creative&task=${TASK}`);
     expect(await screen.findByLabelText('Production notes')).toBeVisible();

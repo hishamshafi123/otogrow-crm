@@ -301,3 +301,31 @@ it('routes an unapproved creative brief to the manager before production', async
     .click(screen.getByRole('button', { name: 'Review creative brief' }));
   expect(open).toHaveBeenCalledWith('creative');
 });
+it('keeps the next action and owner visible while disclosing the full delivery path on demand', async () => {
+  render(
+    <I18nProvider i18n={i18n}>
+      <DeliveryTaskJourney
+        task={task}
+        workspace={workspace}
+        onOpenPanel={jest.fn()}
+      />
+    </I18nProvider>,
+  );
+  expect(screen.getByText('Maya')).toBeVisible();
+  expect(
+    screen.getByRole('button', { name: 'Open task instructions' }),
+  ).toBeVisible();
+  expect(screen.getByText('Brief & assignment')).not.toBeVisible();
+  const user = userEvent.setup();
+  await user.click(screen.getByText('Delivery stages'));
+  expect(screen.getByRole('list', { name: 'Delivery stages' })).toBeVisible();
+  expect(screen.getByText('Brief & assignment').closest('li')).toHaveAttribute(
+    'aria-current',
+    'step',
+  );
+  await user.click(screen.getByText('Delivery stages'));
+  expect(screen.getByText('Brief & assignment')).not.toBeVisible();
+  expect(
+    screen.getByRole('button', { name: 'Open task instructions' }),
+  ).toBeVisible();
+});

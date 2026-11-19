@@ -157,7 +157,7 @@ async function main() {
   );
   const commitments = scoped.map(
     (source, index) =>
-      new DeliveryCommitmentsService(source, deliveries[index]),
+      new DeliveryCommitmentsService(source, deliveries[index], createIsolatedNativeTaskAccess()),
   );
   const creatives = scoped.map(
     (source, index) =>
@@ -895,7 +895,7 @@ async function main() {
           };
           const service = new DeliveryCommitmentsService(
             temporary,
-            deliveries[0],
+            deliveries[0], createIsolatedNativeTaskAccess(),
           );
           if (mode === 'moved') {
             await manager.query(

@@ -1,5 +1,14 @@
 import { useCommitmentScope } from '@/delivery/commitments/useCommitmentScope';
 import { useSearchParams } from 'react-router-dom';
+import { useLayoutEffect, useState } from 'react';
+import { NetworkStatus } from '@apollo/client';
+import { fastDeepEqual } from 'twenty-shared/utils';
+import { isDeliveryTaskUnavailable as isCommitmentSourceUnavailable } from '@/delivery/tasks/isDeliveryTaskUnavailable';
+import {
+  clearOrphanCleanupRecovery,
+  orphanCleanupStorageKey,
+} from '@/delivery/commitments/orphanCleanupStorage';
+import { useOtogrowIdentity } from '@/otogrow-access/useOtogrowIdentity';
 import { clientEngagementParams } from '@/delivery/commitments/clientCommitmentParams';
 import { useQuery } from '@apollo/client/react';
 import { Trans, useLingui } from '@lingui/react/macro';
@@ -8,36 +17,74 @@ import { useDeliveryDraftGuard } from '@/delivery/drafts/DeliveryDraftGuard';
 import {
   StyledDeliveryButton,
   StyledDeliveryCard,
+  StyledDeliveryCompactStack,
   StyledDeliveryStack,
 } from '@/delivery/deliveryStyles';
 import { GET_COMMITMENT_ENGAGEMENTS } from '@/delivery/commitments/delivery-commitments.graphql';
 import { DeliveryCommitments } from '@/delivery/commitments/DeliveryCommitments';
 import { type DeliveryCommitmentEngagementsQuery } from '~/generated-metadata/graphql';
 
-export const DeliveryCommitmentDirectory = () => {
-  const scope = useCommitmentScope();
-  return <CommitmentDirectory key={scope} />;
+type DeliveryCommitmentDirectoryProps = {
+  compact?: boolean;
 };
-const CommitmentDirectory = () => {
+
+export const DeliveryCommitmentDirectory = ({
+  compact = false,
+}: DeliveryCommitmentDirectoryProps) => {
+  const scope = useCommitmentScope();
+  return <CommitmentDirectory key={scope} compact={compact} />;
+};
+type CommitmentDirectoryProps = {
+  compact: boolean;
+};
+const CommitmentDirectory = ({ compact }: CommitmentDirectoryProps) => {
   const { t } = useLingui();
   const permission = useOtogrowAccess();
+  const { identity } = useOtogrowIdentity();
   const ready =
     !permission.loading && !permission.error && Boolean(permission.access);
-  const { requestAction } = useDeliveryDraftGuard();
+  const { requestAction, cancelPendingNavigation } = useDeliveryDraftGuard();
   const [params, setParams] = useSearchParams();
   const selectedId = params.get('clientEngagement') ?? '';
+  const currentAuthorization = ready
+    ? JSON.stringify({
+        capabilities: [...(permission.access?.capabilities ?? [])].sort(),
+        roleIds: [...(permission.access?.roleIds ?? [])].sort(),
+        grants: permission.access?.grants ?? [],
+      })
+    : null;
+  const [lastAuthorization, setLastAuthorization] = useState(
+    currentAuthorization ?? '',
+  );
+  if (
+    currentAuthorization !== null &&
+    currentAuthorization !== lastAuthorization
+  )
+    setLastAuthorization(currentAuthorization);
+  const authorization = currentAuthorization ?? lastAuthorization;
+  const [verifiedAuthorization, setVerifiedAuthorization] = useState<
+    string | null
+  >(null);
+  const [remembered, setRemembered] = useState<
+    | DeliveryCommitmentEngagementsQuery['deliveryCommitmentEngagements']['engagements'][number]
+    | null
+  >(null);
   const query = useQuery<
     DeliveryCommitmentEngagementsQuery,
-    { identity: string | null }
+    { identity: string | null; authorization: string }
   >(GET_COMMITMENT_ENGAGEMENTS, {
-    variables: { identity: permission.scopeKey },
+    variables: { identity: permission.scopeKey, authorization },
     skip: !ready,
     fetchPolicy: 'no-cache',
     notifyOnNetworkStatusChange: true,
     pollInterval: 30000,
   });
   const candidate = query.data?.deliveryCommitmentEngagements;
-  const data =
+  const unavailable =
+    isCommitmentSourceUnavailable(permission.error) ||
+    isCommitmentSourceUnavailable(query.error);
+  const trusted =
+    !unavailable &&
     ready &&
     permission.access &&
     !query.error &&
@@ -46,20 +93,68 @@ const CommitmentDirectory = () => {
     candidate.userWorkspaceId === permission.access.userWorkspaceId
       ? candidate
       : undefined;
+  const refreshing =
+    query.loading &&
+    [NetworkStatus.poll, NetworkStatus.refetch].includes(query.networkStatus);
+  if (trusted && !query.loading && verifiedAuthorization !== authorization)
+    setVerifiedAuthorization(authorization);
+  else if (
+    verifiedAuthorization !== null &&
+    (!trusted || (query.loading && !refreshing))
+  )
+    setVerifiedAuthorization(null);
+  const data =
+    trusted &&
+    (!query.loading || (refreshing && verifiedAuthorization === authorization))
+      ? trusted
+      : undefined;
   const selected = data?.engagements.find((item) => item.id === selectedId);
+  const missingSelected = Boolean(
+    data && !query.loading && selectedId && !selected,
+  );
+  if (selected && !fastDeepEqual(remembered, selected)) setRemembered(selected);
+  useLayoutEffect(() => {
+    if (unavailable || missingSelected) {
+      setRemembered(null);
+      cancelPendingNavigation();
+      if (selectedId)
+        clearOrphanCleanupRecovery(
+          orphanCleanupStorageKey(identity, selectedId),
+        );
+    }
+  }, [
+    unavailable,
+    missingSelected,
+    selectedId,
+    identity,
+    cancelPendingNavigation,
+  ]);
+  const retained =
+    !unavailable && !missingSelected && remembered?.id === selectedId
+      ? remembered
+      : null;
+  const shown = selected ?? retained;
+  const DirectorySurface = compact ? 'div' : StyledDeliveryCard;
+  const DirectoryContent = compact
+    ? StyledDeliveryCompactStack
+    : StyledDeliveryStack;
   return (
     <StyledDeliveryStack>
-      <StyledDeliveryCard>
-        <StyledDeliveryStack>
-          <h2>
-            <Trans>Client commitments</Trans>
-          </h2>
-          <p>
-            <Trans>
-              See promised work and fulfilment for your assigned client
-              projects.
-            </Trans>
-          </p>
+      <DirectorySurface>
+        <DirectoryContent>
+          {!compact && (
+            <>
+              <h2>
+                <Trans>Client service plans</Trans>
+              </h2>
+              <p>
+                <Trans>
+                  See promised work and fulfilment for your assigned client
+                  projects.
+                </Trans>
+              </p>
+            </>
+          )}
           {(permission.loading || query.loading) && (
             <p role="status">
               <Trans>Loading your client projects…</Trans>
@@ -137,13 +232,15 @@ const CommitmentDirectory = () => {
               </StyledDeliveryButton>
             </p>
           )}
-        </StyledDeliveryStack>
-      </StyledDeliveryCard>
-      {selected && (
-        <DeliveryCommitments
-          engagementId={selected.id}
-          billing={selected.billing}
-        />
+        </DirectoryContent>
+      </DirectorySurface>
+      {shown && (
+        <div hidden={!selected} inert={!selected || undefined}>
+          <DeliveryCommitments
+            engagementId={shown.id}
+            billing={shown.billing}
+          />
+        </div>
       )}
     </StyledDeliveryStack>
   );

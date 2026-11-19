@@ -1,4 +1,9 @@
 export const OPERATIONAL_PAGE_QUERIES = {
+  clients: [
+    'DeliveryCommitmentEngagements',
+    'DeliveryCommitments',
+    'DeliveryClientSetup',
+  ],
   content: [
     'DeliveryContentProjects',
     'DeliveryContentProjectChoices',
@@ -68,6 +73,7 @@ export const OPERATIONAL_PAGE_QUERIES = {
   ],
   chat: ['DeliveryChat'],
   health: [
+    'DeliveryFounderPerformance',
     'DeliveryFounderExceptions',
     'DeliveryReadiness',
     'DeliveryFounderEscalations',

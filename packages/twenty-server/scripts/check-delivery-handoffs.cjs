@@ -197,7 +197,7 @@ async function main() {
         {},
         createIsolatedNativeTaskAccess(),
       ),
-      new DeliveryCommitmentsService(scopedDataSource, service),
+      new DeliveryCommitmentsService(scopedDataSource, service, createIsolatedNativeTaskAccess()),
     );
     const handoffs = new DeliveryHandoffsService(
       scopedDataSource,

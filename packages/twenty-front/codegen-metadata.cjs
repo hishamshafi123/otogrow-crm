@@ -29,6 +29,7 @@ module.exports = {
     './src/modules/delivery/reviews/delivery-reviews.graphql.ts',
     './src/modules/delivery/finance/export/delivery-finance-export.graphql.ts',
     './src/modules/delivery/founder/delivery-founder.graphql.ts',
+    './src/modules/delivery/founder/performance/delivery-founder-performance.graphql.ts',
     './src/modules/delivery/founder/escalation/delivery-founder-escalation.graphql.ts',
     './src/modules/delivery/finance/delivery-finance-forecast.graphql.ts',
     './src/modules/delivery/finance/delivery-finance-period.graphql.ts',

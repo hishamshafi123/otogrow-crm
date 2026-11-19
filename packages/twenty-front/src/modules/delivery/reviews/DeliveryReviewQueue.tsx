@@ -17,15 +17,19 @@ import {
 } from '@/delivery/reviews/review-navigation';
 import { useReviewLabels } from '@/delivery/reviews/useReviewLabels';
 import {
-  StyledReviewQueueItem,
   StyledReviewQueueStack,
   StyledReviewQueueCard,
   StyledReviewQueueHeading,
+  StyledReviewQueueSummary,
+  StyledReviewQueueEntry,
+  StyledReviewQueueAction,
+  StyledReviewQueueFacts,
+  StyledReviewQueueDetails,
+  StyledReviewQueueEmpty,
 } from '@/delivery/reviews/reviewStyles';
 import { useWorkflowAccess } from '@/delivery/workflows/useWorkflowAccess';
 import { useDeliveryDraftGuard } from '@/delivery/drafts/DeliveryDraftGuard';
 import { hasOtogrowCapability } from '@/otogrow-access/otogrow-access.types';
-import { useIsMobile } from '@/ui/utilities/responsive/hooks/useIsMobile';
 import {
   StyledDeliveryButton,
   StyledDeliveryRow,
@@ -59,7 +63,6 @@ const ReviewQueueWorkspace = ({
   const labels = useReviewLabels();
   const permission = useWorkflowAccess();
   const [params, setParams] = useSearchParams();
-  const mobile = useIsMobile();
   const { requestAction } = useDeliveryDraftGuard();
   const input = reviewQueueInput(params);
   const authorized =
@@ -127,14 +130,15 @@ const ReviewQueueWorkspace = ({
       <StyledReviewQueueStack>
         <StyledReviewQueueHeading>
           <h2>
-            <Trans>Oldest first</Trans>
+            <Trans>Pending submissions</Trans>
           </h2>
           <StyledDeliveryButton
             aria-label={t`Refresh approvals`}
+            data-variant="quiet"
             disabled={query.loading || !authorized || !input}
             onClick={() => void query.refetch().catch(() => undefined)}
           >
-            {mobile ? t`Refresh` : t`Refresh approvals`}
+            <Trans>Refresh approvals</Trans>
           </StyledDeliveryButton>
         </StyledReviewQueueHeading>
         {(!input || query.error) && (
@@ -189,8 +193,25 @@ const ReviewQueueWorkspace = ({
         )}
         {data && (
           <>
-            <strong>{t`Pending in this selection: ${data.totalCount}`}</strong>
-            <small>{t`Unknown or future waiting time: ${data.unknownAgeCount} · Reviewer needs attention: ${data.unavailableReviewerCount}`}</small>
+            {data.totalCount > 0 && (
+              <StyledReviewQueueSummary>
+                <strong>{t`Pending in this selection: ${data.totalCount}`}</strong>
+                <span>
+                  <Trans>Oldest first</Trans>
+                </span>
+              </StyledReviewQueueSummary>
+            )}
+            {(data.unknownAgeCount > 0 ||
+              data.unavailableReviewerCount > 0) && (
+              <StyledReviewQueueSummary>
+                {data.unknownAgeCount > 0 && (
+                  <span>{t`Unknown or future waiting time: ${data.unknownAgeCount}`}</span>
+                )}
+                {data.unavailableReviewerCount > 0 && (
+                  <span>{t`Reviewer needs attention: ${data.unavailableReviewerCount}`}</span>
+                )}
+              </StyledReviewQueueSummary>
+            )}
             {(params.has('reviewsAfter') || activeFilterCount > 0) && (
               <StyledDeliveryRow>
                 {params.has('reviewsAfter') && (
@@ -214,7 +235,7 @@ const ReviewQueueWorkspace = ({
                 )}
               </StyledDeliveryRow>
             )}
-            <details open={!mobile || undefined}>
+            <details>
               <summary>
                 <Trans>Filter approvals</Trans>
                 {activeFilterCount > 0 && (
@@ -311,12 +332,22 @@ const ReviewQueueWorkspace = ({
               </section>
             )}
             {!data.items.length && (
-              <p>
-                <Trans>
-                  No pending submissions match these filters. Missing or
-                  unavailable evidence is not treated as approval.
-                </Trans>
-              </p>
+              <StyledReviewQueueEmpty>
+                <h3>
+                  {params.has('reviewsAfter')
+                    ? t`No submissions on this page`
+                    : activeFilterCount > 0
+                      ? t`No submissions match these filters`
+                      : t`No submissions awaiting review`}
+                </h3>
+                <p>
+                  {params.has('reviewsAfter')
+                    ? t`Return to the first approval page to check current submissions.`
+                    : activeFilterCount > 0
+                      ? t`Clear the approval filters to see other permitted submissions.`
+                      : t`Submitted work will appear here for an independent review. Approval and client fulfilment are tracked separately.`}
+                </p>
+              </StyledReviewQueueEmpty>
             )}
             {data.items.map((item) => {
               const selectedItem = selected.some(
@@ -326,25 +357,56 @@ const ReviewQueueWorkspace = ({
               );
               const version = item.submissionVersion;
               return (
-                <StyledReviewQueueItem
+                <StyledReviewQueueEntry
                   key={`${item.taskId}:${version}`}
                   aria-label={item.title}
                 >
-                  <StyledDeliveryRow>
+                  <StyledReviewQueueHeading>
                     <h3>{item.title}</h3>
                     <strong>{labels.age(item)}</strong>
-                  </StyledDeliveryRow>
+                  </StyledReviewQueueHeading>
                   {version != null && (
-                    <Link
-                      to={reviewItemDestination(params, {
-                        taskId: item.taskId,
-                        submissionVersion: version,
-                      })}
-                    >
-                      {item.canReviewSubmission
-                        ? t`Review exact submission`
-                        : t`View submission and responsibility`}
-                    </Link>
+                    <StyledReviewQueueAction>
+                      <Link
+                        to={reviewItemDestination(params, {
+                          taskId: item.taskId,
+                          submissionVersion: version,
+                        })}
+                      >
+                        {item.canReviewSubmission
+                          ? t`Review exact submission`
+                          : t`View submission and responsibility`}
+                      </Link>
+                      <label>
+                        <input
+                          type="checkbox"
+                          aria-label={t`Select for review: ${item.title}, submission ${version}`}
+                          checked={selectedItem}
+                          disabled={
+                            !item.canReviewSubmission ||
+                            (!selectedItem && selected.length >= 25)
+                          }
+                          onChange={(event) =>
+                            changeSelection(
+                              event.target.checked
+                                ? [
+                                    ...selected.filter(
+                                      (value) => value.taskId !== item.taskId,
+                                    ),
+                                    {
+                                      taskId: item.taskId,
+                                      submissionVersion: version,
+                                    },
+                                  ]
+                                : selected.filter(
+                                    (value) => value.taskId !== item.taskId,
+                                  ),
+                            )
+                          }
+                        />
+                        <Trans>Select for review</Trans>
+                      </label>
+                    </StyledReviewQueueAction>
                   )}
                   <p>
                     {item.projectName} · {item.service} ·{' '}
@@ -352,61 +414,55 @@ const ReviewQueueWorkspace = ({
                       ? t`Submission ${version}`
                       : t`Submission identity unavailable`}
                   </p>
-                  <p>
-                    {t`Review owner: ${item.effectiveReviewerName}`} ·{' '}
-                    {labels.mode(item.assignmentMode)} ·{' '}
-                    {labels.reviewer(item.reviewerState)}
-                  </p>
-                  <small>{t`Primary delivery manager: ${item.primaryReviewerName}`}</small>
-                  <p>
-                    {item.requiredCheckCount != null
-                      ? t`Required review checks: ${item.requiredCheckCount}`
-                      : t`Review requirements unavailable`}
-                    {' · '}
-                    {t`Submitted`}:{' '}
-                    {labels.submittedAt(item.submittedAt, data.observedAt)}
-                  </p>
+                  <StyledReviewQueueFacts>
+                    <div>
+                      <dt>
+                        <Trans>Review owner</Trans>
+                      </dt>
+                      <dd>{item.effectiveReviewerName}</dd>
+                    </div>
+                    <div>
+                      <dt>
+                        <Trans>Reviewer status</Trans>
+                      </dt>
+                      <dd>{labels.reviewer(item.reviewerState)}</dd>
+                    </div>
+                  </StyledReviewQueueFacts>
                   {item.warnings.length > 0 && (
-                    <details>
+                    <StyledReviewQueueDetails
+                      open={!item.canReviewSubmission || undefined}
+                    >
                       <summary>
-                        <Trans>Source and reviewer checks</Trans>
+                        {t`Source and reviewer checks (${item.warnings.length})`}
                       </summary>
                       {item.warnings.map((code) => (
                         <p key={code}>{labels.warning(code)}</p>
                       ))}
-                    </details>
+                    </StyledReviewQueueDetails>
                   )}
-                  {version != null && (
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={selectedItem}
-                        disabled={
-                          !item.canReviewSubmission ||
-                          (!selectedItem && selected.length >= 25)
-                        }
-                        onChange={(event) =>
-                          changeSelection(
-                            event.target.checked
-                              ? [
-                                  ...selected.filter(
-                                    (value) => value.taskId !== item.taskId,
-                                  ),
-                                  {
-                                    taskId: item.taskId,
-                                    submissionVersion: version,
-                                  },
-                                ]
-                              : selected.filter(
-                                  (value) => value.taskId !== item.taskId,
-                                ),
-                          )
-                        }
-                      />
-                      {t`Select ${item.title} submission ${version}`}
-                    </label>
-                  )}
-                </StyledReviewQueueItem>
+                  <StyledReviewQueueDetails
+                    open={
+                      version == null ||
+                      item.requiredCheckCount == null ||
+                      undefined
+                    }
+                  >
+                    <summary>
+                      <Trans>Submission details</Trans>
+                    </summary>
+                    <p>{labels.mode(item.assignmentMode)}</p>
+                    <p>{t`Primary delivery manager: ${item.primaryReviewerName}`}</p>
+                    <p>
+                      {item.requiredCheckCount != null
+                        ? t`Required review checks: ${item.requiredCheckCount}`
+                        : t`Review requirements unavailable`}
+                    </p>
+                    <p>
+                      {t`Submitted`}:{' '}
+                      {labels.submittedAt(item.submittedAt, data.observedAt)}
+                    </p>
+                  </StyledReviewQueueDetails>
+                </StyledReviewQueueEntry>
               );
             })}
             <StyledDeliveryRow>

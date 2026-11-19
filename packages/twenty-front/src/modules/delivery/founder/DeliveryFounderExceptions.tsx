@@ -8,6 +8,8 @@ import { type DeliveryFounderExceptionsQuery } from '~/generated-metadata/graphq
 import { GET_DELIVERY_FOUNDER_EXCEPTIONS } from '@/delivery/founder/delivery-founder.graphql';
 import { type FounderSnapshot } from '@/delivery/founder/founder.types';
 import { DeliveryFounderAlertRules } from '@/delivery/founder/escalation/DeliveryFounderAlertRules';
+import { FounderViewNavigation } from '@/delivery/founder/FounderViewNavigation';
+import { DeliveryFounderPerformance } from '@/delivery/founder/performance/DeliveryFounderPerformance';
 import { escalationDestination } from '@/delivery/founder/escalation/escalation-navigation';
 import { FounderExceptionRow } from '@/delivery/founder/FounderExceptionRow';
 import {
@@ -33,13 +35,23 @@ import {
 export const DeliveryFounderExceptions = () => {
   const permission = useWorkflowAccess();
   const [params] = useSearchParams();
-  if (params.get('founderPanel') === 'alerts')
-    return <DeliveryFounderAlertRules />;
+  const panel = params.get('founderPanel') ?? 'performance';
+  if (panel === 'alerts')
+    return (
+      <>
+        <FounderViewNavigation active="alerts" />
+        <DeliveryFounderAlertRules />
+      </>
+    );
+  if (panel === 'performance') return <DeliveryFounderPerformance />;
   return (
-    <FounderWorkspace
-      key={`${permission.scope}:${permission.canManageRoles}:${params.toString()}`}
-      permission={permission}
-    />
+    <>
+      <FounderViewNavigation active="attention" />
+      <FounderWorkspace
+        key={`${permission.scope}:${permission.canManageRoles}:${params.toString()}`}
+        permission={permission}
+      />
+    </>
   );
 };
 type FounderWorkspaceProps = {

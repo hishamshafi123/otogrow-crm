@@ -9,6 +9,7 @@ const COMMITMENT_FIELDS = gql`
     engagementName
     projectId
     canManage
+    taskDetailsAvailable
     legacyAllowance
     selectedPeriodId
     periods {
@@ -57,6 +58,38 @@ const COMMITMENT_FIELDS = gql`
       allocatedLineId
       allocatedUnit
     }
+    selectedTask {
+      taskId
+      name
+      taskRevision
+      state
+      allocationRevision
+      allocatedPeriodId
+      allocatedLineId
+      allocatedUnit
+    }
+    selectedParent {
+      taskId
+      name
+      taskRevision
+      state
+      allocationRevision
+      allocatedPeriodId
+      allocatedLineId
+      allocatedUnit
+    }
+    orphanAllocations {
+      allocationId
+      periodId
+      lineId
+      revision
+      state
+      createdAt
+      updatedAt
+      canRemove
+      removalBlockReason
+    }
+    nextOrphanAllocationCursor
     moreTaskOptions
     history {
       id
@@ -149,4 +182,51 @@ export const GET_COMMITMENT_ENGAGEMENTS = gql`
       }
     }
   }
+`;
+
+const ORPHAN_CLEANUP_RESULT = gql`
+  fragment DeliveryCommitmentOrphanCleanupFields on DeliveryCommitmentOrphanCleanupResult {
+    workspaceId
+    memberId
+    userWorkspaceId
+    engagementId
+    periodId
+    requestId
+    allocationId
+    requestedAllocationRevision
+    periodRevision
+    state
+    removedAllocationRevision
+    occurredAt
+  }
+`;
+export const REMOVE_ORPHAN_ALLOCATION = gql`
+  mutation RemoveDeliveryOrphanCommitmentAllocation(
+    $input: DeliveryCommitmentOrphanCleanupInput!
+  ) {
+    removeDeliveryOrphanCommitmentAllocation(input: $input) {
+      ...DeliveryCommitmentOrphanCleanupFields
+    }
+  }
+  ${ORPHAN_CLEANUP_RESULT}
+`;
+export const GET_ORPHAN_CLEANUP_RECEIPT = gql`
+  query DeliveryOrphanCommitmentCleanupReceipt(
+    $input: DeliveryCommitmentOrphanCleanupInput!
+  ) {
+    deliveryOrphanCommitmentCleanupReceipt(input: $input) {
+      ...DeliveryCommitmentOrphanCleanupFields
+    }
+  }
+  ${ORPHAN_CLEANUP_RESULT}
+`;
+export const CANCEL_ORPHAN_CLEANUP = gql`
+  mutation CancelDeliveryOrphanCommitmentCleanup(
+    $input: DeliveryCommitmentOrphanCleanupInput!
+  ) {
+    cancelDeliveryOrphanCommitmentCleanup(input: $input) {
+      ...DeliveryCommitmentOrphanCleanupFields
+    }
+  }
+  ${ORPHAN_CLEANUP_RESULT}
 `;

@@ -1,21 +1,140 @@
 import { Trans, useLingui } from '@lingui/react/macro';
+import { styled } from '@linaria/react';
+import { useId } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { themeCssVariables } from 'twenty-ui/theme-constants';
 import { type TaskListSnapshot } from '@/delivery/tasks/task.types';
 import { taskPageDestination } from '@/delivery/tasks/task-navigation';
 import { deliveryTaskSelection } from '@/delivery/delivery-task-navigation';
 import { DeliveryAssignedReviewsToday } from '@/delivery/reviews/DeliveryAssignedReviewsToday';
-import {
-  StyledDeliveryCard,
-  StyledDeliveryGrid,
-} from '@/delivery/deliveryStyles';
+
+const StyledOverview = styled.section`
+  background: ${themeCssVariables.background.primary};
+  border: 1px solid ${themeCssVariables.border.color.light};
+  border-radius: 16px;
+  min-width: 0;
+  padding: 16px 20px;
+
+  &[data-empty='true'] {
+    padding: 12px 16px;
+
+    &:not(:has(section)) {
+      display: none;
+    }
+  }
+
+  @media (max-width: 700px) {
+    padding: 16px;
+  }
+`;
+
+const StyledScope = styled.p`
+  color: ${themeCssVariables.font.color.secondary};
+  font-size: 12px;
+  line-height: 16px;
+  padding-bottom: 10px;
+`;
+
+const StyledMetrics = styled.div`
+  display: grid;
+  gap: 24px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+
+  &:has(> section) {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 1.4fr);
+  }
+
+  @media (max-width: 700px) {
+    gap: 16px;
+    &:has(> section) {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  &[data-empty='true'] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+`;
+
+const StyledMetric = styled(Link)`
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 44px;
+  min-width: 0;
+  text-decoration: none;
+
+  dl {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 0;
+  }
+
+  dt {
+    color: ${themeCssVariables.color.blue11};
+    font-size: 13px;
+  }
+
+  dd {
+    color: ${themeCssVariables.font.color.primary};
+    font-size: 24px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    letter-spacing: -1px;
+    line-height: 1.15;
+    margin: 0;
+  }
+
+  &:hover dt {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+`;
+
+const StyledProductionSummary = styled.details`
+  margin-top: 12px;
+
+  summary {
+    color: ${themeCssVariables.font.color.secondary};
+    font-size: 13px;
+  }
+
+  &[open] summary {
+    margin-bottom: 12px;
+  }
+
+  > div {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+    margin-bottom: 8px;
+  }
+
+  span {
+    font-size: 13px;
+  }
+
+  strong {
+    font-variant-numeric: tabular-nums;
+  }
+`;
+
 type DeliveryTasksTodayProps = { snapshot: TaskListSnapshot; manager: boolean };
 export const DeliveryTasksToday = ({
   snapshot,
   manager,
 }: DeliveryTasksTodayProps) => {
   const { t } = useLingui();
+  const metricId = useId();
   const [params] = useSearchParams();
   const overview = snapshot.overview;
+  const hasAttention =
+    overview.dueTodayCount > 0 ||
+    overview.overdueCount > 0 ||
+    overview.blockedCount > 0;
   const destination = (status: string | null, attention: string | null) =>
     taskPageDestination(params, {
       ...deliveryTaskSelection(null),
@@ -31,62 +150,92 @@ export const DeliveryTasksToday = ({
       tasksAfter: null,
     });
   return (
-    <>
-      <p>
-        {manager
-          ? t`Across all permitted team assignments`
-          : t`Across your production assignments`}
-      </p>
-      <StyledDeliveryGrid>
+    <StyledOverview
+      aria-label={t`Daily work overview`}
+      data-empty={!hasAttention}
+    >
+      {overview.totalCount > 0 && (
+        <StyledScope>
+          {manager
+            ? t`Across all permitted team assignments`
+            : t`Across your production assignments`}
+        </StyledScope>
+      )}
+      {!hasAttention && overview.totalCount > 0 && (
+        <StyledScope>
+          <Trans>No tasks are due today, overdue or blocked.</Trans>
+        </StyledScope>
+      )}
+      <StyledMetrics data-empty={!hasAttention}>
+        {hasAttention && (
+          <>
+            <StyledMetric
+              to={destination(null, 'today')}
+              aria-label={t`Due today: show today’s work`}
+              aria-describedby={`${metricId}-today`}
+            >
+              <dl>
+                <dt>
+                  <Trans>Due today</Trans>
+                </dt>
+                <dd id={`${metricId}-today`}>{overview.dueTodayCount}</dd>
+              </dl>
+            </StyledMetric>
+            <StyledMetric
+              to={destination(null, 'overdue')}
+              aria-label={t`Overdue: see overdue work`}
+              aria-describedby={`${metricId}-overdue`}
+            >
+              <dl>
+                <dt>
+                  <Trans>Overdue</Trans>
+                </dt>
+                <dd id={`${metricId}-overdue`}>{overview.overdueCount}</dd>
+              </dl>
+            </StyledMetric>
+            <StyledMetric
+              to={destination('BLOCKED', null)}
+              aria-label={t`Blocked: see blockers`}
+              aria-describedby={`${metricId}-blocked`}
+            >
+              <dl>
+                <dt>
+                  <Trans>Blocked</Trans>
+                </dt>
+                <dd id={`${metricId}-blocked`}>{overview.blockedCount}</dd>
+              </dl>
+            </StyledMetric>
+          </>
+        )}
         <DeliveryAssignedReviewsToday />
-        <StyledDeliveryCard>
-          <small>
-            <Trans>Due today</Trans>
-          </small>
-          <h2>{overview.dueTodayCount}</h2>
-          <Link to={destination(null, 'today')}>
-            <Trans>Show today’s work</Trans>
-          </Link>
-        </StyledDeliveryCard>
-        <StyledDeliveryCard>
-          <small>
-            <Trans>Approved work</Trans>
-          </small>
-          <h2>
-            {overview.approvedCount} / {overview.totalCount}
-          </h2>
-          <small>
-            <Trans>Internal approval; client fulfilment is separate.</Trans>
-          </small>
-        </StyledDeliveryCard>
-        <StyledDeliveryCard>
-          <small>
-            <Trans>Production submissions awaiting review</Trans>
-          </small>
-          <h2>{overview.reviewCount}</h2>
-          <Link to={destination('IN_REVIEW', null)}>
-            <Trans>Show submitted work</Trans>
-          </Link>
-        </StyledDeliveryCard>
-        <StyledDeliveryCard>
-          <small>
-            <Trans>Overdue</Trans>
-          </small>
-          <h2>{overview.overdueCount}</h2>
-          <Link to={destination(null, 'overdue')}>
-            <Trans>See overdue work</Trans>
-          </Link>
-        </StyledDeliveryCard>
-        <StyledDeliveryCard>
-          <small>
-            <Trans>Blocked</Trans>
-          </small>
-          <h2>{overview.blockedCount}</h2>
-          <Link to={destination('BLOCKED', null)}>
-            <Trans>See blockers</Trans>
-          </Link>
-        </StyledDeliveryCard>
-      </StyledDeliveryGrid>
-    </>
+      </StyledMetrics>
+      {overview.totalCount > 0 && (
+        <StyledProductionSummary>
+          <summary>
+            <Trans>Submission and approval totals</Trans>
+          </summary>
+          <div>
+            <span>
+              <Trans>Production submissions awaiting review</Trans>:{' '}
+              <strong>{overview.reviewCount}</strong>
+            </span>
+            <Link to={destination('IN_REVIEW', null)}>
+              <Trans>Show submitted work</Trans>
+            </Link>
+          </div>
+          <div>
+            <span>
+              <Trans>Approved work</Trans>:{' '}
+              <strong>
+                {overview.approvedCount} / {overview.totalCount}
+              </strong>
+            </span>
+            <small>
+              <Trans>Internal approval; client fulfilment is separate.</Trans>
+            </small>
+          </div>
+        </StyledProductionSummary>
+      )}
+    </StyledOverview>
   );
 };
