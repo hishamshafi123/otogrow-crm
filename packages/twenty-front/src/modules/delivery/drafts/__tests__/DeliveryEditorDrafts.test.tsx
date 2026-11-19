@@ -45,8 +45,9 @@ const mockMutate = jest.fn();
 const mockRefetch = jest.fn();
 jest.mock('@apollo/client/react', () => ({
   useMutation: () => [mockMutate, { loading: false }],
-  useQuery: () => ({
-    data: {
+  useQuery: (_document: unknown, options?: { skip?: boolean }) => {
+    const selectedTask = options?.skip ? undefined : workspace.tasks[0];
+    const data = {
       deliveryClientServiceCatalog: {
         workspaceId: 'workspace',
         memberId: 'admin',
@@ -74,9 +75,33 @@ jest.mock('@apollo/client/react', () => ({
           },
         ],
       },
-    },
-    refetch: mockRefetch,
-  }),
+      deliveryTaskList: {
+        workspaceId: 'workspace',
+        memberId: 'admin',
+        userWorkspaceId: 'membership',
+        items: workspace.tasks.map((task) => ({
+          id: task.id,
+          projectId: task.projectId,
+          revision: task.revision,
+        })),
+      },
+      deliveryTaskDetail: selectedTask
+        ? {
+            workspaceId: 'workspace',
+            memberId: 'admin',
+            userWorkspaceId: 'membership',
+            task: selectedTask,
+          }
+        : undefined,
+    };
+    return {
+      data,
+      refetch: async () => {
+        await mockRefetch();
+        return { data };
+      },
+    };
+  },
 }));
 const workspace: DeliveryWorkspace = {
   actor: { memberId: 'admin', isAdmin: true, isManager: true },
@@ -607,6 +632,9 @@ it('guards client-share preparation, retains failed choices and requires reviewi
     screen.getByRole('button', { name: 'Discard and continue' }),
   );
   mockRefetch.mockRejectedValueOnce(new Error('Refresh failed'));
+  await user.click(
+    screen.getByRole('button', { name: 'Share approved submission' }),
+  );
   await user.click(
     screen.getByRole('button', { name: 'Share approved submission' }),
   );
