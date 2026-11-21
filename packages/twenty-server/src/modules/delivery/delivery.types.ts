@@ -39,6 +39,7 @@ export type DeliveryDetails = {
   plan?: DeliveryTaskPlan;
   workflow?: DeliveryAppliedWorkflow;
   assignmentAt?: string;
+  allowSelfReview?: boolean;
   creative?: CreativeDocument;
   draftCopy?: string;
   brief: string;

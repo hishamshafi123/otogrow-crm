@@ -88,7 +88,7 @@ export const ClientSetupReceipt = ({
           <p>
             <Trans>
               No first task was requested. You can create work after the project
-              has an eligible assignee and a different delivery reviewer.
+              has an eligible assignee and delivery reviewer.
             </Trans>
           </p>
         )}

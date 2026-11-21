@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useLayoutEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { type DeliveryClientSetupCreateInput } from '~/generated-metadata/graphql';
@@ -91,11 +91,13 @@ export const ClientSetupWizard = ({
   );
   const [firstTask, setFirstTask] = useState(false);
   const [task, setTask] = useState(emptySetupTask);
-  const [openedProject] = useState(() =>
+  const [openedProject, setOpenedProject] = useState(() =>
     context.projects.find((item) => item.id === projectId),
   );
-  const [openedCompanyToken] = useState(context.selectedCompany?.sourceToken);
-  const [openedPlan] = useState(() =>
+  const [openedCompanyToken, setOpenedCompanyToken] = useState(
+    context.selectedCompany?.sourceToken,
+  );
+  const [openedPlan, setOpenedPlan] = useState(() =>
     context.servicePlans.find((item) => item.id === planId),
   );
   const [attempt, setAttempt] = useState<DeliveryClientSetupCreateInput | null>(
@@ -110,6 +112,28 @@ export const ClientSetupWizard = ({
   const company = current?.selectedCompany;
   const project = current?.projects.find((item) => item.id === projectId);
   const existingPlan = current?.servicePlans.find((item) => item.id === planId);
+  useLayoutEffect(() => {
+    if (
+      companyId &&
+      company?.id === companyId &&
+      openedCompanyToken === undefined
+    )
+      setOpenedCompanyToken(company.sourceToken);
+    if (projectId && project?.id === projectId && openedProject === undefined)
+      setOpenedProject(project);
+    if (planId && existingPlan?.id === planId && openedPlan === undefined)
+      setOpenedPlan(existingPlan);
+  }, [
+    companyId,
+    company,
+    openedCompanyToken,
+    projectId,
+    project,
+    openedProject,
+    planId,
+    existingPlan,
+    openedPlan,
+  ]);
   const reviewPlan =
     planMode === 'REUSE' ? existingPlan : servicePlanInput(plan, questions);
   const team = projectMode === 'REUSE' ? (project?.memberIds ?? []) : memberIds;
@@ -185,6 +209,16 @@ export const ClientSetupWizard = ({
   }, []);
   const source = (values: Record<string, string | null>) => {
     if (companyRecoveryRequired) return;
+    if ('setupCompany' in values) {
+      setOpenedCompanyToken(undefined);
+      setOpenedProject(undefined);
+      setOpenedPlan(undefined);
+    }
+    if ('setupProject' in values) {
+      setOpenedProject(undefined);
+      setOpenedPlan(undefined);
+    }
+    if ('setupPlan' in values) setOpenedPlan(undefined);
     requestAction(() =>
       setParams(
         taskPageDestination(params, {
@@ -686,8 +720,9 @@ export const ClientSetupWizard = ({
                   <p>
                     <Trans>
                       The project and service plan can be saved without a task.
-                      A task needs an actual project assignee and a different
-                      delivery manager to review it.
+                      A task needs an actual project assignee and a delivery
+                      manager to review it. For the first task, both roles may
+                      belong to the same manager.
                     </Trans>
                   </p>
                   {firstTask && (
@@ -701,9 +736,9 @@ export const ClientSetupWizard = ({
                   {firstTask && !workReady && (
                     <p role="status">
                       <Trans>
-                        Choose an eligible project assignee and an independent
-                        delivery reviewer, and enter a title. You can also leave
-                        the task out and configure the team first.
+                        Choose an eligible project assignee and delivery reviewer,
+                        and enter a title. You can also leave the task out and
+                        configure the team first.
                       </Trans>{' '}
                       <Link to={taskPageDestination(params, { view: 'team' })}>
                         <Trans>Open Team & projects</Trans>

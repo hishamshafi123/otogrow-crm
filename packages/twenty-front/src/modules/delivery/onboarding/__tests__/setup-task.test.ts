@@ -16,9 +16,20 @@ const prepared = () => ({
   assigneeId: SETUP_EDITOR,
   reviewerId: SETUP_MANAGER,
 });
-it('requires genuine project membership and a different current manager, without assigning anyone automatically', () => {
+it('requires genuine project membership and a current manager, while allowing the same first-task manager in both roles', () => {
   expect(setupTaskReady(emptySetupTask(), members, [SETUP_EDITOR])).toBe(false);
   expect(setupTaskReady(prepared(), members, [SETUP_EDITOR])).toBe(true);
+  expect(
+    setupTaskReady(
+      {
+        ...prepared(),
+        assigneeId: SETUP_MANAGER,
+        reviewerId: SETUP_MANAGER,
+      },
+      members,
+      [SETUP_MANAGER],
+    ),
+  ).toBe(true);
   expect(
     setupTaskIssues({ ...prepared(), reviewerId: SETUP_EDITOR }, members, [
       SETUP_EDITOR,

@@ -168,3 +168,32 @@ describe('delivery commands', () => {
     ).toBe(false);
   });
 });
+
+
+it('allows only the saved first-task self-review exception during final approval', () => {
+  const details: DeliveryDetails = {
+    ...pendingDetails(),
+    reviewerId: editorId,
+    allowSelfReview: true,
+  };
+  expect(() =>
+    assertDeliveryReview(
+      details,
+      editorId,
+      editorId,
+      true,
+      '',
+      'APPROVED',
+    ),
+  ).not.toThrow();
+  expect(() =>
+    assertDeliveryReview(
+      details,
+      editorId,
+      reviewerId,
+      true,
+      '',
+      'APPROVED',
+    ),
+  ).toThrow(ForbiddenException);
+});

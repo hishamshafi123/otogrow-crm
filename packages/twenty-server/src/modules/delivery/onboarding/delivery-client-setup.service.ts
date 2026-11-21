@@ -527,6 +527,11 @@ export class DeliveryClientSetupService {
             },
           },
           manager,
+          undefined,
+          {
+            allowSelfReview:
+              command.firstTask.assigneeId === command.firstTask.reviewerId,
+          },
         );
         if (typeof created !== 'string')
           throw new Error('First task creation did not return an identity.');

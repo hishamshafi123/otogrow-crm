@@ -140,3 +140,20 @@ it('rejects out-of-range source versions before issuing a database cast', async 
   ).rejects.toThrow('source identity is unavailable');
   expect(query).not.toHaveBeenCalled();
 });
+
+
+it('activates only the explicitly allowed first-task self reviewer', () => {
+  const current = {
+    ...input(),
+    primaryReviewerId: ASSIGNEE,
+    access: [{ memberId: ASSIGNEE, capabilities: ['delivery.manage'] }],
+    actorId: ASSIGNEE,
+  };
+  expect(
+    deliveryReviewAuthority({ ...current, allowSelfReview: true }),
+  ).toMatchObject({ reviewerState: 'ACTIVE', canReview: true });
+  expect(deliveryReviewAuthority(current)).toMatchObject({
+    reviewerState: 'SELF_REVIEW',
+    canReview: false,
+  });
+});

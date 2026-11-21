@@ -84,6 +84,7 @@ type ReviewRow = {
   taskRevision: number;
   service: string;
   primaryReviewerId: string | null;
+  allowSelfReview?: boolean;
   submissionVersion: unknown;
   submittedAt: unknown;
   creativeVersion: unknown;
@@ -268,6 +269,7 @@ export class DeliveryReviewsService {
     const authority = deliveryReviewAuthority({
       primaryReviewerId: row.primaryReviewerId,
       assigneeId: row.assigneeId,
+      allowSelfReview: row.allowSelfReview,
       assignment,
       projectMemberIds: project.memberIds,
       access: people.access,
@@ -363,7 +365,7 @@ export class DeliveryReviewsService {
         const rows: ReviewRow[] = selectedProjects.length
           ? await this.nativeTasks.query<ReviewRow[]>(
               manager,
-              `SELECT task.id AS "taskId",task.title,task."assigneeId",delivery."projectId",delivery.revision AS "taskRevision",COALESCE(delivery.details->>'service','') AS service,delivery.details->>'reviewerId' AS "primaryReviewerId",delivery.details->'submissions'->-1->'version' AS "submissionVersion",delivery.details->'submissions'->-1->'submittedAt' AS "submittedAt",delivery.details->'submissions'->-1->'creativeVersion' AS "creativeVersion",delivery.details->'submissions'->-1->'finalAssetId' AS "finalAssetId",CASE WHEN delivery.details->'submissions'->-1->'workflow' IS NULL THEN 0 WHEN jsonb_typeof(delivery.details->'submissions'->-1->'workflow'->'definition'->'reviewChecks')='array' THEN (SELECT count(*)::integer FROM jsonb_array_elements(delivery.details->'submissions'->-1->'workflow'->'definition'->'reviewChecks') requirement WHERE requirement->>'required'='true') ELSE NULL END AS "requiredCheckCount" FROM core."deliveryTask" delivery JOIN ${this.delivery.schema(workspace)}.task task ON task.id=delivery."taskId" AND task."deletedAt" IS NULL WHERE delivery."workspaceId"=$1 AND delivery."projectId"=ANY($2::uuid[]) AND delivery.details->>'state'='IN_REVIEW' AND ${this.nativeTasks.predicate(workspace, nativeVisibility, 'task.id')} ORDER BY task.id LIMIT $3`,
+              `SELECT task.id AS "taskId",task.title,task."assigneeId",delivery."projectId",delivery.revision AS "taskRevision",COALESCE(delivery.details->>'service','') AS service,delivery.details->>'reviewerId' AS "primaryReviewerId",COALESCE(delivery.details->'allowSelfReview','false'::jsonb) AS "allowSelfReview",delivery.details->'submissions'->-1->'version' AS "submissionVersion",delivery.details->'submissions'->-1->'submittedAt' AS "submittedAt",delivery.details->'submissions'->-1->'creativeVersion' AS "creativeVersion",delivery.details->'submissions'->-1->'finalAssetId' AS "finalAssetId",CASE WHEN delivery.details->'submissions'->-1->'workflow' IS NULL THEN 0 WHEN jsonb_typeof(delivery.details->'submissions'->-1->'workflow'->'definition'->'reviewChecks')='array' THEN (SELECT count(*)::integer FROM jsonb_array_elements(delivery.details->'submissions'->-1->'workflow'->'definition'->'reviewChecks') requirement WHERE requirement->>'required'='true') ELSE NULL END AS "requiredCheckCount" FROM core."deliveryTask" delivery JOIN ${this.delivery.schema(workspace)}.task task ON task.id=delivery."taskId" AND task."deletedAt" IS NULL WHERE delivery."workspaceId"=$1 AND delivery."projectId"=ANY($2::uuid[]) AND delivery.details->>'state'='IN_REVIEW' AND ${this.nativeTasks.predicate(workspace, nativeVisibility, 'task.id')} ORDER BY task.id LIMIT $3`,
               [
                 workspace.id,
                 selectedProjects.map((project) => project.id),
@@ -787,6 +789,7 @@ export class DeliveryReviewsService {
         const authority = deliveryReviewAuthority({
           primaryReviewerId: scope.task.details.reviewerId,
           assigneeId: scope.assigneeId,
+          allowSelfReview: scope.task.details.allowSelfReview,
           assignment: {
             mode: 'BACKUP',
             reviewerId: command.reviewerId,

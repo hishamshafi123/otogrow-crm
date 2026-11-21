@@ -2215,3 +2215,26 @@ Pushed only the 11-line workflow change atop the typing fix as `e66b475694a7b96d
 The all-source main release built server/frontend and passed contracts plus backend OS workflows, but stopped before Tailscale/VPS upload when `DeliveryEditorDrafts` could not find Task. The form's typed task-list/detail migration was not represented by the older Apollo mock: it returned no task sources and treated skipped detail reads as populated. Updated the mock to provide current workspace task/list detail, preserve refetch failures and retry the revised-version share. The product form was not weakened or bypassed.
 
 Validation: the affected suite passes 10/10; the exact deployment frontend command passes 178 suites and 2,124 tests. The earlier Node20 deprecation is only a warning. This correction targets the existing main-push deployment route; production activation remains a separate result.
+
+
+### 2026-11-19 — founder performance production rollout accepted
+
+Main source release `c1234fde5f74caa10d07d2eb62d46eb89140a730` is live through GitHub run 44470962762 (job 135404620349). The first rerun attempt's hosted runner communication loss produced no job log and was rerun without changing application resources. The rerun passed all builds/contracts/OS tests, VPS upload and activation, exact API/background-worker checks and public Cloudflare health. Deployment duration 23m23s. The remaining Node20 action warning is non-blocking. Whole-item counts remain unchanged; real staff/accounting interpretation and the remaining design matrix stay separate.
+
+
+### 2026-11-22 — IMP-04/08/39 first-task reviewer exception decision
+
+- **Business outcome and workflow:** a manager setting up a client's first work may also be its assignee. Requiring a second manager blocks onboarding for small teams without adding useful independent review. The complete flow must support client setup → first task → submission → approval, not only form selection.
+- **Alternatives and chosen approach:** do not remove independent review globally and do not expose a public command flag that other callers could use to bypass it. The onboarding service will internally mark only a first task whose selected assignee and reviewer are the same with `allowSelfReview`. Generic task creation and all existing records retain the current independent-review rule. Any different assignee/reviewer selection still requires a current delivery manager and the normal review process.
+- **UI/UX:** first-task fields will offer eligible managers without removing the current assignee, use "First task reviewer" instead of "Independent", and explain that the same manager may review first-task work. Wizard, validation and receipt copy will stop claiming a different reviewer is required. Ordinary task forms and review policy text remain unchanged.
+- **System effects:** persist the exception in task details so final review remains valid after saving. Review-authority projections must recognize it wherever the task is read; no migration is needed for additive JSON. The exception does not expand project membership or delivery-management permission.
+- **Acceptance:** cover same-person first-task readiness and creation, ordinary same-person rejection, final approval by the allowed first-task reviewer, unauthorized/other-person denial, and review queue authority. Run focused and delivery regressions, inspect the onboarding form at desktop/narrow widths, and deploy only the verified change.
+
+
+### 2026-11-22 — first-task exception implementation and release checks
+
+Implemented the scoped onboarding exception and source-readiness correction. First-task fields accept an eligible manager as both assignee and reviewer; ordinary tasks and unmarked records still reject self-review. The internal onboarding service saves `allowSelfReview` only when those first-task selections match, and final review plus all task/review/founder/notice projections honor it. No public command flag, migration, or broader permission grant was added.
+
+Also corrected source snapshot capture/reset for companies, projects and plans selected after the wizard mounts, preventing false stale-source blocking while retaining genuine revision checks. Added a non-remounting company-selection regression and updated the same-person wizard journey.
+
+Verification: 37 focused backend policy/onboarding cases and 10 frontend wizard/validator cases pass; both direct package typechecks pass. Real rollback PostgreSQL proved ordinary same-person creation rejection and first-task create → submit → approve by the same manager. The local browser automation did not complete its full journey, so visual acceptance remains pending and is not claimed. User directed the verified source change to GitHub for the existing automatic VPS action.

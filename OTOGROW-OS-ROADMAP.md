@@ -290,3 +290,8 @@ Company overview now has a locally accepted bounded Performance slice: company c
 Validation includes 15 new backend and 23 new frontend cases, 90 backend delivery suites/1,109 tests, direct contracts, metadata generation, scoped lint/format, production Nest/Vite builds, real rollback PostgreSQL checks and populated Chromium desktop/mobile journeys. Independent critique found and resolved four correctness/design issues before bounded acceptance. Synthetic fixtures were removed with protected baselines unchanged. Full details and evidence are in `OTOGROW-OS-IMPROVEMENTS.md` under the same date.
 
 This is local implementation and bounded visual/workflow acceptance, not production rollout or complete accounting. The client-share test-mock failure was subsequently corrected and the exact frontend OS gate passes 178 suites/2,124 tests; actual zoom/contrast/dense multi-currency matrix cases and real staff/accounting acceptance remain open. Existing whole-improvement counts are unchanged.
+
+
+### 2026-11-19 — production founder performance rollout
+
+Current production source is `c1234fde5f74caa10d07d2eb62d46eb89140a730`, deployed through GitHub run 44470962762. The rerun after a transient hosted-runner communication loss passed VPS activation, exact API/background-worker verification and Cloudflare health. This is production deployment evidence, not a claim of complete accounting or real-staff acceptance. Whole-item counts remain unchanged.

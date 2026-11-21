@@ -93,8 +93,7 @@ export const setupTaskIssues = (
     ...(!members.some(
       (member) =>
         member.id === values.reviewerId &&
-        ['ADMIN', 'MANAGER'].includes(member.access) &&
-        member.id !== values.assigneeId,
+        ['ADMIN', 'MANAGER'].includes(member.access),
     )
       ? ['TASK_REVIEWER']
       : []),
@@ -134,17 +133,15 @@ export const SetupFirstTaskFields = ({
     TASK_TITLE: t`Enter a first task title of at most 200 characters.`,
     TASK_TEXT: t`Keep task instructions within 20,000 characters and the service within 100.`,
     TASK_ASSIGNEE: t`Choose a current member of the selected project.`,
-    TASK_REVIEWER: t`Choose a different current delivery manager to review this task.`,
+    TASK_REVIEWER: t`Choose a current delivery manager. The first task assignee and reviewer may be the same person.`,
     TASK_PRIORITY: t`Choose a supported task priority.`,
     TASK_DATE: t`Choose valid calendar dates or leave the dates empty.`,
     TASK_CHECKLIST: t`Use at most 100 checklist lines, with at most 200 characters in each.`,
     TASK_REFERENCES: t`Use at most 30 references, each a complete HTTP or HTTPS URL of at most 2,000 characters.`,
   };
   const assignees = members.filter((member) => memberIds.includes(member.id));
-  const reviewers = members.filter(
-    (member) =>
-      ['ADMIN', 'MANAGER'].includes(member.access) &&
-      member.id !== values.assigneeId,
+  const reviewers = members.filter((member) =>
+    ['ADMIN', 'MANAGER'].includes(member.access),
   );
   return (
     <StyledDeliveryStack>
@@ -208,15 +205,15 @@ export const SetupFirstTaskFields = ({
           </select>
         </label>
         <label>
-          <Trans>Independent first task reviewer</Trans>
+          <Trans>First task reviewer</Trans>
           <select
-            aria-label={t`Independent first task reviewer`}
+            aria-label={t`First task reviewer`}
             value={values.reviewerId}
             onChange={(event) =>
               onChange({ ...values, reviewerId: event.target.value })
             }
           >
-            <option value="">{t`Choose a different delivery manager`}</option>
+            <option value="">{t`Choose a delivery manager`}</option>
             {values.reviewerId &&
               !reviewers.some((member) => member.id === values.reviewerId) && (
                 <option

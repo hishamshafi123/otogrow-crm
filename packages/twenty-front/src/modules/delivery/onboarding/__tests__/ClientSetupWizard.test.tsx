@@ -126,7 +126,7 @@ jest.mock('@apollo/client/react', () => ({
   },
 }));
 
-const Harness = () => {
+const Harness = ({ stable = false }: { stable?: boolean }) => {
   const [params] = useSearchParams();
   const [initialRequestId] = useState(params.get('setupRequest'));
   const companyId = params.get('setupCompany');
@@ -146,7 +146,7 @@ const Harness = () => {
     <>
       <Link to="/delivery?view=clients">Leave client setup</Link>
       <ClientSetupWizard
-        key={source.toString()}
+        key={stable ? 'stable' : source.toString()}
         state={state}
         context={context}
         companyId={companyId}
@@ -161,6 +161,7 @@ const Harness = () => {
 };
 const setup = (
   entry = `/delivery?view=onboarding&setupCompany=${SETUP_COMPANY}`,
+  stable = false,
 ) => {
   const router = createMemoryRouter(
     [
@@ -169,7 +170,7 @@ const setup = (
         element: (
           <I18nProvider i18n={i18n}>
             <DeliveryDraftGuardProvider>
-              <Harness />
+              <Harness stable={stable} />
             </DeliveryDraftGuardProvider>
           </I18nProvider>
         ),
@@ -200,7 +201,7 @@ const prepareFirstTask = async (
     SETUP_EDITOR,
   );
   await user.selectOptions(
-    screen.getByLabelText('Independent first task reviewer'),
+    screen.getByLabelText('First task reviewer'),
     SETUP_MANAGER,
   );
 };
@@ -349,7 +350,7 @@ it('reviews a new project, explicit team and advertising service plan with a ret
   });
 });
 
-it('cannot use one person as assignee and reviewer and can deliberately save reused records without a task', async () => {
+it('allows one first-task manager in both roles and can deliberately save reused records without a task', async () => {
   mockContext.members = [mockContext.members[0]];
   mockContext.projects[0].memberIds = [SETUP_MANAGER];
   const { user } = setup(reusedEntry());
@@ -360,21 +361,25 @@ it('cannot use one person as assignee and reviewer and can deliberately save reu
   );
   await user.type(
     screen.getByLabelText('First task title'),
-    'Needs independent review',
+    'First task allows same manager',
   );
   await user.selectOptions(
     screen.getByLabelText('First task assignee'),
     SETUP_MANAGER,
   );
+  await user.selectOptions(
+    screen.getByLabelText('First task reviewer'),
+    SETUP_MANAGER,
+  );
   expect(
     within(
-      screen.getByLabelText('Independent first task reviewer'),
-    ).queryByRole('option', { name: 'Independent manager' }),
-  ).not.toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled();
+      screen.getByLabelText('First task reviewer'),
+    ).getByRole('option', { name: 'Independent manager' }),
+  ).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Continue' })).toBeEnabled();
   expect(
-    screen.getByRole('link', { name: 'Open Team & projects' }),
-  ).toBeVisible();
+    screen.queryByRole('link', { name: 'Open Team & projects' }),
+  ).not.toBeInTheDocument();
   await user.click(
     screen.getByRole('checkbox', {
       name: 'Include the first task in this setup',
@@ -495,3 +500,19 @@ jest.mock('@/delivery/onboarding/useServiceCatalog', () => ({
     add: jest.fn(),
   }),
 }));
+
+
+it('allows a company selected after mount without treating its first source version as stale', async () => {
+  const { user } = setup('/delivery?view=onboarding', true);
+  await user.selectOptions(
+    screen.getByRole('combobox', { name: 'Client company' }),
+    SETUP_COMPANY,
+  );
+  await continueStep(user);
+  expect(
+    screen.getByRole('region', { name: 'Project and team' }),
+  ).toBeInTheDocument();
+  expect(
+    screen.queryByText(/selected project or service plan changed/),
+  ).not.toBeInTheDocument();
+});
