@@ -85,9 +85,10 @@ const ClientWorkspaceDirectory = () => {
     : (state.data ?? (retained.source === state.source ? retained.data : null));
   const available = Boolean(state.data) && !state.denied;
   const company = data?.selectedCompany;
-  const project = data?.projects.find(
-    (item) => item.id === selection.projectId,
-  );
+  const serviceProjectId =
+    selection.projectId ??
+    (data?.projects.length === 1 ? data.projects[0].id : null);
+  const project = data?.projects.find((item) => item.id === serviceProjectId);
   const sectionLabels = {
     profile: t`Profile`,
     contacts: t`Contacts`,
@@ -283,7 +284,7 @@ const ClientWorkspaceDirectory = () => {
                     <label>
                       <Trans>Client project</Trans>
                       <select
-                        value={selection.projectId ?? ''}
+                        value={serviceProjectId ?? ''}
                         onChange={(event) => {
                           const destination = clientWorkspaceDestination({
                             ...selection,

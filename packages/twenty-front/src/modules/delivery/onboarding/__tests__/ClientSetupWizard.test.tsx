@@ -372,9 +372,9 @@ it('allows one first-task manager in both roles and can deliberately save reused
     SETUP_MANAGER,
   );
   expect(
-    within(
-      screen.getByLabelText('First task reviewer'),
-    ).getByRole('option', { name: 'Independent manager' }),
+    within(screen.getByLabelText('First task reviewer')).getByRole('option', {
+      name: 'Independent manager',
+    }),
   ).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Continue' })).toBeEnabled();
   expect(
@@ -501,7 +501,6 @@ jest.mock('@/delivery/onboarding/useServiceCatalog', () => ({
   }),
 }));
 
-
 it('allows a company selected after mount without treating its first source version as stale', async () => {
   const { user } = setup('/delivery?view=onboarding', true);
   await user.selectOptions(
@@ -515,4 +514,41 @@ it('allows a company selected after mount without treating its first source vers
   expect(
     screen.queryByText(/selected project or service plan changed/),
   ).not.toBeInTheDocument();
+});
+
+it('opens a requested additional plan directly without a redundant mode choice', async () => {
+  const { user } = setup(
+    `/delivery?view=onboarding&setupCompany=${SETUP_COMPANY}&setupProject=${SETUP_PROJECT}&setupPlanMode=new`,
+  );
+  expect(
+    screen.getByRole('region', { name: 'Service plan' }),
+  ).toBeInTheDocument();
+  expect(
+    screen.queryByLabelText('Service plan choice'),
+  ).not.toBeInTheDocument();
+  await user.type(
+    screen.getByLabelText('Service plan name'),
+    'Additional client services',
+  );
+  await user.click(screen.getByRole('checkbox', { name: 'SEO' }));
+  await user.selectOptions(
+    screen.getByLabelText('Billing arrangement'),
+    'RETAINER',
+  );
+  await user.type(
+    screen.getByLabelText('Client-visible scope'),
+    'Additional agreed scope',
+  );
+  await continueStep(user);
+  expect(
+    screen.getByRole('region', { name: 'First task' }),
+  ).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Back' }));
+  expect(screen.getByLabelText('Service plan name')).toHaveValue(
+    'Additional client services',
+  );
+  expect(
+    screen.getByRole('list', { name: 'Selected services' }),
+  ).toHaveTextContent('SEO');
+  expect(mockCreate).not.toHaveBeenCalled();
 });

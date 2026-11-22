@@ -85,6 +85,9 @@ beforeEach(() => {
 it('shows agreed scope and exact existing workflows without opening an editor', () => {
   render(view());
   expect(screen.getByText('Four launch videos')).toBeInTheDocument();
+  expect(
+    screen.getByRole('link', { name: 'Add service plan' }),
+  ).toHaveAttribute('href', expect.stringContaining('setupPlanMode=new'));
   expect(screen.queryByLabelText('Service plan name')).not.toBeInTheDocument();
   expect(
     screen.getByRole('link', { name: 'View commitments' }),

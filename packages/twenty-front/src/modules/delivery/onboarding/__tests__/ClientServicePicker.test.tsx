@@ -33,36 +33,41 @@ beforeEach(() => {
   mockServices = [];
   mockAdd.mockReset();
 });
-it('selects multiple services and all defaults without losing a legacy service', async () => {
+it('selects multiple services and keeps selected items visible above available choices', async () => {
   const user = userEvent.setup();
   render(<Form initial={['Brand consulting']} />);
   await user.click(screen.getByRole('checkbox', { name: 'SEO' }));
+  expect(screen.getByLabelText('Find a service or product')).toHaveFocus();
   await user.click(screen.getByRole('checkbox', { name: 'Website' }));
-  expect(screen.getByRole('checkbox', { name: 'SEO' })).toBeChecked();
+  const selected = screen.getByRole('list', { name: 'Selected services' });
+  expect(selected).toHaveTextContent('Brand consulting');
+  expect(selected).toHaveTextContent('SEO');
+  expect(selected).toHaveTextContent('Website');
   expect(
-    screen.getByRole('checkbox', { name: 'Brand consulting' }),
-  ).toBeChecked();
-  await user.click(screen.getByRole('button', { name: 'Select all' }));
-  for (const checkbox of screen.getAllByRole('checkbox'))
-    expect(checkbox).toBeChecked();
+    screen.queryByRole('checkbox', { name: 'SEO' }),
+  ).not.toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Remove SEO' }));
+  expect(screen.getByRole('checkbox', { name: 'SEO' })).toBeInTheDocument();
 });
-it('saves a new service, selects it, and shows it unselected on the next onboarding', async () => {
+it('saves a new service, selects it, and shows it available on the next onboarding', async () => {
   const user = userEvent.setup();
   mockAdd.mockImplementation(async (name: string) => {
     mockServices.push(name);
     return mockServices;
   });
   const view = render(<Form />);
-  await user.click(screen.getByRole('button', { name: 'Add service' }));
+  await user.click(
+    screen.getByRole('button', { name: 'Add a custom service or product' }),
+  );
   await user.type(
-    screen.getByLabelText('New service name'),
+    screen.getByLabelText('New service or product name'),
     '  Brand   strategy ',
   );
   await user.click(screen.getByRole('button', { name: 'Save and select' }));
   expect(mockAdd).toHaveBeenCalledWith('Brand strategy');
   expect(
-    screen.getByRole('checkbox', { name: 'Brand strategy' }),
-  ).toBeChecked();
+    screen.getByRole('list', { name: 'Selected services' }),
+  ).toHaveTextContent('Brand strategy');
   view.unmount();
   render(<Form />);
   expect(
@@ -73,34 +78,49 @@ it('reuses a case-insensitive duplicate without another save', async () => {
   const user = userEvent.setup();
   mockServices = ['Brand strategy'];
   render(<Form />);
-  await user.click(screen.getByRole('button', { name: 'Add service' }));
-  await user.type(screen.getByLabelText('New service name'), 'brand STRATEGY');
+  await user.click(
+    screen.getByRole('button', { name: 'Add a custom service or product' }),
+  );
+  await user.type(
+    screen.getByLabelText('New service or product name'),
+    'brand STRATEGY',
+  );
   await user.click(screen.getByRole('button', { name: 'Save and select' }));
   expect(mockAdd).not.toHaveBeenCalled();
   expect(
-    screen.getByRole('checkbox', { name: 'Brand strategy' }),
-  ).toBeChecked();
+    screen.getByRole('list', { name: 'Selected services' }),
+  ).toHaveTextContent('Brand strategy');
 });
 it('retains the name after a failed save and does not select unsaved services', async () => {
   const user = userEvent.setup();
   mockAdd.mockRejectedValue(new Error('offline'));
   render(<Form />);
-  await user.click(screen.getByRole('button', { name: 'Add service' }));
-  await user.type(screen.getByLabelText('New service name'), 'Email marketing');
+  await user.click(
+    screen.getByRole('button', { name: 'Add a custom service or product' }),
+  );
+  await user.type(
+    screen.getByLabelText('New service or product name'),
+    'Email marketing',
+  );
   await user.click(screen.getByRole('button', { name: 'Save and select' }));
   expect(await screen.findByRole('alert')).toHaveTextContent('Could not save');
-  expect(screen.getByLabelText('New service name')).toHaveValue(
+  expect(screen.getByLabelText('New service or product name')).toHaveValue(
     'Email marketing',
   );
   expect(
-    screen.queryByRole('checkbox', { name: 'Email marketing' }),
+    screen.queryByRole('list', { name: 'Selected services' }),
   ).not.toBeInTheDocument();
 });
 it('rejects comma-separated names before saving', async () => {
   const user = userEvent.setup();
   render(<Form />);
-  await user.click(screen.getByRole('button', { name: 'Add service' }));
-  await user.type(screen.getByLabelText('New service name'), 'Brand, Email');
+  await user.click(
+    screen.getByRole('button', { name: 'Add a custom service or product' }),
+  );
+  await user.type(
+    screen.getByLabelText('New service or product name'),
+    'Brand, Email',
+  );
   await user.click(screen.getByRole('button', { name: 'Save and select' }));
   expect(screen.getByRole('alert')).toHaveTextContent('without commas');
   expect(mockAdd).not.toHaveBeenCalled();
@@ -134,8 +154,13 @@ it('uses the latest form callback when a save finishes after another field chang
   };
   const user = userEvent.setup();
   render(<Parent />);
-  await user.click(screen.getByRole('button', { name: 'Add service' }));
-  await user.type(screen.getByLabelText('New service name'), 'Brand strategy');
+  await user.click(
+    screen.getByRole('button', { name: 'Add a custom service or product' }),
+  );
+  await user.type(
+    screen.getByLabelText('New service or product name'),
+    'Brand strategy',
+  );
   await user.click(screen.getByRole('button', { name: 'Save and select' }));
   await user.clear(screen.getByLabelText('Scope'));
   await user.type(screen.getByLabelText('Scope'), 'New scope');
@@ -148,71 +173,141 @@ it('uses the latest form callback when a save finishes after another field chang
   });
 });
 
-it('filters services and selects results without losing hidden selections', async () => {
+it('filters available options without hiding selected items and supports individual catalog selection', async () => {
   const user = userEvent.setup();
   mockServices = ['Email marketing', 'Brand strategy'];
   render(<Form initial={['SEO']} />);
-  await user.type(screen.getByLabelText('Find a service'), 'marketing');
+  await user.type(
+    screen.getByLabelText('Find a service or product'),
+    'marketing',
+  );
   expect(
-    screen.queryByRole('checkbox', { name: 'SEO' }),
+    screen.getByRole('list', { name: 'Selected services' }),
+  ).toHaveTextContent('SEO');
+  expect(
+    screen.queryByRole('checkbox', { name: 'Brand strategy' }),
   ).not.toBeInTheDocument();
-  await user.click(screen.getByRole('button', { name: 'Select results' }));
-  await user.clear(screen.getByLabelText('Find a service'));
-  expect(screen.getByRole('checkbox', { name: 'SEO' })).toBeChecked();
-  expect(
-    screen.getByRole('checkbox', { name: 'Email marketing' }),
-  ).toBeChecked();
-  expect(
-    screen.getByRole('checkbox', { name: 'Performance marketing' }),
-  ).toBeChecked();
-  expect(
-    screen.getByRole('checkbox', { name: 'Brand strategy' }),
-  ).not.toBeChecked();
+  await user.click(screen.getByRole('checkbox', { name: 'Email marketing' }));
+  const selected = screen.getByRole('list', { name: 'Selected services' });
+  expect(selected).toHaveTextContent('SEO');
+  expect(selected).toHaveTextContent('Email marketing');
 });
-it('shows only selected services and clears the selection explicitly', async () => {
-  const user = userEvent.setup();
-  render(<Form initial={['SEO', 'Website']} />);
-  await user.click(screen.getByRole('button', { name: 'Show selected' }));
-  expect(screen.getAllByRole('checkbox')).toHaveLength(2);
-  await user.click(screen.getByRole('button', { name: 'Clear selection' }));
-  expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
-  await user.click(screen.getByRole('button', { name: 'Show all services' }));
-  expect(screen.getByRole('checkbox', { name: 'SEO' })).not.toBeChecked();
-});
-it('prefills a missing search as a new service and restores focus on cancel', async () => {
+it('prefills a missing search as a custom service and restores focus on cancel', async () => {
   const user = userEvent.setup();
   render(<Form />);
-  await user.type(screen.getByLabelText('Find a service'), 'Brand strategy');
-  expect(screen.getByText(/No matching service/)).toBeInTheDocument();
-  await user.click(screen.getByRole('button', { name: 'Add service' }));
-  expect(screen.getByLabelText('New service name')).toHaveValue(
+  await user.type(
+    screen.getByLabelText('Find a service or product'),
     'Brand strategy',
   );
-  expect(screen.getByLabelText('New service name')).toHaveFocus();
+  expect(screen.getByText(/No available options match/)).toBeInTheDocument();
+  const add = screen.getByRole('button', {
+    name: 'Add a custom service or product',
+  });
+  await user.click(add);
+  expect(screen.getByLabelText('New service or product name')).toHaveValue(
+    'Brand strategy',
+  );
+  expect(screen.getByLabelText('New service or product name')).toHaveFocus();
   await user.click(screen.getByRole('button', { name: 'Cancel' }));
-  expect(screen.getByRole('button', { name: 'Add service' })).toHaveFocus();
+  expect(
+    screen.getByRole('button', { name: 'Add a custom service or product' }),
+  ).toHaveFocus();
 });
-it('allows filtered selection from a catalog larger than the per-plan limit', async () => {
+it('allows individual selection from a catalog larger than the per-plan limit', async () => {
   mockServices = Array.from(
     { length: 25 },
     (_, index) => `Custom service ${index}`,
   );
   const user = userEvent.setup();
   render(<Form />);
-  expect(screen.getByRole('button', { name: 'Select all' })).toBeDisabled();
-  await user.type(screen.getByLabelText('Find a service'), 'Custom service 24');
-  await user.click(screen.getByRole('button', { name: 'Select results' }));
+  await user.type(
+    screen.getByLabelText('Find a service or product'),
+    'Custom service 24',
+  );
+  await user.click(screen.getByRole('checkbox', { name: 'Custom service 24' }));
   expect(
-    screen.getByRole('checkbox', { name: 'Custom service 24' }),
-  ).toBeChecked();
+    screen.getByRole('list', { name: 'Selected services' }),
+  ).toHaveTextContent('Custom service 24');
 });
 
-it('keeps keyboard focus when removing a checkbox from the selected-only view', async () => {
+it('reuses a selected custom service without promoting it to the shared catalog again', async () => {
   const user = userEvent.setup();
-  render(<Form initial={['SEO']} />);
-  await user.click(screen.getByRole('button', { name: 'Show selected' }));
-  await user.click(screen.getByRole('checkbox', { name: 'SEO' }));
+  render(<Form initial={['Legacy custom']} />);
+  await user.click(
+    screen.getByRole('button', { name: 'Add a custom service or product' }),
+  );
+  await user.type(
+    screen.getByLabelText('New service or product name'),
+    'LEGACY CUSTOM',
+  );
+  await user.click(screen.getByRole('button', { name: 'Save and select' }));
+  expect(mockAdd).not.toHaveBeenCalled();
   expect(
-    screen.getByRole('button', { name: 'Show all services' }),
-  ).toHaveFocus();
+    screen.getByRole('list', { name: 'Selected services' }),
+  ).toHaveTextContent('Legacy custom');
+});
+
+it('keeps keyboard focus predictable when selecting and removing services', async () => {
+  const user = userEvent.setup();
+  render(<Form />);
+  const search = screen.getByLabelText('Find a service or product');
+  await user.click(search);
+  await user.tab();
+  expect(screen.getByRole('checkbox', { name: 'AI video' })).toHaveFocus();
+  await user.keyboard('[Space]');
+  expect(search).toHaveFocus();
+  await user.tab({ shift: true });
+  expect(screen.getByRole('button', { name: 'Remove AI video' })).toHaveFocus();
+  await user.keyboard('{Enter}');
+  expect(screen.getByRole('checkbox', { name: 'AI video' })).toHaveFocus();
+});
+
+it('blocks plan submission while custom catalog saving is pending and includes the confirmed service', async () => {
+  let resolve: (services: string[]) => void = () => {};
+  mockAdd.mockReturnValue(
+    new Promise<string[]>((done) => {
+      resolve = done;
+    }),
+  );
+  const submitted = jest.fn();
+  const Parent = () => {
+    const [services, setServices] = useState<string[]>([]);
+    const [editorState, setEditorState] = useState({
+      dirty: false,
+      busy: false,
+    });
+    return (
+      <I18nProvider i18n={i18n}>
+        <ClientServicePicker
+          services={services}
+          onChange={setServices}
+          onEditorStateChange={setEditorState}
+        />
+        <button
+          disabled={editorState.dirty || editorState.busy}
+          onClick={() => submitted(services)}
+        >
+          Save plan
+        </button>
+      </I18nProvider>
+    );
+  };
+  const user = userEvent.setup();
+  render(<Parent />);
+  await user.click(
+    screen.getByRole('button', { name: 'Add a custom service or product' }),
+  );
+  await user.type(
+    screen.getByLabelText('New service or product name'),
+    'Brand strategy',
+  );
+  await user.click(screen.getByRole('button', { name: 'Save and select' }));
+  expect(screen.getByRole('button', { name: 'Save plan' })).toBeDisabled();
+  expect(submitted).not.toHaveBeenCalled();
+  await act(async () => {
+    resolve(['Brand strategy']);
+  });
+  expect(screen.getByRole('button', { name: 'Save plan' })).toBeEnabled();
+  await user.click(screen.getByRole('button', { name: 'Save plan' }));
+  expect(submitted).toHaveBeenCalledWith(['Brand strategy']);
 });

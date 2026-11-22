@@ -3,11 +3,13 @@ import { gql } from '@apollo/client';
 import { useMutation } from '@apollo/client/react';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { styled } from '@linaria/react';
+import { themeCssVariables } from 'twenty-ui/theme-constants';
 import { Link } from 'react-router-dom';
 import { type ClientsSnapshot } from '@/delivery/delivery-clients.types';
 import { type useClientSetup } from '@/delivery/onboarding/useClientSetup';
 import { type ClientSetupContext } from '@/delivery/onboarding/client-setup.types';
 import { ServicePlanFields } from '@/delivery/onboarding/ServicePlanFields';
+import { ClientSetupLink } from '@/delivery/onboarding/ClientSetupLink';
 import {
   servicePlanValues,
   servicePlanInput,
@@ -20,7 +22,6 @@ import { useFinanceExportRequestGuard } from '@/delivery/finance/export/useFinan
 import { isOtogrowAccessDenied } from '@/otogrow-access/isOtogrowAccessDenied';
 import {
   StyledDeliveryButton,
-  StyledDeliveryCard,
   StyledDeliveryRow,
   StyledDeliveryStack,
 } from '@/delivery/deliveryStyles';
@@ -28,6 +29,16 @@ import {
 const CHANGE_CLIENT_SERVICE = gql`
   mutation ChangeClientServicePlan($input: JSON!) {
     changeDeliveryClients(input: $input)
+  }
+`;
+const StyledClientServicePlan = styled.div`
+  border-top: 1px solid ${themeCssVariables.border.color.light};
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px 0;
+  p {
+    max-width: 72ch;
   }
 `;
 const StyledClientServiceScope = styled.p`
@@ -80,14 +91,31 @@ const ClientServicePlanList = ({
   return (
     <StyledClientServiceBoundary hidden={!state.data} disabled={!state.data}>
       <StyledDeliveryStack>
-        <h2>
-          <Trans>Service plans</Trans>
-        </h2>
+        <StyledDeliveryRow>
+          <div>
+            <h2>
+              <Trans>Service plans</Trans>
+            </h2>
+            <p>
+              <Trans>
+                Each plan defines the services, billing, scope and onboarding
+                agreed for this project.
+              </Trans>
+            </p>
+          </div>
+          <ClientSetupLink
+            companyId={data.selectedCompany?.id}
+            projectId={projectId}
+            newServicePlan
+          >
+            <Trans>Add service plan</Trans>
+          </ClientSetupLink>
+        </StyledDeliveryRow>
         {plans.length === 0 && (
           <p>
             <Trans>
-              No service plans in this project yet. Use client setup to agree
-              the scope and first work.
+              No service plans yet. Add one to define the work included, its
+              billing arrangement and the scope the client will see.
             </Trans>
           </p>
         )}
@@ -102,7 +130,7 @@ const ClientServicePlanList = ({
             clientProject: plan.projectId,
           });
           return (
-            <StyledDeliveryCard key={plan.id}>
+            <StyledClientServicePlan key={plan.id}>
               {editing?.id === plan.id ? (
                 <ClientServiceEditor
                   key={`${editing.id}:${editing.revision}`}
@@ -114,7 +142,7 @@ const ClientServicePlanList = ({
                   onReload={() => requestAction(() => setEditing(plan))}
                 />
               ) : (
-                <StyledDeliveryStack>
+                <>
                   <StyledDeliveryRow>
                     <h3>{plan.name}</h3>
                     <StyledDeliveryButton
@@ -158,9 +186,9 @@ const ClientServicePlanList = ({
                       <Trans>Portal and onboarding</Trans>
                     </Link>
                   </StyledDeliveryRow>
-                </StyledDeliveryStack>
+                </>
               )}
-            </StyledDeliveryCard>
+            </StyledClientServicePlan>
           );
         })}
       </StyledDeliveryStack>
@@ -187,6 +215,10 @@ const ClientServiceEditor = ({
   const [values, setValues] = useState(() => servicePlanValues(initial));
   const [fields, setFields] = useState(initial.fields);
   const [saving, setSaving] = useState(false);
+  const [customServiceState, setCustomServiceState] = useState({
+    dirty: false,
+    busy: false,
+  });
   const [uncertain, setUncertain] = useState(false);
   const [error, setError] = useState('');
   const [mutate] = useMutation<{ changeDeliveryClients: ClientsSnapshot }>(
@@ -210,8 +242,8 @@ const ClientServiceEditor = ({
   const startRequest = useFinanceExportRequestGuard(identity, available);
   const startMountedRequest = useFinanceExportRequestGuard(identity, true);
   const draft = useDeliveryNativeDraft({
-    extraValues: { values, fields },
-    busy: saving,
+    extraValues: { values, fields, customServiceState },
+    busy: saving || customServiceState.busy,
   });
   const disabled = !available || saving || state.busy || state.refreshing;
   const save = async (event: FormEvent<HTMLFormElement>) => {
@@ -219,6 +251,8 @@ const ClientServiceEditor = ({
     if (
       !available ||
       disabled ||
+      customServiceState.dirty ||
+      customServiceState.busy ||
       stale ||
       uncertain ||
       !project ||
@@ -342,6 +376,7 @@ const ClientServiceEditor = ({
               setFields={setFields}
               members={context.members}
               projectMemberIds={project?.memberIds ?? []}
+              onCustomServiceStateChange={setCustomServiceState}
             />
             {requirements.length > 0 && (
               <ul role="status">
@@ -358,6 +393,8 @@ const ClientServiceEditor = ({
             data-primary="true"
             disabled={
               disabled ||
+              customServiceState.dirty ||
+              customServiceState.busy ||
               uncertain ||
               stale ||
               !project ||

@@ -356,6 +356,7 @@ const ClientWorkspace = ({
                   <ClientSetupLink
                     companyId={selected?.companyId}
                     projectId={selected?.projectId}
+                    newServicePlan
                   >
                     <Trans>New client service plan</Trans>
                   </ClientSetupLink>
@@ -693,6 +694,10 @@ const EngagementForm = ({
       ].map((label) => ({ id: crypto.randomUUID(), label, required: true })),
   );
   const [values, setValues] = useState(() => servicePlanValues(initial));
+  const [customServiceState, setCustomServiceState] = useState({
+    dirty: false,
+    busy: false,
+  });
   const project = workspace.projects.find(
     (item) => item.id === values.projectId && Boolean(item.companyId),
   );
@@ -714,13 +719,22 @@ const EngagementForm = ({
   ];
   const [saving, setSaving] = useState(false);
   const draft = useDeliveryNativeDraft({
-    extraValues: { fields, values },
-    busy: busy || saving,
+    extraValues: { fields, values, customServiceState },
+    busy: busy || saving || customServiceState.busy,
   });
   const stale = Boolean(initial && initial.revision !== latestRevision);
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (busy || saving || stale || !draft.dirty || requirements.length) return;
+    if (
+      busy ||
+      saving ||
+      customServiceState.dirty ||
+      customServiceState.busy ||
+      stale ||
+      !draft.dirty ||
+      requirements.length
+    )
+      return;
     setSaving(true);
     try {
       await onSave({
@@ -788,6 +802,7 @@ const EngagementForm = ({
               setFields={setFields}
               members={workspace.members}
               projectMemberIds={project?.memberIds ?? []}
+              onCustomServiceStateChange={setCustomServiceState}
             />
             {requirements.length > 0 && (
               <div role="status">
@@ -806,6 +821,8 @@ const EngagementForm = ({
                 disabled={
                   busy ||
                   saving ||
+                  customServiceState.dirty ||
+                  customServiceState.busy ||
                   stale ||
                   !draft.dirty ||
                   requirements.length > 0

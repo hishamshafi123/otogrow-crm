@@ -70,14 +70,19 @@ export const ClientSetupWizard = ({
   const companyRecoveryRequired = Boolean(
     companyRequestId && !companyRecoveryChecked,
   );
+  const newPlanRequested = params.get('setupPlanMode') === 'new';
   const [projectMode, setProjectMode] = useState<'NEW' | 'REUSE' | ''>(
     projectId ? 'REUSE' : params.get('setupProjectMode') === 'new' ? 'NEW' : '',
   );
   const [projectName, setProjectName] = useState('');
   const [memberIds, setMemberIds] = useState<string[]>([]);
   const [planMode, setPlanMode] = useState<'NEW' | 'REUSE' | ''>(
-    planId ? 'REUSE' : params.get('setupPlanMode') === 'new' ? 'NEW' : '',
+    planId ? 'REUSE' : newPlanRequested ? 'NEW' : '',
   );
+  const [customServiceState, setCustomServiceState] = useState({
+    dirty: false,
+    busy: false,
+  });
   const [plan, setPlan] = useState(() => ({
     ...servicePlanValues(null),
     billing: '',
@@ -154,9 +159,11 @@ export const ClientSetupWizard = ({
     team,
   );
   const planReady =
-    planMode === 'REUSE'
+    !customServiceState.dirty &&
+    !customServiceState.busy &&
+    (planMode === 'REUSE'
       ? Boolean(existingPlan)
-      : planMode === 'NEW' && planRequirements.length === 0;
+      : planMode === 'NEW' && planRequirements.length === 0);
   const workReady = !firstTask || setupTaskReady(task, context.members, team);
   const stale = Boolean(
     (companyId && openedCompanyToken !== company?.sourceToken) ||
@@ -174,6 +181,8 @@ export const ClientSetupWizard = ({
   const dirty =
     !receipt &&
     (attempt !== null ||
+      customServiceState.dirty ||
+      customServiceState.busy ||
       projectName !== '' ||
       memberIds.length > 0 ||
       plan.name !== '' ||
@@ -620,28 +629,33 @@ export const ClientSetupWizard = ({
               )}
               {step === 2 && (
                 <>
-                  <label>
-                    <Trans>Service plan choice</Trans>
-                    <select
-                      aria-label={t`Service plan choice`}
-                      value={planMode}
-                      onChange={(event) => {
-                        if (event.target.value === 'REUSE')
-                          setPlanMode('REUSE');
-                        else if (event.target.value === 'NEW') {
-                          if (planId)
-                            source({ setupPlan: null, setupPlanMode: 'new' });
-                          else setPlanMode('NEW');
+                  {!newPlanRequested && (
+                    <label>
+                      <Trans>Service plan choice</Trans>
+                      <select
+                        aria-label={t`Service plan choice`}
+                        disabled={
+                          customServiceState.dirty || customServiceState.busy
                         }
-                      }}
-                    >
-                      <option value="">{t`Choose how to set up the service plan`}</option>
-                      {projectId && (
-                        <option value="REUSE">{t`Reuse a saved service plan unchanged`}</option>
-                      )}
-                      <option value="NEW">{t`Prepare a new service plan`}</option>
-                    </select>
-                  </label>
+                        value={planMode}
+                        onChange={(event) => {
+                          if (event.target.value === 'REUSE')
+                            setPlanMode('REUSE');
+                          else if (event.target.value === 'NEW') {
+                            if (planId)
+                              source({ setupPlan: null, setupPlanMode: 'new' });
+                            else setPlanMode('NEW');
+                          }
+                        }}
+                      >
+                        <option value="">{t`Choose how to set up the service plan`}</option>
+                        {projectId && (
+                          <option value="REUSE">{t`Reuse a saved service plan unchanged`}</option>
+                        )}
+                        <option value="NEW">{t`Prepare a new service plan`}</option>
+                      </select>
+                    </label>
+                  )}
                   {planMode === 'REUSE' && (
                     <>
                       <label>
@@ -695,6 +709,7 @@ export const ClientSetupWizard = ({
                         setFields={setQuestions}
                         members={context.members}
                         projectMemberIds={team}
+                        onCustomServiceStateChange={setCustomServiceState}
                       />
                       {planRequirements.length > 0 && (
                         <ul>
@@ -736,9 +751,9 @@ export const ClientSetupWizard = ({
                   {firstTask && !workReady && (
                     <p role="status">
                       <Trans>
-                        Choose an eligible project assignee and delivery reviewer,
-                        and enter a title. You can also leave the task out and
-                        configure the team first.
+                        Choose an eligible project assignee and delivery
+                        reviewer, and enter a title. You can also leave the task
+                        out and configure the team first.
                       </Trans>{' '}
                       <Link to={taskPageDestination(params, { view: 'team' })}>
                         <Trans>Open Team & projects</Trans>
@@ -945,7 +960,11 @@ export const ClientSetupWizard = ({
             {step > 0 && (
               <StyledDeliveryButton
                 type="button"
-                disabled={!editable}
+                disabled={
+                  !editable ||
+                  (step === 2 &&
+                    (customServiceState.dirty || customServiceState.busy))
+                }
                 onClick={() => setStep((value) => value - 1)}
               >
                 <Trans>Back</Trans>

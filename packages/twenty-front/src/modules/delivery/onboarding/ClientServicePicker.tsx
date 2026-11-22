@@ -1,18 +1,19 @@
 import { useId, useLayoutEffect, useRef, useState } from 'react';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { styled } from '@linaria/react';
+import { themeCssVariables } from 'twenty-ui/theme-constants';
 import {
   StyledDeliveryButton,
   StyledDeliveryRow,
 } from '@/delivery/deliveryStyles';
 import { useServiceCatalog } from '@/delivery/onboarding/useServiceCatalog';
 
-const StyledChoices = styled.div`
+const StyledServiceChoices = styled.div`
   display: grid;
   gap: 4px 12px;
-  grid-template-columns: repeat(auto-fit, minmax(min(160px, 100%), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
   margin-block: 12px;
-  max-height: 320px;
+  max-height: 280px;
   overflow-y: auto;
   padding: 4px;
   > label {
@@ -28,27 +29,70 @@ const StyledChoices = styled.div`
     margin: 0;
   }
 `;
+const StyledSelectedServices = styled.ul`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  li {
+    align-items: center;
+    background: ${themeCssVariables.background.secondary};
+    border: 1px solid ${themeCssVariables.border.color.light};
+    border-radius: 9px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    max-width: 100%;
+    padding: 6px 8px 6px 12px;
+  }
+  li > span {
+    overflow-wrap: anywhere;
+  }
+  li > button {
+    min-height: 32px;
+    padding: 4px 8px;
+  }
+`;
+const StyledCustomService = styled.div`
+  border-left: 3px solid ${themeCssVariables.color.blue8};
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 12px 0;
+  padding: 4px 0 4px 16px;
+`;
 const serviceKey = (value: string) =>
   value.trim().toLowerCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ');
+export type ClientServiceEditorState = { dirty: boolean; busy: boolean };
 type ClientServicePickerProps = {
   services: string[];
   onChange: (services: string[]) => void;
+  onEditorStateChange?: (state: ClientServiceEditorState) => void;
 };
 export const ClientServicePicker = ({
   services,
   onChange,
+  onEditorStateChange,
 }: ClientServicePickerProps) => {
   const { t } = useLingui();
   const catalog = useServiceCatalog();
   const [adding, setAdding] = useState(false);
   const [search, setSearch] = useState('');
-  const [selectedOnly, setSelectedOnly] = useState(false);
+  const [name, setName] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
   const helpId = useId();
-  const limitId = useId();
-  const viewToggle = useRef<HTMLButtonElement>(null);
   const errorId = useId();
+  const searchInput = useRef<HTMLInputElement>(null);
   const nameInput = useRef<HTMLInputElement>(null);
   const addButton = useRef<HTMLButtonElement>(null);
+  // oxlint-disable-next-line twenty/no-state-useref -- Store live DOM inputs only to restore keyboard focus after removal.
+  const availableOptions = useRef(new Map<string, HTMLInputElement>());
+  // oxlint-disable-next-line twenty/no-state-useref -- Coordinate imperative focus once the restored option mounts, not rendered state.
+  const pendingFocus = useRef<string | null>(null);
   // oxlint-disable-next-line twenty/no-state-useref -- Return focus only after closing the inline editor, never on initial mount.
   const wasAdding = useRef(false);
   useLayoutEffect(() => {
@@ -56,10 +100,16 @@ export const ClientServicePicker = ({
     else if (wasAdding.current) addButton.current?.focus();
     wasAdding.current = adding;
   }, [adding]);
-  const [name, setName] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
+  useLayoutEffect(() => {
+    onEditorStateChange?.({ dirty: adding, busy });
+  }, [adding, busy, onEditorStateChange]);
+  useLayoutEffect(() => {
+    if (pendingFocus.current === null) return;
+    const input = availableOptions.current.get(pendingFocus.current);
+    if (input) input.focus();
+    else searchInput.current?.focus();
+    pendingFocus.current = null;
+  }, [services]);
   const defaults = [
     ['AI video', t`AI video`],
     ['Static ads', t`Static ads`],
@@ -78,13 +128,11 @@ export const ClientServicePicker = ({
   }
   const selected = (value: string) =>
     services.some((service) => serviceKey(service) === serviceKey(value));
-  const matching = choices.filter(
+  const available = choices.filter(
     ([value, label]) =>
-      (!selectedOnly || selected(value)) &&
+      !selected(value) &&
       serviceKey(`${value} ${label}`).includes(serviceKey(search)),
   );
-  const missing = matching.filter(([value]) => !selected(value));
-  const hasFilter = Boolean(search.trim()) || selectedOnly;
   const openEditor = () => {
     setName(search.trim());
     setAdding(true);
@@ -92,7 +140,8 @@ export const ClientServicePicker = ({
     setMessage('');
   };
   const select = (value: string) => {
-    if (!selected(value)) onChange([...services, value]);
+    if (!selected(value) && services.length < 20)
+      onChange([...services, value]);
   };
   // oxlint-disable-next-line twenty/no-state-useref -- A catalog response must use the current form callback so concurrent edits are preserved.
   const latestSelect = useRef(select);
@@ -106,9 +155,7 @@ export const ClientServicePicker = ({
       normalized.length > 100 ||
       /[,\u0000-\u001f\u007f]/.test(name)
     ) {
-      setError(
-        t`Enter one service name, up to 100 characters, without commas.`,
-      );
+      setError(t`Enter one name, up to 100 characters, without commas.`);
       return;
     }
     if (services.length >= 20 && !selected(normalized)) {
@@ -118,17 +165,10 @@ export const ClientServicePicker = ({
     const existing = choices.find(
       ([value]) => serviceKey(value) === serviceKey(normalized),
     );
-    // Selected legacy names still need saving to become available to other clients.
-    if (
-      existing &&
-      [...defaults.map(([value]) => value), ...catalog.services].some(
-        (value) => serviceKey(value) === serviceKey(normalized),
-      )
-    ) {
+    if (existing) {
       select(existing[0]);
       setName('');
       setSearch('');
-      setSelectedOnly(false);
       setAdding(false);
       setError('');
       setMessage(t`Existing service selected.`);
@@ -149,7 +189,6 @@ export const ClientServicePicker = ({
       latestSelect.current(confirmed);
       setName('');
       setSearch('');
-      setSelectedOnly(false);
       setAdding(false);
       setMessage(
         t`Service saved and selected. It is available for future client setups.`,
@@ -163,12 +202,85 @@ export const ClientServicePicker = ({
   return (
     <fieldset disabled={busy}>
       <legend>
-        <Trans>Client services</Trans>
+        <Trans>Included services and products</Trans>
       </legend>
       <p>
-        <Trans>Select all services included in this plan.</Trans>{' '}
+        <Trans>
+          Choose the work covered by this plan. Add a custom option only when it
+          is missing.
+        </Trans>{' '}
         <Trans>{services.length} of 20 selected.</Trans>
       </p>
+      {services.length > 0 && (
+        <StyledSelectedServices aria-label={t`Selected services`}>
+          {services.map((service) => (
+            <li key={serviceKey(service)}>
+              <span>{service}</span>
+              <StyledDeliveryButton
+                type="button"
+                data-variant="quiet"
+                aria-label={t`Remove ${service}`}
+                onClick={() => {
+                  pendingFocus.current = serviceKey(service);
+                  setSearch('');
+                  setMessage(t`${service} removed.`);
+                  onChange(
+                    services.filter(
+                      (value) => serviceKey(value) !== serviceKey(service),
+                    ),
+                  );
+                }}
+              >
+                <Trans>Remove</Trans>
+              </StyledDeliveryButton>
+            </li>
+          ))}
+        </StyledSelectedServices>
+      )}
+      <label>
+        <Trans>Find a service or product</Trans>
+        <input
+          ref={searchInput}
+          type="search"
+          value={search}
+          placeholder={t`Search available options`}
+          onChange={(event) => setSearch(event.target.value)}
+        />
+      </label>
+      <StyledServiceChoices>
+        {available.map(([value, label]) => (
+          <label key={serviceKey(value)}>
+            <input
+              ref={(input) => {
+                if (input)
+                  availableOptions.current.set(serviceKey(value), input);
+                else availableOptions.current.delete(serviceKey(value));
+              }}
+              type="checkbox"
+              checked={false}
+              disabled={services.length >= 20}
+              onChange={() => {
+                select(value);
+                setMessage(t`${value} selected.`);
+                searchInput.current?.focus();
+              }}
+            />
+            {label}
+          </label>
+        ))}
+      </StyledServiceChoices>
+      {available.length === 0 && (
+        <p role="status">
+          <Trans>
+            No available options match. Your selected items remain included.
+          </Trans>
+        </p>
+      )}
+      {services.length >= 20 && (
+        <p role="status">
+          <Trans>This plan has reached its 20-service limit.</Trans>
+        </p>
+      )}
       {!adding ? (
         <StyledDeliveryRow>
           <StyledDeliveryButton
@@ -177,13 +289,13 @@ export const ClientServicePicker = ({
             disabled={!catalog.canAdd}
             onClick={openEditor}
           >
-            <Trans>Add service</Trans>
+            <Trans>Add a custom service or product</Trans>
           </StyledDeliveryButton>
         </StyledDeliveryRow>
       ) : (
-        <div>
+        <StyledCustomService>
           <label>
-            <Trans>New service name</Trans>
+            <Trans>New service or product name</Trans>
             <input
               ref={nameInput}
               maxLength={100}
@@ -208,17 +320,16 @@ export const ClientServicePicker = ({
           </label>
           <p id={helpId}>
             <Trans>
-              Saved for everyone managing client setups in this workspace, even
-              if you cancel this onboarding.
+              Saving adds this option to the shared workspace catalog, even if
+              you later cancel this client setup. Save or cancel this custom
+              option before saving or continuing the service plan.
             </Trans>
           </p>
           <StyledDeliveryRow>
             <StyledDeliveryButton
               type="button"
               disabled={!catalog.canAdd || !name.trim()}
-              onClick={() => {
-                void save();
-              }}
+              onClick={() => void save()}
             >
               {busy ? t`Saving…` : t`Save and select`}
             </StyledDeliveryButton>
@@ -232,89 +343,7 @@ export const ClientServicePicker = ({
               <Trans>Cancel</Trans>
             </StyledDeliveryButton>
           </StyledDeliveryRow>
-        </div>
-      )}
-      <label>
-        <Trans>Find a service</Trans>
-        <input
-          type="search"
-          value={search}
-          placeholder={t`Search services`}
-          onChange={(event) => setSearch(event.target.value)}
-        />
-      </label>
-      <StyledDeliveryRow>
-        <StyledDeliveryButton
-          type="button"
-          ref={viewToggle}
-          aria-pressed={selectedOnly}
-          onClick={() => setSelectedOnly(!selectedOnly)}
-        >
-          {selectedOnly ? t`Show all services` : t`Show selected`}
-        </StyledDeliveryButton>
-        <StyledDeliveryButton
-          type="button"
-          disabled={!services.length}
-          onClick={() => {
-            onChange([]);
-            setMessage('');
-          }}
-        >
-          <Trans>Clear selection</Trans>
-        </StyledDeliveryButton>
-      </StyledDeliveryRow>
-      <StyledChoices>
-        {matching.map(([value, label]) => (
-          <label key={serviceKey(value)}>
-            <input
-              type="checkbox"
-              checked={selected(value)}
-              disabled={!selected(value) && services.length >= 20}
-              onChange={(event) => {
-                if (selectedOnly && !event.target.checked)
-                  viewToggle.current?.focus();
-                setMessage('');
-                onChange(
-                  event.target.checked
-                    ? [...services, value]
-                    : services.filter(
-                        (service) => serviceKey(service) !== serviceKey(value),
-                      ),
-                );
-              }}
-            />
-            {label}
-          </label>
-        ))}
-      </StyledChoices>
-      {matching.length === 0 && (
-        <p role="status">
-          {selectedOnly
-            ? t`No selected services match this view. Show all services to choose more.`
-            : t`No matching service. Use Add service above to save a new option.`}
-        </p>
-      )}
-      {hasFilter && (
-        <p role="status">
-          <Trans>
-            {matching.length} services shown. Hidden selections are kept.
-          </Trans>
-        </p>
-      )}
-      {services.length + missing.length > 20 && (
-        <p id={limitId}>
-          <Trans>
-            You can select {20 - services.length} more services. Narrow your
-            search or choose services individually.
-          </Trans>
-        </p>
-      )}
-      {choices.length > 20 && (
-        <p>
-          <Trans>
-            Choose up to 20 services individually from your catalog.
-          </Trans>
-        </p>
+        </StyledCustomService>
       )}
       {catalog.loading && (
         <p role="status">
@@ -329,33 +358,12 @@ export const ClientServicePicker = ({
           </Trans>{' '}
           <StyledDeliveryButton
             type="button"
-            onClick={() => {
-              void catalog.retry().catch(() => {});
-            }}
+            onClick={() => void catalog.retry().catch(() => {})}
           >
             <Trans>Retry</Trans>
           </StyledDeliveryButton>
         </p>
       )}
-      <StyledDeliveryRow>
-        <StyledDeliveryButton
-          type="button"
-          aria-describedby={
-            services.length + missing.length > 20 ? limitId : undefined
-          }
-          disabled={
-            missing.length === 0 ||
-            services.length + missing.length > 20 ||
-            catalog.loading ||
-            catalog.unavailable
-          }
-          onClick={() =>
-            onChange([...services, ...missing.map(([value]) => value)])
-          }
-        >
-          {hasFilter ? t`Select results` : t`Select all`}
-        </StyledDeliveryButton>
-      </StyledDeliveryRow>
       {error && (
         <p role="alert" id={errorId}>
           {error}

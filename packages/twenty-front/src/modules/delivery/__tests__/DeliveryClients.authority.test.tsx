@@ -84,6 +84,7 @@ jest.mock('@/delivery/deliveryStyles', () => ({
 jest.mock('@linaria/react', () => ({
   styled: {
     p: () => 'p',
+    ul: () => 'ul',
     div: () => 'div',
     fieldset: () => 'fieldset',
     dialog: () => 'dialog',

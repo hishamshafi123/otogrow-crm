@@ -181,7 +181,18 @@ it('keeps staff on assigned commitments', () => {
   expect(screen.getByText('Assigned commitments')).toBeVisible();
   expect(mockRead).not.toHaveBeenCalled();
 });
-it('requires explicit project selection before showing service details', () => {
+it('shows a single project’s services immediately without redundant selection', () => {
+  setup(`clientCompany=${SETUP_COMPANY}&clientSection=services`);
+  expect(screen.getByText('Editable services')).toBeVisible();
+  expect(screen.getByLabelText('Client project')).toHaveValue(SETUP_PROJECT);
+});
+it('still requires explicit project selection when a client has multiple projects', () => {
+  if (mockData)
+    mockData.projects.push({
+      ...mockData.projects[0],
+      id: 'second-project',
+      name: 'Second project',
+    });
   setup(`clientCompany=${SETUP_COMPANY}&clientSection=services`);
   expect(screen.queryByText('Editable services')).not.toBeInTheDocument();
   expect(screen.getByLabelText('Client project')).toBeVisible();
