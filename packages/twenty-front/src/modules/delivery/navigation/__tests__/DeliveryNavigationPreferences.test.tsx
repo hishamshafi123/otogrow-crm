@@ -95,7 +95,9 @@ it('applies personal choices, preserves them after remount, and resets to role d
   );
   await open();
   await user.click(screen.getByRole('button', { name: 'Use role defaults' }));
-  expect(screen.getByLabelText('Start destination')).toHaveTextContent('home');
+  expect(screen.getByLabelText('Start destination')).toHaveTextContent(
+    'health',
+  );
   expect(
     screen.getByRole('checkbox', { name: 'Creative studio' }),
   ).not.toBeChecked();
@@ -116,7 +118,9 @@ it('keeps one person’s choices out of another membership and filters revoked d
     userWorkspaceId: 'other-membership',
   };
   rerender(view(store));
-  expect(screen.getByLabelText('Start destination')).toHaveTextContent('home');
+  expect(screen.getByLabelText('Start destination')).toHaveTextContent(
+    'health',
+  );
   expect(screen.getByRole('checkbox', { name: 'Finance' })).not.toBeChecked();
   mockAccess = original;
   rerender(view(store));
