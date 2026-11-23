@@ -2,19 +2,32 @@ import { styled } from '@linaria/react';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
 
 export const StyledPerformanceViewNavigation = styled.nav`
-  display: flex;
+  align-items: center;
+  background: ${themeCssVariables.background.primary};
+  border: 1px solid ${themeCssVariables.border.color.light};
+  border-radius: 12px;
+  display: inline-flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 4px;
+  max-width: 100%;
+  padding: 4px;
   a {
-    border: 1px solid ${themeCssVariables.border.color.light};
+    align-items: center;
+    border: 1px solid transparent;
     border-radius: 9px;
     color: ${themeCssVariables.font.color.secondary};
-    font-weight: 500;
-    padding: 8px 12px;
+    display: inline-flex;
+    font-size: 13px;
+    font-weight: 600;
+    gap: 6px;
+    padding: 7px 14px;
     text-decoration: none;
+    transition:
+      background-color 120ms ease,
+      color 120ms ease;
   }
   a:hover {
-    background: ${themeCssVariables.background.primary};
+    background: ${themeCssVariables.background.secondary};
     color: ${themeCssVariables.font.color.primary};
   }
   a[aria-current='page'] {
@@ -24,8 +37,6 @@ export const StyledPerformanceViewNavigation = styled.nav`
   }
   @media (pointer: coarse) {
     a {
-      align-items: center;
-      display: inline-flex;
       min-height: 44px;
     }
   }
@@ -47,24 +58,28 @@ export const StyledPerformanceFilters = styled.form`
 `;
 export const StyledPerformanceMetrics = styled.dl`
   display: grid;
-  gap: 1px;
+  gap: 10px;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   margin: 0;
   > div {
     background: ${themeCssVariables.background.secondary};
+    border: 1px solid ${themeCssVariables.border.color.light};
+    border-radius: 12px;
     box-sizing: border-box;
     min-width: 0;
-    padding: 14px;
+    padding: 14px 16px;
   }
   dt {
     color: ${themeCssVariables.font.color.secondary};
     font-size: 12px;
+    font-weight: 500;
   }
   dd {
     font-size: 20px;
     font-variant-numeric: tabular-nums;
-    font-weight: 600;
-    margin: 4px 0 0;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+    margin: 6px 0 0;
     overflow-wrap: anywhere;
   }
   @media (max-width: 720px) {

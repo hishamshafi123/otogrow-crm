@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { Link } from 'react-router-dom';
 import { type DeliveryFounderPerformanceQuery } from '~/generated-metadata/graphql';
@@ -9,6 +10,12 @@ import {
   formatPerformanceMonth,
   formatPerformanceRate,
 } from '@/delivery/founder/performance/performance-format';
+import { classifyClientHealth } from '@/delivery/founder/performance/admin-dashboard-metrics';
+import {
+  StyledFilterTab,
+  StyledFilterTabs,
+  StyledStatusPill,
+} from '@/delivery/founder/performance/adminDashboardStyles';
 import {
   StyledPerformanceList,
   StyledPerformanceMuted,
@@ -42,16 +49,57 @@ export const PerformanceClients = ({
   canReadFinance: boolean;
 }) => {
   const { t } = useLingui();
+  const [filter, setFilter] = useState<'all' | 'attention' | 'finance'>('all');
+  const attentionClients = clients.filter(
+    (client) => classifyClientHealth(client) === 'attention',
+  );
+  const financeClients = clients.filter((client) => client.finance.length > 0);
+  const visibleClients =
+    filter === 'attention'
+      ? attentionClients
+      : filter === 'finance'
+        ? financeClients
+        : clients;
+
   return (
     <StyledDeliveryCard aria-label={t`Client performance`}>
       <StyledDeliveryStack>
         <StyledDeliveryRow>
-          <h2>
-            <Trans>Clients</Trans>
-          </h2>
-          <StyledPerformanceMuted>
-            {total === 1 ? t`1 client project` : t`${total} client projects`}
-          </StyledPerformanceMuted>
+          <div>
+            <h2>
+              <Trans>Clients</Trans>
+            </h2>
+            <StyledPerformanceMuted>
+              {total === 1 ? t`1 client project` : t`${total} client projects`}
+            </StyledPerformanceMuted>
+          </div>
+          {clients.length > 0 && (
+            <StyledFilterTabs role="group" aria-label={t`Filter client health`}>
+              <StyledFilterTab
+                type="button"
+                aria-pressed={filter === 'all'}
+                onClick={() => setFilter('all')}
+              >
+                {t`All (${clients.length})`}
+              </StyledFilterTab>
+              <StyledFilterTab
+                type="button"
+                aria-pressed={filter === 'attention'}
+                onClick={() => setFilter('attention')}
+              >
+                {t`Needs attention (${attentionClients.length})`}
+              </StyledFilterTab>
+              {canReadFinance && (
+                <StyledFilterTab
+                  type="button"
+                  aria-pressed={filter === 'finance'}
+                  onClick={() => setFilter('finance')}
+                >
+                  {t`With finance (${financeClients.length})`}
+                </StyledFilterTab>
+              )}
+            </StyledFilterTabs>
+          )}
         </StyledDeliveryRow>
         <p>
           <Trans>
@@ -66,9 +114,16 @@ export const PerformanceClients = ({
               before measuring client performance.
             </Trans>
           </p>
+        ) : !visibleClients.length ? (
+          <p>
+            <Trans>
+              No client projects match this filter on the current page.
+            </Trans>
+          </p>
         ) : (
           <StyledPerformanceList>
-            {clients.map((client) => {
+            {visibleClients.map((client) => {
+              const health = classifyClientHealth(client);
               const workDestination = `/delivery?view=planner&plannerView=tasks&project=${client.projectId}&taskTimezone=${encodeURIComponent(timezone)}`;
               const clientDestination = client.companyId
                 ? `/delivery?view=clients&clientCompany=${client.companyId}&clientProject=${client.projectId}`
@@ -78,7 +133,24 @@ export const PerformanceClients = ({
                   <StyledPerformanceRecord>
                     <StyledDeliveryStack>
                       <div>
-                        <h3>{client.projectName}</h3>
+                        <StyledDeliveryRow>
+                          <h3>{client.projectName}</h3>
+                          <StyledStatusPill
+                            data-tone={
+                              health === 'attention'
+                                ? 'warning'
+                                : health === 'watch'
+                                  ? 'accent'
+                                  : 'positive'
+                            }
+                          >
+                            {health === 'attention'
+                              ? t`Needs attention`
+                              : health === 'watch'
+                                ? t`Open receivables`
+                                : t`Steady`}
+                          </StyledStatusPill>
+                        </StyledDeliveryRow>
                         <small>
                           {client.teamCount === 1
                             ? t`1 active team member`

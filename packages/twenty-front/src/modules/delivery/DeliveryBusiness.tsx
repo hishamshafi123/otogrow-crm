@@ -1565,11 +1565,19 @@ const BusinessForm = ({
                   name="currency"
                   defaultValue={String(initial?.currency ?? 'USD')}
                 >
-                  {['USD', 'AED', 'EUR', 'GBP', 'INR', 'SGD', 'AUD', 'CAD'].map(
-                    (currency) => (
-                      <option key={currency}>{currency}</option>
-                    ),
-                  )}
+                  {[
+                    'INR',
+                    'USD',
+                    'QAR',
+                    'AED',
+                    'EUR',
+                    'GBP',
+                    'SGD',
+                    'AUD',
+                    'CAD',
+                  ].map((currency) => (
+                    <option key={currency}>{currency}</option>
+                  ))}
                 </select>
               </label>
             )}

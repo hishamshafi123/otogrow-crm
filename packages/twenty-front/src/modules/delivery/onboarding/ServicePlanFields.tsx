@@ -202,11 +202,19 @@ export const ServicePlanFields = ({
                     })
                   }
                 >
-                  {['USD', 'AED', 'EUR', 'GBP', 'INR', 'SGD', 'AUD', 'CAD'].map(
-                    (value) => (
-                      <option key={value}>{value}</option>
-                    ),
-                  )}
+                  {[
+                    'INR',
+                    'USD',
+                    'QAR',
+                    'AED',
+                    'EUR',
+                    'GBP',
+                    'SGD',
+                    'AUD',
+                    'CAD',
+                  ].map((value) => (
+                    <option key={value}>{value}</option>
+                  ))}
                 </select>
               </label>
               <label>

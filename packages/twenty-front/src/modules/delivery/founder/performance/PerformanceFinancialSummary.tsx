@@ -6,6 +6,17 @@ import {
   formatFinanceRecordedMargin,
 } from '@/delivery/finance/finance-money';
 import { formatPerformanceMonth } from '@/delivery/founder/performance/performance-format';
+import {
+  calculateCostSegments,
+  calculateMonthDelta,
+} from '@/delivery/founder/performance/admin-dashboard-metrics';
+import {
+  StyledCostBarSegment,
+  StyledCostBarTrack,
+  StyledCostLegend,
+  StyledLegendDot,
+  StyledStatusPill,
+} from '@/delivery/founder/performance/adminDashboardStyles';
 import { StyledPerformanceMetrics } from '@/delivery/founder/performance/performanceStyles';
 import {
   StyledDeliveryCard,
@@ -26,6 +37,13 @@ export const PerformanceFinancialSummary = ({
   previousMonth: string;
 }) => {
   const { t } = useLingui();
+  const segmentLabels = {
+    salary: t`Salary`,
+    overhead: t`Overhead`,
+    ai: t`Production AI`,
+    other: t`Other costs`,
+    unassigned: t`Unassigned`,
+  };
   if (!currencies.length)
     return (
       <StyledDeliveryCard>
@@ -51,6 +69,11 @@ export const PerformanceFinancialSummary = ({
     <StyledDeliveryStack>
       {currencies.map((summary) => {
         const destination = `/delivery?view=finance&financeView=monthly&financeMonth=${month}&financeCurrency=${summary.currency}`;
+        const revenueDelta = calculateMonthDelta(
+          summary.revenueMicros,
+          summary.previousRevenueMicros,
+        );
+        const costSegments = calculateCostSegments(summary);
         const metrics = [
           {
             label: t`Recognized revenue`,
@@ -111,9 +134,33 @@ export const PerformanceFinancialSummary = ({
                     <Trans>Recognized service-month performance</Trans>
                   </small>
                 </div>
-                <Link to={destination}>
-                  <Trans>Review monthly records</Trans>
-                </Link>
+                <StyledDeliveryRow>
+                  {revenueDelta && (
+                    <StyledStatusPill
+                      data-tone={
+                        revenueDelta.direction === 'up'
+                          ? 'positive'
+                          : revenueDelta.direction === 'down'
+                            ? 'warning'
+                            : undefined
+                      }
+                    >
+                      {t`MoM ${revenueDelta.percentText}`}
+                    </StyledStatusPill>
+                  )}
+                  <StyledStatusPill
+                    data-tone={
+                      summary.periodStatus === 'LOCKED' ? 'positive' : 'accent'
+                    }
+                  >
+                    {summary.periodStatus === 'LOCKED'
+                      ? t`Month locked after review`
+                      : t`Month open for reviewed posting`}
+                  </StyledStatusPill>
+                  <Link to={destination}>
+                    <Trans>Review monthly records</Trans>
+                  </Link>
+                </StyledDeliveryRow>
               </StyledDeliveryRow>
               <StyledPerformanceMetrics>
                 {metrics.map((metric) => (
@@ -123,13 +170,36 @@ export const PerformanceFinancialSummary = ({
                   </div>
                 ))}
               </StyledPerformanceMetrics>
-              <p>
-                <Trans>
-                  Recorded result and margin use posted entries only. Complete
-                  profitability requires every salary, overhead, provider and
-                  other cost to be reviewed and allocated.
-                </Trans>
-              </p>
+              {costSegments.length > 0 && (
+                <StyledDeliveryStack>
+                  <StyledCostBarTrack
+                    aria-label={t`${summary.currency} cost mix`}
+                  >
+                    {costSegments.map((segment) => (
+                      <StyledCostBarSegment
+                        key={segment.key}
+                        data-segment={segment.key}
+                        style={{ width: `${segment.sharePercent}%` }}
+                      />
+                    ))}
+                  </StyledCostBarTrack>
+                  <StyledCostLegend>
+                    {costSegments.map((segment) => (
+                      <li key={segment.key}>
+                        <StyledLegendDot data-segment={segment.key} />
+                        <span>{segmentLabels[segment.key]}</span>
+                        <strong>
+                          {formatFinanceAmountMicros(
+                            segment.amountMicros,
+                            summary.currency,
+                          )}{' '}
+                          ({segment.sharePercent.toFixed(0)}%)
+                        </strong>
+                      </li>
+                    ))}
+                  </StyledCostLegend>
+                </StyledDeliveryStack>
+              )}
               <p>
                 <Trans>Previous month</Trans> ·{' '}
                 {formatPerformanceMonth(previousMonth)}:{' '}
@@ -142,14 +212,9 @@ export const PerformanceFinancialSummary = ({
                   summary.previousResultMicros,
                   summary.currency,
                 )}{' '}
-                <Trans>recorded result</Trans>
-              </p>
-              <p>
+                <Trans>recorded result</Trans> ·{' '}
                 {t`${summary.postedEntryCount} posted entries`} ·{' '}
-                {t`${summary.draftEntryCount} drafts excluded`} ·{' '}
-                {summary.periodStatus === 'LOCKED'
-                  ? t`Month locked after review`
-                  : t`Month open for reviewed posting`}
+                {t`${summary.draftEntryCount} drafts excluded`}
               </p>
               {(!summary.financeComplete || !summary.cashComplete) && (
                 <p role="status">
@@ -171,29 +236,38 @@ export const PerformanceFinancialSummary = ({
                 <summary>
                   <Trans>Cost breakdown and company allocations</Trans>
                 </summary>
-                <StyledPerformanceMetrics>
-                  {[
-                    [t`Salary`, summary.salaryCostMicros],
-                    [t`Overhead`, summary.overheadCostMicros],
-                    [t`Production AI`, summary.aiCostMicros],
-                    [t`Other costs`, summary.otherCostMicros],
-                    [
-                      t`Company / unassigned revenue`,
-                      summary.unassignedRevenueMicros,
-                    ],
-                    [
-                      t`Company / unassigned costs`,
-                      summary.unassignedCostMicros,
-                    ],
-                  ].map(([label, amount]) => (
-                    <div key={String(label)}>
-                      <dt>{label}</dt>
-                      <dd>
-                        {formatFinanceAmountMicros(amount, summary.currency)}
-                      </dd>
-                    </div>
-                  ))}
-                </StyledPerformanceMetrics>
+                <StyledDeliveryStack>
+                  <p>
+                    <Trans>
+                      Recorded result and margin use posted entries only.
+                      Complete profitability requires every salary, overhead,
+                      provider and other cost to be reviewed and allocated.
+                    </Trans>
+                  </p>
+                  <StyledPerformanceMetrics>
+                    {[
+                      [t`Salary`, summary.salaryCostMicros],
+                      [t`Overhead`, summary.overheadCostMicros],
+                      [t`Production AI`, summary.aiCostMicros],
+                      [t`Other costs`, summary.otherCostMicros],
+                      [
+                        t`Company / unassigned revenue`,
+                        summary.unassignedRevenueMicros,
+                      ],
+                      [
+                        t`Company / unassigned costs`,
+                        summary.unassignedCostMicros,
+                      ],
+                    ].map(([label, amount]) => (
+                      <div key={String(label)}>
+                        <dt>{label}</dt>
+                        <dd>
+                          {formatFinanceAmountMicros(amount, summary.currency)}
+                        </dd>
+                      </div>
+                    ))}
+                  </StyledPerformanceMetrics>
+                </StyledDeliveryStack>
               </details>
             </StyledDeliveryStack>
           </StyledDeliveryCard>

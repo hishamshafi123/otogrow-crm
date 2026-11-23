@@ -316,8 +316,15 @@ it.each([
   async (view) => {
     const queries = [
       'DeliveryChat',
+      'DeliveryFounderPerformance',
+      'DeliveryFounderExecutiveInsights',
+      'DeliveryFinanceForecast',
       'DeliveryFounderExceptions',
       'DeliveryReadiness',
+      'DeliveryCapacitySummary',
+      'DeliveryHandoffs',
+      'MetaLeadForms',
+      'OtogrowAiBudgetSnapshot',
       'DeliveryFounderEscalations',
       'PreviewDeliveryFounderEscalationRule',
       'DeliveryWorkspace',
@@ -388,8 +395,15 @@ it.each([
                   ? Number(queryName.startsWith('DeliveryRelease'))
                   : Number(
                       [
+                        'DeliveryFounderPerformance',
+                        'DeliveryFounderExecutiveInsights',
+                        'DeliveryFinanceForecast',
                         'DeliveryFounderExceptions',
                         'DeliveryReadiness',
+                        'DeliveryCapacitySummary',
+                        'DeliveryHandoffs',
+                        'MetaLeadForms',
+                        'OtogrowAiBudgetSnapshot',
                         'DeliveryFounderEscalations',
                         'PreviewDeliveryFounderEscalationRule',
                       ].includes(queryName),

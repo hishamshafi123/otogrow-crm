@@ -32,13 +32,13 @@ export const getDeliveryNavigationDefaults = (
     manager && deliveryLead && !hasRole('admin')
       ? 'planner'
       : administrator
-        ? 'home'
+        ? 'health'
         : manager
           ? 'planner'
           : 'mine';
   const pinnedViews = [
-    ...(startView === 'home'
-      ? ['home', 'health', 'clients']
+    ...(startView === 'health'
+      ? ['health', 'home', 'clients']
       : manager
         ? ['planner', 'reviews', 'batches']
         : ['mine']),

@@ -13,7 +13,7 @@ const accessFor = (roles: string[], capabilities: string[] = []) => ({
 });
 
 it.each([
-  ['admin', ['workspace.admin'], 'home', ['health', 'clients']],
+  ['admin', ['workspace.admin'], 'health', ['health', 'home', 'clients']],
   ['secondary-admin', ['workspace.admin'], 'planner', ['reviews', 'batches']],
   ['project-manager', ['delivery.manage'], 'planner', ['reviews', 'batches']],
   ['editor', [], 'mine', ['creative', 'knowledge']],
@@ -53,7 +53,7 @@ it('combines multiple roles without duplicate shortcuts or authority from a role
     getDeliveryNavigationDefaults(
       accessFor(['admin', 'secondary-admin'], ['workspace.admin']),
     ).startView,
-  ).toBe('home');
+  ).toBe('health');
 });
 
 it('uses effective capabilities for custom roles and never names as authority', () => {
@@ -61,7 +61,7 @@ it('uses effective capabilities for custom roles and never names as authority', 
     getDeliveryNavigationDefaults(
       accessFor(['custom-admin'], ['workspace.admin']),
     ).startView,
-  ).toBe('home');
+  ).toBe('health');
   expect(
     getDeliveryNavigationDefaults(
       accessFor(['custom-manager'], ['delivery.manage']),

@@ -7,7 +7,10 @@ import { fastDeepEqual, isDefined } from 'twenty-shared/utils';
 import { type DeliveryFounderPerformanceQuery } from '~/generated-metadata/graphql';
 import { useWorkflowAccess } from '@/delivery/workflows/useWorkflowAccess';
 import { useIsMobile } from '@/ui/utilities/responsive/hooks/useIsMobile';
-import { useFinanceLabels } from '@/delivery/finance/useFinanceLabels';
+import {
+  PRIMARY_FINANCE_CURRENCIES,
+  useFinanceLabels,
+} from '@/delivery/finance/useFinanceLabels';
 import { FounderViewNavigation } from '@/delivery/founder/FounderViewNavigation';
 import { GET_DELIVERY_FOUNDER_PERFORMANCE } from '@/delivery/founder/performance/delivery-founder-performance.graphql';
 import {
@@ -24,6 +27,26 @@ import {
   PerformanceClients,
   PerformanceEmployees,
 } from '@/delivery/founder/performance/PerformanceDirectories';
+import { AdminDashboardPulse } from '@/delivery/founder/performance/AdminDashboardPulse';
+import { AdminCashForecastPanel } from '@/delivery/founder/performance/AdminCashForecastPanel';
+import { AdminAttentionStrip } from '@/delivery/founder/performance/AdminAttentionStrip';
+import { AdminGrowthHandoffCard } from '@/delivery/founder/performance/AdminGrowthHandoffCard';
+import { AdminOperationsDeck } from '@/delivery/founder/performance/AdminOperationsDeck';
+import { AdminSixMonthTrendPanel } from '@/delivery/founder/performance/AdminSixMonthTrendPanel';
+import { AdminPipelineAndRenewalDeck } from '@/delivery/founder/performance/AdminPipelineAndRenewalDeck';
+import { buildExecutiveCsv } from '@/delivery/founder/performance/admin-dashboard-metrics';
+import { useAdminExecutiveSignals } from '@/delivery/founder/performance/useAdminExecutiveSignals';
+import {
+  StyledAdminControlRow,
+  StyledAdminHeroBar,
+  StyledAdminHeroTop,
+  StyledAdminTwoColumn,
+  StyledCurrencyPill,
+  StyledCurrencyPills,
+  StyledDataHealthDrawer,
+  StyledQuickLinks,
+  StyledStatusPill,
+} from '@/delivery/founder/performance/adminDashboardStyles';
 import {
   StyledPerformanceFilters,
   StyledPerformanceFiltersDisclosure,
@@ -122,8 +145,43 @@ const PerformanceWorkspace = ({
   )
     setLastVerified(null);
   const data = fresh ?? retained;
+
+  const forecastCurrency =
+    filters.currency ??
+    (data?.currencies.length === 1 ? data.currencies[0].currency : null);
+
+  const signals = useAdminExecutiveSignals({
+    authorized: authorized && parsed.success && Boolean(data),
+    permission,
+    month: filters.month,
+    timezone: filters.timezone,
+    selectedCurrency: filters.currency,
+    forecastCurrency,
+    observedAt: data?.observedAt,
+  });
+
   const update = (changes: Partial<PerformanceNavigationValue>) =>
     setParams(writePerformanceNavigation(params, { ...filters, ...changes }));
+  const selectCurrency = (currency?: string) =>
+    update({
+      currency,
+      afterProjectId: undefined,
+      afterMemberId: undefined,
+    });
+
+  const attentionParams = new URLSearchParams({
+    view: 'health',
+    founderPanel: 'attention',
+    founderMonth: filters.month,
+  });
+  if (filters.currency)
+    attentionParams.set('founderCurrency', filters.currency);
+  const attentionHref = `/delivery?${attentionParams}`;
+
+  const primaryCurrencies = PRIMARY_FINANCE_CURRENCIES.filter((currency) =>
+    financeLabels.currencies.includes(currency),
+  );
+
   const warningLabels: Record<string, string> = {
     COST_COMPLETENESS_NOT_VERIFIED: t`Recorded results are not complete profitability until all salary, overhead, provider and other costs are reviewed and allocated.`,
     CURRENT_ASSIGNMENT_HISTORY: t`Employee approval, on-time, first-review and revision evidence follows the task’s current assignee after reassignment; it is not historic performer attribution.`,
@@ -179,100 +237,192 @@ const PerformanceWorkspace = ({
     );
   return (
     <StyledDeliverySectionStack>
-      <StyledDeliveryCard>
-        <StyledDeliveryStack>
+      <StyledAdminHeroBar aria-label={t`Admin dashboard controls`}>
+        <StyledAdminHeroTop>
           <div>
             <h2>
-              <Trans>Business performance</Trans>
+              <Trans>Executive command center</Trans>
             </h2>
             <p>
               <Trans>
-                Review recognized revenue, recorded margins, cash and delivery
-                evidence. Currencies always remain separate.
+                Cash flow, 90-day forecast, delivery health, sales handoffs and
+                client contribution. Currencies always remain separate.
               </Trans>
             </p>
           </div>
-          {!parsed.success && (
-            <>
-              <p role="alert">
-                <Trans>
-                  This performance link has invalid reporting filters. Reset
-                  them before reviewing figures.
-                </Trans>
-              </p>
-              <StyledDeliveryButton onClick={() => update(fallback)}>
-                <Trans>Reset performance filters</Trans>
+          <StyledQuickLinks aria-label={t`Quick admin actions`}>
+            <Link to="/delivery?view=clients">
+              <Trans>Clients</Trans>
+            </Link>
+            <Link to="/delivery?view=planner">
+              <Trans>Team planner</Trans>
+            </Link>
+            {permission.canReadFinance && (
+              <Link
+                to={`/delivery?view=finance&financeView=forecast${filters.currency ? `&financeCurrency=${filters.currency}` : ''}`}
+              >
+                <Trans>Cash forecast</Trans>
+              </Link>
+            )}
+            <Link to="/delivery?view=team">
+              <Trans>Team & access</Trans>
+            </Link>
+            {data && (
+              <StyledDeliveryButton
+                type="button"
+                onClick={() => {
+                  const csv = buildExecutiveCsv({
+                    month: data.month,
+                    timezone: data.timezone,
+                    observedAt: data.observedAt,
+                    canReadFinance: data.canReadFinance,
+                    currencies: data.currencies,
+                    operations: data.operations,
+                    clients: data.clients,
+                  });
+                  const blob = new Blob([csv], {
+                    type: 'text/csv;charset=utf-8',
+                  });
+                  const url = URL.createObjectURL(blob);
+                  const anchor = document.createElement('a');
+                  anchor.href = url;
+                  anchor.download = `otogrow-executive-${data.month}${data.currency ? `-${data.currency}` : ''}.csv`;
+                  anchor.click();
+                  URL.revokeObjectURL(url);
+                }}
+              >
+                <Trans>Export CSV</Trans>
               </StyledDeliveryButton>
-            </>
-          )}
-          <StyledPerformanceFiltersDisclosure open={!mobile || !parsed.success}>
-            <summary>
-              <Trans>Reporting filters</Trans>
-              <small>
-                {filters.month} · {filters.currency ?? t`All currencies`}
-              </small>
-            </summary>
-            <StyledPerformanceFilters
-              key={`${filters.month}:${filters.timezone}:${filters.currency ?? ''}`}
-              aria-label={t`Performance reporting filters`}
-              onSubmit={(event) => {
-                event.preventDefault();
-                const fields = new FormData(event.currentTarget);
-                update({
-                  month: String(fields.get('month') ?? ''),
-                  timezone: String(fields.get('timezone') ?? ''),
-                  currency: String(fields.get('currency') ?? '') || undefined,
-                  afterProjectId: undefined,
-                  afterMemberId: undefined,
-                });
-              }}
+            )}
+          </StyledQuickLinks>
+        </StyledAdminHeroTop>
+
+        {parsed.success && (
+          <StyledAdminControlRow>
+            <StyledCurrencyPills
+              role="group"
+              aria-label={t`Primary currency filter`}
             >
-              <label>
-                <Trans>Service month</Trans>
-                <input
-                  name="month"
-                  type="month"
-                  required
-                  defaultValue={filters.month}
-                />
-              </label>
-              <label>
-                <Trans>Reporting time zone</Trans>
-                <input
-                  name="timezone"
-                  required
-                  defaultValue={filters.timezone}
-                  list="performance-timezones"
-                />
-                <datalist id="performance-timezones">
-                  {[
-                    ...new Set([
-                      defaultTimezone,
-                      'UTC',
-                      'Asia/Qatar',
-                      'Asia/Dubai',
-                    ]),
-                  ].map((timezone) => (
-                    <option key={timezone} value={timezone} />
-                  ))}
-                </datalist>
-              </label>
-              <label>
-                <Trans>Currency</Trans>
-                <select name="currency" defaultValue={filters.currency ?? ''}>
-                  <option value="">{t`All currencies — kept separate`}</option>
-                  {financeLabels.currencies.map((currency) => (
-                    <option key={currency}>{currency}</option>
-                  ))}
-                </select>
-              </label>
-              <StyledDeliveryButton type="submit" data-primary="true">
-                <Trans>Apply reporting period</Trans>
-              </StyledDeliveryButton>
-            </StyledPerformanceFilters>
-          </StyledPerformanceFiltersDisclosure>
-        </StyledDeliveryStack>
-      </StyledDeliveryCard>
+              <StyledCurrencyPill
+                type="button"
+                aria-pressed={!filters.currency}
+                onClick={() => selectCurrency(undefined)}
+              >
+                <Trans>All</Trans>
+              </StyledCurrencyPill>
+              {primaryCurrencies.map((currency) => (
+                <StyledCurrencyPill
+                  key={currency}
+                  type="button"
+                  aria-pressed={filters.currency === currency}
+                  onClick={() => selectCurrency(currency)}
+                >
+                  {currency}
+                </StyledCurrencyPill>
+              ))}
+            </StyledCurrencyPills>
+            {data && (
+              <small>
+                <Trans>Checked at</Trans>{' '}
+                <time dateTime={data.observedAt}>
+                  {new Date(data.observedAt).toLocaleString()}
+                </time>{' '}
+                · {data.timezone}
+                {refreshing && (
+                  <span role="status">
+                    {' '}
+                    ·{' '}
+                    <Trans>Refreshing; showing the last verified figures</Trans>
+                  </span>
+                )}
+              </small>
+            )}
+          </StyledAdminControlRow>
+        )}
+
+        {!parsed.success && (
+          <>
+            <p role="alert">
+              <Trans>
+                This performance link has invalid reporting filters. Reset them
+                before reviewing figures.
+              </Trans>
+            </p>
+            <StyledDeliveryButton onClick={() => update(fallback)}>
+              <Trans>Reset performance filters</Trans>
+            </StyledDeliveryButton>
+          </>
+        )}
+
+        <StyledPerformanceFiltersDisclosure open={!mobile || !parsed.success}>
+          <summary>
+            <Trans>Reporting filters</Trans>
+            <small>
+              {filters.month} · {filters.currency ?? t`All currencies`}
+            </small>
+          </summary>
+          <StyledPerformanceFilters
+            key={`${filters.month}:${filters.timezone}:${filters.currency ?? ''}`}
+            aria-label={t`Performance reporting filters`}
+            onSubmit={(event) => {
+              event.preventDefault();
+              const fields = new FormData(event.currentTarget);
+              update({
+                month: String(fields.get('month') ?? ''),
+                timezone: String(fields.get('timezone') ?? ''),
+                currency: String(fields.get('currency') ?? '') || undefined,
+                afterProjectId: undefined,
+                afterMemberId: undefined,
+              });
+            }}
+          >
+            <label>
+              <Trans>Service month</Trans>
+              <input
+                name="month"
+                type="month"
+                required
+                defaultValue={filters.month}
+              />
+            </label>
+            <label>
+              <Trans>Reporting time zone</Trans>
+              <input
+                name="timezone"
+                required
+                defaultValue={filters.timezone}
+                list="performance-timezones"
+              />
+              <datalist id="performance-timezones">
+                {[
+                  ...new Set([
+                    defaultTimezone,
+                    'UTC',
+                    'Asia/Qatar',
+                    'Asia/Dubai',
+                    'Asia/Kolkata',
+                  ]),
+                ].map((timezone) => (
+                  <option key={timezone} value={timezone} />
+                ))}
+              </datalist>
+            </label>
+            <label>
+              <Trans>Currency</Trans>
+              <select name="currency" defaultValue={filters.currency ?? ''}>
+                <option value="">{t`All currencies — kept separate`}</option>
+                {financeLabels.currencies.map((currency) => (
+                  <option key={currency}>{currency}</option>
+                ))}
+              </select>
+            </label>
+            <StyledDeliveryButton type="submit" data-primary="true">
+              <Trans>Apply reporting period</Trans>
+            </StyledDeliveryButton>
+          </StyledPerformanceFilters>
+        </StyledPerformanceFiltersDisclosure>
+      </StyledAdminHeroBar>
+
       {query.error ? (
         <StyledDeliveryCard>
           <StyledDeliveryStack>
@@ -299,19 +449,6 @@ const PerformanceWorkspace = ({
         </StyledDeliveryCard>
       ) : (
         <>
-          <p>
-            <Trans>Checked at</Trans>{' '}
-            <time dateTime={data.observedAt}>
-              {new Date(data.observedAt).toLocaleString()}
-            </time>{' '}
-            · <Trans>Reporting time zone</Trans> {data.timezone}
-            {refreshing && (
-              <span role="status">
-                {' '}
-                · <Trans>Refreshing; showing the last verified figures</Trans>
-              </span>
-            )}
-          </p>
           {needsCoverageReview && (
             <p role="status">
               <Trans>
@@ -320,12 +457,46 @@ const PerformanceWorkspace = ({
               </Trans>
             </p>
           )}
+
+          <AdminDashboardPulse
+            data={data}
+            activeCurrency={forecastCurrency}
+            forecast={signals.forecast}
+            attentionCount={signals.exceptions?.totalCount ?? null}
+            degradedConnectionCount={signals.degradedConnections.length}
+            attentionHref={attentionHref}
+          />
+
+          <AdminAttentionStrip
+            exceptions={signals.exceptions}
+            degradedConnections={signals.degradedConnections}
+            attentionHref={attentionHref}
+            month={data.month}
+            currency={filters.currency}
+          />
+
           {data.canReadFinance ? (
-            <PerformanceFinancialSummary
-              currencies={data.currencies}
-              month={data.month}
-              previousMonth={data.previousMonth}
-            />
+            forecastCurrency ? (
+              <StyledAdminTwoColumn>
+                <AdminCashForecastPanel
+                  currency={forecastCurrency}
+                  forecast={signals.forecast}
+                  loading={signals.forecastLoading}
+                  error={signals.forecastError}
+                />
+                <PerformanceFinancialSummary
+                  currencies={data.currencies}
+                  month={data.month}
+                  previousMonth={data.previousMonth}
+                />
+              </StyledAdminTwoColumn>
+            ) : (
+              <PerformanceFinancialSummary
+                currencies={data.currencies}
+                month={data.month}
+                previousMonth={data.previousMonth}
+              />
+            )
           ) : (
             <StyledDeliveryCard>
               <StyledDeliveryStack>
@@ -342,7 +513,38 @@ const PerformanceWorkspace = ({
               </StyledDeliveryStack>
             </StyledDeliveryCard>
           )}
-          <PerformanceOperationsSummary operations={data.operations} />
+
+          {data.canReadFinance && signals.executiveInsights && (
+            <AdminSixMonthTrendPanel
+              trends={signals.executiveInsights.trends}
+              canReadFinance={data.canReadFinance}
+              month={data.month}
+            />
+          )}
+
+          {signals.executiveInsights && (
+            <AdminPipelineAndRenewalDeck
+              salesFunnel={signals.executiveInsights.salesFunnel}
+              renewals={signals.executiveInsights.renewals}
+              inboxSla={signals.executiveInsights.inboxSla}
+            />
+          )}
+
+          <StyledAdminTwoColumn>
+            <PerformanceOperationsSummary operations={data.operations} />
+            <AdminGrowthHandoffCard
+              metaLeads={signals.metaLeads}
+              handoffs={signals.handoffs}
+            />
+          </StyledAdminTwoColumn>
+
+          <AdminOperationsDeck
+            operations={data.operations}
+            capacity={signals.capacity}
+            aiBudget={signals.aiBudget}
+            readiness={signals.readiness}
+          />
+
           <PerformanceClients
             clients={data.clients}
             total={data.clientTotal}
@@ -372,6 +574,7 @@ const PerformanceWorkspace = ({
               </Link>
             )}
           </StyledDeliveryRow>
+
           <PerformanceEmployees
             employees={data.employees}
             total={data.employeeTotal}
@@ -401,11 +604,21 @@ const PerformanceWorkspace = ({
               </Link>
             )}
           </StyledDeliveryRow>
-          <StyledDeliveryCard>
-            <StyledDeliveryStack>
-              <h3>
+
+          <StyledDataHealthDrawer open={Boolean(needsCoverageReview)}>
+            <summary>
+              <span>
                 <Trans>Reporting coverage and definitions</Trans>
-              </h3>
+              </span>
+              <StyledStatusPill
+                data-tone={needsCoverageReview ? 'warning' : 'neutral'}
+              >
+                {needsCoverageReview
+                  ? t`${data.warnings.length} coverage notes`
+                  : t`${data.warnings.length} definitions`}
+              </StyledStatusPill>
+            </summary>
+            <StyledDeliveryStack>
               <p>
                 <Trans>
                   Recognized revenue and costs use posted service-month entries.
@@ -434,7 +647,7 @@ const PerformanceWorkspace = ({
                 </Link>
               )}
             </StyledDeliveryStack>
-          </StyledDeliveryCard>
+          </StyledDataHealthDrawer>
         </>
       )}
     </StyledDeliverySectionStack>

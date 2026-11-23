@@ -1,5 +1,23 @@
 import { useLingui } from '@lingui/react/macro';
 
+export const PRIMARY_FINANCE_CURRENCIES: readonly string[] = [
+  'INR',
+  'USD',
+  'QAR',
+  'AED',
+];
+export const DELIVERY_CURRENCIES: readonly string[] = [
+  'INR',
+  'USD',
+  'QAR',
+  'AED',
+  'EUR',
+  'GBP',
+  'SGD',
+  'AUD',
+  'CAD',
+];
+
 export const useFinanceLabels = () => {
   const { t } = useLingui();
   const planTypes: Record<string, string> = {
@@ -32,7 +50,7 @@ export const useFinanceLabels = () => {
     SOURCE_PLAN_MISSING: t`The source plan is no longer available. Review the saved source evidence before posting.`,
     SOURCE_MEMBER_INACTIVE: t`The employee linked to the source plan is no longer active. Review the amount and effective month before posting.`,
   };
-  const currencies = ['USD', 'AED', 'EUR', 'GBP', 'INR', 'SGD', 'AUD', 'CAD'];
+  const currencies = [...DELIVERY_CURRENCIES];
   return {
     planTypes,
     entryKinds,

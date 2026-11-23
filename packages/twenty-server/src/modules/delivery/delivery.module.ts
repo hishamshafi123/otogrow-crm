@@ -67,6 +67,7 @@ import { DeliveryFinanceEventEntity } from 'src/modules/delivery/finance/entitie
 import { DeliveryFounderService } from 'src/modules/delivery/founder/delivery-founder.service';
 import { DeliveryFounderResolver } from 'src/modules/delivery/founder/delivery-founder.resolver';
 import { DeliveryFounderPerformanceService } from 'src/modules/delivery/founder/performance/delivery-founder-performance.service';
+import { DeliveryFounderExecutiveInsightsService } from 'src/modules/delivery/founder/performance/delivery-founder-executive-insights.service';
 import { DeliveryFounderPerformanceResolver } from 'src/modules/delivery/founder/performance/delivery-founder-performance.resolver';
 import { DeliveryFounderEscalationService } from 'src/modules/delivery/founder/escalation/delivery-founder-escalation.service';
 import { DeliveryFounderEscalationResolver } from 'src/modules/delivery/founder/escalation/delivery-founder-escalation.resolver';
@@ -309,6 +310,7 @@ import { DeliveryCreativeReadsResolver } from 'src/modules/delivery/creative/rea
     DeliveryFounderService,
     DeliveryFounderResolver,
     DeliveryFounderPerformanceService,
+    DeliveryFounderExecutiveInsightsService,
     DeliveryFounderPerformanceResolver,
     DeliveryFinanceExportService,
     DeliveryFinanceExportResolver,
