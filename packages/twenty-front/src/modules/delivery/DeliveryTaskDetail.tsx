@@ -15,6 +15,8 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { DeliveryCreativeReview } from '@/delivery/creative/review/DeliveryCreativeReview';
 import { creativeReviewDestination } from '@/delivery/creative/review/creative-review-navigation';
 import { Trans, useLingui } from '@lingui/react/macro';
+import { styled } from '@linaria/react';
+import { themeCssVariables } from 'twenty-ui/theme-constants';
 import {
   useDeliveryDraftGuard,
   useDeliveryDraftStatus,
@@ -33,6 +35,44 @@ import {
   StyledDeliveryRow,
   StyledDeliveryStack,
 } from '@/delivery/deliveryStyles';
+
+const StyledTaskIdentity = styled.header`
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+`;
+
+const StyledTaskPeople = styled.dl`
+  display: grid;
+  gap: 12px 24px;
+  grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
+  margin: 0;
+
+  dt {
+    color: ${themeCssVariables.font.color.secondary};
+    font-size: 13px;
+    margin-bottom: 4px;
+  }
+
+  dd {
+    font-weight: 500;
+    margin: 0;
+  }
+`;
+
+const StyledTaskDisclosure = styled.details`
+  border-top: 1px solid ${themeCssVariables.border.color.light};
+  min-width: 0;
+  padding-top: 12px;
+
+  > summary {
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.5;
+  }
+`;
 
 type DeliveryTaskDetailProps = {
   task: DeliveryTask;
@@ -113,6 +153,14 @@ const TaskDetailWorkspace = ({
           String(submission.version) === params.get('creativeSubmission'),
       )
     : latestSubmission;
+  const hasSubmissionReviewSelection = [
+    'creativeSubmission',
+    'creativeCompare',
+    'creativeFeedback',
+    'creativeFeedbackAfter',
+    'creativeFeedbackBefore',
+    'creativeSubmissionsBefore',
+  ].some((key) => params.has(key));
   const exactCreativeIdentity = Boolean(
     latestSubmission?.creativeVersion &&
     latestSubmission.finalAssetId &&
@@ -385,25 +433,66 @@ const TaskDetailWorkspace = ({
     );
   return (
     <StyledDeliveryStack>
-      <StyledDeliveryRow>
-        <StyledDeliveryBadge data-state={details.state}>
-          {stateLabel(details.state)}
-        </StyledDeliveryBadge>
-        {workspace.actor.isManager &&
-          !['IN_REVIEW', 'APPROVED'].includes(details.state) && (
-            <StyledDeliveryButton
-              onClick={() =>
-                requestAction(() => {
-                  resetDraftInputs();
-                  setEditing(true);
-                })
-              }
-            >
-              <Trans>Edit assignment</Trans>
-            </StyledDeliveryButton>
-          )}
-      </StyledDeliveryRow>
-      <h2>{task.title}</h2>
+      <StyledTaskIdentity>
+        <h2>{task.title}</h2>
+        <StyledDeliveryRow>
+          <StyledDeliveryBadge data-state={details.state}>
+            {stateLabel(details.state)}
+          </StyledDeliveryBadge>
+          {workspace.actor.isManager &&
+            !['IN_REVIEW', 'APPROVED'].includes(details.state) && (
+              <StyledDeliveryButton
+                onClick={() =>
+                  requestAction(() => {
+                    resetDraftInputs();
+                    setEditing(true);
+                  })
+                }
+              >
+                <Trans>Edit assignment</Trans>
+              </StyledDeliveryButton>
+            )}
+        </StyledDeliveryRow>
+
+        <StyledTaskPeople>
+          <div>
+            <dt>
+              <Trans>Assigned to</Trans>
+            </dt>
+            <dd>{memberName(task.assigneeId)}</dd>
+          </div>
+          <div>
+            <dt>
+              <Trans>Primary manager for client delivery</Trans>
+            </dt>
+            <dd>{memberName(details.reviewerId)}</dd>
+          </div>
+        </StyledTaskPeople>
+      </StyledTaskIdentity>
+      <StyledTaskDisclosure open={!latestSubmission}>
+        <summary>
+          <Trans>Brief and notes</Trans>
+        </summary>
+        <StyledDeliveryStack>
+          <p style={{ whiteSpace: 'pre-wrap' }}>
+            {details.brief || t`No production notes yet.`}
+          </p>
+          {(!latestSubmission || taskReview.data) &&
+            details.evidence.map((url) => (
+              <a key={url} href={url} target="_blank" rel="noreferrer">
+                {url}
+              </a>
+            ))}
+        </StyledDeliveryStack>
+      </StyledTaskDisclosure>
+      {details.blocker && (
+        <p role="status">
+          <strong>
+            <Trans>Blocker:</Trans>
+          </strong>{' '}
+          {details.blocker}
+        </p>
+      )}
       {!creativeReview && latestSubmission && taskReview.data && (
         <section aria-label={t`Exact submitted work`}>
           {selectedSubmission ? (
@@ -448,7 +537,7 @@ const TaskDetailWorkspace = ({
           }
         />
       )}
-      {creativeReview && (
+      {creativeReview && (latestSubmission || hasSubmissionReviewSelection) && (
         <DeliveryCreativeReview
           taskId={task.id}
           taskRevision={task.revision}
@@ -491,11 +580,6 @@ const TaskDetailWorkspace = ({
           </StyledDeliveryButton>
         </StyledDeliveryCard>
       )}
-      <p>
-        <Trans>Assigned to</Trans> {memberName(task.assigneeId)} ·{' '}
-        <Trans>Primary manager for client delivery</Trans>{' '}
-        {memberName(details.reviewerId)}
-      </p>
       {celebrated && (
         <StyledDeliveryCelebration role="status">
           <strong>
@@ -509,71 +593,44 @@ const TaskDetailWorkspace = ({
           </StyledDeliveryButton>
         </StyledDeliveryCelebration>
       )}
-      <StyledDeliveryCard>
-        <StyledDeliveryStack>
-          <h3>
-            <Trans>Brief and notes</Trans>
-          </h3>
-          <p style={{ whiteSpace: 'pre-wrap' }}>
-            {details.brief || t`No production notes yet.`}
-          </p>
-          {(!latestSubmission || taskReview.data) &&
-            details.evidence.map((url) => (
-              <a key={url} href={url} target="_blank" rel="noreferrer">
-                {url}
-              </a>
-            ))}
-        </StyledDeliveryStack>
-      </StyledDeliveryCard>
-      {details.blocker && (
-        <p role="status">
-          <strong>
-            <Trans>Blocker:</Trans>
-          </strong>{' '}
-          {details.blocker}
-        </p>
-      )}
       <DeliveryTaskWorkflow controller={workflow} />
-      <DeliveryTaskPlan
-        task={task}
-        canManage={workspace.actor.isManager}
-        run={run}
-        busy={busy || saving}
-      />
-      <StyledDeliveryStack>
-        <h3>
+
+      <StyledTaskDisclosure open={details.checklist.length > 0}>
+        <summary>
           <Trans>Custom checklist</Trans>
-        </h3>
-        {!details.checklist.length && (
-          <small>
-            <Trans>No checklist items yet.</Trans>
-          </small>
-        )}
-        {details.checklist.map((item) => (
-          <label key={item.id} style={{ flexDirection: 'row' }}>
-            <input
-              type="checkbox"
-              checked={item.done}
-              disabled={!canProduce || busy || saving}
-              onChange={() =>
-                void change({
-                  action: 'progress',
-                  state:
-                    details.state === 'BLOCKED' ? 'BLOCKED' : 'IN_PROGRESS',
-                  blocker: details.blocker,
-                  evidence: details.evidence,
-                  checklist: details.checklist.map((candidate) =>
-                    candidate.id === item.id
-                      ? { ...candidate, done: !candidate.done }
-                      : candidate,
-                  ),
-                })
-              }
-            />
-            {item.text}
-          </label>
-        ))}
-      </StyledDeliveryStack>
+        </summary>
+        <StyledDeliveryStack>
+          {!details.checklist.length && (
+            <small>
+              <Trans>No checklist items yet.</Trans>
+            </small>
+          )}
+          {details.checklist.map((item) => (
+            <label key={item.id} style={{ flexDirection: 'row' }}>
+              <input
+                type="checkbox"
+                checked={item.done}
+                disabled={!canProduce || busy || saving}
+                onChange={() =>
+                  void change({
+                    action: 'progress',
+                    state:
+                      details.state === 'BLOCKED' ? 'BLOCKED' : 'IN_PROGRESS',
+                    blocker: details.blocker,
+                    evidence: details.evidence,
+                    checklist: details.checklist.map((candidate) =>
+                      candidate.id === item.id
+                        ? { ...candidate, done: !candidate.done }
+                        : candidate,
+                    ),
+                  })
+                }
+              />
+              {item.text}
+            </label>
+          ))}
+        </StyledDeliveryStack>
+      </StyledTaskDisclosure>
       {canProduce && (
         <StyledDeliveryCard>
           <StyledDeliveryStack>
@@ -686,6 +743,17 @@ const TaskDetailWorkspace = ({
           </StyledDeliveryStack>
         </StyledDeliveryCard>
       )}
+      <StyledTaskDisclosure>
+        <summary>
+          <Trans>Capacity planning</Trans>
+        </summary>
+        <DeliveryTaskPlan
+          task={task}
+          canManage={workspace.actor.isManager}
+          run={run}
+          busy={busy || saving}
+        />
+      </StyledTaskDisclosure>
       <DeliveryRevisions task={task} onUnavailable={onUnavailable} />
       {(!latestSubmission || taskReview.data) && (
         <section aria-label={t`Submission history`}>

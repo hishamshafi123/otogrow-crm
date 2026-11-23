@@ -62,7 +62,10 @@ import {
   type FounderTask,
 } from 'src/modules/delivery/founder/delivery-founder.policy';
 
-type TaskSource = FounderTask & { submissions: DeliveryDetails['submissions'] };
+type TaskSource = FounderTask & {
+  submissions: DeliveryDetails['submissions'];
+  allowSelfReview?: boolean;
+};
 type Engagement = {
   id: string;
   projectId: string;
@@ -367,7 +370,7 @@ export class DeliveryFounderService {
     ) {
       tasks = await this.bounded<TaskSource>(
         manager,
-        `SELECT task.id,task.title,delivery."projectId",delivery.revision,delivery.details->>'state' AS state,task."assigneeId",delivery.details->>'reviewerId' AS "reviewerId",to_char(task."dueAt" AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "dueAt",to_char(GREATEST(task."updatedAt",delivery."updatedAt") AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS "updatedAt",to_char(task."updatedAt" AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS "nativeUpdatedAt",CASE WHEN jsonb_typeof(delivery.details->'submissions')='array' AND jsonb_array_length(delivery.details->'submissions')>0 THEN jsonb_build_array(jsonb_build_object('version',delivery.details->'submissions'->-1->'version','decision',delivery.details->'submissions'->-1->'decision','reviewedAt',delivery.details->'submissions'->-1->'reviewedAt','description','','evidence','[]'::jsonb,'submittedBy','','submittedAt',delivery.details->'submissions'->-1->'submittedAt')) ELSE '[]'::jsonb END AS submissions FROM core."deliveryTask" delivery JOIN ${this.delivery.schema(workspace)}.task task ON task.id=delivery."taskId" JOIN core."deliveryProject" project ON project.id=delivery."projectId" AND project."workspaceId"=delivery."workspaceId" WHERE delivery."workspaceId"=$1 AND task."deletedAt" IS NULL AND ($2::uuid IS NULL OR delivery."projectId"=$2) ORDER BY task.id`,
+        `SELECT task.id,task.title,delivery."projectId",delivery.revision,delivery.details->>'state' AS state,task."assigneeId",delivery.details->>'reviewerId' AS "reviewerId",COALESCE(delivery.details->'allowSelfReview','false'::jsonb) AS "allowSelfReview",to_char(task."dueAt" AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "dueAt",to_char(GREATEST(task."updatedAt",delivery."updatedAt") AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS "updatedAt",to_char(task."updatedAt" AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS "nativeUpdatedAt",CASE WHEN jsonb_typeof(delivery.details->'submissions')='array' AND jsonb_array_length(delivery.details->'submissions')>0 THEN jsonb_build_array(jsonb_build_object('version',delivery.details->'submissions'->-1->'version','decision',delivery.details->'submissions'->-1->'decision','reviewedAt',delivery.details->'submissions'->-1->'reviewedAt','description','','evidence','[]'::jsonb,'submittedBy','','submittedAt',delivery.details->'submissions'->-1->'submittedAt')) ELSE '[]'::jsonb END AS submissions FROM core."deliveryTask" delivery JOIN ${this.delivery.schema(workspace)}.task task ON task.id=delivery."taskId" JOIN core."deliveryProject" project ON project.id=delivery."projectId" AND project."workspaceId"=delivery."workspaceId" WHERE delivery."workspaceId"=$1 AND task."deletedAt" IS NULL AND ($2::uuid IS NULL OR delivery."projectId"=$2) ORDER BY task.id`,
         [workspace.id, query.projectId],
         'Current delivery tasks',
       );
@@ -405,6 +408,7 @@ export class DeliveryFounderService {
           ? deliveryReviewAuthority({
               primaryReviewerId: task.reviewerId,
               assigneeId: task.assigneeId,
+              allowSelfReview: task.allowSelfReview,
               assignment: reviewAssignments.get(task.id),
               projectMemberIds:
                 projects.find((project) => project.id === task.projectId)

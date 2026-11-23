@@ -74,6 +74,7 @@ type TaskRow = {
   priority: string;
   scheduledDate: string | null;
   primaryReviewerId: string | null;
+  allowSelfReview?: boolean;
   workGroup: string;
   groupRank: number;
   priorityRank: number;
@@ -391,7 +392,7 @@ export class DeliveryTasksService {
         const source = `WITH source AS (
         SELECT t.id,t.title,t."assigneeId",t."dueAt",d."projectId",p.name AS "projectName",d.revision,
           COALESCE(d.details->>'service','') AS service,CASE WHEN d.details->>'state'=ANY(ARRAY['PLANNED','IN_PROGRESS','BLOCKED','IN_REVIEW','CHANGES_REQUESTED','APPROVED']) THEN d.details->>'state' ELSE 'UNKNOWN' END AS state,
-          COALESCE(d.details->>'priority','UNKNOWN') AS priority,d.details->>'scheduledDate' AS "scheduledDate",d.details->>'reviewerId' AS "primaryReviewerId",
+          COALESCE(d.details->>'priority','UNKNOWN') AS priority,d.details->>'scheduledDate' AS "scheduledDate",d.details->>'reviewerId' AS "primaryReviewerId",COALESCE(d.details->'allowSelfReview','false'::jsonb) AS "allowSelfReview",
           CASE WHEN d.details->>'state'='APPROVED' THEN 'approved' WHEN d.details->>'state'='IN_REVIEW' THEN 'review' WHEN d.details->>'state'='CHANGES_REQUESTED' THEN 'revisions' WHEN d.details->>'state'='BLOCKED' THEN 'blocked'
             WHEN t."dueAt"<$3::timestamptz THEN 'overdue' WHEN d.details->>'state'='IN_PROGRESS' OR d.details->>'scheduledDate'<=$5 OR to_char(t."dueAt" AT TIME ZONE $4,'YYYY-MM-DD')=$5 THEN 'today'
             WHEN d.details->>'scheduledDate' IS NOT NULL OR t."dueAt" IS NOT NULL THEN 'upcoming' ELSE 'unscheduled' END AS "workGroup",
@@ -519,6 +520,7 @@ export class DeliveryTasksService {
               ...deliveryReviewAuthority({
                 primaryReviewerId: row.primaryReviewerId,
                 assigneeId: row.assigneeId,
+                allowSelfReview: row.allowSelfReview,
                 assignment: assignments.get(row.id),
                 projectMemberIds:
                   projects.find((project) => project.id === row.projectId)
@@ -628,6 +630,7 @@ export class DeliveryTasksService {
               ...deliveryReviewAuthority({
                 primaryReviewerId: record.details.reviewerId,
                 assigneeId: task.assigneeId,
+                allowSelfReview: record.details.allowSelfReview,
                 assignment: assignments.get(task.id),
                 projectMemberIds: project.memberIds,
                 access,

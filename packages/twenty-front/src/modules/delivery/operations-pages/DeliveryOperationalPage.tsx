@@ -1,6 +1,8 @@
 import { useLayoutEffect, useState, type ReactNode } from 'react';
 import { useApolloClient } from '@apollo/client/react';
 import { Trans, useLingui } from '@lingui/react/macro';
+import { DeliveryPageHeader } from '@/delivery/DeliveryPageHeader';
+import { DeliveryPageRefreshButton } from '@/delivery/DeliveryPageRefreshButton';
 import { Link, useNavigate } from 'react-router-dom';
 import { styled } from '@linaria/react';
 import { useDeliveryDraftGuard } from '@/delivery/drafts/DeliveryDraftGuard';
@@ -73,6 +75,10 @@ const OperationalWorkspace = ({
     DeliveryOperationalView,
     { title: string; description: string }
   > = {
+    clients: {
+      title: t`Clients`,
+      description: t`Manage client details, relationships and delivery.`,
+    },
     chat: {
       title: t`Team chat`,
       description: t`Message teammates and follow up on unread messages.`,
@@ -107,7 +113,7 @@ const OperationalWorkspace = ({
     },
     health: {
       title: t`Company overview`,
-      description: t`Business exceptions and connection readiness.`,
+      description: t`Company performance, business exceptions and connection readiness.`,
     },
   };
   const client = useApolloClient();
@@ -162,67 +168,62 @@ const OperationalWorkspace = ({
   };
   return (
     <StyledDeliveryStack>
-      <StyledDeliveryRow>
-        <StyledDeliveryRow>
-          {!expanded && <NavigationDrawerCollapseButton direction="right" />}
-          <div>
-            <h1>{pageLabels[view].title}</h1>
-            <p>{pageLabels[view].description}</p>
-          </div>
-        </StyledDeliveryRow>
-        <StyledDeliveryButton
-          type="button"
-          disabled={refreshing}
-          onClick={() => void refresh()}
-        >
-          {refreshing ? t`Refreshing…` : t`Refresh page`}
-        </StyledDeliveryButton>
-      </StyledDeliveryRow>
-      {authorized && (
-        <DeliveryNavigationPreferences
-          key={personalNavigation.scope}
-          personalNavigation={personalNavigation}
-        />
-      )}
-      {authorized && mobile && (
-        <label>
-          <Trans>Go to</Trans>
-          <select
-            aria-label={t`Go to workspace`}
-            value={view}
-            onChange={(event) => {
-              const destination = `/delivery?view=${event.currentTarget.value}`;
-              requestAction(() => navigate(destination));
-            }}
-          >
-            {personalNavigation.pinnedPages.length > 0 && (
-              <optgroup label={t`Pinned`}>
-                {personalNavigation.pinnedPages.map((page) => (
-                  <option key={page.view} value={page.view}>
-                    {page.label}
-                  </option>
-                ))}
-              </optgroup>
-            )}
-            {navigationGroups.map((group) => (
-              <optgroup key={group.id} label={group.label}>
-                {group.items
-                  .filter(
-                    (page) =>
-                      !personalNavigation.pinnedPages.some(
-                        (pinned) => pinned.view === page.view,
-                      ),
-                  )
-                  .map((page) => (
+      <DeliveryPageHeader
+        titleControl={
+          authorized && mobile ? (
+            <select
+              aria-label={t`Go to workspace`}
+              value={view}
+              onChange={(event) => {
+                const destination = `/delivery?view=${event.currentTarget.value}`;
+                requestAction(() => navigate(destination));
+              }}
+            >
+              {personalNavigation.pinnedPages.length > 0 && (
+                <optgroup label={t`Pinned`}>
+                  {personalNavigation.pinnedPages.map((page) => (
                     <option key={page.view} value={page.view}>
                       {page.label}
                     </option>
                   ))}
-              </optgroup>
-            ))}
-          </select>
-        </label>
-      )}
+                </optgroup>
+              )}
+              {navigationGroups.map((group) => (
+                <optgroup key={group.id} label={group.label}>
+                  {group.items
+                    .filter(
+                      (page) =>
+                        !personalNavigation.pinnedPages.some(
+                          (pinned) => pinned.view === page.view,
+                        ),
+                    )
+                    .map((page) => (
+                      <option key={page.view} value={page.view}>
+                        {page.label}
+                      </option>
+                    ))}
+                </optgroup>
+              ))}
+            </select>
+          ) : undefined
+        }
+        title={pageLabels[view].title}
+        description={
+          mobile && view === 'creative'
+            ? undefined
+            : pageLabels[view].description
+        }
+        navigation={
+          !expanded && <NavigationDrawerCollapseButton direction="right" />
+        }
+        actions={
+          <DeliveryPageRefreshButton
+            refreshing={refreshing}
+            onClick={() => void refresh()}
+          />
+        }
+      />
+
       {refreshFailed && (
         <p role="alert">
           <Trans>
@@ -264,6 +265,12 @@ const OperationalWorkspace = ({
       >
         {mounted && children}
       </StyledOperationalBoundary>
+      {authorized && (
+        <DeliveryNavigationPreferences
+          key={personalNavigation.scope}
+          personalNavigation={personalNavigation}
+        />
+      )}
     </StyledDeliveryStack>
   );
 };

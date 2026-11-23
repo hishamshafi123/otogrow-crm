@@ -1,6 +1,7 @@
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Trans, useLingui } from '@lingui/react/macro';
+import { DeliveryPageHeader } from '@/delivery/DeliveryPageHeader';
 import { isValidUuid } from 'twenty-shared/utils';
 import { PageBody } from '@/ui/layout/page/components/PageBody';
 import { PageContainer } from '@/ui/layout/page/components/PageContainer';
@@ -211,22 +212,15 @@ const AssistantWorkspace = ({
     <StyledDeliveryStack>
       {!embedded && (
         <>
-          <StyledDeliveryRow>
-            <div>
-              <h1>
-                <Trans>AI assistants</Trans>
-              </h1>
-              <p>
-                <Trans>
-                  Choose a permitted assistant or review a saved run. People
-                  confirm all proposed edits.
-                </Trans>
-              </p>
-            </div>
-            <Link to="/delivery?view=home">
-              <Trans>Back to Today</Trans>
-            </Link>
-          </StyledDeliveryRow>
+          <DeliveryPageHeader
+            title={t`AI assistants`}
+            description={t`Choose a permitted assistant or review a saved run. People confirm all proposed edits.`}
+            actions={
+              <Link to="/delivery?view=home">
+                <Trans>Back to Today</Trans>
+              </Link>
+            }
+          />
           <DeliveryAiWorkspaceNavigation administrator={state.administrator} />
         </>
       )}

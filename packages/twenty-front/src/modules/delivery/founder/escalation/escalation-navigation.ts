@@ -14,8 +14,8 @@ export const escalationDestination = (
 export const founderQueueDestination = (params: URLSearchParams) => {
   const next = new URLSearchParams(params);
   next.set('view', 'health');
+  next.set('founderPanel', 'attention');
   for (const key of [
-    'founderPanel',
     'founderRule',
     'founderIssue',
     'founderRulesAfter',

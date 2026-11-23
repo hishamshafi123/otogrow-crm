@@ -158,7 +158,7 @@ async function main() {
   );
   const commitments = scoped.map(
     (source, index) =>
-      new DeliveryCommitmentsService(source, deliveries[index]),
+      new DeliveryCommitmentsService(source, deliveries[index], createIsolatedNativeTaskAccess()),
   );
   const creatives = scoped.map(
     (source, index) =>

@@ -25,6 +25,7 @@ type CommitmentEditorProps = {
   data: CommitmentSnapshot;
   billing: string;
   busy: boolean;
+  saving: boolean;
   error: string;
   moreTaskOptions: boolean;
   moreParentOptions: boolean;
@@ -32,6 +33,10 @@ type CommitmentEditorProps = {
   taskOptions: CommitmentSnapshot['taskOptions'];
   parentOptions: CommitmentSnapshot['taskOptions'];
   onSearch: (value: string, parents: boolean) => void;
+  onSelectedSources: (selection: {
+    taskId: string | null;
+    parentTaskId: string | null;
+  }) => void;
   onSave: (command: CommitmentCommand) => Promise<boolean>;
   onCancel: () => void;
   onReload: () => Promise<void>;
@@ -41,6 +46,7 @@ export const CommitmentEditor = ({
   data,
   billing,
   busy,
+  saving,
   error,
   moreTaskOptions,
   moreParentOptions,
@@ -48,6 +54,7 @@ export const CommitmentEditor = ({
   taskOptions,
   parentOptions,
   onSearch,
+  onSelectedSources,
   onSave,
   onCancel,
   onReload,
@@ -93,18 +100,20 @@ export const CommitmentEditor = ({
       taskRevision: 0,
     },
     revision,
-    busy,
+    busy: saving,
   });
   const [failed, setFailed] = useState(false);
   const [taskSearch, setTaskSearch] = useState('');
   const [parentSearch, setParentSearch] = useState('');
-  const [chosenTask, setChosenTask] = useState<
-    CommitmentSnapshot['taskOptions'][number] | null
-  >(null);
-  const [chosenParent, setChosenParent] = useState<
-    CommitmentSnapshot['taskOptions'][number] | null
-  >(null);
   const values = draft.values;
+  const chosenTask =
+    data.selectedTask?.taskId === values.taskId
+      ? data.selectedTask
+      : taskOptions.find((item) => item.taskId === values.taskId);
+  const chosenParent =
+    data.selectedParent?.taskId === values.parentTaskId
+      ? data.selectedParent
+      : parentOptions.find((item) => item.taskId === values.parentTaskId);
   const update = (patch: Partial<typeof values>) =>
     draft.update({ ...values, ...patch });
   const selectedLine = data.lines.find((item) => item.id === values.lineId);
@@ -114,7 +123,16 @@ export const CommitmentEditor = ({
     selection.kind === 'period'
       ? editedPeriod?.state === 'CLOSED'
       : !period || (period.state !== 'OPEN' && selection.kind !== 'state');
-  const stale = draft.stale || unavailable;
+  const selectedTaskChanged =
+    selection.kind === 'assign' &&
+    chosenTask &&
+    (chosenTask.taskRevision !== values.taskRevision ||
+      chosenTask.allocationRevision !== values.allocationRevision);
+  const parentEligible =
+    chosenParent?.allocatedUnit === 'UNIQUE_VIDEO' &&
+    chosenParent.allocatedPeriodId === period?.id &&
+    chosenParent.taskId !== values.taskId;
+  const stale = draft.stale || unavailable || Boolean(selectedTaskChanged);
   const periodRequirements: string[] = [];
   if (selection.kind === 'period') {
     if (!commitmentEndExclusive(values.startDate))
@@ -147,7 +165,8 @@ export const CommitmentEditor = ({
     (selection.kind === 'assign' &&
       (!values.taskId ||
         !selectedLine ||
-        (selectedLine.unit === 'VARIATION' && !values.parentTaskId)));
+        (selectedLine.unit === 'VARIATION' &&
+          (!values.parentTaskId || !parentEligible))));
   const title =
     selection.kind === 'period'
       ? newPeriod
@@ -384,7 +403,10 @@ export const CommitmentEditor = ({
                         lineRevision: next?.revision ?? 0,
                         parentTaskId: '',
                       });
-                      setChosenParent(null);
+                      onSelectedSources({
+                        taskId: values.taskId || null,
+                        parentTaskId: null,
+                      });
                     }}
                   >
                     <option value="">{t`Choose promised work`}</option>
@@ -420,7 +442,10 @@ export const CommitmentEditor = ({
                       const next = taskOptions.find(
                         (item) => item.taskId === event.target.value,
                       );
-                      setChosenTask(next ?? null);
+                      onSelectedSources({
+                        taskId: next?.taskId ?? null,
+                        parentTaskId: values.parentTaskId || null,
+                      });
                       update({
                         taskId: next?.taskId ?? '',
                         taskRevision: next?.taskRevision ?? 0,
@@ -461,6 +486,16 @@ export const CommitmentEditor = ({
                     </Trans>
                   </p>
                 )}
+                {selectedLine?.unit === 'VARIATION' &&
+                  values.parentTaskId &&
+                  !parentEligible && (
+                    <p role="status">
+                      <Trans>
+                        Choose an original video currently linked to this
+                        period.
+                      </Trans>
+                    </p>
+                  )}
                 {selectedLine?.unit === 'VARIATION' && (
                   <>
                     {parentSearchFailed && (
@@ -506,7 +541,10 @@ export const CommitmentEditor = ({
                           const next = parentOptions.find(
                             (item) => item.taskId === event.target.value,
                           );
-                          setChosenParent(next ?? null);
+                          onSelectedSources({
+                            taskId: values.taskId || null,
+                            parentTaskId: next?.taskId ?? null,
+                          });
                           update({ parentTaskId: next?.taskId ?? '' });
                         }}
                       >
@@ -523,6 +561,7 @@ export const CommitmentEditor = ({
                           .filter(
                             (item) =>
                               item.allocatedUnit === 'UNIQUE_VIDEO' &&
+                              item.allocatedPeriodId === period?.id &&
                               item.taskId !== values.taskId,
                           )
                           .map((item) => (
@@ -538,7 +577,7 @@ export const CommitmentEditor = ({
             )}
             {selection.kind === 'remove' && (
               <p>
-                {allocation?.taskName ?? selection.taskId} ·{' '}
+                {allocation?.taskName ?? t`Task no longer available`} ·{' '}
                 <Trans>
                   The task stays in the project. Its assignment and current
                   credit are removed from this commitment.

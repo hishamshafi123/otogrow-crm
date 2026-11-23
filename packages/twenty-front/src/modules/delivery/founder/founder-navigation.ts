@@ -50,6 +50,7 @@ export const writeFounderNavigation = (
 ) => {
   const next = new URLSearchParams(params);
   next.set('view', 'health');
+  next.set('founderPanel', 'attention');
   for (const [key, parameter] of Object.entries(PARAMETERS)) {
     next.delete(parameter);
     const field = value[key as keyof FounderNavigationValue];

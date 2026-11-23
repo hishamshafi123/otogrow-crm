@@ -16,9 +16,13 @@ export const assertDeliveryReview = (
   decision: string,
   effectiveReviewerId: string | null = details.reviewerId,
 ): void => {
-  if (!canReview || effectiveReviewerId !== actorId || assigneeId === actorId) {
+  if (
+    !canReview ||
+    effectiveReviewerId !== actorId ||
+    (assigneeId === actorId && details.allowSelfReview !== true)
+  ) {
     throw new ForbiddenException(
-      'Only the assigned reviewer can review work submitted by another person.',
+      'Only the assigned reviewer can review this work. Independent review is required unless this is an allowed first task.',
     );
   }
   if (details.state !== 'IN_REVIEW' || details.submissions.length === 0) {

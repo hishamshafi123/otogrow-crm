@@ -39,6 +39,9 @@ import { DeliveryMyWorkQueue } from '@/delivery/DeliveryMyWorkQueue';
 import { OtogrowActivity } from '@/otogrow-activity/OtogrowActivity';
 import { OtogrowActivityPage } from '@/otogrow-activity/OtogrowActivityPage';
 import { DeliveryClients } from '@/delivery/DeliveryClients';
+import { DeliveryCommitmentsPage } from '@/delivery/commitments/DeliveryCommitmentsPage';
+import { DeliveryClientWorkspacePage } from '@/delivery/client-workspace/DeliveryClientWorkspacePage';
+import { clientCommitmentsParams } from '@/delivery/commitments/clientCommitmentParams';
 import { DeliveryOperations } from '@/delivery/DeliveryOperations';
 import { DeliveryCreative } from '@/delivery/DeliveryCreative';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
@@ -47,9 +50,11 @@ import { useMutation, useQuery } from '@apollo/client/react';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { styled } from '@linaria/react';
-import { Navigate, useLocation, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useDeliveryNavigationPreferences } from '@/delivery/navigation/useDeliveryNavigationPreferences';
 import { DeliveryNavigationPreferences } from '@/delivery/navigation/DeliveryNavigationPreferences';
+import { DeliveryPageHeader } from '@/delivery/DeliveryPageHeader';
+import { DeliveryPageRefreshButton } from '@/delivery/DeliveryPageRefreshButton';
 import { getDeliveryEntryView } from '@/delivery/navigation/delivery-navigation-preferences';
 import { GET_DELIVERY_WORKSPACE } from '@/delivery/deliveryWorkspaceQuery';
 import { useDeliveryNavigation } from '@/delivery/useDeliveryNavigation';
@@ -139,6 +144,16 @@ export const DeliveryWorkspacePage = () => {
         <DeliveryInboxPage />
       ) : view === 'onboarding' ? (
         <DeliveryClientSetupPage />
+      ) : view === 'clients' &&
+        (!params.get('clientView') ||
+          params.get('clientView') === 'workspace') &&
+        !params.has('clientEngagement') &&
+        !params.has('task') ? (
+        <DeliveryClientWorkspacePage />
+      ) : view === 'clients' &&
+        !['agreements', 'legacy'].includes(params.get('clientView') ?? '') &&
+        !params.has('task') ? (
+        <DeliveryCommitmentsPage />
       ) : view === 'creative' && params.get('creativeView') === 'learning' ? (
         <DeliveryCreativeLearningPage />
       ) : view === 'creative' && params.get('creativeView') !== 'legacy' ? (
@@ -472,6 +487,11 @@ const LegacyDeliveryWorkspacePage = ({
               <h1>
                 <Trans>Otogrow workspace</Trans>
               </h1>
+              {view === 'clients' && (
+                <Link to={`/delivery?${clientCommitmentsParams(params)}`}>
+                  <Trans>Open delivery commitments</Trans>
+                </Link>
+              )}
               {query.error ||
               permission.error ||
               (permission.ready && candidateWorkspace && !workspaceVerified) ? (
@@ -678,6 +698,11 @@ const LegacyDeliveryWorkspacePage = ({
       <PageBody>
         {!workspaceVerified && !drawerOpen && (
           <StyledDeliveryStack>
+            {view === 'clients' && (
+              <Link to={`/delivery?${clientCommitmentsParams(params)}`}>
+                <Trans>Open delivery commitments</Trans>
+              </Link>
+            )}
             <p role="status">
               <Trans>
                 Your workspace access could not be verified. Saved information
@@ -703,53 +728,9 @@ const LegacyDeliveryWorkspacePage = ({
         >
           <StyledDeliveryCanvas>
             <StyledDeliveryStack>
-              <StyledDeliveryRow>
-                <StyledDeliveryRow>
-                  {!isNavigationExpanded && (
-                    <NavigationDrawerCollapseButton direction="right" />
-                  )}
-                  <div>
-                    <h1>{currentPage.label}</h1>
-                    <p>{currentPage.description}</p>
-                  </div>
-                </StyledDeliveryRow>
-                <StyledDeliveryRow>
-                  {workspace.actor.isManager &&
-                    ['home', 'mine', 'planner', 'reviews', 'creative'].includes(
-                      view,
-                    ) && (
-                      <StyledDeliveryButton
-                        data-primary="true"
-                        onClick={() => {
-                          if (!workspace.projects.length) {
-                            selectView('team');
-                            return;
-                          }
-                          setCreating(true);
-                          setError('');
-                        }}
-                      >
-                        {workspace.projects.length
-                          ? t`New task`
-                          : t`Set up first project`}
-                      </StyledDeliveryButton>
-                    )}
-                  <StyledDeliveryButton
-                    disabled={refreshing}
-                    onClick={() => void refreshVisibleWork()}
-                  >
-                    {refreshing ? t`Refreshing…` : t`Refresh page`}
-                  </StyledDeliveryButton>
-                </StyledDeliveryRow>
-              </StyledDeliveryRow>
-              <DeliveryNavigationPreferences
-                key={personalNavigation.scope}
-                personalNavigation={personalNavigation}
-              />
-              {isMobile && (
-                <StyledDeliveryRow>
-                  <label>
-                    <Trans>Go to</Trans>
+              <DeliveryPageHeader
+                titleControl={
+                  isMobile ? (
                     <select
                       aria-label={t`Go to workspace`}
                       value={view}
@@ -781,9 +762,52 @@ const LegacyDeliveryWorkspacePage = ({
                         </optgroup>
                       ))}
                     </select>
-                  </label>
-                </StyledDeliveryRow>
-              )}
+                  ) : undefined
+                }
+                title={currentPage.label}
+                description={
+                  isMobile && view === 'finance'
+                    ? undefined
+                    : currentPage.description
+                }
+                navigation={
+                  !isNavigationExpanded && (
+                    <NavigationDrawerCollapseButton direction="right" />
+                  )
+                }
+                actions={
+                  <>
+                    {workspace.actor.isManager &&
+                      [
+                        'home',
+                        'mine',
+                        'planner',
+                        'reviews',
+                        'creative',
+                      ].includes(view) && (
+                        <StyledDeliveryButton
+                          data-primary="true"
+                          onClick={() => {
+                            if (!workspace.projects.length) {
+                              selectView('team');
+                              return;
+                            }
+                            setCreating(true);
+                            setError('');
+                          }}
+                        >
+                          {workspace.projects.length
+                            ? t`New task`
+                            : t`Set up first project`}
+                        </StyledDeliveryButton>
+                      )}
+                    <DeliveryPageRefreshButton
+                      refreshing={refreshing}
+                      onClick={() => void refreshVisibleWork()}
+                    />
+                  </>
+                }
+              />
               {error && !selectedTask && !creating && (
                 <p role="alert">{error}</p>
               )}
@@ -1279,6 +1303,10 @@ const LegacyDeliveryWorkspacePage = ({
                   )}
                 </>
               )}
+              <DeliveryNavigationPreferences
+                key={personalNavigation.scope}
+                personalNavigation={personalNavigation}
+              />
             </StyledDeliveryStack>
           </StyledDeliveryCanvas>
         </StyledWorkspaceAccessBoundary>

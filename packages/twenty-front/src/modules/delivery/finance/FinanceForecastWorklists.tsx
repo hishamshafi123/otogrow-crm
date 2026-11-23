@@ -7,6 +7,7 @@ import {
 } from '@/delivery/finance/finance-forecast.types';
 import { useFinanceForecastLabels } from '@/delivery/finance/useFinanceForecastLabels';
 import { formatFinanceAmountMicros } from '@/delivery/finance/finance-money';
+import { StyledFinanceSection } from '@/delivery/finance/financeStyles';
 import {
   StyledDeliveryRow,
   StyledDeliveryStack,
@@ -52,7 +53,7 @@ export const FinanceForecastWorklists = ({
       : formatFinanceAmountMicros(value, data.currency);
   return (
     <StyledDeliveryStack>
-      <section aria-label={t`Unresolved cash forecast items`}>
+      <StyledFinanceSection aria-label={t`Unresolved cash forecast items`}>
         <h3>{t`Needs attention (${data.exceptionCount})`}</h3>
         <p>
           {t`Known collections outside the dated scenario`}:{' '}
@@ -165,8 +166,8 @@ export const FinanceForecastWorklists = ({
             </Link>
           )}
         </StyledDeliveryRow>
-      </section>
-      <section aria-label={t`Expected cash follow-up`}>
+      </StyledFinanceSection>
+      <StyledFinanceSection aria-label={t`Expected cash follow-up`}>
         <h3>{t`Expected collections and payments (${data.itemCount})`}</h3>
         {!data.items.length && (
           <p>
@@ -233,7 +234,7 @@ export const FinanceForecastWorklists = ({
             </Link>
           )}
         </StyledDeliveryRow>
-      </section>
+      </StyledFinanceSection>
     </StyledDeliveryStack>
   );
 };

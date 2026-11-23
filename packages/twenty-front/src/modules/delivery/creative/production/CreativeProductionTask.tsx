@@ -3,6 +3,7 @@ import { useQuery } from '@apollo/client/react';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { fastDeepEqual } from 'twenty-shared/utils';
+import { CreativeDueDate } from '@/delivery/creative/production/CreativeDueDate';
 import { DeliveryCreative } from '@/delivery/DeliveryCreative';
 import { DeliveryTaskAssignmentRead } from '@/delivery/tasks/DeliveryTaskAssignmentRead';
 import { useAssistantRead } from '@/delivery/assistants/useAssistantRead';
@@ -21,11 +22,16 @@ import {
 import { creativeProductionDocument } from '@/delivery/creative/production/creative-production-document';
 import { isCreativeSourceUnavailable } from '@/delivery/creative/production/creative-production-errors';
 import { CreativeApprovedReferences } from '@/delivery/creative/production/CreativeApprovedReferences';
-import { StyledCreativeBoundary } from '@/delivery/creative/production/creative-production-styles';
+import {
+  StyledCreativeBoundary,
+  StyledCreativeFacts,
+  StyledCreativeTaskHeading,
+  StyledCreativeToolbar,
+} from '@/delivery/creative/production/creative-production-styles';
+import { useTaskLabels } from '@/delivery/tasks/useTaskLabels';
 import {
   StyledDeliveryButton,
   StyledDeliveryCard,
-  StyledDeliveryRow,
   StyledDeliveryStack,
 } from '@/delivery/deliveryStyles';
 import {
@@ -42,6 +48,7 @@ export const CreativeProductionTask = ({
   taskId: string;
 }) => {
   const { t } = useLingui();
+  const labels = useTaskLabels();
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const { requestAction, cancelPendingNavigation } = useDeliveryDraftGuard();
@@ -178,20 +185,22 @@ export const CreativeProductionTask = ({
     requestAction(() =>
       navigate(creativeProductionDestination(params, { task: null })),
     );
+  const refreshAction = (
+    <StyledDeliveryButton
+      type="button"
+      disabled={refreshing}
+      onClick={() => void refresh().catch(() => undefined)}
+    >
+      {refreshing ? t`Refreshing…` : t`Refresh production`}
+    </StyledDeliveryButton>
+  );
   return (
     <StyledDeliveryStack>
-      <StyledDeliveryRow>
+      <StyledCreativeToolbar>
         <StyledDeliveryButton type="button" onClick={back}>
           <Trans>Back to production queue</Trans>
         </StyledDeliveryButton>
-        <StyledDeliveryButton
-          type="button"
-          disabled={refreshing}
-          onClick={() => void refresh().catch(() => undefined)}
-        >
-          {refreshing ? t`Refreshing…` : t`Refresh production`}
-        </StyledDeliveryButton>
-      </StyledDeliveryRow>
+      </StyledCreativeToolbar>
       {!available && (
         <StyledDeliveryCard>
           <p
@@ -215,6 +224,7 @@ export const CreativeProductionTask = ({
                   ? t`Current production could not be checked. Information is hidden and unsaved work is kept while you retry.`
                   : t`Loading the exact production task…`}
           </p>
+          <StyledCreativeToolbar>{refreshAction}</StyledCreativeToolbar>
         </StyledDeliveryCard>
       )}
       <StyledCreativeBoundary
@@ -224,7 +234,65 @@ export const CreativeProductionTask = ({
       >
         {current && (
           <div key={`${taskId}:${privateEpoch}`} ref={focusPanel} tabIndex={-1}>
-            <h2>{current.task.title}</h2>
+            <StyledCreativeTaskHeading>
+              <h2>{current.task.title}</h2>
+              <StyledCreativeFacts>
+                <div>
+                  <dt>
+                    <Trans>Assigned to</Trans>
+                  </dt>
+                  <dd>{current.task.assigneeName ?? t`Unassigned`}</dd>
+                </div>
+                <div>
+                  <dt>
+                    <Trans>Status</Trans>
+                  </dt>
+                  <dd>{labels.state(current.task.state)}</dd>
+                </div>
+                {current.task.dueAt && (
+                  <div>
+                    <dt>
+                      <Trans>Due</Trans>
+                    </dt>
+                    <dd>
+                      <CreativeDueDate value={current.task.dueAt} />
+                    </dd>
+                  </div>
+                )}
+              </StyledCreativeFacts>
+              <details>
+                <summary>
+                  <Trans>Task details</Trans>
+                </summary>
+                <StyledDeliveryStack>
+                  <StyledCreativeFacts>
+                    <div>
+                      <dt>
+                        <Trans>Project</Trans>
+                      </dt>
+                      <dd>{current.task.projectName}</dd>
+                    </div>
+                    <div>
+                      <dt>
+                        <Trans>Service</Trans>
+                      </dt>
+                      <dd>{current.task.service}</dd>
+                    </div>
+                    {!current.task.dueAt && (
+                      <div>
+                        <dt>
+                          <Trans>Due</Trans>
+                        </dt>
+                        <dd>
+                          <Trans>No due date</Trans>
+                        </dd>
+                      </div>
+                    )}
+                  </StyledCreativeFacts>
+                  <StyledCreativeToolbar>{refreshAction}</StyledCreativeToolbar>
+                </StyledDeliveryStack>
+              </details>
+            </StyledCreativeTaskHeading>
             {current.task.assignmentKey && (
               <DeliveryTaskAssignmentRead
                 key={`${current.task.id}:${current.task.assignmentKey}`}
@@ -238,11 +306,6 @@ export const CreativeProductionTask = ({
                 }
               />
             )}
-            <p>
-              {current.task.projectName} ·{' '}
-              {current.task.assigneeName ?? t`Unassigned`} ·{' '}
-              {current.task.service}
-            </p>
             <DeliveryCreative
               task={{
                 id: current.task.id,

@@ -149,3 +149,11 @@ export class DeliveryClientSetupReceiptDTO {
   @Field() reusedProject: boolean;
   @Field() reusedEngagement: boolean;
 }
+
+@ObjectType('DeliveryClientServiceCatalog')
+export class DeliveryClientServiceCatalogDTO {
+  @Field(() => ID) workspaceId: string;
+  @Field(() => ID) memberId: string;
+  @Field(() => ID) userWorkspaceId: string;
+  @Field(() => [String]) services: string[];
+}

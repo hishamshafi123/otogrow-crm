@@ -253,6 +253,7 @@ export class DeliveryService {
               ...deliveryReviewAuthority({
                 primaryReviewerId: task.details.reviewerId,
                 assigneeId: task.assigneeId,
+                allowSelfReview: task.details.allowSelfReview,
                 assignment: reviewAssignments.get(task.id),
                 projectMemberIds:
                   projects.find((project) => project.id === task.projectId)
@@ -314,6 +315,7 @@ export class DeliveryService {
     input: unknown,
     transactionManager?: EntityManager,
     activityActor?: { actorType: 'SYSTEM' | 'CLIENT'; actorId: null },
+    options?: { allowSelfReview?: boolean },
   ) {
     const parsed = deliveryCommandSchema.safeParse(input);
     if (!parsed.success)
@@ -425,9 +427,10 @@ export class DeliveryService {
         project: DeliveryProjectEntity,
         assigneeId: string,
         reviewerId: string,
+        allowSelfReview = false,
       ) => {
         assertMembers([assigneeId, reviewerId]);
-        if (assigneeId === reviewerId)
+        if (assigneeId === reviewerId && !allowSelfReview)
           throw new BadRequestException(
             'Choose a reviewer other than the assignee.',
           );
@@ -464,7 +467,12 @@ export class DeliveryService {
         });
         if (!project) throw new NotFoundException();
         const fields = command.fields;
-        await validateAssignment(project, fields.assigneeId, fields.reviewerId);
+        await validateAssignment(
+          project,
+          fields.assigneeId,
+          fields.reviewerId,
+          options?.allowSelfReview === true,
+        );
         const taskId = v4();
         await manager.query(
           `INSERT INTO ${this.schema(workspace)}."task" (id, title, "assigneeId", "dueAt", status) VALUES ($1, $2, $3, $4, 'TODO')`,
@@ -484,6 +492,10 @@ export class DeliveryService {
           projectId: project.id,
           details: {
             assignmentAt: new Date().toISOString(),
+            ...(options?.allowSelfReview === true &&
+            fields.assigneeId === fields.reviewerId
+              ? { allowSelfReview: true }
+              : {}),
             brief: fields.brief,
             service: fields.service,
             priority: fields.priority,
@@ -648,6 +660,7 @@ export class DeliveryService {
         const reviewAuthority = deliveryReviewAuthority({
           primaryReviewerId: details.reviewerId,
           assigneeId: task.assigneeId,
+          allowSelfReview: details.allowSelfReview,
           assignment,
           projectMemberIds: project.memberIds,
           access: [{ memberId, capabilities: actor.capabilities }],
@@ -774,6 +787,7 @@ export class DeliveryService {
         const authority = deliveryReviewAuthority({
           primaryReviewerId: details.reviewerId,
           assigneeId: task.assigneeId,
+          allowSelfReview: details.allowSelfReview,
           projectMemberIds: project.memberIds,
           access: await this.access.listAccess(workspace.id, manager),
           actorId: details.reviewerId,

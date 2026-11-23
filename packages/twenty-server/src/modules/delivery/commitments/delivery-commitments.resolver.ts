@@ -18,11 +18,58 @@ import {
   DeliveryCommitmentLineSaveInput,
   DeliveryCommitmentTaskAssignInput,
   DeliveryCommitmentTaskRemoveInput,
+  DeliveryCommitmentOrphanCleanupInput,
+  DeliveryCommitmentOrphanCleanupResultDTO,
 } from 'src/modules/delivery/commitments/delivery-commitments.dto';
 @UseGuards(WorkspaceAuthGuard, RequireAccessTokenGuard, CustomPermissionGuard)
 @MetadataResolver()
 export class DeliveryCommitmentsResolver {
   constructor(private readonly commitments: DeliveryCommitmentsService) {}
+
+  @Mutation(() => DeliveryCommitmentOrphanCleanupResultDTO)
+  cancelDeliveryOrphanCommitmentCleanup(
+    @AuthWorkspace() workspace: WorkspaceEntity,
+    @AuthWorkspaceMemberId() memberId: string,
+    @AuthUserWorkspaceId() userWorkspaceId: string,
+    @Args('input') input: DeliveryCommitmentOrphanCleanupInput,
+  ) {
+    return this.commitments.cancelOrphanCleanup(
+      workspace,
+      memberId,
+      userWorkspaceId,
+      input,
+    );
+  }
+
+  @Mutation(() => DeliveryCommitmentOrphanCleanupResultDTO)
+  removeDeliveryOrphanCommitmentAllocation(
+    @AuthWorkspace() workspace: WorkspaceEntity,
+    @AuthWorkspaceMemberId() memberId: string,
+    @AuthUserWorkspaceId() userWorkspaceId: string,
+    @Args('input') input: DeliveryCommitmentOrphanCleanupInput,
+  ) {
+    return this.commitments.removeOrphanAllocation(
+      workspace,
+      memberId,
+      userWorkspaceId,
+      input,
+    );
+  }
+
+  @Query(() => DeliveryCommitmentOrphanCleanupResultDTO)
+  deliveryOrphanCommitmentCleanupReceipt(
+    @AuthWorkspace() workspace: WorkspaceEntity,
+    @AuthWorkspaceMemberId() memberId: string,
+    @AuthUserWorkspaceId() userWorkspaceId: string,
+    @Args('input') input: DeliveryCommitmentOrphanCleanupInput,
+  ) {
+    return this.commitments.orphanCleanupReceipt(
+      workspace,
+      memberId,
+      userWorkspaceId,
+      input,
+    );
+  }
   @Query(() => DeliveryCommitmentEngagementsDTO)
   deliveryCommitmentEngagements(
     @AuthWorkspace() workspace: WorkspaceEntity,

@@ -14,13 +14,51 @@ type FinanceForecastProjectionSummaryProps = {
 type FinanceForecastTimelineProps = FinanceForecastProjectionSummaryProps;
 const StyledForecastTotals = styled.dl`
   display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 20px 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   margin: 0;
+  dt {
+    color: ${themeCssVariables.font.color.secondary};
+    font-size: 13px;
+  }
   dd {
+    font-size: 22px;
     font-weight: 600;
-    margin: 4px 0 0;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.3;
+    margin: 6px 0 0;
     overflow-wrap: anywhere;
+  }
+  > div:last-child {
+    align-items: baseline;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    grid-column: 1 / -1;
+    dd {
+      font-size: 14px;
+      margin: 0;
+    }
+  }
+  > div[data-shortfall='true'] {
+    background: ${themeCssVariables.color.orange3};
+    border: 1px solid ${themeCssVariables.color.orange6};
+    border-radius: 10px;
+    padding: 12px 16px;
+    dt {
+      color: ${themeCssVariables.color.orange11};
+      font-size: 14px;
+      font-weight: 600;
+    }
+    dd {
+      font-size: 22px;
+    }
+  }
+  @container (max-width: 460px) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  @container (min-width: 800px) {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 `;
 const StyledForecastDays = styled.ol`
@@ -50,6 +88,7 @@ export const FinanceForecastProjectionSummary = ({
   incomplete,
 }: FinanceForecastProjectionSummaryProps) => {
   const { t } = useLingui();
+  const hasCashShortfall = isDefined(projection.firstNegativeDate);
   const amount = (value: string | null | undefined) =>
     !isDefined(value)
       ? t`Not confirmed`
@@ -96,7 +135,10 @@ export const FinanceForecastProjectionSummary = ({
             </dt>
             <dd>{amount(projection.endingCashMicros)}</dd>
           </div>
-          <div>
+          <div
+            data-shortfall={hasCashShortfall ? 'true' : undefined}
+            role={hasCashShortfall ? 'status' : undefined}
+          >
             <dt>
               <Trans>First negative daily close</Trans>
             </dt>

@@ -58,6 +58,25 @@ it('labels current recorded cash separately from the remaining collection and ou
   ).toHaveTextContent('$1,000.00');
   expect(screen.getByText('None in the reviewed dated items')).toBeVisible();
   expect(screen.queryByText('Incomplete information')).not.toBeInTheDocument();
+  expect(screen.queryByRole('status')).not.toBeInTheDocument();
+});
+
+it('announces a projected cash shortfall with its first negative date', () => {
+  render(
+    <I18nProvider i18n={i18n}>
+      <FinanceForecastProjectionSummary
+        projection={{
+          ...projectionFixture(),
+          firstNegativeDate: '2026-10-29',
+        }}
+        currency="USD"
+        incomplete={false}
+      />
+    </I18nProvider>,
+  );
+  const shortfall = screen.getByRole('status');
+  expect(shortfall).toHaveTextContent('First negative daily close');
+  expect(shortfall).toHaveTextContent('2026-10-29');
 });
 
 it('qualifies a numeric ending balance when unresolved information makes the scenario incomplete', () => {

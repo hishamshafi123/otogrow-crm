@@ -3,7 +3,6 @@ import { styled } from '@linaria/react';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
 import {
   StyledDeliveryButton,
-  StyledDeliveryCard,
   StyledDeliveryRow,
 } from '@/delivery/deliveryStyles';
 import {
@@ -12,24 +11,56 @@ import {
 } from '@/delivery/delivery.types';
 import { type TaskReviewSnapshot } from '@/delivery/reviews/review.types';
 
-const StyledSteps = styled.ol`
-  display: grid;
+const StyledJourney = styled.section`
+  background: ${themeCssVariables.background.primary};
+  border: 1px solid ${themeCssVariables.border.color.light};
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
   gap: 8px;
-  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  min-width: 0;
+  overflow-wrap: anywhere;
+  padding: 16px;
+
+  > p {
+    max-width: 72ch;
+  }
+
+  > button {
+    align-self: flex-start;
+    margin-top: 4px;
+    max-width: 100%;
+  }
+
+  > details {
+    border-top: 1px solid ${themeCssVariables.border.color.light};
+    margin-top: 4px;
+    padding-top: 8px;
+  }
+
+  > details > summary {
+    color: ${themeCssVariables.font.color.secondary};
+    font-size: 13px;
+  }
+`;
+
+const StyledSteps = styled.ol`
   list-style: none;
-  margin: 12px 0;
+  margin: 0;
   padding: 0;
+
   li {
-    border: 1px solid ${themeCssVariables.border.color.light};
-    border-radius: 8px;
-    padding: 10px;
+    align-items: baseline;
+    border-left: 2px solid ${themeCssVariables.border.color.light};
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    justify-content: space-between;
+    padding: 8px 12px;
+
     &[aria-current='step'] {
-      border-color: ${themeCssVariables.font.color.primary};
+      border-color: ${themeCssVariables.color.blue11};
       font-weight: 600;
-    }
-    small {
-      display: block;
-      margin-top: 4px;
     }
   }
 `;
@@ -116,7 +147,7 @@ export const DeliveryTaskJourney = ({
               : details.state === 'BLOCKED'
                 ? t`Production is blocked`
                 : details.state === 'PLANNED'
-                  ? t`Ready to begin`
+                  ? t`Work planned`
                   : t`Production in progress`;
   const next = briefNeedsApproval
     ? t`A manager must approve the current creative brief before production continues.`
@@ -162,30 +193,11 @@ export const DeliveryTaskJourney = ({
     t`Fulfilment`,
   ];
   return (
-    <StyledDeliveryCard aria-label={t`Deliverable journey`}>
+    <StyledJourney aria-label={t`Deliverable journey`}>
       <StyledDeliveryRow>
         <h3>{heading}</h3>
         {latest && <span>{t`Submission ${latest.version}`}</span>}
       </StyledDeliveryRow>
-      <StyledSteps aria-label={t`Delivery stages`}>
-        {steps.map((label, index) => (
-          <li
-            key={label}
-            aria-current={
-              !fulfilled && currentStage === index ? 'step' : undefined
-            }
-          >
-            {label}
-            <small>
-              {fulfilled || index < currentStage
-                ? t`Complete`
-                : index === currentStage
-                  ? t`Current step`
-                  : t`Next`}
-            </small>
-          </li>
-        ))}
-      </StyledSteps>
       {!fulfilled && (
         <p>
           <Trans>Next owner:</Trans> <strong>{owner}</strong>
@@ -232,6 +244,30 @@ export const DeliveryTaskJourney = ({
       <StyledDeliveryButton onClick={() => onOpenPanel(panel)}>
         {action}
       </StyledDeliveryButton>
-    </StyledDeliveryCard>
+      <details>
+        <summary>
+          <Trans>Delivery stages</Trans>
+        </summary>
+        <StyledSteps aria-label={t`Delivery stages`}>
+          {steps.map((label, index) => (
+            <li
+              key={label}
+              aria-current={
+                !fulfilled && currentStage === index ? 'step' : undefined
+              }
+            >
+              {label}
+              <small>
+                {fulfilled || index < currentStage
+                  ? t`Complete`
+                  : index === currentStage
+                    ? t`Current step`
+                    : t`Next`}
+              </small>
+            </li>
+          ))}
+        </StyledSteps>
+      </details>
+    </StyledJourney>
   );
 };

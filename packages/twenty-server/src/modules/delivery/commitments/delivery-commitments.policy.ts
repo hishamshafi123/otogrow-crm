@@ -1,6 +1,14 @@
 import { type DeliveryDetails } from 'src/modules/delivery/delivery.types';
 import { type Fulfilment } from 'src/modules/delivery/operations/delivery-operations.types';
 import { type DeliveryCommitmentAllocationEntity } from 'src/modules/delivery/commitments/entities/delivery-commitment-allocation.entity';
+import { financeReviewToken } from 'src/modules/delivery/finance/delivery-finance-reconciliation.policy';
+import { type z } from 'zod';
+import { type commitmentOrphanCleanupSchema } from 'src/modules/delivery/commitments/delivery-commitments.types';
+
+export const commitmentCleanupRequestHash = (
+  identity: { workspaceId: string; memberId: string; userWorkspaceId: string },
+  input: z.infer<typeof commitmentOrphanCleanupSchema>,
+) => financeReviewToken({ identity, input });
 
 export const currentCommitmentEvidence = (
   details: Pick<DeliveryDetails, 'state' | 'submissions'> | null,

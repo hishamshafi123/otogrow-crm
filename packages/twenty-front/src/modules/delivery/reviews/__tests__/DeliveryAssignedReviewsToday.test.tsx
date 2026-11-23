@@ -108,7 +108,7 @@ beforeEach(() => {
 });
 it('uses the complete current-person queue count rather than page length or production assignments', () => {
   setup();
-  expect(screen.getByRole('heading', { name: '54' })).toBeVisible();
+  expect(screen.getByText('54')).toBeVisible();
   expect(mockQuery).toHaveBeenLastCalledWith(
     expect.anything(),
     expect.objectContaining({
@@ -119,7 +119,7 @@ it('uses the complete current-person queue count rather than page length or prod
       fetchPolicy: 'no-cache',
     }),
   );
-  const link = screen.getByRole('link', { name: 'Open your assigned reviews' });
+  const link = screen.getByRole('link', { name: 'Reviews assigned to you' });
   const params = new URL(link.getAttribute('href')!, 'http://localhost')
     .searchParams;
   expect(params.get('view')).toBe('reviews');
@@ -134,6 +134,17 @@ it('uses the complete current-person queue count rather than page length or prod
     expect(params.has(name)).toBe(false);
   expect(mockRefetch).not.toHaveBeenCalled();
 });
+it('explains review responsibility without confusing it with production assignments', async () => {
+  setup();
+  const user = userEvent.setup();
+  const explanation = screen.getByText(
+    'Submission review responsibility; separate from your production assignments.',
+  );
+  expect(explanation).not.toBeVisible();
+  await user.click(screen.getByText('About review assignments'));
+  expect(explanation).toBeVisible();
+  expect(screen.getByText('54')).toBeVisible();
+});
 it.each(['error', 'loading', 'identity', 'authority'] as const)(
   'hides stale counts when current %s is unverified',
   (condition) => {
@@ -144,11 +155,9 @@ it.each(['error', 'loading', 'identity', 'authority'] as const)(
       mockSnapshot = { ...mockSnapshot, userWorkspaceId: 'foreign' };
     if (condition === 'authority') mockCapability = false;
     act(() => mockRefresh());
+    expect(screen.queryByText('54')).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('heading', { name: '54' }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('link', { name: 'Open your assigned reviews' }),
+      screen.queryByRole('link', { name: 'Reviews assigned to you' }),
     ).not.toBeInTheDocument();
   },
 );
@@ -160,7 +169,7 @@ it('keeps a separate dirty draft until assigned-review navigation is explicitly 
     'Keep this',
   );
   await user.click(
-    screen.getByRole('link', { name: 'Open your assigned reviews' }),
+    screen.getByRole('link', { name: 'Reviews assigned to you' }),
   );
   expect(screen.getByRole('dialog')).toBeVisible();
   await user.click(screen.getByRole('button', { name: 'Keep editing' }));
@@ -169,7 +178,7 @@ it('keeps a separate dirty draft until assigned-review navigation is explicitly 
     screen.getByRole('textbox', { name: 'Separate task draft' }),
   ).toHaveValue('Keep this');
   await user.click(
-    screen.getByRole('link', { name: 'Open your assigned reviews' }),
+    screen.getByRole('link', { name: 'Reviews assigned to you' }),
   );
   await user.click(
     screen.getByRole('button', { name: 'Discard and continue' }),

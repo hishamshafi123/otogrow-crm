@@ -23,7 +23,8 @@ const setup = () => {
     userWorkspaceId = randomUUID(),
     companyId = randomUUID(),
     projectId = randomUUID(),
-    engagementId = randomUUID();
+    engagementId = randomUUID(),
+    taskId = randomUUID();
   const auth = {
     type: 'user',
     workspace,
@@ -70,7 +71,10 @@ const setup = () => {
           ? receipts
           : entity === DeliveryProjectEntity
             ? projects
-            : { findOneBy: async () => null },
+            : {
+                findOneBy: async () =>
+                  receipt?.taskId ? { taskId: receipt.taskId } : null,
+              },
   } as unknown as EntityManager;
   const source = {
     transaction: async (work: (manager: EntityManager) => Promise<unknown>) =>
@@ -98,6 +102,7 @@ const setup = () => {
         };
         return projectId;
       }
+      if (input.action === 'create') return taskId;
       throw new Error('Unexpected task creation.');
     },
   );
@@ -164,6 +169,7 @@ const setup = () => {
   return {
     service,
     auth,
+    memberId,
     actor,
     input,
     company,
@@ -277,4 +283,32 @@ describe('Atomic client setup and exact outcome recovery', () => {
       [test.input.companyId],
     );
   });
+});
+
+
+it('passes an internal self-review exception only for the same-person first task', async () => {
+  const test = setup();
+  const memberId = test.memberId;
+  const result = await test.create({
+    ...test.input,
+    firstTask: {
+      title: 'First client deliverable',
+      brief: '',
+      service: 'SEO',
+      assigneeId: memberId,
+      reviewerId: memberId,
+      priority: 'NORMAL',
+      scheduledDate: null,
+      dueAt: null,
+      checklist: [],
+      evidence: [],
+    },
+  });
+  expect(result.taskId).toEqual(expect.any(String));
+  expect(test.receipt().taskId).toBe(result.taskId);
+  const createCall = test.command.mock.calls.find(
+    (call) => (call[3] as { action: string }).action === 'create',
+  ) as unknown[] | undefined;
+  expect(createCall?.[3]).not.toHaveProperty('allowSelfReview');
+  expect(createCall?.[6]).toEqual({ allowSelfReview: true });
 });

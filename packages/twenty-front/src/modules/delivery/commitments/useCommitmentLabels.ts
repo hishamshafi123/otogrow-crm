@@ -36,6 +36,8 @@ export const useCommitmentLabels = () => {
     COMMITMENT_LINE_UPDATED: t`Promised work updated`,
     COMMITMENT_TASK_ASSIGNED: t`Task linked`,
     COMMITMENT_TASK_REMOVED: t`Task removed`,
+    COMMITMENT_ORPHAN_CLEANUP_CANCELLED: t`Allocation cleanup stopped`,
+    COMMITMENT_ORPHAN_REMOVED: t`Unavailable-source allocation released`,
     COMMITMENT_TASK_CREDITED: t`Fulfilment counted`,
     COMMITMENT_TASK_REOPENED: t`Fulfilment reopened`,
   };

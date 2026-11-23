@@ -45,6 +45,11 @@ import {
 } from '@/delivery/finance/FinanceForecastWorklists';
 import { FinanceForecastHistory } from '@/delivery/finance/FinanceForecastHistory';
 import { useFinanceForecastLabels } from '@/delivery/finance/useFinanceForecastLabels';
+import {
+  StyledFinanceIntroduction,
+  StyledFinanceFilterBar,
+  StyledFinanceMetadata,
+} from '@/delivery/finance/financeStyles';
 import { useFinanceLabels } from '@/delivery/finance/useFinanceLabels';
 import { formatFinanceAmountMicros } from '@/delivery/finance/finance-money';
 import {
@@ -70,6 +75,21 @@ const StyledForecastBoundary = styled.fieldset`
   padding: 0;
   &[hidden] {
     display: none;
+  }
+`;
+const StyledForecastStartingCash = styled(StyledDeliveryCard)`
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+
+  > button {
+    align-self: flex-start;
+  }
+
+  @container (max-width: 460px) {
+    > button {
+      align-self: stretch;
+    }
   }
 `;
 export const DeliveryFinanceForecast = ({
@@ -350,15 +370,17 @@ const ForecastWorkspace = ({
     );
   return (
     <StyledDeliveryStack>
-      <h2>
-        <Trans>Cash forecast</Trans>
-      </h2>
-      <p>
-        <Trans>
-          Review recorded cash and expected collections and payments. This
-          scenario is separate from monthly results and does not move money.
-        </Trans>
-      </p>
+      <StyledFinanceIntroduction>
+        <h2>
+          <Trans>Cash forecast</Trans>
+        </h2>
+        <p>
+          <Trans>
+            Expected collections and payments, separate from monthly results.
+            This scenario does not move money.
+          </Trans>
+        </p>
+      </StyledFinanceIntroduction>
       <form
         onSubmit={(event) => {
           event.preventDefault();
@@ -381,7 +403,7 @@ const ForecastWorkspace = ({
           setParams(next);
         }}
       >
-        <StyledDeliveryRow>
+        <StyledFinanceFilterBar>
           <label>
             <Trans>Forecast currency</Trans>
             <select name="currency" defaultValue={currency}>
@@ -402,7 +424,7 @@ const ForecastWorkspace = ({
           <StyledDeliveryButton type="submit" disabled={busy}>
             <Trans>Apply forecast filters</Trans>
           </StyledDeliveryButton>
-        </StyledDeliveryRow>
+        </StyledFinanceFilterBar>
       </form>
       {!filtersValid && (
         <p role="alert">
@@ -465,23 +487,17 @@ const ForecastWorkspace = ({
             <VerifiedForecastContent available={available}>
               {error && <p role="alert">{error}</p>}
               {notice && <p role="status">{notice}</p>}
-              <StyledDeliveryRow>
-                <strong>{currency}</strong>
-                <span>
-                  {data.businessDate && data.timezone
-                    ? t`Business date: ${data.businessDate} · ${data.timezone}`
-                    : t`Business date and starting cash are not confirmed`}
-                </span>
-                <StyledDeliveryButton
-                  type="button"
-                  disabled={busy || query.loading}
-                  onClick={() => void query.refetch().catch(() => undefined)}
-                >
-                  <Trans>Refresh cash forecast</Trans>
-                </StyledDeliveryButton>
-              </StyledDeliveryRow>
             </VerifiedForecastContent>
-            <StyledDeliveryCard>
+            <VerifiedForecastContent available={available}>
+              {data.anchor && (
+                <FinanceForecastProjectionSummary
+                  projection={data}
+                  currency={currency}
+                  incomplete={!data.projectionComplete}
+                />
+              )}
+            </VerifiedForecastContent>
+            <StyledForecastStartingCash>
               <VerifiedForecastContent available={available}>
                 <h3>
                   <Trans>Starting cash</Trans>
@@ -533,6 +549,7 @@ const ForecastWorkspace = ({
                 {canManage && (
                   <StyledDeliveryButton
                     type="button"
+                    data-primary={!data.anchor ? 'true' : undefined}
                     onClick={() => openEditor({ kind: 'ANCHOR' })}
                   >
                     {data.anchor
@@ -553,15 +570,21 @@ const ForecastWorkspace = ({
                   onReload={() => void reload()}
                 />
               )}
-            </StyledDeliveryCard>
+            </StyledForecastStartingCash>
             <VerifiedForecastContent available={available}>
-              {data.anchor && (
-                <FinanceForecastProjectionSummary
-                  projection={data}
-                  currency={currency}
-                  incomplete={!data.projectionComplete}
-                />
-              )}
+              <StyledFinanceMetadata>
+                {data.businessDate && data.timezone && (
+                  <span>{t`Business date: ${data.businessDate} · ${data.timezone}`}</span>
+                )}
+                <StyledDeliveryButton
+                  type="button"
+                  data-variant="quiet"
+                  disabled={busy || query.loading}
+                  onClick={() => void query.refetch().catch(() => undefined)}
+                >
+                  <Trans>Refresh cash forecast</Trans>
+                </StyledDeliveryButton>
+              </StyledFinanceMetadata>
               <FinanceForecastWorklists
                 data={data}
                 destination={destination}

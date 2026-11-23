@@ -117,7 +117,7 @@ const {
       {},
       createIsolatedNativeTaskAccess(),
     );
-    const commitments = new DeliveryCommitmentsService(source, delivery);
+    const commitments = new DeliveryCommitmentsService(source, delivery, createIsolatedNativeTaskAccess());
     const clients = new DeliveryClientsService(
       source,
       delivery,

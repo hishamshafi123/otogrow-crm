@@ -42,7 +42,10 @@ export const commitmentsInputSchema = z
     engagementId: identifier,
     periodId: identifier.nullish(),
     taskSearch: z.string().trim().max(160).nullish(),
+    selectedTaskId: identifier.nullish(),
+    selectedParentTaskId: identifier.nullish(),
     allocationCursor: z.string().max(1000).nullish(),
+    orphanAllocationCursor: z.string().max(1000).nullish(),
     historyCursor: z.string().max(1000).nullish(),
     limit: z.number().int().min(1).max(100).nullish(),
   })
@@ -108,5 +111,17 @@ export const commitmentRemoveSchema = z
     taskId: identifier,
     revision,
     reason,
+  })
+  .strict();
+
+export const commitmentOrphanCleanupSchema = z
+  .object({
+    requestId: identifier,
+    engagementId: identifier,
+    periodId: identifier,
+    periodRevision: revision,
+    allocationId: identifier,
+    allocationRevision: revision,
+    confirm: z.literal(true),
   })
   .strict();

@@ -310,11 +310,8 @@ it('distinguishes historical cash estimates from reviewed forecasts and accounta
     screen.getByText(/Estimates use entered cash records only/),
   ).toHaveTextContent('do not confirm available cash');
   expect(
-    screen.getByRole('link', { name: 'Open reviewed cash forecast' }),
-  ).toHaveAttribute('href', '/delivery?view=finance&financeView=forecast');
-  expect(
-    screen.getByRole('link', { name: 'Accounting exports' }),
-  ).toHaveAttribute('href', '/delivery?view=finance&financeView=exports');
+    screen.getByText(/Raw records include receivables, opening balances/),
+  ).toHaveTextContent('Use Accounting exports for a reviewed accountant CSV.');
   expect(
     screen.getByRole('button', { name: 'Download financial CSV' }),
   ).toBeVisible();
@@ -381,9 +378,6 @@ it('lets a finance reader view and export without editing', async () => {
       /Raw records include receivables, opening balances and voided entries/,
     ),
   ).toBeInTheDocument();
-  expect(
-    screen.getByRole('link', { name: 'Accounting exports' }),
-  ).toHaveAttribute('href', '/delivery?view=finance&financeView=exports');
   expect(
     screen.queryByRole('button', { name: 'New financial entry' }),
   ).not.toBeInTheDocument();

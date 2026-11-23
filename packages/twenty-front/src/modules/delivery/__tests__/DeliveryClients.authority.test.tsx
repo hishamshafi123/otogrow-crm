@@ -15,6 +15,7 @@ import { DeliveryClients } from '@/delivery/DeliveryClients';
 import { DeliveryDraftGuardProvider } from '@/delivery/drafts/DeliveryDraftGuard';
 import { type DeliveryWorkspace } from '@/delivery/delivery.types';
 import { type ClientsSnapshot } from '@/delivery/delivery-clients.types';
+import { taskDetailFixture } from '@/delivery/tasks/__tests__/tasks.fixtures';
 
 const COMPANY_ID = '10000000-0000-4000-8000-000000000001';
 const PROJECT_ID = '10000000-0000-4000-8000-000000000002';
@@ -83,6 +84,7 @@ jest.mock('@/delivery/deliveryStyles', () => ({
 jest.mock('@linaria/react', () => ({
   styled: {
     p: () => 'p',
+    ul: () => 'ul',
     div: () => 'div',
     fieldset: () => 'fieldset',
     dialog: () => 'dialog',
@@ -135,7 +137,7 @@ jest.mock('@apollo/client/react', () => ({
   }),
   useMutation: () => [mockMutate, { loading: false }],
 }));
-const setup = () => {
+const setup = (entryOverride?: string) => {
   const Page = () => {
     const [, update] = useState(0);
     const [params] = useSearchParams();
@@ -154,7 +156,8 @@ const setup = () => {
       </>
     );
   };
-  const entry = `/delivery?view=clients&clientEngagement=${PLAN_ID}`;
+  const entry =
+    entryOverride ?? `/delivery?view=clients&clientEngagement=${PLAN_ID}`;
   const router = createMemoryRouter(
     [
       {
@@ -185,6 +188,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockError = undefined;
   mockRoles = [];
+  workspace.tasks = [];
   Object.assign(globalThis, { Request });
   i18n.loadAndActivate({ locale: 'en', messages: {} });
   HTMLDialogElement.prototype.showModal = function () {
@@ -377,4 +381,40 @@ it('rejects late portal credentials after a concurrent file denial and does not 
   expect(
     screen.queryByDisplayValue('do-not-revive-code'),
   ).not.toBeInTheDocument();
+});
+
+it('opens task-free commitments with the exact selected service plan and period', async () => {
+  const periodId = '10000000-0000-4000-8000-000000000007';
+  const router = setup(
+    `/delivery?view=clients&clientView=agreements&clientEngagement=${PLAN_ID}&commitmentPeriod=${periodId}&task=old&panel=creative`,
+  );
+  await userEvent
+    .setup()
+    .click(screen.getByRole('link', { name: 'Delivery commitments' }));
+  const params = new URLSearchParams(router.state.location.search);
+  expect(params.get('view')).toBe('clients');
+  expect(params.get('clientView')).toBeNull();
+  expect(params.get('clientEngagement')).toBe(PLAN_ID);
+  expect(params.get('commitmentPeriod')).toBe(periodId);
+  expect(params.get('task')).toBeNull();
+  expect(params.get('panel')).toBeNull();
+});
+it('never renders a cached parent task as a portal share choice', () => {
+  workspace.tasks = [
+    {
+      ...taskDetailFixture().task,
+      projectId: PROJECT_ID,
+      title: 'PRIVATE_CACHED_PARENT_TASK',
+    },
+  ];
+  setup();
+  expect(
+    screen.queryByText('PRIVATE_CACHED_PARENT_TASK'),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole('button', { name: 'Share approved submission' }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.getByRole('button', { name: 'Check task access' }),
+  ).toBeVisible();
 });

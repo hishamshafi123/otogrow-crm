@@ -2,6 +2,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { isValidUuid } from 'twenty-shared/utils';
 import { AtlasMediaSettings } from '@/delivery/creative/atlas/AtlasMediaSettings';
+import { DeliveryPageHeader } from '@/delivery/DeliveryPageHeader';
 import { DeliveryAiWorkspaceNavigation } from '@/delivery/creative/atlas/DeliveryAiWorkspaceNavigation';
 import { useWorkflowAccess } from '@/delivery/workflows/useWorkflowAccess';
 import { deliveryTaskDestination } from '@/delivery/delivery-task-navigation';
@@ -12,7 +13,6 @@ import { NavigationDrawerCollapseButton } from '@/ui/navigation/navigation-drawe
 import { useNavigationDrawerExpanded } from '@/navigation/hooks/useNavigationDrawerExpanded';
 import {
   StyledDeliveryCanvas,
-  StyledDeliveryRow,
   StyledDeliveryStack,
 } from '@/delivery/deliveryStyles';
 export const AtlasMediaPage = () => {
@@ -29,42 +29,44 @@ export const AtlasMediaPage = () => {
       <PageBody>
         <StyledDeliveryCanvas>
           <StyledDeliveryStack>
-            <StyledDeliveryRow>
-              <StyledDeliveryRow>
-                {!expanded && (
+            <DeliveryPageHeader
+              title={t`Media models`}
+              description={t`Choose permitted Atlas models and defaults for new production requests.`}
+              navigation={
+                !expanded && (
                   <NavigationDrawerCollapseButton direction="right" />
-                )}
-                <div>
-                  <h1>
-                    <Trans>Media models</Trans>
-                  </h1>
-                  <p>
-                    <Trans>
-                      Choose permitted Atlas models and defaults for new
-                      production requests.
-                    </Trans>
-                  </p>
-                </div>
-              </StyledDeliveryRow>
-              {taskId && isValidUuid(taskId) && (
-                <Link
-                  to={deliveryTaskDestination(params, taskId, 'creative', {
-                    view: 'creative',
-                    agentView: null,
-                  })}
-                >{t`Back to creative production`}</Link>
-              )}
-              {!administrator && !(taskId && isValidUuid(taskId)) && (
-                <Link
-                  to={taskPageDestination(params, {
-                    view: 'home',
-                    agentView: null,
-                  })}
-                >
-                  <Trans>Go to Today</Trans>
-                </Link>
-              )}
-            </StyledDeliveryRow>
+                )
+              }
+              actions={
+                (taskId && isValidUuid(taskId)) || !administrator ? (
+                  <>
+                    {taskId && isValidUuid(taskId) && (
+                      <Link
+                        to={deliveryTaskDestination(
+                          params,
+                          taskId,
+                          'creative',
+                          {
+                            view: 'creative',
+                            agentView: null,
+                          },
+                        )}
+                      >{t`Back to creative production`}</Link>
+                    )}
+                    {!administrator && !(taskId && isValidUuid(taskId)) && (
+                      <Link
+                        to={taskPageDestination(params, {
+                          view: 'home',
+                          agentView: null,
+                        })}
+                      >
+                        <Trans>Go to Today</Trans>
+                      </Link>
+                    )}
+                  </>
+                ) : undefined
+              }
+            />
             <DeliveryAiWorkspaceNavigation administrator={administrator} />
             <AtlasMediaSettings key={permission.scope} />
           </StyledDeliveryStack>

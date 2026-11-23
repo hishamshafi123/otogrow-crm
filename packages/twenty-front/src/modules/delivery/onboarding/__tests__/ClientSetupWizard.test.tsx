@@ -126,7 +126,7 @@ jest.mock('@apollo/client/react', () => ({
   },
 }));
 
-const Harness = () => {
+const Harness = ({ stable = false }: { stable?: boolean }) => {
   const [params] = useSearchParams();
   const [initialRequestId] = useState(params.get('setupRequest'));
   const companyId = params.get('setupCompany');
@@ -146,7 +146,7 @@ const Harness = () => {
     <>
       <Link to="/delivery?view=clients">Leave client setup</Link>
       <ClientSetupWizard
-        key={source.toString()}
+        key={stable ? 'stable' : source.toString()}
         state={state}
         context={context}
         companyId={companyId}
@@ -161,6 +161,7 @@ const Harness = () => {
 };
 const setup = (
   entry = `/delivery?view=onboarding&setupCompany=${SETUP_COMPANY}`,
+  stable = false,
 ) => {
   const router = createMemoryRouter(
     [
@@ -169,7 +170,7 @@ const setup = (
         element: (
           <I18nProvider i18n={i18n}>
             <DeliveryDraftGuardProvider>
-              <Harness />
+              <Harness stable={stable} />
             </DeliveryDraftGuardProvider>
           </I18nProvider>
         ),
@@ -200,7 +201,7 @@ const prepareFirstTask = async (
     SETUP_EDITOR,
   );
   await user.selectOptions(
-    screen.getByLabelText('Independent first task reviewer'),
+    screen.getByLabelText('First task reviewer'),
     SETUP_MANAGER,
   );
 };
@@ -349,7 +350,7 @@ it('reviews a new project, explicit team and advertising service plan with a ret
   });
 });
 
-it('cannot use one person as assignee and reviewer and can deliberately save reused records without a task', async () => {
+it('allows one first-task manager in both roles and can deliberately save reused records without a task', async () => {
   mockContext.members = [mockContext.members[0]];
   mockContext.projects[0].memberIds = [SETUP_MANAGER];
   const { user } = setup(reusedEntry());
@@ -360,21 +361,25 @@ it('cannot use one person as assignee and reviewer and can deliberately save reu
   );
   await user.type(
     screen.getByLabelText('First task title'),
-    'Needs independent review',
+    'First task allows same manager',
   );
   await user.selectOptions(
     screen.getByLabelText('First task assignee'),
     SETUP_MANAGER,
   );
+  await user.selectOptions(
+    screen.getByLabelText('First task reviewer'),
+    SETUP_MANAGER,
+  );
   expect(
-    within(
-      screen.getByLabelText('Independent first task reviewer'),
-    ).queryByRole('option', { name: 'Independent manager' }),
+    within(screen.getByLabelText('First task reviewer')).getByRole('option', {
+      name: 'Independent manager',
+    }),
+  ).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Continue' })).toBeEnabled();
+  expect(
+    screen.queryByRole('link', { name: 'Open Team & projects' }),
   ).not.toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled();
-  expect(
-    screen.getByRole('link', { name: 'Open Team & projects' }),
-  ).toBeVisible();
   await user.click(
     screen.getByRole('checkbox', {
       name: 'Include the first task in this setup',
@@ -483,4 +488,67 @@ it('returns to a retained draft after a fresh absent receipt and keeps its origi
     requestId,
     firstTask: { title: 'Corrected prepared creative' },
   });
+});
+
+jest.mock('@/delivery/onboarding/useServiceCatalog', () => ({
+  useServiceCatalog: () => ({
+    services: [],
+    loading: false,
+    unavailable: false,
+    canAdd: true,
+    retry: jest.fn(),
+    add: jest.fn(),
+  }),
+}));
+
+it('allows a company selected after mount without treating its first source version as stale', async () => {
+  const { user } = setup('/delivery?view=onboarding', true);
+  await user.selectOptions(
+    screen.getByRole('combobox', { name: 'Client company' }),
+    SETUP_COMPANY,
+  );
+  await continueStep(user);
+  expect(
+    screen.getByRole('region', { name: 'Project and team' }),
+  ).toBeInTheDocument();
+  expect(
+    screen.queryByText(/selected project or service plan changed/),
+  ).not.toBeInTheDocument();
+});
+
+it('opens a requested additional plan directly without a redundant mode choice', async () => {
+  const { user } = setup(
+    `/delivery?view=onboarding&setupCompany=${SETUP_COMPANY}&setupProject=${SETUP_PROJECT}&setupPlanMode=new`,
+  );
+  expect(
+    screen.getByRole('region', { name: 'Service plan' }),
+  ).toBeInTheDocument();
+  expect(
+    screen.queryByLabelText('Service plan choice'),
+  ).not.toBeInTheDocument();
+  await user.type(
+    screen.getByLabelText('Service plan name'),
+    'Additional client services',
+  );
+  await user.click(screen.getByRole('checkbox', { name: 'SEO' }));
+  await user.selectOptions(
+    screen.getByLabelText('Billing arrangement'),
+    'RETAINER',
+  );
+  await user.type(
+    screen.getByLabelText('Client-visible scope'),
+    'Additional agreed scope',
+  );
+  await continueStep(user);
+  expect(
+    screen.getByRole('region', { name: 'First task' }),
+  ).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Back' }));
+  expect(screen.getByLabelText('Service plan name')).toHaveValue(
+    'Additional client services',
+  );
+  expect(
+    screen.getByRole('list', { name: 'Selected services' }),
+  ).toHaveTextContent('SEO');
+  expect(mockCreate).not.toHaveBeenCalled();
 });

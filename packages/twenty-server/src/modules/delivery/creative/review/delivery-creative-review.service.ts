@@ -83,6 +83,7 @@ export class DeliveryCreativeReviewService {
     return deliveryReviewAuthority({
       primaryReviewerId: scope.task.details.reviewerId,
       assigneeId: scope.assigneeId,
+      allowSelfReview: scope.task.details.allowSelfReview,
       assignment,
       projectMemberIds: project?.memberIds ?? [],
       access: [

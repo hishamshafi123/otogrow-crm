@@ -7,6 +7,7 @@ type ClientSetupLinkProps = {
   companyId?: string | null;
   projectId?: string | null;
   planId?: string | null;
+  newServicePlan?: boolean;
   children: ReactNode;
 };
 export const ClientSetupLink = (props: ClientSetupLinkProps) =>
@@ -15,6 +16,7 @@ export const ClientSetupLink = (props: ClientSetupLinkProps) =>
       companyId={props.companyId}
       projectId={props.projectId}
       planId={props.planId}
+      newServicePlan={props.newServicePlan}
     >
       {props.children}
     </ClientSetupRouteLink>
@@ -24,6 +26,7 @@ const ClientSetupRouteLink = ({
   companyId,
   projectId,
   planId,
+  newServicePlan = false,
   children,
 }: ClientSetupRouteLinkProps) => {
   const [params] = useSearchParams();
@@ -35,6 +38,7 @@ const ClientSetupRouteLink = ({
         setupCompany: companyId ?? null,
         setupProject: projectId ?? null,
         setupPlan: planId ?? null,
+        setupPlanMode: newServicePlan ? 'new' : null,
         setupCompanyRequest: null,
         setupRequest: null,
       })}

@@ -1,7 +1,9 @@
 import { useState } from 'react';
+import { isDefined } from 'twenty-shared/utils';
+import { CreativeDueDate } from '@/delivery/creative/production/CreativeDueDate';
 import { useQuery } from '@apollo/client/react';
 import { Trans, useLingui } from '@lingui/react/macro';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAssistantRead } from '@/delivery/assistants/useAssistantRead';
 import { useDeliveryDraftGuard } from '@/delivery/drafts/DeliveryDraftGuard';
 import type { useCreativeProductionContext } from '@/delivery/creative/production/useCreativeProductionContext';
@@ -9,11 +11,20 @@ import {
   GET_CREATIVE_PROJECTS,
   GET_CREATIVE_TASKS,
 } from '@/delivery/creative/production/creative-production.graphql';
+import {
+  StyledCreativeAppliedFilters,
+  StyledCreativeFacts,
+  StyledCreativeFilterFields,
+  StyledCreativeFilters,
+  StyledCreativeQueue,
+  StyledCreativeQueueItem,
+  StyledCreativeSearch,
+  StyledCreativeToolbar,
+} from '@/delivery/creative/production/creative-production-styles';
 import { creativeProductionDestination } from '@/delivery/creative/production/creative-production-navigation';
 import {
   StyledDeliveryButton,
   StyledDeliveryCard,
-  StyledDeliveryGrid,
   StyledDeliveryRow,
   StyledDeliveryStack,
 } from '@/delivery/deliveryStyles';
@@ -82,81 +93,128 @@ export const CreativeProductionQueue = ({
     CHANGES_REQUESTED: t`Changes requested`,
     APPROVED: t`Approved work`,
   };
+  const appliedFilters = [
+    input.projectId
+      ? (data?.selectedProject?.name ?? t`Selected project`)
+      : null,
+    input.state ? (statuses[input.state] ?? t`Selected status`) : null,
+    input.production === 'STARTED'
+      ? t`Production started`
+      : input.production === 'NOT_STARTED'
+        ? t`Not started`
+        : null,
+    input.mine ? t`Assigned to me` : null,
+  ].filter(isDefined);
+  const hasFilters = Boolean(input.search) || appliedFilters.length > 0;
   return (
     <StyledDeliveryStack>
       <div>
-        <h2>
-          <Trans>Production queue</Trans>
-        </h2>
-        <p>
-          <Trans>
-            Choose a task to prepare its brief, references, shots and final
-            work. Newest tasks appear first.
-          </Trans>
-        </p>
-      </div>
-      <StyledDeliveryCard>
         <form
-          key={JSON.stringify(input)}
+          key={`search:${input.search ?? ''}`}
           onSubmit={(event) => {
             event.preventDefault();
             const form = new FormData(event.currentTarget);
             go({
               creativeSearch: String(form.get('search') ?? '').trim(),
-              creativeState: String(form.get('state') ?? ''),
-              creativeProduction: String(form.get('production') ?? ''),
-              creativeMine: form.has('mine') ? '1' : null,
               creativeAfter: null,
             });
           }}
         >
-          <StyledDeliveryRow>
+          <StyledCreativeSearch>
             <label>
               <Trans>Search tasks</Trans>
               <input
                 name="search"
                 maxLength={160}
                 defaultValue={input.search ?? ''}
+                placeholder={t`Find a creative task`}
               />
             </label>
-            <label>
-              <Trans>Work status</Trans>
-              <select name="state" defaultValue={input.state ?? ''}>
-                <option value="">{t`All statuses`}</option>
-                {Object.entries(statuses).map(([value, label]) => (
-                  <option value={value} key={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <Trans>Production</Trans>
-              <select name="production" defaultValue={input.production}>
-                <option value="ALL">{t`All tasks`}</option>
-                <option value="STARTED">{t`Production started`}</option>
-                <option value="NOT_STARTED">{t`Ready to start`}</option>
-              </select>
-            </label>
-            <label>
-              <input name="mine" type="checkbox" defaultChecked={input.mine} />
-              <Trans>Assigned to me</Trans>
-            </label>
             <StyledDeliveryButton type="submit">
-              <Trans>Apply filters</Trans>
+              <Trans>Search</Trans>
             </StyledDeliveryButton>
-            <StyledDeliveryButton type="button" onClick={clear}>
-              <Trans>Clear filters</Trans>
-            </StyledDeliveryButton>
-          </StyledDeliveryRow>
+          </StyledCreativeSearch>
         </form>
-        <CreativeProjectPicker
-          state={state}
-          selectedName={data?.selectedProject?.name ?? null}
-          selectedId={input.projectId}
-          onSelect={(id) => go({ creativeProject: id, creativeAfter: null })}
-        />
-      </StyledDeliveryCard>
+        <StyledCreativeFilters>
+          <summary>
+            {appliedFilters.length > 0 ? (
+              <Trans>Filters ({appliedFilters.length} active)</Trans>
+            ) : (
+              <Trans>Filters</Trans>
+            )}
+          </summary>
+          <div>
+            <form
+              key={`filters:${JSON.stringify(input)}`}
+              onSubmit={(event) => {
+                event.preventDefault();
+                const form = new FormData(event.currentTarget);
+                go({
+                  creativeState: String(form.get('state') ?? ''),
+                  creativeProduction: String(form.get('production') ?? ''),
+                  creativeMine: form.has('mine') ? '1' : null,
+                  creativeAfter: null,
+                });
+              }}
+            >
+              <StyledDeliveryStack>
+                <StyledCreativeFilterFields>
+                  <label>
+                    <Trans>Work status</Trans>
+                    <select name="state" defaultValue={input.state ?? ''}>
+                      <option value="">{t`All statuses`}</option>
+                      {Object.entries(statuses).map(([value, label]) => (
+                        <option value={value} key={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    <Trans>Production</Trans>
+                    <select name="production" defaultValue={input.production}>
+                      <option value="ALL">{t`All tasks`}</option>
+                      <option value="STARTED">{t`Production started`}</option>
+                      <option value="NOT_STARTED">{t`Not started`}</option>
+                    </select>
+                  </label>
+                  <label>
+                    <input
+                      name="mine"
+                      type="checkbox"
+                      defaultChecked={input.mine}
+                    />
+                    <Trans>Assigned to me</Trans>
+                  </label>
+                </StyledCreativeFilterFields>
+                <StyledCreativeToolbar>
+                  <StyledDeliveryButton type="submit">
+                    <Trans>Apply filters</Trans>
+                  </StyledDeliveryButton>
+                  {hasFilters && data?.items.length !== 0 && (
+                    <StyledDeliveryButton type="button" onClick={clear}>
+                      <Trans>Clear filters</Trans>
+                    </StyledDeliveryButton>
+                  )}
+                </StyledCreativeToolbar>
+              </StyledDeliveryStack>
+            </form>
+            <CreativeProjectPicker
+              state={state}
+              selectedName={data?.selectedProject?.name ?? null}
+              selectedId={input.projectId}
+              onSelect={(id) =>
+                go({ creativeProject: id, creativeAfter: null })
+              }
+            />
+          </div>
+        </StyledCreativeFilters>
+      </div>
+      {appliedFilters.length > 0 && (
+        <StyledCreativeAppliedFilters>
+          <Trans>Showing:</Trans> {appliedFilters.join(', ')}
+        </StyledCreativeAppliedFilters>
+      )}
       {query.error && (
         <div role="alert">
           <Trans>
@@ -186,54 +244,102 @@ export const CreativeProductionQueue = ({
       )}
       {data && (
         <>
-          <p>
-            <Trans>
-              {data.items.length} shown of {data.totalCount} matching tasks
-            </Trans>
-          </p>
+          {(data.items.length > 0 || hasFilters || input.after) && (
+            <StyledCreativeToolbar>
+              <h2>
+                <Trans>Production queue</Trans>
+              </h2>
+              <small>
+                <Trans>
+                  {data.items.length} shown of {data.totalCount} matching tasks
+                </Trans>
+              </small>
+            </StyledCreativeToolbar>
+          )}
           {data.items.length === 0 && (
             <StyledDeliveryCard>
-              <Trans>
-                No tasks match these filters. Create and assign work from Today,
-                or clear the filters.
-              </Trans>
-              <StyledDeliveryButton type="button" onClick={clear}>
-                <Trans>Clear filters</Trans>
-              </StyledDeliveryButton>
+              <StyledDeliveryStack>
+                <div>
+                  <h2>
+                    {input.after
+                      ? t`No tasks on this page`
+                      : hasFilters
+                        ? t`No matching tasks`
+                        : t`Your creative queue is ready`}
+                  </h2>
+                  <p>
+                    {input.after
+                      ? t`Return to the first page to see current production work.`
+                      : hasFilters
+                        ? t`Try a different search or clear the filters to see more work.`
+                        : state.data?.actor.isManager
+                          ? t`Create and assign a task from Today, then open it here to prepare the brief and produce the creative.`
+                          : t`Creative tasks in your projects will appear here. Your project manager can create and assign new work.`}
+                  </p>
+                </div>
+                <StyledCreativeToolbar>
+                  {hasFilters && (
+                    <StyledDeliveryButton type="button" onClick={clear}>
+                      <Trans>Clear filters</Trans>
+                    </StyledDeliveryButton>
+                  )}
+                  {!hasFilters && !input.after && (
+                    <Link to="/delivery?view=home">
+                      <Trans>Open Today</Trans>
+                    </Link>
+                  )}
+                </StyledCreativeToolbar>
+              </StyledDeliveryStack>
             </StyledDeliveryCard>
           )}
-          <StyledDeliveryGrid>
-            {data.items.map((task) => (
-              <StyledDeliveryCard key={task.id}>
-                <StyledDeliveryStack>
+          {data.items.length > 0 && (
+            <StyledCreativeQueue aria-label={t`Production tasks`}>
+              {data.items.map((task) => (
+                <StyledCreativeQueueItem key={task.id}>
                   <div>
-                    <strong>{task.title}</strong>
-                    <p>
-                      {task.projectName} · {task.assigneeName ?? t`Unassigned`}
-                    </p>
-                  </div>
-                  <span>
-                    {statuses[task.state] ?? task.state} ·{' '}
-                    {task.hasProduction
-                      ? t`Production started`
-                      : t`Production not started`}
-                  </span>
-                  {task.dueAt && (
+                    <StyledCreativeToolbar>
+                      <h3 id={`creative-task-${task.id}`}>{task.title}</h3>
+                      <StyledDeliveryButton
+                        type="button"
+                        aria-describedby={`creative-task-${task.id}`}
+                        onClick={() => go({ task: task.id })}
+                      >
+                        <Trans>Open production</Trans>
+                      </StyledDeliveryButton>
+                    </StyledCreativeToolbar>
+                    <p>{task.projectName}</p>
                     <small>
-                      <Trans>Due</Trans>{' '}
-                      {new Date(task.dueAt).toLocaleDateString()}
+                      {task.hasProduction
+                        ? t`Production started`
+                        : t`Not started`}
                     </small>
-                  )}
-                  <StyledDeliveryButton
-                    type="button"
-                    onClick={() => go({ task: task.id })}
-                  >
-                    <Trans>Open production</Trans>
-                  </StyledDeliveryButton>
-                </StyledDeliveryStack>
-              </StyledDeliveryCard>
-            ))}
-          </StyledDeliveryGrid>
+                  </div>
+                  <StyledCreativeFacts>
+                    <div>
+                      <dt>
+                        <Trans>Assigned to</Trans>
+                      </dt>
+                      <dd>{task.assigneeName ?? t`Unassigned`}</dd>
+                    </div>
+                    <div>
+                      <dt>
+                        <Trans>Status</Trans>
+                      </dt>
+                      <dd>{statuses[task.state] ?? t`Status unavailable`}</dd>
+                    </div>
+                    <div>
+                      <dt>
+                        <Trans>Due</Trans>
+                      </dt>
+                      <dd>
+                        <CreativeDueDate value={task.dueAt ?? null} />
+                      </dd>
+                    </div>
+                  </StyledCreativeFacts>
+                </StyledCreativeQueueItem>
+              ))}
+            </StyledCreativeQueue>
+          )}
           <StyledDeliveryRow>
             {input.after && (
               <StyledDeliveryButton

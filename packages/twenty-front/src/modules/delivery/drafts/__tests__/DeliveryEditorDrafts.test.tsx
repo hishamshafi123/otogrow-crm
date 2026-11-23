@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Request } from 'cross-fetch';
 import { i18n } from '@lingui/core';
 import { I18nProvider } from '@lingui/react';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, Link, RouterProvider } from 'react-router-dom';
 import { DeliveryClients } from '@/delivery/DeliveryClients';
@@ -43,10 +43,27 @@ let mockClients: ClientsSnapshot;
 let mockBusiness: BusinessSnapshot;
 const mockMutate = jest.fn();
 const mockRefetch = jest.fn();
+const mockCatalogAdd = jest.fn();
+jest.mock('@/delivery/onboarding/useServiceCatalog', () => ({
+  useServiceCatalog: () => ({
+    services: [],
+    loading: false,
+    unavailable: false,
+    canAdd: true,
+    add: mockCatalogAdd,
+  }),
+}));
 jest.mock('@apollo/client/react', () => ({
   useMutation: () => [mockMutate, { loading: false }],
-  useQuery: () => ({
-    data: {
+  useQuery: (_document: unknown, options?: { skip?: boolean }) => {
+    const selectedTask = options?.skip ? undefined : workspace.tasks[0];
+    const data = {
+      deliveryClientServiceCatalog: {
+        workspaceId: 'workspace',
+        memberId: 'admin',
+        userWorkspaceId: 'membership',
+        services: [],
+      },
       deliveryClients: mockClients,
       deliveryBusiness: mockBusiness,
       deliveryAgents: {
@@ -68,9 +85,33 @@ jest.mock('@apollo/client/react', () => ({
           },
         ],
       },
-    },
-    refetch: mockRefetch,
-  }),
+      deliveryTaskList: {
+        workspaceId: 'workspace',
+        memberId: 'admin',
+        userWorkspaceId: 'membership',
+        items: workspace.tasks.map((task) => ({
+          id: task.id,
+          projectId: task.projectId,
+          revision: task.revision,
+        })),
+      },
+      deliveryTaskDetail: selectedTask
+        ? {
+            workspaceId: 'workspace',
+            memberId: 'admin',
+            userWorkspaceId: 'membership',
+            task: selectedTask,
+          }
+        : undefined,
+    };
+    return {
+      data,
+      refetch: async () => {
+        await mockRefetch();
+        return { data };
+      },
+    };
+  },
 }));
 const workspace: DeliveryWorkspace = {
   actor: { memberId: 'admin', isAdmin: true, isManager: true },
@@ -153,7 +194,7 @@ const editServicePlan = async () => {
     screen.getByRole('button', { name: 'Edit client service plan' }),
   );
   await user.clear(screen.getByLabelText('Service plan name'));
-  await user.clear(screen.getByLabelText('Services, separated by commas'));
+  await user.click(screen.getByRole('button', { name: 'Remove Video' }));
   await user.clear(screen.getByLabelText('Client-visible scope'));
   return user;
 };
@@ -441,21 +482,13 @@ it('shows only applicable engagement settings and blocks missing basics before s
   expect(screen.getByLabelText('Project')).toBeDisabled();
   expect(screen.getByLabelText('Project')).toHaveValue('project');
   await user.type(
-    screen.getByLabelText('Services, separated by commas'),
-    ' , , ',
-  );
-  await user.type(
     screen.getByLabelText('Client-visible scope'),
     'Improve site visibility',
   );
   expect(
     screen.getByRole('button', { name: 'Save client service plan' }),
   ).toBeDisabled();
-  await user.clear(screen.getByLabelText('Services, separated by commas'));
-  await user.type(
-    screen.getByLabelText('Services, separated by commas'),
-    'SEO',
-  );
+  await user.click(screen.getByRole('checkbox', { name: 'SEO' }));
   expect(
     screen.getByRole('button', { name: 'Save client service plan' }),
   ).toBeEnabled();
@@ -482,9 +515,8 @@ it('shows only applicable engagement settings and blocks missing basics before s
 it('retains advertising choices across disclosure toggles and requires different eligible manager and marketer', async () => {
   const user = await editServicePlan();
   await user.type(screen.getByLabelText('Service plan name'), 'Ad management');
-  await user.type(
-    screen.getByLabelText('Services, separated by commas'),
-    'Performance marketing',
+  await user.click(
+    screen.getByRole('checkbox', { name: 'Performance marketing' }),
   );
   await user.type(
     screen.getByLabelText('Client-visible scope'),
@@ -503,7 +535,7 @@ it('retains advertising choices across disclosure toggles and requires different
     'admin',
   );
   await user.selectOptions(screen.getByLabelText('Assigned marketer'), 'admin');
-  expect(screen.getByRole('status')).toHaveTextContent(
+  expect(screen.getByText('Before saving:').parentElement).toHaveTextContent(
     'must be different people',
   );
   expect(
@@ -613,6 +645,9 @@ it('guards client-share preparation, retains failed choices and requires reviewi
   await user.click(
     screen.getByRole('button', { name: 'Share approved submission' }),
   );
+  await user.click(
+    screen.getByRole('button', { name: 'Share approved submission' }),
+  );
   expect(mockMutate).toHaveBeenLastCalledWith(
     expect.objectContaining({
       variables: {
@@ -682,12 +717,11 @@ it('removes advertising entitlement when Performance marketing is deselected and
     screen.getByLabelText('Service plan name'),
     'Services changed',
   );
-  await user.click(screen.getByRole('checkbox', { name: 'SEO' }));
   expect(
-    screen.getByLabelText(
+    screen.queryByLabelText(
       'Configure the PM, marketer and client budget requests',
     ),
-  ).toBeDisabled();
+  ).not.toBeInTheDocument();
   await user.click(
     screen.getByRole('checkbox', {
       name: 'Performance marketing',
@@ -711,20 +745,13 @@ it('removes advertising entitlement when Performance marketing is deselected and
     'editor',
   );
   await user.click(
-    screen.getByRole('checkbox', {
-      name: 'Performance marketing',
-    }),
+    screen.getByRole('button', { name: 'Remove Performance marketing' }),
   );
   expect(
-    screen.getByLabelText(
+    screen.queryByLabelText(
       'Configure the PM, marketer and client budget requests',
     ),
-  ).not.toBeChecked();
-  expect(
-    screen.getByLabelText(
-      'Configure the PM, marketer and client budget requests',
-    ),
-  ).toBeDisabled();
+  ).not.toBeInTheDocument();
   await user.click(
     screen.getByRole('checkbox', {
       name: 'Performance marketing',
@@ -737,10 +764,9 @@ it('removes advertising entitlement when Performance marketing is deselected and
   );
   expect(screen.getByLabelText('Assigned marketer')).toHaveValue('editor');
   await user.click(
-    screen.getByRole('checkbox', {
-      name: 'Performance marketing',
-    }),
+    screen.getByRole('button', { name: 'Remove Performance marketing' }),
   );
+  await user.click(screen.getByRole('checkbox', { name: 'SEO' }));
   await user.click(
     screen.getByRole('button', { name: 'Save client service plan' }),
   );
@@ -751,6 +777,69 @@ it('removes advertising entitlement when Performance marketing is deselected and
           engagement: expect.objectContaining({
             services: ['SEO'],
             advertising: null,
+          }),
+        }),
+      },
+    }),
+  );
+});
+
+it('guards unfinished custom services and includes the confirmed catalog result in the saved plan', async () => {
+  const user = await editServicePlan();
+  await user.type(
+    screen.getByLabelText('Service plan name'),
+    'Services changed',
+  );
+  await user.click(screen.getByRole('checkbox', { name: 'SEO' }));
+  await user.type(
+    screen.getByLabelText('Client-visible scope'),
+    'Changed service package',
+  );
+  await user.click(
+    screen.getByRole('button', { name: 'Add a custom service or product' }),
+  );
+  await user.type(
+    screen.getByLabelText('New service or product name'),
+    'Brand strategy',
+  );
+  expect(
+    screen.getByRole('button', { name: 'Save client service plan' }),
+  ).toBeDisabled();
+  const cancelButtons = screen.getAllByRole('button', { name: 'Cancel' });
+  await user.click(cancelButtons[cancelButtons.length - 1]);
+  await user.click(screen.getByRole('button', { name: 'Keep editing' }));
+  expect(screen.getByLabelText('New service or product name')).toHaveValue(
+    'Brand strategy',
+  );
+  let resolve: (services: string[]) => void = () => {};
+  mockCatalogAdd.mockReturnValue(
+    new Promise<string[]>((done) => {
+      resolve = done;
+    }),
+  );
+  await user.click(screen.getByRole('button', { name: 'Save and select' }));
+  expect(
+    screen.getByRole('button', { name: 'Save client service plan' }),
+  ).toBeDisabled();
+  expect(mockMutate).not.toHaveBeenCalled();
+  await act(async () => {
+    resolve(['Brand strategy']);
+  });
+  expect(
+    screen.getByRole('list', { name: 'Selected services' }),
+  ).toHaveTextContent('Brand strategy');
+  expect(
+    screen.getByRole('button', { name: 'Save client service plan' }),
+  ).toBeEnabled();
+  await user.click(
+    screen.getByRole('button', { name: 'Save client service plan' }),
+  );
+  expect(mockMutate).toHaveBeenCalledWith(
+    expect.objectContaining({
+      variables: {
+        input: expect.objectContaining({
+          engagement: expect.objectContaining({
+            services: ['SEO', 'Brand strategy'],
           }),
         }),
       },

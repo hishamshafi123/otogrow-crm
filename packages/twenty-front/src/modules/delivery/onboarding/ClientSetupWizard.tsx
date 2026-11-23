@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useLayoutEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { type DeliveryClientSetupCreateInput } from '~/generated-metadata/graphql';
@@ -70,14 +70,19 @@ export const ClientSetupWizard = ({
   const companyRecoveryRequired = Boolean(
     companyRequestId && !companyRecoveryChecked,
   );
+  const newPlanRequested = params.get('setupPlanMode') === 'new';
   const [projectMode, setProjectMode] = useState<'NEW' | 'REUSE' | ''>(
     projectId ? 'REUSE' : params.get('setupProjectMode') === 'new' ? 'NEW' : '',
   );
   const [projectName, setProjectName] = useState('');
   const [memberIds, setMemberIds] = useState<string[]>([]);
   const [planMode, setPlanMode] = useState<'NEW' | 'REUSE' | ''>(
-    planId ? 'REUSE' : params.get('setupPlanMode') === 'new' ? 'NEW' : '',
+    planId ? 'REUSE' : newPlanRequested ? 'NEW' : '',
   );
+  const [customServiceState, setCustomServiceState] = useState({
+    dirty: false,
+    busy: false,
+  });
   const [plan, setPlan] = useState(() => ({
     ...servicePlanValues(null),
     billing: '',
@@ -91,11 +96,13 @@ export const ClientSetupWizard = ({
   );
   const [firstTask, setFirstTask] = useState(false);
   const [task, setTask] = useState(emptySetupTask);
-  const [openedProject] = useState(() =>
+  const [openedProject, setOpenedProject] = useState(() =>
     context.projects.find((item) => item.id === projectId),
   );
-  const [openedCompanyToken] = useState(context.selectedCompany?.sourceToken);
-  const [openedPlan] = useState(() =>
+  const [openedCompanyToken, setOpenedCompanyToken] = useState(
+    context.selectedCompany?.sourceToken,
+  );
+  const [openedPlan, setOpenedPlan] = useState(() =>
     context.servicePlans.find((item) => item.id === planId),
   );
   const [attempt, setAttempt] = useState<DeliveryClientSetupCreateInput | null>(
@@ -110,6 +117,28 @@ export const ClientSetupWizard = ({
   const company = current?.selectedCompany;
   const project = current?.projects.find((item) => item.id === projectId);
   const existingPlan = current?.servicePlans.find((item) => item.id === planId);
+  useLayoutEffect(() => {
+    if (
+      companyId &&
+      company?.id === companyId &&
+      openedCompanyToken === undefined
+    )
+      setOpenedCompanyToken(company.sourceToken);
+    if (projectId && project?.id === projectId && openedProject === undefined)
+      setOpenedProject(project);
+    if (planId && existingPlan?.id === planId && openedPlan === undefined)
+      setOpenedPlan(existingPlan);
+  }, [
+    companyId,
+    company,
+    openedCompanyToken,
+    projectId,
+    project,
+    openedProject,
+    planId,
+    existingPlan,
+    openedPlan,
+  ]);
   const reviewPlan =
     planMode === 'REUSE' ? existingPlan : servicePlanInput(plan, questions);
   const team = projectMode === 'REUSE' ? (project?.memberIds ?? []) : memberIds;
@@ -130,9 +159,11 @@ export const ClientSetupWizard = ({
     team,
   );
   const planReady =
-    planMode === 'REUSE'
+    !customServiceState.dirty &&
+    !customServiceState.busy &&
+    (planMode === 'REUSE'
       ? Boolean(existingPlan)
-      : planMode === 'NEW' && planRequirements.length === 0;
+      : planMode === 'NEW' && planRequirements.length === 0);
   const workReady = !firstTask || setupTaskReady(task, context.members, team);
   const stale = Boolean(
     (companyId && openedCompanyToken !== company?.sourceToken) ||
@@ -150,6 +181,8 @@ export const ClientSetupWizard = ({
   const dirty =
     !receipt &&
     (attempt !== null ||
+      customServiceState.dirty ||
+      customServiceState.busy ||
       projectName !== '' ||
       memberIds.length > 0 ||
       plan.name !== '' ||
@@ -185,6 +218,16 @@ export const ClientSetupWizard = ({
   }, []);
   const source = (values: Record<string, string | null>) => {
     if (companyRecoveryRequired) return;
+    if ('setupCompany' in values) {
+      setOpenedCompanyToken(undefined);
+      setOpenedProject(undefined);
+      setOpenedPlan(undefined);
+    }
+    if ('setupProject' in values) {
+      setOpenedProject(undefined);
+      setOpenedPlan(undefined);
+    }
+    if ('setupPlan' in values) setOpenedPlan(undefined);
     requestAction(() =>
       setParams(
         taskPageDestination(params, {
@@ -586,28 +629,33 @@ export const ClientSetupWizard = ({
               )}
               {step === 2 && (
                 <>
-                  <label>
-                    <Trans>Service plan choice</Trans>
-                    <select
-                      aria-label={t`Service plan choice`}
-                      value={planMode}
-                      onChange={(event) => {
-                        if (event.target.value === 'REUSE')
-                          setPlanMode('REUSE');
-                        else if (event.target.value === 'NEW') {
-                          if (planId)
-                            source({ setupPlan: null, setupPlanMode: 'new' });
-                          else setPlanMode('NEW');
+                  {!newPlanRequested && (
+                    <label>
+                      <Trans>Service plan choice</Trans>
+                      <select
+                        aria-label={t`Service plan choice`}
+                        disabled={
+                          customServiceState.dirty || customServiceState.busy
                         }
-                      }}
-                    >
-                      <option value="">{t`Choose how to set up the service plan`}</option>
-                      {projectId && (
-                        <option value="REUSE">{t`Reuse a saved service plan unchanged`}</option>
-                      )}
-                      <option value="NEW">{t`Prepare a new service plan`}</option>
-                    </select>
-                  </label>
+                        value={planMode}
+                        onChange={(event) => {
+                          if (event.target.value === 'REUSE')
+                            setPlanMode('REUSE');
+                          else if (event.target.value === 'NEW') {
+                            if (planId)
+                              source({ setupPlan: null, setupPlanMode: 'new' });
+                            else setPlanMode('NEW');
+                          }
+                        }}
+                      >
+                        <option value="">{t`Choose how to set up the service plan`}</option>
+                        {projectId && (
+                          <option value="REUSE">{t`Reuse a saved service plan unchanged`}</option>
+                        )}
+                        <option value="NEW">{t`Prepare a new service plan`}</option>
+                      </select>
+                    </label>
+                  )}
                   {planMode === 'REUSE' && (
                     <>
                       <label>
@@ -661,6 +709,7 @@ export const ClientSetupWizard = ({
                         setFields={setQuestions}
                         members={context.members}
                         projectMemberIds={team}
+                        onCustomServiceStateChange={setCustomServiceState}
                       />
                       {planRequirements.length > 0 && (
                         <ul>
@@ -686,8 +735,9 @@ export const ClientSetupWizard = ({
                   <p>
                     <Trans>
                       The project and service plan can be saved without a task.
-                      A task needs an actual project assignee and a different
-                      delivery manager to review it.
+                      A task needs an actual project assignee and a delivery
+                      manager to review it. For the first task, both roles may
+                      belong to the same manager.
                     </Trans>
                   </p>
                   {firstTask && (
@@ -701,9 +751,9 @@ export const ClientSetupWizard = ({
                   {firstTask && !workReady && (
                     <p role="status">
                       <Trans>
-                        Choose an eligible project assignee and an independent
-                        delivery reviewer, and enter a title. You can also leave
-                        the task out and configure the team first.
+                        Choose an eligible project assignee and delivery
+                        reviewer, and enter a title. You can also leave the task
+                        out and configure the team first.
                       </Trans>{' '}
                       <Link to={taskPageDestination(params, { view: 'team' })}>
                         <Trans>Open Team & projects</Trans>
@@ -910,7 +960,11 @@ export const ClientSetupWizard = ({
             {step > 0 && (
               <StyledDeliveryButton
                 type="button"
-                disabled={!editable}
+                disabled={
+                  !editable ||
+                  (step === 2 &&
+                    (customServiceState.dirty || customServiceState.busy))
+                }
                 onClick={() => setStep((value) => value - 1)}
               >
                 <Trans>Back</Trans>

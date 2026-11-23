@@ -122,7 +122,7 @@ const {
       scoped,
       delivery,
       creative,
-      new DeliveryCommitmentsService(scoped, delivery),
+      new DeliveryCommitmentsService(scoped, delivery, createIsolatedNativeTaskAccess()),
     );
     const business = new DeliveryBusinessService(
       scoped,

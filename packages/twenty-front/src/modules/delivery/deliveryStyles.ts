@@ -7,6 +7,7 @@ export const StyledDeliveryCanvas = styled.div`
   box-sizing: border-box;
   color-scheme: light;
   color: ${themeCssVariables.font.color.primary};
+  font-family: ${themeCssVariables.font.family};
   font-size: 14px;
   line-height: 1.5;
   min-height: 100%;
@@ -25,21 +26,30 @@ export const StyledDeliveryCanvas = styled.div`
     font-size: 30px;
     font-weight: 600;
     letter-spacing: -0.8px;
+    line-height: 1.2;
   }
   h2 {
     font-size: 19px;
+    font-weight: 600;
+    letter-spacing: -0.3px;
+    line-height: 1.3;
   }
   h3 {
     font-size: 15px;
+    font-weight: 600;
+    line-height: 1.4;
   }
   small {
     color: ${themeCssVariables.font.color.secondary};
+    font-size: 12px;
+    line-height: 1.5;
   }
   button,
   input,
   select,
   textarea {
-    font: inherit;
+    font-family: inherit;
+    font-size: inherit;
   }
   button {
     cursor: pointer;
@@ -58,7 +68,7 @@ export const StyledDeliveryCanvas = styled.div`
   }
   summary {
     cursor: pointer;
-    min-height: 24px;
+    min-height: 28px;
   }
   summary:focus-visible {
     outline: 3px solid ${themeCssVariables.color.blue11};
@@ -75,8 +85,18 @@ export const StyledDeliveryCanvas = styled.div`
     border-radius: 8px;
     box-sizing: border-box;
     color: inherit;
+    line-height: inherit;
     min-width: 0;
     padding: 9px 11px;
+  }
+  input:not([type='checkbox']):not([type='radio']),
+  select {
+    min-height: 40px;
+  }
+  input:disabled,
+  select:disabled,
+  textarea:disabled {
+    cursor: not-allowed;
   }
   fieldset {
     border: 0;
@@ -107,6 +127,11 @@ export const StyledDeliveryCanvas = styled.div`
   a {
     color: ${themeCssVariables.color.blue11};
     overflow-wrap: anywhere;
+    text-underline-offset: 3px;
+  }
+  progress {
+    accent-color: ${themeCssVariables.color.blue9};
+    max-width: 100%;
   }
   @media (max-width: 700px) {
     padding: 16px;
@@ -118,11 +143,40 @@ export const StyledDeliveryCanvas = styled.div`
     // Floating navigation and the phone control must not cover the last action.
     padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
   }
+  @media (max-width: ${MOBILE_VIEWPORT}px), (pointer: coarse) {
+    input:not([type='checkbox']):not([type='radio']),
+    select,
+    summary {
+      min-height: 44px;
+    }
+  }
 `;
 export const StyledDeliveryStack = styled.div`
   display: flex;
   flex-direction: column;
   gap: 20px;
+`;
+export const StyledDeliverySectionStack = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  min-width: 0;
+  @media (max-width: 700px) {
+    gap: 24px;
+  }
+`;
+export const StyledDeliveryCompactStack = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+`;
+export const StyledDeliveryToolbar = styled.div`
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
 `;
 export const StyledDeliveryRow = styled.div`
   align-items: center;
@@ -140,26 +194,86 @@ export const StyledDeliveryCard = styled.section`
   background: ${themeCssVariables.background.primary};
   border: 1px solid ${themeCssVariables.border.color.light};
   border-radius: 16px;
-  box-shadow: 0 4px 16px ${themeCssVariables.background.transparent.light};
+  box-sizing: border-box;
   min-width: 0;
-  padding: 22px;
+  padding: 20px;
+  @media (max-width: 700px) {
+    padding: 16px;
+  }
 `;
 export const StyledDeliveryButton = styled.button`
+  align-items: center;
   background: ${themeCssVariables.background.primary};
   border: 1px solid ${themeCssVariables.border.color.medium};
   border-radius: 9px;
+  box-sizing: border-box;
   color: inherit;
+  display: inline-flex;
   font-weight: 500;
+  gap: 8px;
+  justify-content: center;
+  line-height: 1.4;
+  max-width: 100%;
+  min-height: 40px;
+  overflow-wrap: anywhere;
   padding: 8px 14px;
+  text-align: center;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
+  &:hover:not(:disabled) {
+    background: ${themeCssVariables.background.secondary};
+    border-color: ${themeCssVariables.border.color.strong};
+  }
+  &:active:not(:disabled) {
+    background: ${themeCssVariables.background.tertiary};
+  }
+  &:focus-visible {
+    outline: 3px solid ${themeCssVariables.color.blue11};
+    outline-offset: 3px;
+  }
+  &[data-variant='quiet'] {
+    background: transparent;
+    border-color: transparent;
+    color: ${themeCssVariables.font.color.secondary};
+    &:hover:not(:disabled),
+    &:active:not(:disabled) {
+      background: ${themeCssVariables.background.tertiary};
+      color: ${themeCssVariables.font.color.primary};
+    }
+  }
   &[data-primary='true'] {
     background: ${themeCssVariables.color.blue9};
     border-color: ${themeCssVariables.color.blue9};
     color: ${GRAY_SCALE_LIGHT.gray1};
+    &:hover:not(:disabled),
+    &:active:not(:disabled) {
+      background: ${themeCssVariables.color.blue10};
+      border-color: ${themeCssVariables.color.blue10};
+      color: ${GRAY_SCALE_LIGHT.gray1};
+    }
   }
-  &[aria-current='page'] {
+  .dark &[data-primary='true']:hover:not(:disabled),
+  .dark &[data-primary='true']:active:not(:disabled) {
+    background: ${themeCssVariables.color.blue9};
+    border-color: ${themeCssVariables.color.blue11};
+  }
+  &[aria-current='page'],
+  &[aria-pressed='true'] {
     background: ${themeCssVariables.color.blue3};
     border-color: ${themeCssVariables.color.blue6};
     color: ${themeCssVariables.color.blue11};
+    &:hover:not(:disabled),
+    &:active:not(:disabled) {
+      background: ${themeCssVariables.color.blue4};
+      border-color: ${themeCssVariables.color.blue7};
+    }
+  }
+  @media (max-width: ${MOBILE_VIEWPORT}px), (pointer: coarse) {
+    min-height: 44px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
   }
 `;
 export const StyledDeliveryTaskButton = styled.button`
@@ -170,18 +284,27 @@ export const StyledDeliveryTaskButton = styled.button`
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-width: 0;
   padding: 16px;
   text-align: left;
   width: 100%;
-  &:hover {
+  &:hover:not(:disabled) {
+    background: ${themeCssVariables.background.secondary};
     border-color: ${themeCssVariables.color.blue8};
-    box-shadow: 0 3px 12px ${themeCssVariables.background.transparent.blue};
+  }
+  &:active:not(:disabled) {
+    background: ${themeCssVariables.color.blue3};
   }
 `;
 export const StyledDeliveryBadge = styled.span`
+  align-items: center;
   background: ${themeCssVariables.background.tertiary};
   border-radius: 6px;
+  display: inline-flex;
   font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+  max-width: 100%;
   padding: 3px 8px;
   &[data-state='APPROVED'] {
     background: ${themeCssVariables.color.green3};

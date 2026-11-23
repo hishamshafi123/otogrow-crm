@@ -1,3 +1,7 @@
+import {
+  ClientServicePicker,
+  type ClientServiceEditorState,
+} from '@/delivery/onboarding/ClientServicePicker';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { styled } from '@linaria/react';
 import {
@@ -13,23 +17,6 @@ import {
   StyledDeliveryRow,
   StyledDeliveryStack,
 } from '@/delivery/deliveryStyles';
-const StyledClientServiceChoices = styled.div`
-  display: grid;
-  gap: 4px 12px;
-  grid-template-columns: repeat(auto-fit, minmax(min(160px, 100%), 1fr));
-  margin-bottom: 12px;
-  > label {
-    align-items: center;
-    cursor: pointer;
-    display: flex;
-    gap: 8px;
-    min-height: 44px;
-  }
-  input[type='checkbox'] {
-    flex: 0 0 auto;
-    margin: 0;
-  }
-`;
 const StyledServicePlanFields = styled.div`
   display: flex;
   flex-direction: column;
@@ -47,6 +34,7 @@ type ServicePlanFieldsProps = {
   setFields: (value: ServicePlanQuestion[]) => void;
   members: ServicePlanMember[];
   projectMemberIds: string[];
+  onCustomServiceStateChange?: (state: ClientServiceEditorState) => void;
 };
 export const ServicePlanFields = ({
   values,
@@ -55,6 +43,7 @@ export const ServicePlanFields = ({
   setFields,
   members,
   projectMemberIds,
+  onCustomServiceStateChange,
 }: ServicePlanFieldsProps) => {
   const { t } = useLingui();
   const services = servicePlanServices(values.services);
@@ -77,55 +66,11 @@ export const ServicePlanFields = ({
     <StyledServicePlanFields>
       {' '}
       <StyledDeliveryGrid>
-        <fieldset>
-          <legend>
-            <Trans>Client services</Trans>
-          </legend>
-          <StyledClientServiceChoices>
-            {[
-              ['AI video', t`AI video`],
-              ['Static ads', t`Static ads`],
-              ['Performance marketing', t`Performance marketing`],
-              ['SEO', t`SEO`],
-              ['Website', t`Website`],
-              ['SaaS', t`SaaS`],
-              ['Mobile app', t`Mobile app`],
-            ].map(([value, label]) => (
-              <label key={value}>
-                <input
-                  type="checkbox"
-                  checked={services.some(
-                    (service) =>
-                      service.toLowerCase().replace(/[_-]+/g, ' ') ===
-                      value.toLowerCase(),
-                  )}
-                  onChange={(event) =>
-                    changeServices(
-                      (event.target.checked
-                        ? [...services, value]
-                        : services.filter(
-                            (service) =>
-                              service.toLowerCase().replace(/[_-]+/g, ' ') !==
-                              value.toLowerCase(),
-                          )
-                      ).join(', '),
-                    )
-                  }
-                />
-                {label}
-              </label>
-            ))}
-          </StyledClientServiceChoices>
-          <label>
-            <Trans>Services, separated by commas</Trans>
-            <input
-              name="services"
-              required
-              value={values.services}
-              onChange={(event) => changeServices(event.target.value)}
-            />
-          </label>
-        </fieldset>
+        <ClientServicePicker
+          services={services}
+          onChange={(next) => changeServices(next.join(', '))}
+          onEditorStateChange={onCustomServiceStateChange}
+        />
         <label>
           <Trans>Billing arrangement</Trans>
           <select
@@ -177,129 +122,139 @@ export const ServicePlanFields = ({
           />
         </label>
       </StyledDeliveryGrid>
-      <fieldset>
-        <legend>
-          <Trans>Performance marketing responsibilities</Trans>
-        </legend>
-        <label>
-          <input
-            type="checkbox"
-            name="advertising"
-            disabled={!performanceMarketing && !values.advertising}
-            checked={values.advertising}
-            onChange={(event) =>
-              setValues({ ...values, advertising: event.target.checked })
-            }
-          />
-          <Trans>Configure the PM, marketer and client budget requests</Trans>
-        </label>
-        {!performanceMarketing && (
-          <p>{t`Select Performance marketing above to configure advertising responsibilities. Removing that service turns off this setup and the client’s budget controls when saved.`}</p>
-        )}
-        <p>
-          <Trans>
-            These assignments are reused by linked performance reports. Select
-            Performance marketing in Client services to make this service plan
-            available for reporting. Client budget requests change advertising
-            spend, not the agency retainer.
-          </Trans>
-        </p>
-        <fieldset hidden={!values.advertising} disabled={!values.advertising}>
-          <StyledDeliveryGrid>
-            <label>
-              <Trans>Advertising project manager</Trans>
-              <select
-                name="advertisingManager"
-                required
-                value={values.managerId}
-                onChange={(event) =>
-                  setValues({ ...values, managerId: event.target.value })
-                }
-              >
-                <option value="">{t`Choose a manager`}</option>
-                {managers.map((member) => (
-                  <option key={member.id} value={member.id}>
-                    {member.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <Trans>Assigned marketer</Trans>
-              <select
-                name="advertisingMarketer"
-                required
-                value={values.marketerId}
-                onChange={(event) =>
-                  setValues({ ...values, marketerId: event.target.value })
-                }
-              >
-                <option value="">{t`Choose a project member`}</option>
-                {marketers.map((member) => (
-                  <option key={member.id} value={member.id}>
-                    {member.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </StyledDeliveryGrid>
-          <StyledDeliveryGrid>
-            <label>
-              <Trans>Advertising currency</Trans>
-              <select
-                name="advertisingCurrency"
-                value={values.advertisingCurrency}
-                onChange={(event) =>
-                  setValues({
-                    ...values,
-                    advertisingCurrency: event.target.value,
-                  })
-                }
-              >
-                {['USD', 'AED', 'EUR', 'GBP', 'INR', 'SGD', 'AUD', 'CAD'].map(
-                  (value) => (
+      {performanceMarketing && (
+        <fieldset>
+          <legend>
+            <Trans>Performance marketing responsibilities</Trans>
+          </legend>
+          <p>
+            <Trans>
+              Optional. Configure these only when this plan includes managed
+              advertising and client budget requests. They do not change the
+              agency retainer.
+            </Trans>
+          </p>
+          <label>
+            <input
+              type="checkbox"
+              name="advertising"
+              checked={values.advertising}
+              onChange={(event) =>
+                setValues({ ...values, advertising: event.target.checked })
+              }
+            />
+            <Trans>Configure the PM, marketer and client budget requests</Trans>
+          </label>
+          <p>
+            <Trans>
+              The selected assignments are reused by linked performance reports.
+            </Trans>
+          </p>
+          <fieldset hidden={!values.advertising} disabled={!values.advertising}>
+            <StyledDeliveryGrid>
+              <label>
+                <Trans>Advertising project manager</Trans>
+                <select
+                  name="advertisingManager"
+                  required
+                  value={values.managerId}
+                  onChange={(event) =>
+                    setValues({ ...values, managerId: event.target.value })
+                  }
+                >
+                  <option value="">{t`Choose a manager`}</option>
+                  {managers.map((member) => (
+                    <option key={member.id} value={member.id}>
+                      {member.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <Trans>Assigned marketer</Trans>
+                <select
+                  name="advertisingMarketer"
+                  required
+                  value={values.marketerId}
+                  onChange={(event) =>
+                    setValues({ ...values, marketerId: event.target.value })
+                  }
+                >
+                  <option value="">{t`Choose a project member`}</option>
+                  {marketers.map((member) => (
+                    <option key={member.id} value={member.id}>
+                      {member.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </StyledDeliveryGrid>
+            <StyledDeliveryGrid>
+              <label>
+                <Trans>Advertising currency</Trans>
+                <select
+                  name="advertisingCurrency"
+                  value={values.advertisingCurrency}
+                  onChange={(event) =>
+                    setValues({
+                      ...values,
+                      advertisingCurrency: event.target.value,
+                    })
+                  }
+                >
+                  {[
+                    'INR',
+                    'USD',
+                    'QAR',
+                    'AED',
+                    'EUR',
+                    'GBP',
+                    'SGD',
+                    'AUD',
+                    'CAD',
+                  ].map((value) => (
                     <option key={value}>{value}</option>
-                  ),
-                )}
-              </select>
-            </label>
-            <label>
-              <Trans>Advertising platform</Trans>
-              <select
-                name="advertisingChannel"
-                value={values.advertisingChannel}
-                onChange={(event) =>
-                  setValues({
-                    ...values,
-                    advertisingChannel: event.target.value,
-                  })
-                }
-              >
-                {['META', 'X', 'TIKTOK', 'CHATGPT'].map((value) => (
-                  <option key={value}>{value}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <Trans>Budget period</Trans>
-              <select
-                name="advertisingPeriod"
-                value={values.advertisingPeriod}
-                onChange={(event) =>
-                  setValues({
-                    ...values,
-                    advertisingPeriod: event.target.value,
-                  })
-                }
-              >
-                <option value="DAILY">{t`Daily`}</option>
-                <option value="MONTHLY">{t`Monthly`}</option>
-                <option value="LIFETIME">{t`Lifetime`}</option>
-              </select>
-            </label>
-          </StyledDeliveryGrid>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <Trans>Advertising platform</Trans>
+                <select
+                  name="advertisingChannel"
+                  value={values.advertisingChannel}
+                  onChange={(event) =>
+                    setValues({
+                      ...values,
+                      advertisingChannel: event.target.value,
+                    })
+                  }
+                >
+                  {['META', 'X', 'TIKTOK', 'CHATGPT'].map((value) => (
+                    <option key={value}>{value}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <Trans>Budget period</Trans>
+                <select
+                  name="advertisingPeriod"
+                  value={values.advertisingPeriod}
+                  onChange={(event) =>
+                    setValues({
+                      ...values,
+                      advertisingPeriod: event.target.value,
+                    })
+                  }
+                >
+                  <option value="DAILY">{t`Daily`}</option>
+                  <option value="MONTHLY">{t`Monthly`}</option>
+                  <option value="LIFETIME">{t`Lifetime`}</option>
+                </select>
+              </label>
+            </StyledDeliveryGrid>
+          </fieldset>
         </fieldset>
-      </fieldset>
+      )}
       <details>
         <summary>
           <Trans>Onboarding questions</Trans>: {fields.length} ·{' '}

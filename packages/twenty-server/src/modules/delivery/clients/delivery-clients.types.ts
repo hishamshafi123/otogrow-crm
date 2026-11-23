@@ -14,11 +14,12 @@ export const engagementSchema = z
         managerId: identifier,
         marketerId: identifier,
         currency: z.enum([
+          'INR',
           'USD',
+          'QAR',
           'AED',
           'EUR',
           'GBP',
-          'INR',
           'SGD',
           'AUD',
           'CAD',

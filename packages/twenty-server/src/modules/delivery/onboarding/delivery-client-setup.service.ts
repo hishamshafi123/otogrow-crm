@@ -14,6 +14,8 @@ import { WorkspaceEntity } from 'src/engine/core-modules/workspace/workspace.ent
 import { DeliveryService } from 'src/modules/delivery/delivery.service';
 import { DeliveryClientsService } from 'src/modules/delivery/clients/delivery-clients.service';
 import { engagementSchema } from 'src/modules/delivery/clients/delivery-clients.types';
+import { DeliveryOperationsEntity } from 'src/modules/delivery/entities/delivery-operations.entity';
+import { newDeliveryOperations } from 'src/modules/delivery/operations/delivery-operations.types';
 import { DeliveryProjectEntity } from 'src/modules/delivery/entities/delivery-project.entity';
 import { DeliveryTaskEntity } from 'src/modules/delivery/entities/delivery-task.entity';
 import { OtogrowAccessService } from 'src/modules/otogrow-access/otogrow-access.service';
@@ -30,6 +32,7 @@ import {
   type ClientSetupCompany,
 } from 'src/modules/delivery/onboarding/delivery-client-setup.policy';
 import {
+  type DeliveryClientServiceCatalogDTO,
   type DeliveryClientSetupContextDTO,
   type DeliveryClientSetupContextInput,
   type DeliveryClientSetupCreateInput,
@@ -39,6 +42,8 @@ import {
 } from 'src/modules/delivery/onboarding/delivery-client-setup.dto';
 
 const DIRECTORY_LIMIT = 2000;
+const serviceNameKey = (name: string) =>
+  name.trim().toLowerCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ');
 const planSchema = engagementSchema.extend({
   id: z.uuid(),
   revision: z.number().int().positive(),
@@ -79,6 +84,88 @@ export class DeliveryClientSetupService {
         'Current delivery management access is required to set up client work.',
       );
     return { identity, workspace };
+  }
+  async serviceCatalog(
+    auth: WorkspaceAuthContext,
+  ): Promise<DeliveryClientServiceCatalogDTO> {
+    const identity = this.identity(auth);
+    return readDeliverySnapshot(
+      this.dataSource,
+      identity.workspaceId,
+      async (manager) => {
+        await this.authorize(auth, manager);
+        const record = await manager
+          .getRepository(DeliveryOperationsEntity)
+          .findOneBy({
+            workspaceId: identity.workspaceId,
+          });
+        return { ...identity, services: record?.state.serviceCatalog ?? [] };
+      },
+    );
+  }
+  async addService(
+    auth: WorkspaceAuthContext,
+    name: string,
+  ): Promise<DeliveryClientServiceCatalogDTO> {
+    const identity = this.identity(auth);
+    if (typeof name !== 'string' || /[,\u0000-\u001f\u007f]/u.test(name))
+      throw new BadRequestException(
+        'Use a service name without commas or control characters.',
+      );
+    const normalized = name.trim().replace(/\s+/gu, ' ');
+    if (!normalized || normalized.length > 100)
+      throw new BadRequestException(
+        'Service names must contain 1 to 100 characters.',
+      );
+    return this.dataSource.transaction(async (manager) => {
+      await manager.query(
+        'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+        [`delivery:${identity.workspaceId}`],
+      );
+      await this.authorize(auth, manager);
+      const repository = manager.getRepository(DeliveryOperationsEntity);
+      const record =
+        (await repository.findOneBy({ workspaceId: identity.workspaceId })) ??
+        repository.create({
+          workspaceId: identity.workspaceId,
+          state: newDeliveryOperations(),
+        });
+      const services = record.state.serviceCatalog ?? [];
+      if (
+        services.some(
+          (service) => serviceNameKey(service) === serviceNameKey(normalized),
+        )
+      )
+        return { ...identity, services };
+      if (services.length >= 200)
+        throw new BadRequestException(
+          'The workspace service catalog supports up to 200 custom services.',
+        );
+      record.state.serviceCatalog = [...services, normalized];
+      if (JSON.stringify(record.state).length > 10000000)
+        throw new BadRequestException(
+          'Operations history reached its storage limit. Contact an administrator for maintenance.',
+        );
+      await repository.save(record);
+      await recordOtogrowActivity(manager, {
+        workspaceId: identity.workspaceId,
+        actorId: identity.memberId,
+        category: 'CLIENT',
+        action: 'CLIENT_SERVICE_CATALOG_UPDATED',
+        outcome: 'RECORDED',
+        summary: 'Added a reusable service to the workspace catalog.',
+        sourceType: 'settings',
+        sourceId: identity.workspaceId,
+        changes: [
+          {
+            field: 'serviceCount',
+            before: String(services.length),
+            after: String(record.state.serviceCatalog.length),
+          },
+        ],
+      });
+      return { ...identity, services: record.state.serviceCatalog };
+    });
   }
   private async company(
     auth: WorkspaceAuthContext,
@@ -440,6 +527,11 @@ export class DeliveryClientSetupService {
             },
           },
           manager,
+          undefined,
+          {
+            allowSelfReview:
+              command.firstTask.assigneeId === command.firstTask.reviewerId,
+          },
         );
         if (typeof created !== 'string')
           throw new Error('First task creation did not return an identity.');

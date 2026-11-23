@@ -5,11 +5,12 @@ const title = z.string().trim().min(1).max(240);
 const text = z.string().trim().max(12000);
 const money = z.number().int().min(0).max(100000000000);
 const currency = z.enum([
+  'INR',
   'USD',
+  'QAR',
   'AED',
   'EUR',
   'GBP',
-  'INR',
   'SGD',
   'AUD',
   'CAD',

@@ -83,7 +83,7 @@ async function main() {
       source,
       services.delivery,
       creative,
-      new DeliveryCommitmentsService(source, services.delivery),
+      new DeliveryCommitmentsService(source, services.delivery, createIsolatedNativeTaskAccess()),
     );
     clients.snapshot = noSnapshot;
     let nativeDenied = false,

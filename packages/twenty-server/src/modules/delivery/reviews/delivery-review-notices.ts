@@ -76,6 +76,7 @@ export const currentDeliveryReviewNotice = async (
   return deliveryReviewAuthority({
     primaryReviewerId: scope.task.details.reviewerId,
     assigneeId: scope.assigneeId,
+    allowSelfReview: scope.task.details.allowSelfReview,
     assignment,
     projectMemberIds: project.memberIds,
     access: [

@@ -183,11 +183,12 @@ export const RevisionEditor = ({
                   >
                     <option value="">{t`Choose currency`}</option>
                     {[
+                      'INR',
                       'USD',
+                      'QAR',
                       'AED',
                       'EUR',
                       'GBP',
-                      'INR',
                       'SGD',
                       'AUD',
                       'CAD',

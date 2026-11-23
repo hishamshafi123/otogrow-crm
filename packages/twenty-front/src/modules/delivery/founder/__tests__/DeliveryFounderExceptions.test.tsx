@@ -81,7 +81,7 @@ const setup = (extra = '') => {
     ],
     {
       initialEntries: [
-        `/delivery?view=health&readinessStatus=NEEDS_SETUP${extra}`,
+        `/delivery?view=health&founderPanel=attention&readinessStatus=NEEDS_SETUP${extra}`,
       ],
     },
   );

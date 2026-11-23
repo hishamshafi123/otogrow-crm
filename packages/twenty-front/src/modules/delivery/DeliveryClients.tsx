@@ -15,7 +15,10 @@ import { useAssistantAccess } from '@/delivery/assistants/useAssistantAccess';
 import { isOtogrowAccessDenied } from '@/otogrow-access/isOtogrowAccessDenied';
 import { fastDeepEqual } from 'twenty-shared/utils';
 import { useFinanceExportRequestGuard } from '@/delivery/finance/export/useFinanceExportRequestGuard';
-import { clientEngagementParams } from '@/delivery/commitments/clientCommitmentParams';
+import {
+  clientCommitmentsParams,
+  clientEngagementParams,
+} from '@/delivery/commitments/clientCommitmentParams';
 import { useDeliveryNativeDraft } from '@/delivery/drafts/useDeliveryNativeDraft';
 import { DeliveryDraftConflict } from '@/delivery/drafts/DeliveryDraftConflict';
 import { useStore } from 'jotai';
@@ -32,7 +35,7 @@ import {
   useState,
   type FormEvent,
 } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { styled } from '@linaria/react';
 import { type DeliveryWorkspace } from '@/delivery/delivery.types';
 import {
@@ -340,6 +343,11 @@ const ClientWorkspace = ({
                   </p>
                 </div>
                 <StyledDeliveryRow>
+                  <Link
+                    to={`/delivery?${clientCommitmentsParams(params).toString()}`}
+                  >
+                    <Trans>Delivery commitments</Trans>
+                  </Link>
                   {selected && (
                     <ClientSetupLink>
                       <Trans>Set up another client</Trans>
@@ -348,6 +356,7 @@ const ClientWorkspace = ({
                   <ClientSetupLink
                     companyId={selected?.companyId}
                     projectId={selected?.projectId}
+                    newServicePlan
                   >
                     <Trans>New client service plan</Trans>
                   </ClientSetupLink>
@@ -599,7 +608,6 @@ const ClientWorkspace = ({
                     <DeliveryClientShareForm
                       key={selected.id}
                       engagement={selected}
-                      tasks={workspace.tasks}
                       busy={mutation.loading}
                       run={run}
                     />
@@ -686,6 +694,10 @@ const EngagementForm = ({
       ].map((label) => ({ id: crypto.randomUUID(), label, required: true })),
   );
   const [values, setValues] = useState(() => servicePlanValues(initial));
+  const [customServiceState, setCustomServiceState] = useState({
+    dirty: false,
+    busy: false,
+  });
   const project = workspace.projects.find(
     (item) => item.id === values.projectId && Boolean(item.companyId),
   );
@@ -707,13 +719,22 @@ const EngagementForm = ({
   ];
   const [saving, setSaving] = useState(false);
   const draft = useDeliveryNativeDraft({
-    extraValues: { fields, values },
-    busy: busy || saving,
+    extraValues: { fields, values, customServiceState },
+    busy: busy || saving || customServiceState.busy,
   });
   const stale = Boolean(initial && initial.revision !== latestRevision);
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (busy || saving || stale || !draft.dirty || requirements.length) return;
+    if (
+      busy ||
+      saving ||
+      customServiceState.dirty ||
+      customServiceState.busy ||
+      stale ||
+      !draft.dirty ||
+      requirements.length
+    )
+      return;
     setSaving(true);
     try {
       await onSave({
@@ -781,6 +802,7 @@ const EngagementForm = ({
               setFields={setFields}
               members={workspace.members}
               projectMemberIds={project?.memberIds ?? []}
+              onCustomServiceStateChange={setCustomServiceState}
             />
             {requirements.length > 0 && (
               <div role="status">
@@ -799,6 +821,8 @@ const EngagementForm = ({
                 disabled={
                   busy ||
                   saving ||
+                  customServiceState.dirty ||
+                  customServiceState.busy ||
                   stale ||
                   !draft.dirty ||
                   requirements.length > 0

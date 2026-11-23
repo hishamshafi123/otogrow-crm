@@ -1,6 +1,7 @@
 const COMMITMENT_CURSORS = [
   'commitmentAllocationsAfter',
   'commitmentHistoryBefore',
+  'commitmentOrphansAfter',
 ];
 
 export const commitmentPeriodParams = (
@@ -21,5 +22,20 @@ export const clientEngagementParams = (
   const next = commitmentPeriodParams(params, null);
   if (engagementId) next.set('clientEngagement', engagementId);
   else next.delete('clientEngagement');
+  return next;
+};
+
+export const clientCommitmentsParams = (params: URLSearchParams) => {
+  const next = new URLSearchParams(params);
+  next.set('view', 'clients');
+  next.delete('clientView');
+  next.delete('task');
+  next.delete('panel');
+  return next;
+};
+
+export const clientAgreementsParams = (params: URLSearchParams) => {
+  const next = clientCommitmentsParams(params);
+  next.set('clientView', 'agreements');
   return next;
 };

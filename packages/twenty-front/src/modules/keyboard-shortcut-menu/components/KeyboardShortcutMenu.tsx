@@ -15,12 +15,12 @@ export const KeyboardShortcutMenu = () => {
   const { closeSidePanelMenu } = useSidePanelMenu();
 
   useGlobalHotkeys({
-    keys: ['shift+?', 'meta+?'],
+    keys: ['ctrl+shift+/', 'meta+shift+/'],
     callback: () => {
       closeSidePanelMenu();
       toggleKeyboardShortcutMenu();
     },
-    containsModifier: false,
+    containsModifier: true,
     dependencies: [toggleKeyboardShortcutMenu],
   });
 

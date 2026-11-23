@@ -30,6 +30,8 @@ import { useTaskLabels } from '@/delivery/tasks/useTaskLabels';
 import { DeliveryTaskSummaryList } from '@/delivery/tasks/DeliveryTaskSummaryList';
 import { DeliveryTaskFilters } from '@/delivery/tasks/DeliveryTaskFilters';
 import { DeliveryTasksToday } from '@/delivery/tasks/DeliveryTasksToday';
+import { DeliveryPageHeader } from '@/delivery/DeliveryPageHeader';
+import { DeliveryPageRefreshButton } from '@/delivery/DeliveryPageRefreshButton';
 import { DeliveryTaskAssignmentRead } from '@/delivery/tasks/DeliveryTaskAssignmentRead';
 import { claimTaskApprovalCelebration } from '@/delivery/tasks/task-approval-celebration';
 import { DeliveryPlannerCapacity } from '@/delivery/capacity/read/DeliveryPlannerCapacity';
@@ -41,6 +43,7 @@ import {
   StyledDeliveryDrawer,
   StyledDeliveryRow,
   StyledDeliveryStack,
+  StyledDeliveryToolbar,
 } from '@/delivery/deliveryStyles';
 const StyledTaskReadBoundary = styled.fieldset`
   border: 0;
@@ -166,6 +169,12 @@ export const DeliveryTasksPage = () => {
     setCreating(false);
   const task = state.detail ?? state.retainedDetail;
   const panel = params.get('panel') ?? 'task';
+  const taskPanels = [
+    { id: 'task', label: t`Task and final approval` },
+    { id: 'creative', label: t`Creative production` },
+    { id: 'operations', label: t`Delivery and messages` },
+    { id: 'agents', label: t`Text assistants` },
+  ];
   const update = (changes: Record<string, string | null>) =>
     setParams(taskPageDestination(params, changes).split('?')[1]);
   const taskReview = useTaskReview({
@@ -307,81 +316,77 @@ export const DeliveryTasksPage = () => {
             >
               <StyledDeliveryCanvas>
                 <StyledDeliveryStack>
-                  <StyledDeliveryRow>
-                    <StyledDeliveryRow>
-                      {!expanded && (
-                        <NavigationDrawerCollapseButton direction="right" />
-                      )}
-                      <div>
-                        <h1 tabIndex={-1}>{page?.label ?? t`My tasks`}</h1>
-                        <p>{page?.description}</p>
-                      </div>
-                    </StyledDeliveryRow>
-                    <StyledDeliveryRow>
-                      {state.permission.manager && (
-                        <StyledDeliveryButton
-                          data-primary="true"
-                          onClick={() =>
-                            requestAction(() => {
-                              if (!context.projects.length) {
-                                update({
-                                  ...deliveryTaskSelection(null),
-                                  view: 'team',
-                                });
-                                return;
-                              }
-                              update(deliveryTaskSelection(null));
-                              setCreating(true);
-                              setCreateVersion((current) => current + 1);
-                            })
-                          }
+                  <DeliveryPageHeader
+                    titleControl={
+                      mobile ? (
+                        <select
+                          aria-label={t`Go to workspace`}
+                          value={view}
+                          onChange={(event) => {
+                            const nextView = event.target.value;
+                            requestAction(() =>
+                              update({
+                                ...deliveryTaskSelection(null),
+                                view: nextView,
+                                tasksAfter: null,
+                              }),
+                            );
+                          }}
                         >
-                          {context.projects.length
-                            ? t`New task`
-                            : t`Set up first project`}
-                        </StyledDeliveryButton>
-                      )}
-                      <StyledDeliveryButton
-                        disabled={state.busy}
-                        onClick={retry}
-                      >
-                        <Trans>Refresh page</Trans>
-                      </StyledDeliveryButton>
-                    </StyledDeliveryRow>
-                  </StyledDeliveryRow>
-                  <DeliveryNavigationPreferences
-                    key={personalNavigation.scope}
-                    personalNavigation={personalNavigation}
+                          {groups.map((group) => (
+                            <optgroup key={group.id} label={group.label}>
+                              {group.items.map((item) => (
+                                <option key={item.view} value={item.view}>
+                                  {item.label}
+                                </option>
+                              ))}
+                            </optgroup>
+                          ))}
+                        </select>
+                      ) : undefined
+                    }
+                    title={page?.label ?? t`My tasks`}
+                    description={
+                      view === 'home' ? undefined : page?.description
+                    }
+                    headingTabIndex={-1}
+                    navigation={
+                      !expanded && (
+                        <NavigationDrawerCollapseButton direction="right" />
+                      )
+                    }
+                    actions={
+                      <>
+                        {state.permission.manager && view !== 'reviews' && (
+                          <StyledDeliveryButton
+                            data-primary="true"
+                            onClick={() =>
+                              requestAction(() => {
+                                if (!context.projects.length) {
+                                  update({
+                                    ...deliveryTaskSelection(null),
+                                    view: 'team',
+                                  });
+                                  return;
+                                }
+                                update(deliveryTaskSelection(null));
+                                setCreating(true);
+                                setCreateVersion((current) => current + 1);
+                              })
+                            }
+                          >
+                            {context.projects.length
+                              ? t`New task`
+                              : t`Set up first project`}
+                          </StyledDeliveryButton>
+                        )}
+                        <DeliveryPageRefreshButton
+                          disabled={state.busy}
+                          onClick={retry}
+                        />
+                      </>
+                    }
                   />
-                  {mobile && (
-                    <label>
-                      <Trans>Go to</Trans>
-                      <select
-                        aria-label={t`Go to workspace`}
-                        value={view}
-                        onChange={(event) => {
-                          const nextView = event.target.value;
-                          requestAction(() =>
-                            update({
-                              ...deliveryTaskSelection(null),
-                              view: nextView,
-                              tasksAfter: null,
-                            }),
-                          );
-                        }}
-                      >
-                        {groups.map((group) => (
-                          <optgroup key={group.id} label={group.label}>
-                            {group.items.map((item) => (
-                              <option key={item.view} value={item.view}>
-                                {item.label}
-                              </option>
-                            ))}
-                          </optgroup>
-                        ))}
-                      </select>
-                    </label>
-                  )}
                   {state.error && <p role="alert">{state.error}</p>}
                   {state.message && (
                     <p role="status">
@@ -451,6 +456,12 @@ export const DeliveryTasksPage = () => {
                           </Trans>
                         </p>
                       )}
+                      {view === 'home' && state.list && (
+                        <DeliveryTasksToday
+                          snapshot={state.list}
+                          manager={actor.isManager}
+                        />
+                      )}
                       <DeliveryTaskFilters
                         context={context}
                         snapshot={state.list}
@@ -460,29 +471,25 @@ export const DeliveryTasksPage = () => {
                         }
                       />
                       {view === 'planner' && (
-                        <StyledDeliveryButton
-                          aria-pressed={params.get('layout') === 'board'}
-                          onClick={() =>
-                            requestAction(() =>
-                              update({
-                                layout:
-                                  params.get('layout') === 'board'
-                                    ? null
-                                    : 'board',
-                              }),
-                            )
-                          }
-                        >
-                          {params.get('layout') === 'board'
-                            ? t`List view`
-                            : t`Board view`}
-                        </StyledDeliveryButton>
-                      )}
-                      {view === 'home' && state.list && (
-                        <DeliveryTasksToday
-                          snapshot={state.list}
-                          manager={actor.isManager}
-                        />
+                        <StyledDeliveryToolbar>
+                          <StyledDeliveryButton
+                            aria-pressed={params.get('layout') === 'board'}
+                            onClick={() =>
+                              requestAction(() =>
+                                update({
+                                  layout:
+                                    params.get('layout') === 'board'
+                                      ? null
+                                      : 'board',
+                                }),
+                              )
+                            }
+                          >
+                            {params.get('layout') === 'board'
+                              ? t`List view`
+                              : t`Board view`}
+                          </StyledDeliveryButton>
+                        </StyledDeliveryToolbar>
                       )}
                       {state.list ? (
                         <DeliveryTaskSummaryList
@@ -590,6 +597,10 @@ export const DeliveryTasksPage = () => {
                       </StyledDeliveryRow>
                     </StyledDeliveryCard>
                   )}
+                  <DeliveryNavigationPreferences
+                    key={personalNavigation.scope}
+                    personalNavigation={personalNavigation}
+                  />
                 </StyledDeliveryStack>
               </StyledDeliveryCanvas>
             </StyledTaskReadBoundary>
@@ -745,38 +756,55 @@ export const DeliveryTasksPage = () => {
                                 )
                               }
                             />
-                            <StyledDeliveryRow>
-                              {[
-                                {
-                                  id: 'task',
-                                  label: t`Task and final approval`,
-                                },
-                                {
-                                  id: 'creative',
-                                  label: t`Creative production`,
-                                },
-                                {
-                                  id: 'operations',
-                                  label: t`Delivery and messages`,
-                                },
-                                { id: 'agents', label: t`Text assistants` },
-                              ].map((item) => (
-                                <StyledDeliveryButton
-                                  key={item.id}
-                                  aria-pressed={panel === item.id}
-                                  onClick={() =>
+                            {mobile ? (
+                              <label>
+                                <Trans>Task section</Trans>
+                                <select
+                                  aria-label={t`Task section`}
+                                  value={
+                                    taskPanels.some((item) => item.id === panel)
+                                      ? panel
+                                      : 'task'
+                                  }
+                                  onChange={(event) => {
+                                    const nextPanel = event.target.value;
                                     requestAction(() =>
                                       update({
                                         panel:
-                                          item.id === 'task' ? null : item.id,
+                                          nextPanel === 'task'
+                                            ? null
+                                            : nextPanel,
                                       }),
-                                    )
-                                  }
+                                    );
+                                  }}
                                 >
-                                  {item.label}
-                                </StyledDeliveryButton>
-                              ))}
-                            </StyledDeliveryRow>
+                                  {taskPanels.map((item) => (
+                                    <option key={item.id} value={item.id}>
+                                      {item.label}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+                            ) : (
+                              <StyledDeliveryRow>
+                                {taskPanels.map((item) => (
+                                  <StyledDeliveryButton
+                                    key={item.id}
+                                    aria-pressed={panel === item.id}
+                                    onClick={() =>
+                                      requestAction(() =>
+                                        update({
+                                          panel:
+                                            item.id === 'task' ? null : item.id,
+                                        }),
+                                      )
+                                    }
+                                  >
+                                    {item.label}
+                                  </StyledDeliveryButton>
+                                ))}
+                              </StyledDeliveryRow>
+                            )}
                             {domain ? (
                               <StyledDeliveryCard>
                                 <p>{domain.text}</p>

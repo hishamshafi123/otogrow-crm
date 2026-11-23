@@ -30,6 +30,7 @@ let mockHistoryError: Error | undefined;
 let mockLoading = false;
 let mockNetworkStatus = NetworkStatus.ready;
 let mockReady = true;
+let mockPermissionLoading = false;
 let mockManager = true;
 let mockReviewCapability = true;
 let mockMembership = 'membership';
@@ -51,6 +52,7 @@ jest.mock('@/delivery/reviews/reviewStyles', () => ({
 jest.mock('@/delivery/workflows/useWorkflowAccess', () => ({
   useWorkflowAccess: () => ({
     ready: mockReady,
+    loading: mockPermissionLoading,
     manager: mockManager,
     scope: `workspace:member:${mockMembership}`,
     access: { capabilities: mockReviewCapability ? ['delivery.review'] : [] },
@@ -164,6 +166,7 @@ beforeEach(() => {
   mockLoading = false;
   mockNetworkStatus = NetworkStatus.ready;
   mockReady = true;
+  mockPermissionLoading = false;
   mockManager = true;
   mockReviewCapability = true;
   mockMembership = 'membership';
@@ -307,6 +310,34 @@ it('separates effective review responsibility from primary delivery ownership', 
     screen.getByText('Primary manager for client delivery: Amna'),
   ).toBeInTheDocument();
 });
+it.each(['review', 'permission'])(
+  'shows a neutral status during initial %s loading and reveals responsibility only after verification',
+  (source) => {
+    mockLoading = source === 'review';
+    mockPermissionLoading = source === 'permission';
+    mockReady = !mockPermissionLoading;
+    const view = setup();
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Checking submission review access…',
+    );
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Retry submission review access' }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Scoped reviewer')).not.toBeInTheDocument();
+    expect(screen.getByText('Approval unavailable')).toBeVisible();
+    mockLoading = false;
+    mockPermissionLoading = false;
+    mockReady = true;
+    view.refresh();
+    expect(screen.getByText('Scoped reviewer')).toBeVisible();
+    expect(screen.getByText('Current approval authority')).toBeVisible();
+    expect(
+      screen.queryByText('Checking submission review access…'),
+    ).not.toBeInTheDocument();
+    expect(mockAssign).not.toHaveBeenCalled();
+  },
+);
 it('does not carry a task assignment success or read error into another exact submission', async () => {
   const saved = taskReviewFixture();
   saved.assignment!.revision = 3;
@@ -489,6 +520,29 @@ const nativeDenied = () =>
       },
     ],
   });
+
+it.each(['offline', 'denied'])(
+  'keeps a known %s review source fail closed while a request is still loading',
+  (failure) => {
+    mockLoading = true;
+    mockError = failure === 'denied' ? nativeDenied() : new Error('Offline');
+    setup();
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      failure === 'denied'
+        ? 'Submission review access is unavailable.'
+        : 'Current submission reviewer access could not be verified.',
+    );
+    expect(
+      screen.queryByText('Checking submission review access…'),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Scoped reviewer')).not.toBeInTheDocument();
+    expect(screen.getByText('Approval unavailable')).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'Retry submission review access' }),
+    ).toBeDisabled();
+    expect(mockAssign).not.toHaveBeenCalled();
+  },
+);
 
 it('clears denied private preparation, restores lost focus and requires an explicit fresh check after regrant', async () => {
   const view = setup();

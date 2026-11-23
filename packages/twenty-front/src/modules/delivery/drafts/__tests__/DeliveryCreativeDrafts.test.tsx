@@ -16,6 +16,13 @@ import {
 jest.mock('@/delivery/creative/atlas/AtlasProductionTools', () => ({
   AtlasProductionTools: () => <section>Atlas generation tools</section>,
 }));
+jest.mock('@/delivery/creative/production/creative-production-styles', () => ({
+  StyledCreativeBriefFields: 'div',
+  StyledCreativeFormSection: 'section',
+  StyledCreativeStageButtons: 'div',
+  StyledCreativeStageSelect: 'label',
+  StyledCreativeToolbar: 'div',
+}));
 jest.mock('@/delivery/deliveryStyles', () => ({
   StyledDeliveryStack: 'div',
   StyledDeliveryRow: 'div',
@@ -383,3 +390,26 @@ it.each(['readable', 'denied', 'offline'])(
     );
   },
 );
+
+it('protects an unsaved grouped brief when changing the narrow production selector', async () => {
+  const user = setup();
+  await user.type(screen.getByLabelText('Concept'), ' updated');
+  await user.selectOptions(
+    screen.getByLabelText('Production stage'),
+    'references',
+  );
+  expect(screen.getByRole('dialog')).toBeVisible();
+  await user.click(screen.getByRole('button', { name: 'Keep editing' }));
+  expect(screen.getByLabelText('Production stage')).toHaveValue('brief');
+  expect(screen.getByLabelText('Concept')).toHaveValue('Launch updated');
+  await user.selectOptions(
+    screen.getByLabelText('Production stage'),
+    'references',
+  );
+  await user.click(
+    screen.getByRole('button', { name: 'Discard and continue' }),
+  );
+  expect(screen.getByLabelText('Title')).toBeVisible();
+  expect(screen.getByLabelText('Production stage')).toHaveValue('references');
+  expect(mockMutate).not.toHaveBeenCalled();
+});

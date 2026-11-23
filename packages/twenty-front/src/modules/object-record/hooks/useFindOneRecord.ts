@@ -1,4 +1,5 @@
 import { useQuery } from '@apollo/client/react';
+import { type FetchPolicy } from '@apollo/client';
 import { useMemo } from 'react';
 
 import { useApolloCoreClient } from '@/object-metadata/hooks/useApolloCoreClient';
@@ -19,11 +20,13 @@ export const useFindOneRecord = <T extends ObjectRecord = ObjectRecord>({
   recordGqlFields,
   skip,
   withSoftDeleted = false,
+  fetchPolicy,
 }: ObjectMetadataItemIdentifier & {
   objectRecordId: string | undefined;
   recordGqlFields?: RecordGqlOperationGqlRecordFields;
   skip?: boolean;
   withSoftDeleted?: boolean;
+  fetchPolicy?: FetchPolicy;
 }) => {
   const { objectMetadataItem } = useObjectMetadataItem({
     objectNameSingular,
@@ -60,6 +63,7 @@ export const useFindOneRecord = <T extends ObjectRecord = ObjectRecord>({
       skip ||
       !hasReadPermission,
     variables: { objectRecordId },
+    fetchPolicy,
     client: apolloCoreClient,
   });
 

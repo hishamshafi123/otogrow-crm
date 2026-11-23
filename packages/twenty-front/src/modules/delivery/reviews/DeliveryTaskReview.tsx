@@ -37,6 +37,12 @@ const TaskReviewWorkspace = ({
   const [editing, setEditing] = useState(false);
   const [version, setVersion] = useState(0);
   const { data, retained } = controller;
+  const checkingAccess =
+    (controller.loading || controller.permission.loading) &&
+    !controller.unavailable &&
+    !controller.readError &&
+    !controller.permission.error &&
+    !controller.error;
   // oxlint-disable-next-line twenty/no-state-useref -- Recover only focus lost when private review controls leave the document.
   const focusState = useRef({ visible: false, pending: false });
   // oxlint-disable-next-line twenty/no-state-useref -- The recovery control survives removal of the private assignment form.
@@ -47,20 +53,26 @@ const TaskReviewWorkspace = ({
     if (visible) focusState.current.pending = false;
     else if (focusState.current.visible) focusState.current.pending = true;
     focusState.current.visible = visible;
-    if (!focusState.current.pending || controller.loading) return;
+    if (!focusState.current.pending || controller.loading || checkingAccess)
+      return;
     focusState.current.pending = false;
     if (
       document.activeElement === document.body ||
       document.activeElement === document.documentElement
     )
       recoveryButton.current?.focus();
-  }, [visible, controller.loading, controller.unavailable]);
+  }, [visible, checkingAccess, controller.loading, controller.unavailable]);
   return (
     <StyledDeliveryCard aria-label={t`Submission review responsibility`}>
       <StyledDeliveryStack>
         {controller.error && <p role="alert">{controller.error}</p>}
         {controller.notice && <p role="status">{controller.notice}</p>}
-        {!data && (
+        {!data && checkingAccess && (
+          <p role="status">
+            <Trans>Checking submission review access…</Trans>
+          </p>
+        )}
+        {!data && !checkingAccess && (
           <p role={controller.readError ? 'alert' : 'status'}>
             {controller.unavailable ? (
               <Trans>

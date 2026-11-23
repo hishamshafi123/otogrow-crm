@@ -1,6 +1,10 @@
 import { commitmentLastDay } from '@/delivery/commitments/commitmentDates';
 import { useCommitmentScope } from '@/delivery/commitments/useCommitmentScope';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
+import { NetworkStatus } from '@apollo/client';
+import { isDeliveryTaskUnavailable as isCommitmentSourceUnavailable } from '@/delivery/tasks/isDeliveryTaskUnavailable';
+import { useOtogrowIdentity } from '@/otogrow-access/useOtogrowIdentity';
+import { CommitmentOrphanCleanup } from '@/delivery/commitments/CommitmentOrphanCleanup';
 import { useMutation, useQuery } from '@apollo/client/react';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -72,15 +76,48 @@ const CommitmentWorkspace = ({
   const { t } = useLingui();
   const labels = useCommitmentLabels();
   const permission = useOtogrowAccess();
+  const { identity } = useOtogrowIdentity();
+  const scope = useCommitmentScope();
   const ready =
     !permission.loading && !permission.error && Boolean(permission.access);
-  const { requestAction } = useDeliveryDraftGuard();
+  const { requestAction, cancelPendingNavigation } = useDeliveryDraftGuard();
   const [params, setParams] = useSearchParams();
   const linkedPeriodId = params.get('commitmentPeriod') || null;
   // oxlint-disable-next-line twenty/no-state-useref -- Remembering an imperative focus operation keeps background refresh from stealing focus without rendering state.
   const focusedLinkedPeriod = useRef<string | null>(null);
   const allocationCursor = params.get('commitmentAllocationsAfter') || null;
   const historyCursor = params.get('commitmentHistoryBefore') || null;
+  const orphanCursor = params.get('commitmentOrphansAfter') || null;
+  const [contractDenied, setContractDenied] = useState(false);
+  const [taskPreparationDenied, setTaskPreparationDenied] = useState(false);
+  const [selectedSources, setSelectedSources] = useState<{
+    taskId: string | null;
+    parentTaskId: string | null;
+  }>({ taskId: null, parentTaskId: null });
+  const currentAuthorization = ready
+    ? JSON.stringify({
+        capabilities: [...(permission.access?.capabilities ?? [])].sort(),
+        roleIds: [...(permission.access?.roleIds ?? [])].sort(),
+        grants: permission.access?.grants ?? [],
+      })
+    : null;
+  const [authorizationEvidence, setAuthorizationEvidence] = useState(
+    currentAuthorization ?? '',
+  );
+  if (
+    currentAuthorization !== null &&
+    authorizationEvidence !== currentAuthorization
+  )
+    setAuthorizationEvidence(currentAuthorization);
+  const authorization = currentAuthorization ?? authorizationEvidence;
+  // oxlint-disable-next-line twenty/no-state-useref -- Replies and queued editor work cannot cross a confirmed authority boundary.
+  const epoch = useRef(0);
+  const recoveryFocus = useRef<HTMLButtonElement>(null);
+  const refreshFocus = useRef<HTMLButtonElement>(null);
+  // oxlint-disable-next-line twenty/no-state-useref -- Focus recovery waits for loading without stealing focus from another control.
+  const pendingFocus = useRef(false);
+  // oxlint-disable-next-line twenty/no-state-useref -- Track loss of the visible private editor across loading renders.
+  const hadEditor = useRef(false);
   const [taskSearch, setTaskSearch] = useState('');
   const [parentSearch, setParentSearch] = useState('');
   const [editor, setEditor] = useState<{
@@ -97,14 +134,20 @@ const CommitmentWorkspace = ({
     periodId,
     allocationCursor,
     historyCursor,
+    orphanAllocationCursor: orphanCursor,
+    selectedTaskId: selectedSources.taskId,
+    selectedParentTaskId: selectedSources.parentTaskId,
     taskSearch,
     limit: 30,
   };
   const query = useQuery<
     DeliveryCommitmentsQuery,
-    DeliveryCommitmentsQueryVariables & { identity: string | null }
+    DeliveryCommitmentsQueryVariables & {
+      identity: string | null;
+      authorization: string;
+    }
   >(GET_COMMITMENTS, {
-    variables: { input, identity: permission.scopeKey },
+    variables: { input, identity: permission.scopeKey, authorization },
     skip: !ready,
     fetchPolicy: 'no-cache',
     notifyOnNetworkStatusChange: true,
@@ -112,11 +155,15 @@ const CommitmentWorkspace = ({
   });
   const parentQuery = useQuery<
     DeliveryCommitmentsQuery,
-    DeliveryCommitmentsQueryVariables & { identity: string | null }
+    DeliveryCommitmentsQueryVariables & {
+      identity: string | null;
+      authorization: string;
+    }
   >(GET_COMMITMENTS, {
     variables: {
       input: { engagementId, periodId, taskSearch: parentSearch, limit: 100 },
       identity: permission.scopeKey,
+      authorization,
     },
     skip: !ready || editor?.selection.kind !== 'assign',
     fetchPolicy: 'no-cache',
@@ -133,22 +180,168 @@ const CommitmentWorkspace = ({
       (!periodId || candidate.selectedPeriodId === periodId),
     );
   const candidate = query.data?.deliveryCommitments;
-  const data = !query.error && matches(candidate) ? candidate : undefined;
   const parentCandidate = parentQuery.data?.deliveryCommitments;
+  const knownContractLoss =
+    isCommitmentSourceUnavailable(permission.error) ||
+    isCommitmentSourceUnavailable(query.error) ||
+    (editor?.selection.kind === 'assign' &&
+      isCommitmentSourceUnavailable(parentQuery.error));
+  const contractUnavailable = contractDenied || knownContractLoss;
+  const readSource = `${scope}:${authorization}:${JSON.stringify(input)}`;
+  const [verifiedSource, setVerifiedSource] = useState<string | null>(null);
+  const trusted =
+    !contractUnavailable &&
+    !query.error &&
+    matches(candidate) &&
+    (!candidate?.selectedTask ||
+      candidate.selectedTask.taskId === selectedSources.taskId) &&
+    (!candidate?.selectedParent ||
+      candidate.selectedParent.taskId === selectedSources.parentTaskId);
+  const refreshing =
+    query.loading &&
+    [NetworkStatus.poll, NetworkStatus.refetch].includes(query.networkStatus);
+  if (trusted && !query.loading && verifiedSource !== readSource)
+    setVerifiedSource(readSource);
+  else if (
+    verifiedSource !== null &&
+    (!trusted || (query.loading && !refreshing))
+  )
+    setVerifiedSource(null);
+  const data =
+    trusted && (!query.loading || (refreshing && verifiedSource === readSource))
+      ? candidate
+      : undefined;
+  const knownTaskLoss = Boolean(
+    (data && !data.taskDetailsAvailable) ||
+    (editor?.selection.kind === 'assign' &&
+      !parentQuery.loading &&
+      !parentQuery.error &&
+      matches(parentCandidate) &&
+      !parentCandidate?.taskDetailsAvailable) ||
+    (data &&
+      !query.loading &&
+      ((selectedSources.taskId && !data.selectedTask) ||
+        (selectedSources.parentTaskId && !data.selectedParent))),
+  );
+  const canPrepareTasks = Boolean(
+    data?.taskDetailsAvailable && !taskPreparationDenied && !knownTaskLoss,
+  );
   const parentOptions =
-    !parentQuery.error && matches(parentCandidate)
-      ? (parentCandidate?.taskOptions ?? [])
+    !parentQuery.error &&
+    !parentQuery.loading &&
+    matches(parentCandidate) &&
+    parentCandidate?.taskDetailsAvailable
+      ? parentCandidate.taskOptions
       : [];
-  const canManage =
-    data?.canManage === true &&
+  const hasManagementCapability =
     permission.access?.capabilities.some(
       (capability) =>
         capability === 'delivery.manage' || capability === 'workspace.admin',
     ) === true;
+  const managementDenied = ready && !hasManagementCapability;
+  const canManage = data?.canManage === true && hasManagementCapability;
   const startRequest = useFinanceExportRequestGuard(
-    `${permission.scopeKey}:${engagementId}:${linkedPeriodId ?? ''}`,
+    `${scope}:${authorization}:${engagementId}:${linkedPeriodId ?? ''}`,
     canManage,
   );
+  const invalidateTaskPreparation = useCallback(() => {
+    epoch.current += 1;
+    setTaskPreparationDenied(true);
+    setSelectedSources({ taskId: null, parentTaskId: null });
+    setTaskSearch('');
+    setParentSearch('');
+    if (
+      editor?.selection.kind === 'assign' ||
+      editor?.selection.kind === 'remove'
+    ) {
+      setEditor(null);
+      setSaving(false);
+      setError('');
+    }
+    cancelPendingNavigation();
+  }, [editor, cancelPendingNavigation]);
+  useLayoutEffect(() => {
+    if (knownContractLoss && !contractDenied) {
+      epoch.current += 1;
+      setContractDenied(true);
+      setEditor(null);
+      setSelectedSources({ taskId: null, parentTaskId: null });
+      setTaskSearch('');
+      setParentSearch('');
+      setSaving(false);
+      setError('');
+      cancelPendingNavigation();
+    } else if ((managementDenied || (data && !canManage)) && editor) {
+      epoch.current += 1;
+      setEditor(null);
+      setSelectedSources({ taskId: null, parentTaskId: null });
+      setTaskSearch('');
+      setParentSearch('');
+      setSaving(false);
+      setError('');
+      cancelPendingNavigation();
+    } else if (knownTaskLoss && !taskPreparationDenied)
+      invalidateTaskPreparation();
+  }, [
+    knownContractLoss,
+    contractDenied,
+    data,
+    canManage,
+    managementDenied,
+    editor,
+    knownTaskLoss,
+    taskPreparationDenied,
+    cancelPendingNavigation,
+    invalidateTaskPreparation,
+  ]);
+  useLayoutEffect(() => {
+    epoch.current += 1;
+    setSaving(false);
+    return () => {
+      epoch.current += 1;
+    };
+  }, [scope, authorization, engagementId]);
+  useLayoutEffect(() => {
+    const visibleEditor = Boolean(
+      editor && data && canManage && !contractUnavailable,
+    );
+    if (visibleEditor) pendingFocus.current = false;
+    else if (hadEditor.current) pendingFocus.current = true;
+    hadEditor.current = visibleEditor;
+    if (pendingFocus.current && !query.loading && !permission.loading) {
+      pendingFocus.current = false;
+      if (
+        document.activeElement === document.body ||
+        document.activeElement === document.documentElement
+      )
+        (recoveryFocus.current ?? refreshFocus.current)?.focus();
+    }
+  }, [
+    editor,
+    data,
+    canManage,
+    contractUnavailable,
+    query.loading,
+    permission.loading,
+  ]);
+  const refresh = async () => {
+    if (!ready) {
+      await permission.refetch();
+      return;
+    }
+    const started = epoch.current;
+    const result = (await query.refetch()).data?.deliveryCommitments;
+    if (started !== epoch.current || !matches(result))
+      throw new Error(t`Current commitment access could not be verified.`);
+    setContractDenied(false);
+    return result;
+  };
+  const checkTaskAccess = async () => {
+    try {
+      const result = await refresh();
+      if (result?.taskDetailsAvailable) setTaskPreparationDenied(false);
+    } catch {}
+  };
   const selectPeriod = (nextPeriodId: string | null) => {
     const next = commitmentPeriodParams(params, nextPeriodId);
     next.set('clientEngagement', engagementId);
@@ -174,13 +367,28 @@ const CommitmentWorkspace = ({
     SetDeliveryCommitmentPeriodStateMutation,
     SetDeliveryCommitmentPeriodStateMutationVariables
   >(SET_COMMITMENT_PERIOD_STATE);
-  const openEditor = (selection: CommitmentEditorSelection) =>
+  const openEditor = (selection: CommitmentEditorSelection) => {
+    const started = epoch.current;
     requestAction(() => {
-      if (!data) return;
+      if (
+        started !== epoch.current ||
+        !data ||
+        ((selection.kind === 'assign' || selection.kind === 'remove') &&
+          !canPrepareTasks)
+      )
+        return;
+      setSelectedSources({
+        taskId: selection.kind === 'remove' ? selection.taskId : null,
+        parentTaskId: null,
+      });
       setEditor({ selection, key: crypto.randomUUID(), snapshot: data });
       setError('');
     });
-  const changePage = (cursor: string | null, history = false) =>
+  };
+  const changePage = (
+    cursor: string | null,
+    page: 'work' | 'history' | 'orphans' = 'work',
+  ) =>
     requestAction(() => {
       setEditor(null);
       setError('');
@@ -188,9 +396,12 @@ const CommitmentWorkspace = ({
       next.set('clientEngagement', engagementId);
       if (data?.selectedPeriodId)
         next.set('commitmentPeriod', data.selectedPeriodId);
-      const key = history
-        ? 'commitmentHistoryBefore'
-        : 'commitmentAllocationsAfter';
+      const key =
+        page === 'history'
+          ? 'commitmentHistoryBefore'
+          : page === 'orphans'
+            ? 'commitmentOrphansAfter'
+            : 'commitmentAllocationsAfter';
       if (cursor) next.set(key, cursor);
       else next.delete(key);
       setParams(next);
@@ -199,6 +410,11 @@ const CommitmentWorkspace = ({
     const currentAccess = permission.access;
     if (!canManage || saving || !currentAccess) return false;
     const current = startRequest();
+    const started = epoch.current;
+    const taskCommand = command.kind === 'assign' || command.kind === 'remove';
+    if (taskCommand && !canPrepareTasks) return false;
+    const stillCurrent = () =>
+      current() && (!taskCommand || started === epoch.current);
     setSaving(true);
     setError('');
     let result: CommitmentSnapshot | undefined;
@@ -218,7 +434,7 @@ const CommitmentWorkspace = ({
       else
         result = (await setPeriodState({ variables: { input: command.input } }))
           .data?.setDeliveryCommitmentPeriodState;
-      if (!current()) {
+      if (!stillCurrent()) {
         setSaving(false);
         return false;
       }
@@ -233,9 +449,30 @@ const CommitmentWorkspace = ({
           t`The result could not be verified. Refresh before retrying.`,
         );
     } catch (failure) {
-      if (!current()) {
+      if (!stillCurrent()) {
         setSaving(false);
         return false;
+      }
+      if (isCommitmentSourceUnavailable(failure)) {
+        try {
+          const checked = (await query.refetch()).data?.deliveryCommitments;
+          if (!stillCurrent()) {
+            setSaving(false);
+            return false;
+          }
+          if (
+            taskCommand &&
+            matches(checked) &&
+            (!checked?.taskDetailsAvailable ||
+              (selectedSources.taskId && !checked.selectedTask) ||
+              (selectedSources.parentTaskId && !checked.selectedParent))
+          )
+            invalidateTaskPreparation();
+        } catch {}
+        if (!stillCurrent()) {
+          setSaving(false);
+          return false;
+        }
       }
       setError(
         failure instanceof Error
@@ -247,15 +484,17 @@ const CommitmentWorkspace = ({
     }
     const destinationPeriodId = result.selectedPeriodId ?? null;
     setEditor(null);
+    setSelectedSources({ taskId: null, parentTaskId: null });
     if (
       params.get('clientEngagement') !== engagementId ||
       linkedPeriodId !== destinationPeriodId ||
       allocationCursor ||
-      historyCursor
+      historyCursor ||
+      orphanCursor
     ) {
       setSaving(false);
       requestAction(() => {
-        if (current()) selectPeriod(destinationPeriodId);
+        if (stillCurrent()) selectPeriod(destinationPeriodId);
       });
       return true;
     }
@@ -263,9 +502,10 @@ const CommitmentWorkspace = ({
       await query.refetch({
         input: { engagementId, periodId: destinationPeriodId, limit: 30 },
         identity: permission.scopeKey,
+        authorization,
       });
     } catch {
-      if (!current()) return true;
+      if (!stillCurrent()) return true;
       setError(
         t`The change was saved, but the page could not refresh. Refresh before making another change.`,
       );
@@ -311,10 +551,10 @@ const CommitmentWorkspace = ({
           </div>
           <StyledCommitmentActions>
             <StyledDeliveryButton
+              ref={refreshFocus}
               disabled={saving || query.loading}
               onClick={() =>
-                void query
-                  .refetch()
+                void refresh()
                   .then(() => setError(''))
                   .catch(() => undefined)
               }
@@ -346,7 +586,10 @@ const CommitmentWorkspace = ({
                 verified.
               </Trans>
             </p>
-            <StyledDeliveryButton onClick={() => void permission.refetch()}>
+            <StyledDeliveryButton
+              ref={recoveryFocus}
+              onClick={() => void refresh().catch(() => undefined)}
+            >
               <Trans>Check access again</Trans>
             </StyledDeliveryButton>
           </>
@@ -383,7 +626,7 @@ const CommitmentWorkspace = ({
             </Trans>
           </p>
         )}
-        {editor && (
+        {editor && !contractUnavailable && (
           <div hidden={!data || !canManage}>
             <CommitmentEditor
               key={editor.key}
@@ -394,6 +637,7 @@ const CommitmentWorkspace = ({
               moreTaskOptions={data?.moreTaskOptions ?? false}
               moreParentOptions={parentCandidate?.moreTaskOptions ?? false}
               parentSearchFailed={Boolean(parentQuery.error)}
+              saving={saving}
               busy={
                 saving ||
                 query.loading ||
@@ -403,6 +647,7 @@ const CommitmentWorkspace = ({
               }
               taskOptions={data?.taskOptions ?? []}
               parentOptions={parentOptions}
+              onSelectedSources={setSelectedSources}
               onSearch={(value, parents) => {
                 if (parents) {
                   if (value === parentSearch)
@@ -415,27 +660,74 @@ const CommitmentWorkspace = ({
               onSave={save}
               onCancel={() => {
                 setEditor(null);
+                setSelectedSources({ taskId: null, parentTaskId: null });
                 setError('');
               }}
               onReload={async () => {
+                const started = epoch.current;
                 setSaving(true);
                 try {
-                  await query.refetch();
+                  const result = (await query.refetch()).data
+                    ?.deliveryCommitments;
+                  if (started !== epoch.current || !matches(result)) return;
+                  setSelectedSources({ taskId: null, parentTaskId: null });
                   setEditor({ ...editor, key: crypto.randomUUID() });
                   setError('');
                 } catch {
+                  if (started !== epoch.current) return;
                   setError(
                     t`Could not reload the latest plan. Your draft is still here.`,
                   );
                 } finally {
-                  setSaving(false);
+                  if (started === epoch.current) setSaving(false);
                 }
               }}
             />
           </div>
         )}
+        {(allocationCursor || historyCursor || orphanCursor) && !data && (
+          <StyledCommitmentActions>
+            {allocationCursor && (
+              <StyledDeliveryButton onClick={() => changePage(null)}>
+                <Trans>First work page</Trans>
+              </StyledDeliveryButton>
+            )}
+            {historyCursor && (
+              <StyledDeliveryButton onClick={() => changePage(null, 'history')}>
+                <Trans>Latest history</Trans>
+              </StyledDeliveryButton>
+            )}
+            {orphanCursor && (
+              <StyledDeliveryButton onClick={() => changePage(null, 'orphans')}>
+                <Trans>First unavailable-source page</Trans>
+              </StyledDeliveryButton>
+            )}
+          </StyledCommitmentActions>
+        )}
         {data && (
           <>
+            <p>
+              <Trans>
+                Totals cover the full commitment. Linked work and task history
+                show only work you can currently access.
+              </Trans>
+            </p>
+            {!canPrepareTasks && (
+              <div role="status">
+                <p>
+                  {!data.taskDetailsAvailable
+                    ? t`Task details cannot be checked with current access. Contract quantities, period editing and eligible allocation cleanup remain available.`
+                    : t`Private task preparation was cleared because selected work is no longer available. Check task access before linking work again.`}
+                </p>
+                <StyledDeliveryButton
+                  ref={recoveryFocus}
+                  disabled={query.loading}
+                  onClick={() => void checkTaskAccess()}
+                >
+                  <Trans>Check task access</Trans>
+                </StyledDeliveryButton>
+              </div>
+            )}
             {canManage && data.legacyAllowance && (
               <details>
                 <summary>
@@ -588,7 +880,7 @@ const CommitmentWorkspace = ({
                           </div>
                         </StyledCommitmentCounts>
                         <small>
-                          {t`Linked tasks: ${line.assignedQuantity}`}
+                          {t`Assigned work items: ${line.assignedQuantity}`}
                           {line.overdeliveredQuantity > 0
                             ? ` · ${t`${line.overdeliveredQuantity} above the promise`}`
                             : ''}
@@ -602,13 +894,15 @@ const CommitmentWorkspace = ({
             {period && (
               <details>
                 <summary>
-                  <Trans>Linked tasks</Trans>
+                  <Trans>Linked work you can access</Trans>
                 </summary>
                 <StyledDeliveryStack>
                   {canManage && period.state === 'OPEN' && (
                     <StyledCommitmentActions>
                       <StyledDeliveryButton
-                        disabled={saving || !data.lines.length}
+                        disabled={
+                          saving || !canPrepareTasks || !data.lines.length
+                        }
                         onClick={() => openEditor({ kind: 'assign' })}
                       >
                         <Trans>Link a task</Trans>
@@ -617,7 +911,7 @@ const CommitmentWorkspace = ({
                   )}
                   {!data.allocations.length && (
                     <p>
-                      <Trans>No tasks are linked on this page.</Trans>
+                      <Trans>No accessible linked work on this page.</Trans>
                     </p>
                   )}
                   <StyledCommitmentList>
@@ -644,6 +938,16 @@ const CommitmentWorkspace = ({
                             <small>
                               {item.creditReason ?? labels.state(item.state)}
                             </small>
+                            {!item.parentTaskId &&
+                              data.lines.find((line) => line.id === item.lineId)
+                                ?.unit === 'VARIATION' && (
+                                <p>
+                                  <Trans>
+                                    Original video unavailable with current
+                                    access.
+                                  </Trans>
+                                </p>
+                              )}
                             {item.parentTaskId && (
                               <p>
                                 <Trans>Variation of</Trans>{' '}
@@ -657,7 +961,7 @@ const CommitmentWorkspace = ({
                             period.state === 'OPEN' &&
                             item.state !== 'REMOVED' && (
                               <StyledDeliveryButton
-                                disabled={saving}
+                                disabled={saving || !canPrepareTasks}
                                 onClick={() =>
                                   openEditor({
                                     kind: 'remove',
@@ -701,7 +1005,7 @@ const CommitmentWorkspace = ({
                 <StyledDeliveryStack>
                   {!data.history.length && (
                     <p>
-                      <Trans>No recorded changes on this page.</Trans>
+                      <Trans>No accessible history on this page.</Trans>
                     </p>
                   )}
                   <StyledCommitmentList>
@@ -747,7 +1051,7 @@ const CommitmentWorkspace = ({
                     {historyCursor && (
                       <StyledDeliveryButton
                         disabled={query.loading}
-                        onClick={() => changePage(null, true)}
+                        onClick={() => changePage(null, 'history')}
                       >
                         <Trans>Latest history</Trans>
                       </StyledDeliveryButton>
@@ -756,7 +1060,7 @@ const CommitmentWorkspace = ({
                       <StyledDeliveryButton
                         disabled={query.loading}
                         onClick={() =>
-                          changePage(data.nextHistoryCursor ?? null, true)
+                          changePage(data.nextHistoryCursor ?? null, 'history')
                         }
                       >
                         <Trans>Older history</Trans>
@@ -768,6 +1072,26 @@ const CommitmentWorkspace = ({
             )}
           </>
         )}
+        <CommitmentOrphanCleanup
+          data={data}
+          identity={identity}
+          owner={permission.access}
+          engagementId={engagementId}
+          canManage={canManage}
+          denied={
+            contractUnavailable ||
+            managementDenied ||
+            Boolean(data && !canManage)
+          }
+          cursor={orphanCursor}
+          onPrepare={() => {
+            setEditor(null);
+            setError('');
+          }}
+          onPage={(cursor) => changePage(cursor, 'orphans')}
+          onChanged={refresh}
+          editorOpen={Boolean(editor)}
+        />
       </StyledDeliveryStack>
     </StyledDeliveryCard>
   );

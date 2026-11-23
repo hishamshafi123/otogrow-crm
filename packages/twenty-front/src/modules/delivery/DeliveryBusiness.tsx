@@ -1,3 +1,4 @@
+import { StyledFinanceCashOverview } from '@/delivery/finance/financeStyles';
 import { DeliveryReceivableBalance } from '@/delivery/finance/DeliveryReceivableBalance';
 import { financePaymentDestination } from '@/delivery/finance/finance-payment-destination';
 import { useReconciliationLabels } from '@/delivery/finance/useReconciliationLabels';
@@ -134,6 +135,8 @@ const BusinessWorkspace = ({
   if (available && candidate !== lastVerifiedData)
     setLastVerifiedData(candidate);
   const data = available ? candidate : lastVerifiedData;
+  const Overview =
+    view === 'finance' ? StyledFinanceCashOverview : StyledDeliveryCard;
   const canReadFinance =
     permission.canReadFinance && data?.financeAccess.read === true;
   const canManageFinance =
@@ -278,7 +281,7 @@ const BusinessWorkspace = ({
       )}
       <StyledBusinessBoundary hidden={!available} disabled={!available}>
         <StyledDeliveryStack>
-          <StyledDeliveryCard>
+          <Overview>
             <StyledDeliveryStack>
               <StyledDeliveryRow>
                 <h2>
@@ -307,6 +310,7 @@ const BusinessWorkspace = ({
                       <StyledDeliveryButton
                         key={kind}
                         disabled={editing !== null}
+                        data-primary={view === 'finance' ? 'true' : undefined}
                         onClick={() =>
                           requestAction(() => setEditing({ kind }))
                         }
@@ -315,7 +319,10 @@ const BusinessWorkspace = ({
                       </StyledDeliveryButton>
                     ))}
                   {view === 'finance' && canReadFinance && (
-                    <StyledDeliveryButton onClick={exportFinance}>
+                    <StyledDeliveryButton
+                      data-variant="quiet"
+                      onClick={exportFinance}
+                    >
                       <Trans>Download financial CSV</Trans>
                     </StyledDeliveryButton>
                   )}
@@ -523,14 +530,6 @@ const BusinessWorkspace = ({
                       may be incomplete and do not confirm available cash.
                     </Trans>
                   </p>
-                  <StyledDeliveryRow>
-                    <Link to="/delivery?view=finance&financeView=forecast">
-                      <Trans>Open reviewed cash forecast</Trans>
-                    </Link>
-                    <Link to="/delivery?view=finance&financeView=exports">
-                      <Trans>Accounting exports</Trans>
-                    </Link>
-                  </StyledDeliveryRow>
                   <details>
                     <summary>
                       <Trans>How these figures are calculated</Trans>
@@ -564,10 +563,7 @@ const BusinessWorkspace = ({
                 </>
               )}
             </StyledDeliveryStack>
-          </StyledDeliveryCard>
-          {view === 'finance' && canReadFinance && (
-            <DeliveryRevisionCosts workspace={workspace} />
-          )}
+          </Overview>
           {(error || query.error) && (
             <p role="alert">{error || query.error?.message}</p>
           )}
@@ -588,77 +584,6 @@ const BusinessWorkspace = ({
               onOpenTask={onOpenTask}
             />
           )}
-          {view === 'finance' &&
-            data?.finance.map((summary) => (
-              <StyledDeliveryCard key={summary.currency}>
-                <StyledDeliveryStack>
-                  <h3>
-                    {summary.currency} ·{' '}
-                    <Trans>Historical cash estimates</Trans>
-                  </h3>
-                  <StyledDeliveryGrid>
-                    {[
-                      [t`Historical recorded balance`, summary.cash],
-                      [t`Recorded receivables`, summary.receivables],
-                      [t`Recorded overdue amount`, summary.overdue],
-                      [
-                        t`Recorded receipts · trailing 30 days`,
-                        summary.income30,
-                      ],
-                      [t`Recorded costs · trailing 30 days`, summary.expense30],
-                      [
-                        t`Estimated net burn · trailing 30 days`,
-                        summary.netBurn,
-                      ],
-                    ].map(([label, amount]) => (
-                      <div key={String(label)}>
-                        <small>{label}</small>
-                        <h2>{formatMoney(Number(amount), summary.currency)}</h2>
-                      </div>
-                    ))}
-                  </StyledDeliveryGrid>
-                  <p>
-                    <Trans>Historical runway estimate</Trans>:{' '}
-                    {summary.runwayMonths === null
-                      ? t`Not estimated: no recorded net burn in the trailing 30 days`
-                      : t`${summary.runwayMonths.toFixed(1)} months (30-day burn basis)`}
-                  </p>
-                  <p>
-                    <Trans>Recorded receipts change · 30-day comparison</Trans>:{' '}
-                    {summary.revenueGrowth === null
-                      ? '—'
-                      : `${(summary.revenueGrowth * 100).toFixed(1)}%`}{' '}
-                    · <Trans>Recorded costs change · 30-day comparison</Trans>:{' '}
-                    {summary.spendingGrowth === null
-                      ? '—'
-                      : `${(summary.spendingGrowth * 100).toFixed(1)}%`}
-                  </p>
-                  {summary.projects.map((project) => (
-                    <div key={project.projectId ?? 'shared'}>
-                      <strong>
-                        {(view === 'finance'
-                          ? financeProjects
-                          : workspace.projects
-                        ).find(
-                          (candidate) => candidate.id === project.projectId,
-                        )?.name ?? t`Shared / unallocated`}
-                      </strong>
-                      <p>
-                        {t`Recorded cash contribution · trailing 30 days`}:{' '}
-                        {formatMoney(
-                          project.cashContribution,
-                          summary.currency,
-                        )}{' '}
-                        · {t`Recorded cash contribution margin`}:{' '}
-                        {project.margin === null
-                          ? '—'
-                          : `${(project.margin * 100).toFixed(1)}%`}
-                      </p>
-                    </div>
-                  ))}
-                </StyledDeliveryStack>
-              </StyledDeliveryCard>
-            ))}
           {editing &&
             (editing.kind !== 'FINANCE' || !available || canManageFinance) && (
               <BusinessForm
@@ -783,6 +708,80 @@ const BusinessWorkspace = ({
                 t`No work items in this view.`
               )}
             </p>
+          )}
+          {view === 'finance' &&
+            data?.finance.map((summary) => (
+              <StyledDeliveryCard key={summary.currency}>
+                <StyledDeliveryStack>
+                  <h3>
+                    {summary.currency} ·{' '}
+                    <Trans>Historical cash estimates</Trans>
+                  </h3>
+                  <StyledDeliveryGrid>
+                    {[
+                      [t`Historical recorded balance`, summary.cash],
+                      [t`Recorded receivables`, summary.receivables],
+                      [t`Recorded overdue amount`, summary.overdue],
+                      [
+                        t`Recorded receipts · trailing 30 days`,
+                        summary.income30,
+                      ],
+                      [t`Recorded costs · trailing 30 days`, summary.expense30],
+                      [
+                        t`Estimated net burn · trailing 30 days`,
+                        summary.netBurn,
+                      ],
+                    ].map(([label, amount]) => (
+                      <div key={String(label)}>
+                        <small>{label}</small>
+                        <h2>{formatMoney(Number(amount), summary.currency)}</h2>
+                      </div>
+                    ))}
+                  </StyledDeliveryGrid>
+                  <p>
+                    <Trans>Historical runway estimate</Trans>:{' '}
+                    {summary.runwayMonths === null
+                      ? t`Not estimated: no recorded net burn in the trailing 30 days`
+                      : t`${summary.runwayMonths.toFixed(1)} months (30-day burn basis)`}
+                  </p>
+                  <p>
+                    <Trans>Recorded receipts change · 30-day comparison</Trans>:{' '}
+                    {summary.revenueGrowth === null
+                      ? '—'
+                      : `${(summary.revenueGrowth * 100).toFixed(1)}%`}{' '}
+                    · <Trans>Recorded costs change · 30-day comparison</Trans>:{' '}
+                    {summary.spendingGrowth === null
+                      ? '—'
+                      : `${(summary.spendingGrowth * 100).toFixed(1)}%`}
+                  </p>
+                  {summary.projects.map((project) => (
+                    <div key={project.projectId ?? 'shared'}>
+                      <strong>
+                        {(view === 'finance'
+                          ? financeProjects
+                          : workspace.projects
+                        ).find(
+                          (candidate) => candidate.id === project.projectId,
+                        )?.name ?? t`Shared / unallocated`}
+                      </strong>
+                      <p>
+                        {t`Recorded cash contribution · trailing 30 days`}:{' '}
+                        {formatMoney(
+                          project.cashContribution,
+                          summary.currency,
+                        )}{' '}
+                        · {t`Recorded cash contribution margin`}:{' '}
+                        {project.margin === null
+                          ? '—'
+                          : `${(project.margin * 100).toFixed(1)}%`}
+                      </p>
+                    </div>
+                  ))}
+                </StyledDeliveryStack>
+              </StyledDeliveryCard>
+            ))}
+          {view === 'finance' && canReadFinance && (
+            <DeliveryRevisionCosts workspace={workspace} />
           )}
           {selected && !item && (
             <StyledDeliveryCard>
@@ -1566,11 +1565,19 @@ const BusinessForm = ({
                   name="currency"
                   defaultValue={String(initial?.currency ?? 'USD')}
                 >
-                  {['USD', 'AED', 'EUR', 'GBP', 'INR', 'SGD', 'AUD', 'CAD'].map(
-                    (currency) => (
-                      <option key={currency}>{currency}</option>
-                    ),
-                  )}
+                  {[
+                    'INR',
+                    'USD',
+                    'QAR',
+                    'AED',
+                    'EUR',
+                    'GBP',
+                    'SGD',
+                    'AUD',
+                    'CAD',
+                  ].map((currency) => (
+                    <option key={currency}>{currency}</option>
+                  ))}
                 </select>
               </label>
             )}

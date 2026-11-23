@@ -16,7 +16,7 @@ const renderHookConfig = {
 };
 
 describe('useGoToHotkeys', () => {
-  it('should navigate on hotkey trigger', () => {
+  it('does not navigate on legacy unmodified letter sequences', () => {
     const { result } = renderHook(() => {
       useGoToHotkeys({ key: 'a', location: '/three' });
 
@@ -37,6 +37,6 @@ describe('useGoToHotkeys', () => {
       fireEvent.keyDown(document, { key: 'a', code: 'KeyA' });
     });
 
-    expect(result.current.pathname).toBe('/three');
+    expect(result.current.pathname).toBe('/two');
   });
 });

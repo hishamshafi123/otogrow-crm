@@ -43,6 +43,7 @@ export const deliveryReviewAuthority = (input: {
     'revision' | 'mode' | 'reviewerId'
   > | null;
   projectMemberIds: string[];
+  allowSelfReview?: boolean;
   access: Pick<OtogrowAccess, 'memberId' | 'capabilities'>[];
   actorId: string;
 }) => {
@@ -66,7 +67,7 @@ export const deliveryReviewAuthority = (input: {
   );
   const reviewerState = !chosen
     ? 'UNASSIGNED'
-    : effectiveReviewerId === input.assigneeId
+    : effectiveReviewerId === input.assigneeId && input.allowSelfReview !== true
       ? 'SELF_REVIEW'
       : !effectiveReviewerId || !eligible
         ? 'UNAVAILABLE'

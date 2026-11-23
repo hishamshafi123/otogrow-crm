@@ -32,7 +32,18 @@ export const servicePlanServices = (value: string) =>
     .map((service) => service.trim())
     .filter(Boolean);
 export const servicePlanValues = (
-  initial: ClientEngagement | null,
+  initial:
+    | (Pick<
+        ClientEngagement,
+        | 'projectId'
+        | 'name'
+        | 'services'
+        | 'scope'
+        | 'allowance'
+        | 'contact'
+        | 'advertising'
+      > & { billing: string })
+    | null,
 ): ServicePlanValues => ({
   projectId: initial?.projectId ?? '',
   name: initial?.name ?? '',

@@ -62,6 +62,7 @@ jest.mock('@/delivery/deliveryStyles', () => ({
   StyledDeliveryDrawer: 'dialog',
   StyledDeliveryRow: 'div',
   StyledDeliveryStack: 'div',
+  StyledDeliveryToolbar: 'div',
   StyledDeliveryGrid: 'div',
   StyledDeliveryBadge: 'span',
   StyledDeliveryBoard: 'div',
@@ -691,6 +692,70 @@ it('renders full counts and bounded summaries without reading any legacy workspa
   expect(mockMutate).not.toHaveBeenCalled();
   expect(mockSeen).not.toHaveBeenCalled();
 });
+it.each([
+  ['Due today: show today’s work', 'Due today', '20', null, 'today'],
+  ['Overdue: see overdue work', 'Overdue', '8', null, 'overdue'],
+  ['Blocked: see blockers', 'Blocked', '3', 'BLOCKED', null],
+] as const)(
+  'opens the matching work selection from the %s metric',
+  async (name, label, count, status, attention) => {
+    const router = setup(
+      '/delivery?view=home&search=old&status=PLANNED&tasksAfter=old&taskTimezone=Asia%2FQatar',
+    );
+    const user = userEvent.setup();
+    const link = screen.getByRole('link', { name });
+    expect(within(link).getByText(label)).toBeVisible();
+    expect(within(link).getByText(count)).toBeVisible();
+    expect(link).toHaveAccessibleDescription(count);
+    await user.click(link);
+    const params = new URLSearchParams(router.state.location.search);
+    expect(params.get('view')).toBe('home');
+    expect(params.get('status')).toBe(status);
+    expect(params.get('attention')).toBe(attention);
+    expect(params.get('taskTimezone')).toBe('Asia/Qatar');
+    expect(params.has('search')).toBe(false);
+    expect(params.has('tasksAfter')).toBe(false);
+  },
+);
+it('keeps independent reviews when production is empty without showing a wall of zero metrics', () => {
+  mockList = {
+    ...mockList,
+    items: [],
+    totalCount: 0,
+    nextCursor: null,
+    overview: {
+      totalCount: 0,
+      approvedCount: 0,
+      blockedCount: 0,
+      overdueCount: 0,
+      reviewCount: 0,
+      dueTodayCount: 0,
+    },
+  };
+  setup('/delivery?view=home&taskTimezone=Asia%2FQatar');
+  expect(
+    screen.getByRole('heading', { name: 'No work assigned yet' }),
+  ).toBeVisible();
+  expect(
+    screen.getByText('Independent current assigned review count'),
+  ).toBeVisible();
+  expect(
+    screen.queryByRole('link', { name: 'Due today: show today’s work' }),
+  ).not.toBeInTheDocument();
+});
+it('distinguishes a filtered empty selection from an empty workspace', () => {
+  mockList = { ...mockList, items: [], totalCount: 0, nextCursor: null };
+  setup('/delivery?view=home&search=no-match&taskTimezone=Asia%2FQatar');
+  expect(
+    screen.getByRole('heading', { name: 'No matching tasks' }),
+  ).toBeVisible();
+  expect(
+    screen.getByRole('link', { name: 'Due today: show today’s work' }),
+  ).toBeVisible();
+  expect(
+    screen.queryByRole('heading', { name: 'No work assigned yet' }),
+  ).not.toBeInTheDocument();
+});
 it('resolves a staff default entry to My tasks without hydrating a legacy snapshot', async () => {
   mockManager = false;
   mockAccess = { ...mockAccess, capabilities: [], nativeAdministrator: false };
@@ -1074,6 +1139,41 @@ it('links specialized creative production explicitly while preserving this exact
   expect(new URLSearchParams(router.state.location.search).get('panel')).toBe(
     'creative',
   );
+});
+it('guards a mobile task-section change and retains exact task context', async () => {
+  mockMobile = true;
+  const router = setup(
+    `/delivery?view=mine&taskTimezone=Asia%2FQatar&task=${TASK_ID}`,
+  );
+  const user = userEvent.setup();
+  await user.type(screen.getByLabelText('Task draft'), 'Keep this task note');
+  await user.selectOptions(
+    screen.getByRole('combobox', { name: 'Task section' }),
+    'creative',
+  );
+  expect(
+    screen.getByRole('dialog', { name: 'Keep your changes?' }),
+  ).toBeVisible();
+  await user.click(screen.getByRole('button', { name: 'Keep editing' }));
+  expect(screen.getByLabelText('Task draft')).toHaveValue(
+    'Keep this task note',
+  );
+  expect(screen.getByRole('combobox', { name: 'Task section' })).toHaveValue(
+    'task',
+  );
+  await user.selectOptions(
+    screen.getByRole('combobox', { name: 'Task section' }),
+    'creative',
+  );
+  await user.click(
+    screen.getByRole('button', { name: 'Discard and continue' }),
+  );
+  const params = new URLSearchParams(router.state.location.search);
+  expect(params.get('panel')).toBe('creative');
+  expect(params.get('task')).toBe(TASK_ID);
+  expect(
+    screen.getByRole('link', { name: 'Open creative production' }),
+  ).toBeVisible();
 });
 it('records the exact native assignment seen only after its verified recipient card becomes visible', async () => {
   jest.useFakeTimers();

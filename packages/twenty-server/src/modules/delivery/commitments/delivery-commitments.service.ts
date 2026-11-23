@@ -6,10 +6,16 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource, type EntityManager } from 'typeorm';
+import { DataSource, QueryFailedError, type EntityManager } from 'typeorm';
 import { z } from 'zod';
 import { WorkspaceEntity } from 'src/engine/core-modules/workspace/workspace.entity';
 import { DeliveryService } from 'src/modules/delivery/delivery.service';
+import { DeliveryNativeTaskAccessService } from 'src/modules/delivery/delivery-native-task-access.service';
+import {
+  DeliveryNativeTaskPermissionDeniedException,
+  type DeliveryNativeTaskVisibility,
+} from 'src/modules/delivery/native-task-visibility';
+import { financeReviewToken } from 'src/modules/delivery/finance/delivery-finance-reconciliation.policy';
 import { canAccessDeliveryProject } from 'src/modules/delivery/delivery-policy';
 import { type DeliveryDetails } from 'src/modules/delivery/delivery.types';
 import { DeliveryProjectEntity } from 'src/modules/delivery/entities/delivery-project.entity';
@@ -31,14 +37,20 @@ import {
   commitmentPeriodSchema,
   commitmentPeriodStateSchema,
   commitmentRemoveSchema,
+  commitmentOrphanCleanupSchema,
   commitmentsInputSchema,
   type CommitmentChange,
 } from 'src/modules/delivery/commitments/delivery-commitments.types';
 import {
   type DeliveryCommitmentsDTO,
   type DeliveryCommitmentLineDTO,
+  type DeliveryCommitmentTaskOptionDTO,
+  type DeliveryCommitmentOrphanCleanupResultDTO,
 } from 'src/modules/delivery/commitments/delivery-commitments.dto';
-import { commitmentCredit } from 'src/modules/delivery/commitments/delivery-commitments.policy';
+import {
+  commitmentCredit,
+  commitmentCleanupRequestHash,
+} from 'src/modules/delivery/commitments/delivery-commitments.policy';
 import {
   recordDeliveryCommitment,
   syncDeliveryCommitment,
@@ -49,6 +61,7 @@ type Context = {
   operations: DeliveryOperations;
   engagement: ClientEngagement;
   canManage: boolean;
+  policyScope: string;
 };
 type AllocationWithTask = DeliveryCommitmentAllocationEntity & {
   liveDetails: Pick<DeliveryDetails, 'state' | 'submissions'> | null;
@@ -66,10 +79,11 @@ const parseInput = <TOutput>(
 };
 const cursorSchema = z
   .object({
-    version: z.literal(1),
+    version: z.literal(2),
+    scope: z.string().regex(/^[a-f0-9]{64}$/),
     workspaceId: z.uuid(),
     periodId: z.uuid(),
-    kind: z.enum(['allocations', 'history']),
+    kind: z.enum(['allocations', 'history', 'orphans']),
     id: z.uuid(),
     at: z.iso.datetime().optional(),
   })
@@ -80,7 +94,8 @@ const decodeCursor = (
   value: string | null | undefined,
   workspaceId: string,
   periodId: string,
-  kind: 'allocations' | 'history',
+  kind: 'allocations' | 'history' | 'orphans',
+  scope: string,
 ) => {
   if (!value) return null;
   try {
@@ -89,6 +104,7 @@ const decodeCursor = (
     );
     if (
       parsed.workspaceId !== workspaceId ||
+      parsed.scope !== scope ||
       parsed.periodId !== periodId ||
       parsed.kind !== kind ||
       (kind === 'history' && !parsed.at)
@@ -96,8 +112,8 @@ const decodeCursor = (
       throw new Error();
     return parsed;
   } catch {
-    throw new BadRequestException(
-      'Invalid commitment page. Refresh this period.',
+    throw new ConflictException(
+      'Commitment page access changed. Return to the first page of this period.',
     );
   }
 };
@@ -118,6 +134,7 @@ export class DeliveryCommitmentsService {
   constructor(
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly delivery: DeliveryService,
+    private readonly nativeTasks: DeliveryNativeTaskAccessService,
   ) {}
 
   private async scope(
@@ -160,7 +177,24 @@ export class DeliveryCommitmentsService {
       [engagement.companyId],
     );
     if (!companies.length) throw new NotFoundException('Client not found.');
-    return { manager, operations, engagement, canManage: actor.isManager };
+    return {
+      manager,
+      operations,
+      engagement,
+      canManage: actor.isManager,
+      policyScope: financeReviewToken({
+        workspaceId: workspace.id,
+        memberId,
+        userWorkspaceId,
+        engagementId,
+        projectId: project.id,
+        companyId: project.companyId,
+        projectRevision: project.revision,
+        memberIds: [...project.memberIds].sort(),
+        capabilities: [...actor.capabilities].sort(),
+        roleIds: [...actor.roleIds].sort(),
+      }),
+    };
   }
 
   async engagements(
@@ -352,6 +386,61 @@ export class DeliveryCommitmentsService {
     };
   }
 
+  private async taskVisibility(
+    workspace: WorkspaceEntity,
+    manager: EntityManager,
+    memberId: string,
+    userWorkspaceId: string,
+  ) {
+    try {
+      return await this.nativeTasks.visibility(
+        manager,
+        workspace,
+        { memberId, userWorkspaceId },
+        ['id', 'title'],
+      );
+    } catch (error) {
+      if (error instanceof DeliveryNativeTaskPermissionDeniedException)
+        return null;
+      throw error;
+    }
+  }
+
+  private taskPredicate(
+    workspace: WorkspaceEntity,
+    visibility: DeliveryNativeTaskVisibility,
+    taskIdSql: string,
+    projectIdSql: string,
+  ) {
+    return `${this.nativeTasks.predicate(workspace, visibility, taskIdSql)} AND EXISTS (SELECT 1 FROM core."deliveryTask" commitmentTask WHERE commitmentTask."workspaceId"=$1 AND commitmentTask."taskId"=${taskIdSql} AND commitmentTask."projectId"=${projectIdSql})`;
+  }
+
+  private orphanPredicate(workspace: WorkspaceEntity) {
+    return `NOT EXISTS (SELECT 1 FROM ${this.delivery.schema(workspace)}.task orphanNative WHERE orphanNative.id=a."taskId" AND orphanNative."deletedAt" IS NULL) OR EXISTS (SELECT 1 FROM core."deliveryTask" orphanManaged WHERE orphanManaged."workspaceId"=a."workspaceId" AND orphanManaged."taskId"=a."taskId" AND orphanManaged."projectId"<>$2::uuid)`;
+  }
+
+  private async taskOptions(
+    workspace: WorkspaceEntity,
+    context: Context,
+    visibility: DeliveryNativeTaskVisibility | null,
+    search: string,
+    selectedId?: string | null,
+  ): Promise<DeliveryCommitmentTaskOptionDTO[]> {
+    if (!context.canManage || !visibility) return [];
+    return this.nativeTasks.query(
+      context.manager,
+      `SELECT d."taskId",t.title AS name,d.revision AS "taskRevision",d.details->>'state' AS state,COALESCE(a.revision,0) AS "allocationRevision",CASE WHEN a.state<>'REMOVED' THEN a."periodId" END AS "allocatedPeriodId",CASE WHEN a.state<>'REMOVED' THEN a."lineId" END AS "allocatedLineId",CASE WHEN a.state<>'REMOVED' THEN l.unit END AS "allocatedUnit" FROM core."deliveryTask" d JOIN ${this.delivery.schema(workspace)}.task t ON t.id=d."taskId" AND t."deletedAt" IS NULL LEFT JOIN core."deliveryCommitmentAllocation" a ON a."workspaceId"=d."workspaceId" AND a."taskId"=d."taskId" LEFT JOIN core."deliveryCommitmentPeriod" p ON p.id=a."periodId" AND p."workspaceId"=a."workspaceId" LEFT JOIN core."deliveryCommitmentLine" l ON l.id=a."lineId" AND l."workspaceId"=a."workspaceId" WHERE d."workspaceId"=$1 AND d."projectId"=$2 AND ($3='' OR strpos(lower(t.title),lower($3))>0) AND (a.id IS NULL OR p."engagementId"=$4) AND ($5::uuid IS NULL OR d."taskId"=$5::uuid) AND ${this.nativeTasks.predicate(workspace, visibility, 'd."taskId"')} ORDER BY t.title,d."taskId" LIMIT 101`,
+      [
+        workspace.id,
+        context.engagement.projectId,
+        search,
+        context.engagement.id,
+        selectedId ?? null,
+      ],
+      visibility,
+    );
+  }
+
   private async read(
     workspace: WorkspaceEntity,
     memberId: string,
@@ -360,13 +449,23 @@ export class DeliveryCommitmentsService {
     context: Context,
   ): Promise<DeliveryCommitmentsDTO> {
     const { manager, operations, engagement, canManage } = context;
+    const visibility = await this.taskVisibility(
+      workspace,
+      manager,
+      memberId,
+      userWorkspaceId,
+    );
+    const pageScope = financeReviewToken([
+      context.policyScope,
+      visibility?.fingerprint ?? 'PERMISSION_DENIED',
+    ]);
     const periods = await this.periods(manager, workspace.id, engagement);
     const period = input.periodId
       ? periods.find((item) => item.id === input.periodId)
       : periods[0];
     if (input.periodId && !period)
       throw new NotFoundException('Commitment period not found.');
-    const base = {
+    const base: DeliveryCommitmentsDTO = {
       workspaceId: workspace.id,
       memberId,
       userWorkspaceId,
@@ -374,6 +473,7 @@ export class DeliveryCommitmentsService {
       engagementName: engagement.name,
       projectId: engagement.projectId,
       canManage,
+      taskDetailsAvailable: visibility !== null,
       legacyAllowance: canManage ? engagement.allowance : null,
       selectedPeriodId: period?.id ?? null,
       periods: periods.map((item) => this.periodDTO(item)),
@@ -381,8 +481,12 @@ export class DeliveryCommitmentsService {
       allocations: [],
       history: [],
       taskOptions: [],
+      orphanAllocations: [],
+      selectedTask: null,
+      selectedParent: null,
       moreTaskOptions: false,
       nextAllocationCursor: null,
+      nextOrphanAllocationCursor: null,
       nextHistoryCursor: null,
     };
     if (!period) return base;
@@ -391,12 +495,21 @@ export class DeliveryCommitmentsService {
       workspace.id,
       period.id,
       'allocations',
+      pageScope,
     );
     const historyCursor = decodeCursor(
       input.historyCursor,
       workspace.id,
       period.id,
       'history',
+      pageScope,
+    );
+    const orphanCursor = decodeCursor(
+      input.orphanAllocationCursor,
+      workspace.id,
+      period.id,
+      'orphans',
+      context.policyScope,
     );
     const limit = input.limit ?? 50;
     const lines = await manager
@@ -410,57 +523,112 @@ export class DeliveryCommitmentsService {
       manager,
       period.id,
     );
-    const page = allocations
-      .filter((item) => !allocationCursor || item.id > allocationCursor.id)
-      .slice(0, limit + 1);
-    const visible = page.slice(0, limit);
+    const completeAllocations = new Map(
+      allocations.map((item) => [item.id, item]),
+    );
     const fulfilments = new Map(
       operations.fulfilments.map((item) => [item.taskId, item]),
     );
-    const historyQuery = manager
-      .getRepository(DeliveryCommitmentEventEntity)
-      .createQueryBuilder('event')
-      .where(
-        'event."workspaceId"=:workspaceId AND event."periodId"=:periodId',
-        { workspaceId: workspace.id, periodId: period.id },
-      )
-      .orderBy('event.createdAt', 'DESC')
-      .addOrderBy('event.id', 'DESC')
-      .take(limit + 1);
-    if (historyCursor)
-      historyQuery.andWhere(
-        '(event."createdAt",event.id)<(:at::timestamptz,:id::uuid)',
-        { at: historyCursor.at, id: historyCursor.id },
-      );
-    const history = canManage ? await historyQuery.getMany() : [];
-    type TaskOption = {
-      taskId: string;
-      name: string;
-      taskRevision: number;
-      state: string;
-      allocationRevision: number;
-      allocatedPeriodId: string | null;
-      allocatedLineId: string | null;
-      allocatedUnit: string | null;
-    };
-    const tasks: TaskOption[] = canManage
-      ? await manager.query(
-          `SELECT d."taskId",t.title AS name,d.revision AS "taskRevision",d.details->>'state' AS state,COALESCE(a.revision,0) AS "allocationRevision",CASE WHEN a.state<>'REMOVED' THEN a."periodId" END AS "allocatedPeriodId",CASE WHEN a.state<>'REMOVED' THEN a."lineId" END AS "allocatedLineId",CASE WHEN a.state<>'REMOVED' THEN l.unit END AS "allocatedUnit" FROM core."deliveryTask" d JOIN ${this.delivery.schema(workspace)}.task t ON t.id=d."taskId" AND t."deletedAt" IS NULL LEFT JOIN core."deliveryCommitmentAllocation" a ON a."workspaceId"=d."workspaceId" AND a."taskId"=d."taskId" LEFT JOIN core."deliveryCommitmentPeriod" p ON p.id=a."periodId" AND p."workspaceId"=a."workspaceId" LEFT JOIN core."deliveryCommitmentLine" l ON l.id=a."lineId" AND l."workspaceId"=a."workspaceId" WHERE d."workspaceId"=$1 AND d."projectId"=$2 AND ($3='' OR strpos(lower(t.title),lower($3))>0) AND (a.id IS NULL OR p."engagementId"=$4) ORDER BY t.title,d."taskId" LIMIT 101`,
+    const page = visibility
+      ? await this.nativeTasks.query<
+          {
+            id: string;
+            taskName: string;
+            parentTaskId: string | null;
+          }[]
+        >(
+          manager,
+          `SELECT a.id,t.title AS "taskName",CASE WHEN a."parentTaskId" IS NOT NULL AND (${this.taskPredicate(workspace, visibility, 'a."parentTaskId"', '$2::uuid')}) THEN a."parentTaskId" ELSE NULL END AS "parentTaskId" FROM core."deliveryCommitmentAllocation" a JOIN ${this.delivery.schema(workspace)}.task t ON t.id=a."taskId" WHERE a."workspaceId"=$1 AND a."periodId"=$3 AND ($4::uuid IS NULL OR a.id>$4::uuid) AND (${this.taskPredicate(workspace, visibility, 'a."taskId"', '$2::uuid')}) ORDER BY a.id LIMIT $5`,
           [
             workspace.id,
             engagement.projectId,
-            input.taskSearch ?? '',
-            engagement.id,
+            period.id,
+            allocationCursor?.id ?? null,
+            limit + 1,
+          ],
+          visibility,
+        )
+      : [];
+    const visible = page.slice(0, limit);
+    const parentValue = `CASE WHEN parent.value ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN parent.value::uuid ELSE NULL END`;
+    const historyPredicate = visibility
+      ? `(event."taskId" IS NULL OR (${this.taskPredicate(workspace, visibility, 'event."taskId"', '$2::uuid')})) AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(event.changes) change CROSS JOIN LATERAL (VALUES (change->>'before'),(change->>'after')) parent(value) WHERE change->>'field'='parentTaskId' AND parent.value IS NOT NULL AND NOT (${this.taskPredicate(workspace, visibility, parentValue, '$2::uuid')}))`
+      : `event."taskId" IS NULL AND $2::uuid IS NOT NULL AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(event.changes) change WHERE change->>'field'='parentTaskId' AND (change->>'before' IS NOT NULL OR change->>'after' IS NOT NULL))`;
+    const historySql = `SELECT event.* FROM core."deliveryCommitmentEvent" event WHERE event."workspaceId"=$1 AND event."periodId"=$3 AND ($4::timestamptz IS NULL OR (event."createdAt",event.id)<($4::timestamptz,$5::uuid)) AND (${historyPredicate}) ORDER BY event."createdAt" DESC,event.id DESC LIMIT $6`;
+    const historyParameters = [
+      workspace.id,
+      engagement.projectId,
+      period.id,
+      historyCursor?.at ?? null,
+      historyCursor?.id ?? null,
+      limit + 1,
+    ];
+    const history: DeliveryCommitmentEventEntity[] = !canManage
+      ? []
+      : visibility
+        ? await this.nativeTasks.query(
+            manager,
+            historySql,
+            historyParameters,
+            visibility,
+          )
+        : await manager.query(historySql, historyParameters);
+    const orphans: (DeliveryCommitmentAllocationEntity & {
+      hasChildren: boolean;
+    })[] = canManage
+      ? await manager.query(
+          `SELECT a.*,EXISTS (SELECT 1 FROM core."deliveryCommitmentAllocation" child WHERE child."workspaceId"=a."workspaceId" AND child."parentTaskId"=a."taskId" AND child.state<>'REMOVED') AS "hasChildren" FROM core."deliveryCommitmentAllocation" a WHERE a."workspaceId"=$1 AND a."periodId"=$3 AND a.state<>'REMOVED' AND ($4::uuid IS NULL OR a.id>$4::uuid) AND (${this.orphanPredicate(workspace)}) ORDER BY a.id LIMIT $5`,
+          [
+            workspace.id,
+            engagement.projectId,
+            period.id,
+            orphanCursor?.id ?? null,
+            limit + 1,
           ],
         )
       : [];
-    const lastAllocation = visible[visible.length - 1];
+    const tasks = await this.taskOptions(
+      workspace,
+      context,
+      visibility,
+      input.taskSearch ?? '',
+    );
+    const selectedTask = input.selectedTaskId
+      ? ((
+          await this.taskOptions(
+            workspace,
+            context,
+            visibility,
+            '',
+            input.selectedTaskId,
+          )
+        )[0] ?? null)
+      : null;
+    const selectedParent = input.selectedParentTaskId
+      ? ((
+          await this.taskOptions(
+            workspace,
+            context,
+            visibility,
+            '',
+            input.selectedParentTaskId,
+          )
+        )[0] ?? null)
+      : null;
     const visibleHistory = history.slice(0, limit);
+    const visibleOrphans = orphans.slice(0, limit);
+    const lastAllocation = visible[visible.length - 1];
     const lastEvent = visibleHistory[visibleHistory.length - 1];
+    const lastOrphan = visibleOrphans[visibleOrphans.length - 1];
     return {
       ...base,
       lines: this.counts(lines, allocations, operations),
-      allocations: visible.map((item) => {
+      allocations: visible.map((row) => {
+        const item = completeAllocations.get(row.id);
+        if (!item)
+          throw new ConflictException(
+            'Commitment work changed. Refresh this period.',
+          );
         const credit = commitmentCredit(
           item,
           item.liveDetails,
@@ -468,10 +636,10 @@ export class DeliveryCommitmentsService {
         );
         return {
           taskId: item.taskId,
-          taskName: item.taskName,
+          taskName: row.taskName,
           periodId: item.periodId,
           lineId: item.lineId,
-          parentTaskId: item.parentTaskId,
+          parentTaskId: row.parentTaskId,
           revision: item.revision,
           state:
             item.state === 'FULFILLED' && !credit.credited
@@ -486,6 +654,24 @@ export class DeliveryCommitmentsService {
       }),
       taskOptions: tasks.slice(0, 100),
       moreTaskOptions: tasks.length > 100,
+      selectedTask,
+      selectedParent,
+      orphanAllocations: visibleOrphans.map((item) => ({
+        allocationId: item.id,
+        periodId: item.periodId,
+        lineId: item.lineId,
+        revision: item.revision,
+        state: item.state,
+        createdAt: item.createdAt.toISOString(),
+        updatedAt: item.updatedAt.toISOString(),
+        canRemove: period.state === 'OPEN' && !item.hasChildren,
+        removalBlockReason:
+          period.state !== 'OPEN'
+            ? 'Reopen this period before changing its plan.'
+            : item.hasChildren
+              ? 'Reassign or remove its variations first. Appropriate task access may be required.'
+              : null,
+      })),
       history: visibleHistory.map((event) => ({
         id: event.id,
         action: event.action,
@@ -495,22 +681,37 @@ export class DeliveryCommitmentsService {
         taskId: event.taskId,
         taskName: event.taskName,
         reason: event.reason,
-        changes: event.changes,
+        changes: event.changes.filter(
+          (change) => change.field !== 'requestHash',
+        ),
       })),
       nextAllocationCursor:
         page.length > limit && lastAllocation
           ? encodeCursor({
-              version: 1,
+              version: 2,
+              scope: pageScope,
               workspaceId: workspace.id,
               periodId: period.id,
               kind: 'allocations',
               id: lastAllocation.id,
             })
           : null,
+      nextOrphanAllocationCursor:
+        orphans.length > limit && lastOrphan
+          ? encodeCursor({
+              version: 2,
+              scope: context.policyScope,
+              workspaceId: workspace.id,
+              periodId: period.id,
+              kind: 'orphans',
+              id: lastOrphan.id,
+            })
+          : null,
       nextHistoryCursor:
         history.length > limit && lastEvent
           ? encodeCursor({
-              version: 1,
+              version: 2,
+              scope: pageScope,
               workspaceId: workspace.id,
               periodId: period.id,
               kind: 'history',
@@ -519,6 +720,321 @@ export class DeliveryCommitmentsService {
             })
           : null,
     };
+  }
+
+  private async cleanupResult(
+    workspace: WorkspaceEntity,
+    memberId: string,
+    userWorkspaceId: string,
+    input: z.infer<typeof commitmentOrphanCleanupSchema>,
+    manager: EntityManager,
+  ): Promise<DeliveryCommitmentOrphanCleanupResultDTO> {
+    const event = await manager
+      .getRepository(DeliveryCommitmentEventEntity)
+      .findOneBy({ id: input.requestId });
+    const requestHash = commitmentCleanupRequestHash(
+      { workspaceId: workspace.id, memberId, userWorkspaceId },
+      input,
+    );
+    if (
+      event &&
+      (event.workspaceId !== workspace.id ||
+        event.periodId !== input.periodId ||
+        event.actorId !== memberId ||
+        event.actorType !== 'HUMAN' ||
+        ![
+          'COMMITMENT_ORPHAN_REMOVED',
+          'COMMITMENT_ORPHAN_CLEANUP_CANCELLED',
+        ].includes(event.action) ||
+        event.taskId !== null ||
+        event.taskName !== null ||
+        event.changes.find((change) => change.field === 'requestHash')
+          ?.after !== requestHash)
+    )
+      throw new ConflictException(
+        'This cleanup request does not match its recorded result.',
+      );
+    return {
+      workspaceId: workspace.id,
+      memberId,
+      userWorkspaceId,
+      engagementId: input.engagementId,
+      periodId: input.periodId,
+      requestId: input.requestId,
+      allocationId: input.allocationId,
+      requestedAllocationRevision: input.allocationRevision,
+      periodRevision: input.periodRevision,
+      state: event
+        ? event.action === 'COMMITMENT_ORPHAN_REMOVED'
+          ? 'REMOVED'
+          : 'CANCELLED'
+        : 'NOT_FOUND',
+      removedAllocationRevision:
+        event?.action === 'COMMITMENT_ORPHAN_REMOVED'
+          ? input.allocationRevision + 1
+          : null,
+      occurredAt: event?.createdAt.toISOString() ?? null,
+    };
+  }
+
+  async orphanCleanupReceipt(
+    workspace: WorkspaceEntity,
+    memberId: string,
+    userWorkspaceId: string,
+    input: unknown,
+  ) {
+    const parsed = parseInput(commitmentOrphanCleanupSchema, input);
+    return readDeliveryOperations(
+      this.dataSource,
+      workspace.id,
+      async (operations, manager) => {
+        const context = await this.scope(
+          workspace,
+          memberId,
+          userWorkspaceId,
+          parsed.engagementId,
+          operations,
+          manager,
+          true,
+        );
+        await this.taskVisibility(
+          workspace,
+          manager,
+          memberId,
+          userWorkspaceId,
+        );
+        await this.period(context, workspace.id, parsed.periodId, false);
+        return this.cleanupResult(
+          workspace,
+          memberId,
+          userWorkspaceId,
+          parsed,
+          manager,
+        );
+      },
+    );
+  }
+
+  private async lockOrphanSource(
+    workspace: WorkspaceEntity,
+    context: Context,
+    allocation: DeliveryCommitmentAllocationEntity,
+  ) {
+    const manager = context.manager;
+    type NativeSource = { id: string; deletedAt: Date | null };
+    const nativeQuery = `SELECT id,"deletedAt" FROM ${this.delivery.schema(workspace)}.task WHERE id=$1 FOR UPDATE`;
+    let native: NativeSource[] = await manager.query(nativeQuery, [
+      allocation.taskId,
+    ]);
+    if (!native.length) {
+      // An absent row has no lock; serialize same-ID insertion only for this uncommon cleanup branch.
+      await manager.query("SET LOCAL lock_timeout = '5s'");
+      await manager.query(
+        `LOCK TABLE ${this.delivery.schema(workspace)}.task IN SHARE MODE`,
+      );
+      native = await manager.query(nativeQuery, [allocation.taskId]);
+    }
+    const managed = await manager.getRepository(DeliveryTaskEntity).findOne({
+      where: { workspaceId: workspace.id, taskId: allocation.taskId },
+      lock: { mode: 'pessimistic_write' },
+    });
+    if (
+      native.length &&
+      !native[0].deletedAt &&
+      (!managed || managed.projectId === context.engagement.projectId)
+    )
+      throw new ConflictException(
+        'This allocation is no longer eligible for unavailable-source cleanup. Refresh its current status.',
+      );
+  }
+
+  async removeOrphanAllocation(
+    workspace: WorkspaceEntity,
+    memberId: string,
+    userWorkspaceId: string,
+    input: unknown,
+  ): Promise<DeliveryCommitmentOrphanCleanupResultDTO> {
+    return this.changeOrphanAllocation(
+      workspace,
+      memberId,
+      userWorkspaceId,
+      input,
+      false,
+    );
+  }
+
+  async cancelOrphanCleanup(
+    workspace: WorkspaceEntity,
+    memberId: string,
+    userWorkspaceId: string,
+    input: unknown,
+  ): Promise<DeliveryCommitmentOrphanCleanupResultDTO> {
+    return this.changeOrphanAllocation(
+      workspace,
+      memberId,
+      userWorkspaceId,
+      input,
+      true,
+    );
+  }
+
+  private async changeOrphanAllocation(
+    workspace: WorkspaceEntity,
+    memberId: string,
+    userWorkspaceId: string,
+    input: unknown,
+    cancel: boolean,
+  ): Promise<DeliveryCommitmentOrphanCleanupResultDTO> {
+    const parsed = parseInput(commitmentOrphanCleanupSchema, input);
+    return this.dataSource
+      .transaction(async (manager) => {
+        await manager.query("SET LOCAL lock_timeout = '5s'");
+        await manager.query(
+          'SELECT pg_advisory_xact_lock(hashtextextended($1,0))',
+          [`delivery:${workspace.id}`],
+        );
+        const operations =
+          (
+            await manager
+              .getRepository(DeliveryOperationsEntity)
+              .findOneBy({ workspaceId: workspace.id })
+          )?.state ?? newDeliveryOperations();
+        const context = await this.scope(
+          workspace,
+          memberId,
+          userWorkspaceId,
+          parsed.engagementId,
+          operations,
+          manager,
+          true,
+        );
+        await this.taskVisibility(
+          workspace,
+          manager,
+          memberId,
+          userWorkspaceId,
+        );
+        const checkedPeriod = await this.period(
+          context,
+          workspace.id,
+          parsed.periodId,
+          false,
+        );
+        const receipt = await this.cleanupResult(
+          workspace,
+          memberId,
+          userWorkspaceId,
+          parsed,
+          manager,
+        );
+        if (receipt.state !== 'NOT_FOUND') return receipt;
+        if (cancel) {
+          await recordDeliveryCommitment(
+            manager,
+            checkedPeriod,
+            { actorId: memberId, actorType: 'HUMAN' },
+            {
+              eventId: parsed.requestId,
+              action: 'COMMITMENT_ORPHAN_CLEANUP_CANCELLED',
+              reason:
+                'Cancelled this unavailable-source cleanup request before removal. No allocation was changed.',
+              changes: [
+                { field: 'state', before: null, after: 'CANCELLED' },
+                {
+                  field: 'requestHash',
+                  before: null,
+                  after: commitmentCleanupRequestHash(
+                    { workspaceId: workspace.id, memberId, userWorkspaceId },
+                    parsed,
+                  ),
+                },
+              ],
+            },
+          );
+          return this.cleanupResult(
+            workspace,
+            memberId,
+            userWorkspaceId,
+            parsed,
+            manager,
+          );
+        }
+        const period = await this.period(
+          context,
+          workspace.id,
+          parsed.periodId,
+        );
+        this.assertRevision(period.revision, parsed.periodRevision);
+        const repository = manager.getRepository(
+          DeliveryCommitmentAllocationEntity,
+        );
+        const allocation = await repository.findOne({
+          where: {
+            id: parsed.allocationId,
+            workspaceId: workspace.id,
+            periodId: period.id,
+          },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (!allocation)
+          throw new NotFoundException(
+            'Unavailable-source allocation not found.',
+          );
+        this.assertRevision(allocation.revision, parsed.allocationRevision);
+        if (allocation.state === 'REMOVED')
+          throw new ConflictException(
+            'This allocation has already been removed. Check its recorded result.',
+          );
+        await this.lockOrphanSource(workspace, context, allocation);
+        await this.assertNoChildren(manager, workspace.id, allocation.taskId);
+        const before = allocation.state;
+        allocation.state = 'REMOVED';
+        allocation.revision += 1;
+        await repository.save(allocation);
+        await recordDeliveryCommitment(
+          manager,
+          period,
+          { actorId: memberId, actorType: 'HUMAN' },
+          {
+            eventId: parsed.requestId,
+            action: 'COMMITMENT_ORPHAN_REMOVED',
+            reason:
+              'Removed an unavailable-source allocation from this commitment. Promised quantities and delivery history are unchanged.',
+            changes: [
+              { field: 'state', before, after: 'REMOVED' },
+              {
+                field: 'requestHash',
+                before: null,
+                after: commitmentCleanupRequestHash(
+                  { workspaceId: workspace.id, memberId, userWorkspaceId },
+                  parsed,
+                ),
+              },
+            ],
+          },
+        );
+        return this.cleanupResult(
+          workspace,
+          memberId,
+          userWorkspaceId,
+          parsed,
+          manager,
+        );
+      })
+      .catch((failure: unknown) => {
+        if (failure instanceof QueryFailedError) {
+          const code = (failure.driverError as { code?: string }).code;
+          if (code === '23505')
+            throw new ConflictException(
+              'This cleanup request conflicts with a recorded result. Check the original request before retrying.',
+            );
+          if (code === '55P03' || code === '40P01')
+            throw new ConflictException(
+              'Cleanup could not obtain the current source safely. Check its recorded result, then refresh before retrying.',
+            );
+        }
+        throw failure;
+      });
   }
 
   private async write(
@@ -852,6 +1368,13 @@ export class DeliveryCommitmentsService {
           });
         if (!line) throw new NotFoundException('Commitment line not found.');
         this.assertRevision(line.revision, parsed.lineRevision);
+        await this.nativeTasks.assert(
+          manager,
+          workspace,
+          { memberId, userWorkspaceId },
+          parsed.taskId,
+          ['id', 'title'],
+        );
         const task = await manager.getRepository(DeliveryTaskEntity).findOneBy({
           workspaceId: workspace.id,
           taskId: parsed.taskId,
@@ -897,6 +1420,13 @@ export class DeliveryCommitmentsService {
             throw new BadRequestException(
               'Choose a different unique-video parent for this variation.',
             );
+          await this.nativeTasks.assert(
+            manager,
+            workspace,
+            { memberId, userWorkspaceId },
+            parsed.parentTaskId,
+            ['id', 'title'],
+          );
           const parent = await repository.findOneBy({
             workspaceId: workspace.id,
             taskId: parsed.parentTaskId,
@@ -987,6 +1517,21 @@ export class DeliveryCommitmentsService {
           operations.fulfilments.find((item) => item.taskId === task.taskId),
           { actorId: memberId, actorType: 'HUMAN' },
         );
+        await this.nativeTasks.assert(
+          manager,
+          workspace,
+          { memberId, userWorkspaceId },
+          parsed.taskId,
+          ['id', 'title'],
+        );
+        if (parsed.parentTaskId)
+          await this.nativeTasks.assert(
+            manager,
+            workspace,
+            { memberId, userWorkspaceId },
+            parsed.parentTaskId,
+            ['id', 'title'],
+          );
       },
     );
   }
@@ -1010,6 +1555,23 @@ export class DeliveryCommitmentsService {
           workspace.id,
           parsed.periodId,
         );
+        await this.nativeTasks.assert(
+          context.manager,
+          workspace,
+          { memberId, userWorkspaceId },
+          parsed.taskId,
+          ['id', 'title'],
+        );
+        if (
+          !(await context.manager.getRepository(DeliveryTaskEntity).existsBy({
+            workspaceId: workspace.id,
+            taskId: parsed.taskId,
+            projectId: context.engagement.projectId,
+          }))
+        )
+          throw new NotFoundException(
+            'This task is unavailable in the commitment project.',
+          );
         const repository = context.manager.getRepository(
           DeliveryCommitmentAllocationEntity,
         );
@@ -1042,6 +1604,13 @@ export class DeliveryCommitmentsService {
             taskName: allocation.taskName,
             changes: [{ field: 'state', before, after: 'REMOVED' }],
           },
+        );
+        await this.nativeTasks.assert(
+          context.manager,
+          workspace,
+          { memberId, userWorkspaceId },
+          parsed.taskId,
+          ['id', 'title'],
         );
       },
     );

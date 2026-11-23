@@ -387,15 +387,13 @@ it('assigns an optional task only to a selected member and a different explicit 
     'Independent product review',
   );
   expect(screen.getByLabelText('First task assignee')).toHaveValue('');
-  expect(screen.getByLabelText('Independent first task reviewer')).toHaveValue(
-    '',
-  );
+  expect(screen.getByLabelText('First task reviewer')).toHaveValue('');
   await user.selectOptions(
     screen.getByLabelText('First task assignee'),
     SETUP_EDITOR,
   );
   await user.selectOptions(
-    screen.getByLabelText('Independent first task reviewer'),
+    screen.getByLabelText('First task reviewer'),
     SETUP_MANAGER,
   );
   await user.click(screen.getByRole('button', { name: 'Continue' }));
@@ -1005,3 +1003,14 @@ it('clears native company private inputs after a native denial without replacing
   ).toBeVisible();
   expect(mockCoreCreate).toHaveBeenCalledTimes(1);
 });
+
+jest.mock('@/delivery/onboarding/useServiceCatalog', () => ({
+  useServiceCatalog: () => ({
+    services: [],
+    loading: false,
+    unavailable: false,
+    canAdd: true,
+    retry: jest.fn(),
+    add: jest.fn(),
+  }),
+}));
