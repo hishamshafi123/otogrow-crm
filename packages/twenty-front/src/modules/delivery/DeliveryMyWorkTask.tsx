@@ -6,48 +6,71 @@ import { type DeliveryTask } from '@/delivery/delivery.types';
 import { StyledDeliveryBadge } from '@/delivery/deliveryStyles';
 
 const StyledTask = styled.button`
-  background: ${themeCssVariables.background.primary};
-  border: 1px solid ${themeCssVariables.border.color.light};
-  border-radius: 12px;
+  background-color: ${themeCssVariables.background.primary};
+  background-image: radial-gradient(
+    280px circle at 100% 0%,
+    ${themeCssVariables.color.transparent.iris2},
+    transparent 56%
+  );
+  border: 1px solid ${themeCssVariables.border.color.medium};
+  border-radius: 14px;
+  box-shadow:
+    inset 0 1px 0 ${themeCssVariables.color.transparent.gray2},
+    0 2px 8px -6px ${themeCssVariables.boxShadow.color};
   color: inherit;
   display: grid;
   gap: 8px 20px;
   grid-template-columns: minmax(0, 1fr) auto;
-  padding: 16px;
+  padding: 16px 18px;
   text-align: left;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    transform 150ms ease;
   width: 100%;
+
   &:hover {
-    border-color: ${themeCssVariables.color.blue8};
+    border-color: ${themeCssVariables.color.iris7};
+    box-shadow: 0 10px 24px -14px ${themeCssVariables.color.transparent.iris6};
+    transform: translateY(-2px);
   }
+
   strong {
     overflow-wrap: anywhere;
   }
+
   @media (max-width: 700px) {
     grid-template-columns: minmax(0, 1fr);
   }
 `;
+
 const StyledIdentity = styled.span`
   align-items: center;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 `;
+
 const StyledTiming = styled.small`
   align-items: end;
   display: flex;
   flex-direction: column;
   gap: 4px;
+
   @media (max-width: 700px) {
     align-items: start;
   }
 `;
+
 const StyledProgress = styled.span`
   align-items: center;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+
   progress {
-    accent-color: ${themeCssVariables.color.blue9};
+    accent-color: ${themeCssVariables.color.iris9};
     height: 6px;
     max-width: 100%;
     width: 100px;

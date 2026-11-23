@@ -25,6 +25,7 @@ export const StyledCapacityToolbar = styled.div`
   label {
     max-width: 220px;
   }
+
   small {
     color: ${themeCssVariables.font.color.secondary};
     max-width: 46ch;
@@ -32,11 +33,18 @@ export const StyledCapacityToolbar = styled.div`
 `;
 
 export const StyledCapacityMember = styled.details`
-  border-top: 1px solid ${themeCssVariables.border.color.light};
-  padding-top: 12px;
+  background: ${themeCssVariables.background.secondary};
+  border: 1px solid ${themeCssVariables.border.color.light};
+  border-radius: 14px;
+  padding: 14px 16px;
+  transition: border-color 150ms ease;
+
+  &:hover {
+    border-color: ${themeCssVariables.border.color.medium};
+  }
 
   > summary {
-    min-height: 44px;
+    min-height: 40px;
   }
 `;
 
@@ -48,8 +56,9 @@ export const StyledCapacityMemberHeading = styled.span`
   width: calc(100% - 22px);
 
   strong {
-    font-size: 16px;
+    font-size: 15.5px;
   }
+
   @media (max-width: 700px) {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -59,27 +68,35 @@ export const StyledCapacitySignals = styled.span`
   color: ${themeCssVariables.font.color.secondary};
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 16px;
+  gap: 6px 12px;
 
   [data-warning='true'] {
-    color: ${themeCssVariables.font.color.primary};
+    background: ${themeCssVariables.color.transparent.orange3};
+    border: 1px solid ${themeCssVariables.color.transparent.orange6};
+    border-radius: 999px;
+    color: ${themeCssVariables.color.orange11};
+    font-size: 12px;
     font-weight: 600;
+    padding: 1px 10px;
   }
 `;
 
 export const StyledCapacityDays = styled.div`
   display: flex;
   flex-direction: column;
+  gap: 10px;
   min-width: 0;
 `;
 
 export const StyledCapacityDay = styled.section`
-  border-top: 1px solid ${themeCssVariables.border.color.light};
+  background: ${themeCssVariables.background.primary};
+  border: 1px solid ${themeCssVariables.border.color.light};
+  border-radius: 12px;
   display: flex;
   flex-direction: column;
   gap: 10px;
   min-width: 0;
-  padding: 16px 0;
+  padding: 14px 16px;
 `;
 
 export const StyledCapacityDayHeading = styled.div`
@@ -111,18 +128,21 @@ export const StyledCapacityBreakdown = styled.details`
   > summary {
     min-height: 32px;
   }
+
   p + p {
     margin-top: 8px;
   }
 `;
 
 export const StyledCapacityAssignment = styled.section`
-  border-top: 1px solid ${themeCssVariables.border.color.light};
+  background: ${themeCssVariables.background.secondary};
+  border: 1px solid ${themeCssVariables.border.color.light};
+  border-radius: 14px;
   display: flex;
   flex-direction: column;
   gap: 12px;
   min-width: 0;
-  padding: 20px 0;
+  padding: 18px 20px;
 
   strong > a {
     font-size: 16px;

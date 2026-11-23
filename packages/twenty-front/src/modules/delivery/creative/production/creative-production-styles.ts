@@ -6,19 +6,23 @@ export const StyledCreativeBoundary = styled.fieldset`
   margin: 0;
   min-width: 0;
   padding: 0;
+
   &[hidden] {
     display: none;
   }
 `;
+
 export const StyledCreativeText = styled.div`
   min-width: 0;
   overflow-wrap: anywhere;
+
   h2,
   h3,
   h4,
   p {
     overflow-wrap: anywhere;
   }
+
   input,
   select {
     box-sizing: border-box;
@@ -49,18 +53,20 @@ export const StyledCreativeFilters = styled.details`
   > summary {
     align-content: center;
     color: ${themeCssVariables.font.color.secondary};
+    font-weight: 500;
     min-height: 40px;
     width: fit-content;
   }
 
   > div {
     background: ${themeCssVariables.background.primary};
-    border: 1px solid ${themeCssVariables.border.color.light};
-    border-radius: 12px;
+    border: 1px solid ${themeCssVariables.border.color.medium};
+    border-radius: 14px;
+    box-shadow: 0 8px 22px -16px ${themeCssVariables.boxShadow.color};
     display: flex;
     flex-direction: column;
     gap: 16px;
-    padding: 16px;
+    padding: 18px;
   }
 `;
 
@@ -79,11 +85,20 @@ export const StyledCreativeAppliedFilters = styled.p`
 `;
 
 export const StyledCreativeQueue = styled.ul`
-  background: ${themeCssVariables.background.primary};
-  border: 1px solid ${themeCssVariables.border.color.light};
-  border-radius: 16px;
+  background-color: ${themeCssVariables.background.primary};
+  background-image: radial-gradient(
+    420px circle at 0% 0%,
+    ${themeCssVariables.color.transparent.violet2},
+    transparent 52%
+  );
+  border: 1px solid ${themeCssVariables.border.color.medium};
+  border-radius: 18px;
+  box-shadow:
+    inset 0 1px 0 ${themeCssVariables.color.transparent.gray2},
+    0 12px 28px -20px ${themeCssVariables.boxShadow.color};
   list-style: none;
   margin: 0;
+  overflow: hidden;
   padding: 0;
 `;
 
@@ -93,7 +108,12 @@ export const StyledCreativeQueueItem = styled.li`
   display: grid;
   gap: 16px;
   grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
-  padding: 20px;
+  padding: 20px 22px;
+  transition: background-color 140ms ease;
+
+  &:hover {
+    background: ${themeCssVariables.background.transparent.lighter};
+  }
 
   &:last-child {
     border-bottom: 0;
@@ -128,10 +148,14 @@ export const StyledCreativeFacts = styled.dl`
   }
 
   dt {
-    color: ${themeCssVariables.font.color.secondary};
-    font-size: 13px;
+    color: ${themeCssVariables.font.color.tertiary};
+    font-family: ${themeCssVariables.code.font.family};
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
     line-height: 1.5;
     margin-bottom: 2px;
+    text-transform: uppercase;
   }
 
   dd {
@@ -148,25 +172,38 @@ export const StyledCreativeTaskHeading = styled.header`
 
   > h2 {
     font-size: 24px;
-    line-height: 1.3;
+    letter-spacing: -0.025em;
+    line-height: 1.25;
   }
 `;
 
 export const StyledCreativeStageButtons = styled.div`
-  display: flex;
+  background: ${themeCssVariables.background.primary};
+  border: 1px solid ${themeCssVariables.border.color.medium};
+  border-radius: 13px;
+  box-shadow: inset 0 1px 0 ${themeCssVariables.color.transparent.gray2};
+  display: inline-flex;
   flex-wrap: wrap;
   gap: 4px;
+  padding: 4px;
+  width: fit-content;
 
   > button {
     background: transparent;
     border-color: transparent;
+    box-shadow: none;
   }
 
   > button[aria-current='step'],
   > button[aria-current='step']:hover:not(:disabled) {
-    background: ${themeCssVariables.color.blue3};
-    border-color: ${themeCssVariables.color.blue6};
-    color: ${themeCssVariables.color.blue11};
+    background: linear-gradient(
+      135deg,
+      ${themeCssVariables.color.transparent.iris3} 0%,
+      ${themeCssVariables.color.transparent.violet3} 100%
+    );
+    border-color: ${themeCssVariables.color.transparent.iris6};
+    color: ${themeCssVariables.color.iris11};
+    font-weight: 600;
   }
 
   @media (max-width: 700px) {

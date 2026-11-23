@@ -16,16 +16,33 @@ type DeliveryNavigationPreferencesProps = {
 
 const StyledPreferences = styled.details`
   border-top: 1px solid ${themeCssVariables.border.color.light};
-  margin-top: 8px;
+  margin-top: 10px;
   padding-top: 16px;
   > summary {
+    background: ${themeCssVariables.background.secondary};
+    border: 1px solid ${themeCssVariables.border.color.light};
+    border-radius: 999px;
     color: ${themeCssVariables.font.color.secondary};
-    font-size: 13px;
-    padding: 8px 0;
+    cursor: pointer;
+    font-size: 12.5px;
+    font-weight: 500;
+    padding: 7px 14px;
+    transition:
+      background-color 150ms ease,
+      border-color 150ms ease,
+      color 150ms ease;
     width: fit-content;
   }
   > summary:hover {
-    color: ${themeCssVariables.font.color.primary};
+    background: ${themeCssVariables.color.transparent.iris2};
+    border-color: ${themeCssVariables.color.iris5};
+    color: ${themeCssVariables.color.iris11};
+  }
+  &[open] > summary {
+    background: ${themeCssVariables.color.transparent.iris2};
+    border-color: ${themeCssVariables.color.iris6};
+    color: ${themeCssVariables.color.iris11};
+    margin-bottom: 12px;
   }
 `;
 

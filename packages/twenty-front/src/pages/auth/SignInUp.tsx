@@ -49,7 +49,23 @@ const StyledLoaderContainer = styled.div`
 `;
 
 const StyledBackground = styled.div`
-  background: ${themeCssVariables.background.secondary};
+  background:
+    radial-gradient(
+      ellipse 65% 45% at 15% 0%,
+      ${themeCssVariables.color.transparent.iris2} 0%,
+      transparent 70%
+    ),
+    radial-gradient(
+      ellipse 55% 40% at 85% 10%,
+      ${themeCssVariables.color.transparent.cyan2} 0%,
+      transparent 70%
+    ),
+    radial-gradient(
+      ellipse 50% 40% at 50% 100%,
+      ${themeCssVariables.color.transparent.violet2} 0%,
+      transparent 72%
+    ),
+    ${themeCssVariables.background.secondary};
   display: flex;
   flex-direction: column;
   height: calc(100dvh / var(--t-zoom, 1));

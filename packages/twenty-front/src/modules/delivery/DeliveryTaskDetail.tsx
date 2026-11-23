@@ -45,15 +45,23 @@ const StyledTaskIdentity = styled.header`
 `;
 
 const StyledTaskPeople = styled.dl`
+  background: ${themeCssVariables.background.secondary};
+  border: 1px solid ${themeCssVariables.border.color.light};
+  border-radius: 14px;
   display: grid;
   gap: 12px 24px;
   grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
   margin: 0;
+  padding: 14px 16px;
 
   dt {
-    color: ${themeCssVariables.font.color.secondary};
-    font-size: 13px;
+    color: ${themeCssVariables.font.color.tertiary};
+    font-family: ${themeCssVariables.code.font.family};
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
     margin-bottom: 4px;
+    text-transform: uppercase;
   }
 
   dd {
@@ -63,12 +71,14 @@ const StyledTaskPeople = styled.dl`
 `;
 
 const StyledTaskDisclosure = styled.details`
-  border-top: 1px solid ${themeCssVariables.border.color.light};
+  background: ${themeCssVariables.background.secondary};
+  border: 1px solid ${themeCssVariables.border.color.light};
+  border-radius: 14px;
   min-width: 0;
-  padding-top: 12px;
+  padding: 12px 16px;
 
   > summary {
-    font-size: 15px;
+    font-size: 14.5px;
     font-weight: 600;
     line-height: 1.5;
   }

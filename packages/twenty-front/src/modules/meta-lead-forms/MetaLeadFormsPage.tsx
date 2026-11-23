@@ -27,56 +27,116 @@ import {
 } from '@/meta-lead-forms/metaLeadFormsGraphql';
 
 const StyledContent = styled.div`
+  background-color: ${themeCssVariables.background.secondary};
+  background-image:
+    radial-gradient(
+      900px 380px at 8% -4%,
+      ${themeCssVariables.color.transparent.iris2},
+      transparent 58%
+    ),
+    radial-gradient(
+      720px 320px at 92% 0%,
+      ${themeCssVariables.color.transparent.cyan2},
+      transparent 54%
+    );
   color: ${themeCssVariables.font.color.primary};
+  min-height: 100%;
   overflow: auto;
-  padding: ${themeCssVariables.spacing[6]};
+  padding: 28px 32px 64px;
+
   h1 {
-    font-size: 24px;
+    font-size: 28px;
+    font-weight: 650;
+    letter-spacing: -0.03em;
+    margin: 0 0 6px;
   }
+
   p {
     color: ${themeCssVariables.font.color.secondary};
     line-height: 1.5;
   }
+
   label {
+    color: ${themeCssVariables.font.color.secondary};
     display: flex;
     flex-direction: column;
+    font-size: 13px;
+    font-weight: 500;
     gap: 8px;
   }
+
   input,
   select {
     background: ${themeCssVariables.background.primary};
     border: 1px solid ${themeCssVariables.border.color.medium};
-    border-radius: 6px;
+    border-radius: 10px;
     color: inherit;
     font: inherit;
-    padding: 10px;
+    padding: 10px 12px;
+    transition:
+      border-color 150ms ease,
+      box-shadow 150ms ease;
   }
+
+  input:focus,
+  select:focus {
+    border-color: ${themeCssVariables.color.iris9};
+    box-shadow: 0 0 0 3px ${themeCssVariables.color.transparent.iris3};
+    outline: none;
+  }
+
   td > button {
     background: none;
     border: 0;
-    color: ${themeCssVariables.color.blue};
+    color: ${themeCssVariables.color.iris11};
     cursor: pointer;
     font: inherit;
+    font-weight: 500;
     padding: 0;
     text-align: left;
   }
+
   table {
-    border-collapse: collapse;
+    background: ${themeCssVariables.background.primary};
+    border: 1px solid ${themeCssVariables.border.color.medium};
+    border-collapse: separate;
+    border-radius: 16px;
+    border-spacing: 0;
+    box-shadow: 0 10px 28px -20px ${themeCssVariables.boxShadow.color};
+    overflow: hidden;
     width: 100%;
   }
+
   th,
   td {
     border-bottom: 1px solid ${themeCssVariables.border.color.light};
-    padding: 12px;
+    padding: 13px 16px;
     text-align: left;
   }
+
   th {
-    color: ${themeCssVariables.font.color.secondary};
+    background: ${themeCssVariables.background.secondary};
+    color: ${themeCssVariables.font.color.tertiary};
+    font-family: ${themeCssVariables.code.font.family};
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
   }
+
+  tbody tr:last-child td {
+    border-bottom: 0;
+  }
+
+  tbody tr:hover td {
+    background: ${themeCssVariables.background.transparent.lighter};
+  }
+
   a {
-    color: ${themeCssVariables.color.blue};
+    color: ${themeCssVariables.color.iris11};
   }
 `;
+
 const StyledToolbar = styled.div`
   align-items: center;
   display: flex;
@@ -84,36 +144,52 @@ const StyledToolbar = styled.div`
   gap: 12px;
   margin: 20px 0;
 `;
+
 const StyledForm = styled.form`
+  background: ${themeCssVariables.background.primary};
   border: 1px solid ${themeCssVariables.border.color.medium};
-  border-radius: 8px;
+  border-radius: 16px;
+  box-shadow: 0 12px 30px -20px ${themeCssVariables.boxShadow.color};
   display: grid;
   gap: 16px;
   margin: 16px 0;
   max-width: 640px;
   padding: 24px;
 `;
+
 const StyledError = styled.div`
-  color: ${themeCssVariables.color.red};
-  padding: 12px 0;
+  background: ${themeCssVariables.color.transparent.red2};
+  border: 1px solid ${themeCssVariables.color.transparent.red6};
+  border-radius: 10px;
+  color: ${themeCssVariables.color.red11};
+  margin: 12px 0;
+  padding: 12px 14px;
 `;
 
 const StyledEmptyState = styled.div`
+  background: ${themeCssVariables.background.primary};
   border: 1px dashed ${themeCssVariables.border.color.medium};
-  border-radius: 8px;
+  border-radius: 16px;
   margin: 24px 0;
   max-width: 680px;
   padding: 32px;
 `;
+
 const StyledLeadRow = styled.tr`
   &[data-unread='true'] {
-    background: ${themeCssVariables.background.secondary};
+    background: ${themeCssVariables.color.transparent.iris2};
   }
 `;
+
 const StyledNewLabel = styled.span`
-  color: ${themeCssVariables.color.blue};
-  font-size: 12px;
+  background: ${themeCssVariables.color.transparent.iris3};
+  border: 1px solid ${themeCssVariables.color.transparent.iris6};
+  border-radius: 999px;
+  color: ${themeCssVariables.color.iris11};
+  font-size: 11px;
+  font-weight: 600;
   margin-left: 8px;
+  padding: 1px 8px;
 `;
 
 export const MetaLeadFormsPage = () => {

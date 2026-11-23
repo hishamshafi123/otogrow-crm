@@ -51,15 +51,29 @@ const StyledGroupHeading = styled.div`
 `;
 
 const StyledTaskRows = styled.div`
-  background: ${themeCssVariables.background.primary};
-  border: 1px solid ${themeCssVariables.border.color.light};
-  border-radius: 16px;
+  background-color: ${themeCssVariables.background.primary};
+  background-image: radial-gradient(
+    420px circle at 0% 0%,
+    ${themeCssVariables.color.transparent.iris2},
+    transparent 52%
+  );
+  border: 1px solid ${themeCssVariables.border.color.medium};
+  border-radius: 18px;
+  box-shadow:
+    inset 0 1px 0 ${themeCssVariables.color.transparent.gray2},
+    0 12px 28px -20px ${themeCssVariables.boxShadow.color};
+  overflow: hidden;
 `;
 
 const StyledTaskRow = styled.article`
   border-bottom: 1px solid ${themeCssVariables.border.color.light};
   min-width: 0;
-  padding: 16px 20px;
+  padding: 16px 22px;
+  transition: background-color 140ms ease;
+
+  &:hover {
+    background: ${themeCssVariables.background.transparent.lighter};
+  }
 
   &:last-child {
     border-bottom: 0;

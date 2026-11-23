@@ -30,21 +30,54 @@ import { LightIconButton, type SelectOption } from 'twenty-ui/input';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
 
 const StyledStepCard = styled.div`
-  background-color: ${themeCssVariables.background.secondary};
+  background:
+    radial-gradient(
+      ellipse 60% 45% at 100% 0%,
+      ${themeCssVariables.color.transparent.iris2} 0%,
+      transparent 70%
+    ),
+    ${themeCssVariables.background.primary};
   border: 1px solid ${themeCssVariables.border.color.light};
-  border-radius: ${themeCssVariables.border.radius.md};
+  border-radius: 16px;
+  box-shadow:
+    0 1px 2px ${themeCssVariables.color.transparent.gray2},
+    0 8px 24px -18px ${themeCssVariables.color.transparent.gray5},
+    inset 0 1px 0 ${themeCssVariables.color.transparent.gray2};
   display: flex;
   flex-direction: column;
   gap: ${themeCssVariables.spacing[3]};
-  padding: ${themeCssVariables.spacing[4]};
+  padding: 18px 20px;
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease;
+
+  &:hover {
+    border-color: ${themeCssVariables.color.iris6};
+    box-shadow:
+      0 10px 26px -16px ${themeCssVariables.color.transparent.iris5},
+      inset 0 1px 0 ${themeCssVariables.color.transparent.gray2};
+  }
 `;
 
 const StyledStepHeader = styled.div`
   align-items: center;
-  color: ${themeCssVariables.font.color.secondary};
+  border-bottom: 1px solid ${themeCssVariables.border.color.light};
   display: flex;
-  font-weight: ${themeCssVariables.font.weight.semiBold};
   justify-content: space-between;
+  padding-bottom: 10px;
+
+  > span {
+    background: ${themeCssVariables.color.transparent.iris2};
+    border: 1px solid ${themeCssVariables.color.iris5};
+    border-radius: 999px;
+    color: ${themeCssVariables.color.iris11};
+    font-family: ${themeCssVariables.code.font.family};
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    padding: 3px 10px;
+    text-transform: uppercase;
+  }
 `;
 
 const StyledDelayRow = styled.div`
@@ -60,8 +93,13 @@ const StyledEditorContainer = styled.div`
 `;
 
 const StyledChannelHint = styled.div`
-  color: ${themeCssVariables.font.color.tertiary};
+  background: ${themeCssVariables.color.transparent.cyan2};
+  border: 1px solid ${themeCssVariables.color.cyan5};
+  border-radius: 10px;
+  color: ${themeCssVariables.color.cyan11};
   font-size: ${themeCssVariables.font.size.sm};
+  line-height: 1.45;
+  padding: 10px 12px;
 `;
 
 type SequenceStepEditorProps = {

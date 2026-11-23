@@ -41,41 +41,60 @@ type CallRecord = ObjectRecord & {
 const StyledList = styled.div`
   display: flex;
   flex-direction: column;
-  max-height: 180px;
+  gap: 4px;
+  max-height: 196px;
   overflow-y: auto;
 `;
 
 const StyledRow = styled.button`
   align-items: center;
   background: transparent;
-  border: none;
-  border-radius: ${themeCssVariables.border.radius.sm};
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: ${themeCssVariables.font.color.secondary};
   cursor: pointer;
   display: flex;
   gap: ${themeCssVariables.spacing[2]};
-  padding: ${themeCssVariables.spacing[2]};
+  padding: 8px 10px;
   text-align: left;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease;
 
   &:hover {
-    background: ${themeCssVariables.background.transparent.light};
+    background: ${themeCssVariables.color.transparent.iris1};
+    border-color: ${themeCssVariables.color.iris5};
   }
 `;
 
 const StyledNumber = styled.span`
   color: ${themeCssVariables.font.color.primary};
   font-size: ${themeCssVariables.font.size.md};
+  font-variant-numeric: tabular-nums;
+  font-weight: ${themeCssVariables.font.weight.medium};
 `;
 
 const StyledStatus = styled.span`
+  background: ${themeCssVariables.background.secondary};
+  border: 1px solid ${themeCssVariables.border.color.light};
+  border-radius: 999px;
   color: ${themeCssVariables.font.color.tertiary};
-  font-size: ${themeCssVariables.font.size.sm};
+  font-family: ${themeCssVariables.code.font.family};
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
   margin-left: auto;
+  padding: 2px 8px;
+  text-transform: uppercase;
 `;
 
 const StyledEmpty = styled.div`
+  background: ${themeCssVariables.background.secondary};
+  border: 1px dashed ${themeCssVariables.border.color.medium};
+  border-radius: 10px;
   color: ${themeCssVariables.font.color.tertiary};
   font-size: ${themeCssVariables.font.size.sm};
-  padding: ${themeCssVariables.spacing[2]};
+  padding: ${themeCssVariables.spacing[3]};
   text-align: center;
 `;
 

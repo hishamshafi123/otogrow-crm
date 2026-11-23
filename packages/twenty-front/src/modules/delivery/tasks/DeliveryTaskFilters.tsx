@@ -20,15 +20,17 @@ import { AVAILABLE_TIMEZONE_OPTIONS } from '@/settings/experience/constants/Avai
 import { useIsMobile } from '@/ui/utilities/responsive/hooks/useIsMobile';
 
 const StyledFilters = styled.details`
-  border-bottom: 1px solid ${themeCssVariables.border.color.light};
-  border-top: 1px solid ${themeCssVariables.border.color.light};
+  background: ${themeCssVariables.background.primary};
+  border: 1px solid ${themeCssVariables.border.color.medium};
+  border-radius: 14px;
+  box-shadow: inset 0 1px 0 ${themeCssVariables.color.transparent.gray2};
   min-width: 0;
-  padding: 7px 0;
+  padding: 10px 16px;
 
   summary {
     color: ${themeCssVariables.font.color.primary};
     font-size: 13px;
-    font-weight: 500;
+    font-weight: 600;
     line-height: 24px;
   }
 
@@ -46,9 +48,14 @@ const StyledFilters = styled.details`
 `;
 
 const StyledActiveCount = styled.span`
-  color: ${themeCssVariables.font.color.secondary};
-  font-weight: 400;
+  background: ${themeCssVariables.color.transparent.iris3};
+  border: 1px solid ${themeCssVariables.color.transparent.iris6};
+  border-radius: 999px;
+  color: ${themeCssVariables.color.iris11};
+  font-size: 11.5px;
+  font-weight: 600;
   margin-left: 8px;
+  padding: 1px 8px;
 `;
 
 type DeliveryTaskFiltersProps = {

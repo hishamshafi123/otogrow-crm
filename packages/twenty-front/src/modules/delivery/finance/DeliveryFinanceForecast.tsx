@@ -4,6 +4,7 @@ import { useMutation, useQuery } from '@apollo/client/react';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { styled } from '@linaria/react';
 import { isDefined } from 'twenty-shared/utils';
+import { themeCssVariables } from 'twenty-ui/theme-constants';
 import {
   type DeliveryFinanceForecastQuery,
   type DeliveryFinanceForecastSourcesQuery,
@@ -78,9 +79,17 @@ const StyledForecastBoundary = styled.fieldset`
   }
 `;
 const StyledForecastStartingCash = styled(StyledDeliveryCard)`
+  background:
+    radial-gradient(
+      ellipse 70% 100% at 100% 0%,
+      ${themeCssVariables.color.transparent.iris2} 0%,
+      transparent 70%
+    ),
+    ${themeCssVariables.background.primary};
+  border-color: ${themeCssVariables.color.iris5};
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 
   > button {
     align-self: flex-start;

@@ -23,24 +23,35 @@ const DIAL_PAD_KEYS = [
 
 const StyledPad = styled.div`
   display: grid;
-  gap: ${themeCssVariables.spacing[1]};
+  gap: 6px;
   grid-template-columns: repeat(3, 1fr);
 `;
 
 const StyledKey = styled.button`
   align-items: center;
-  background: transparent;
-  border: none;
-  border-radius: ${themeCssVariables.border.radius.sm};
+  background: ${themeCssVariables.background.secondary};
+  border: 1px solid ${themeCssVariables.border.color.light};
+  border-radius: 10px;
   color: ${themeCssVariables.font.color.primary};
   cursor: pointer;
   display: flex;
-  font-size: ${themeCssVariables.font.size.lg};
-  height: ${themeCssVariables.spacing[8]};
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  font-weight: ${themeCssVariables.font.weight.medium};
+  height: 40px;
   justify-content: center;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    transform 120ms ease;
 
   &:hover {
-    background: ${themeCssVariables.background.transparent.light};
+    background: ${themeCssVariables.color.transparent.iris2};
+    border-color: ${themeCssVariables.color.transparent.iris6};
+  }
+
+  &:active {
+    transform: scale(0.96);
   }
 `;
 
@@ -64,11 +75,7 @@ export const DialPad = ({ onDigit }: DialPadProps) => {
   return (
     <StyledPad aria-label={t`Dial pad`}>
       {DIAL_PAD_KEYS.map((digit) => (
-        <StyledKey
-          key={digit}
-          type="button"
-          onClick={() => handleDigit(digit)}
-        >
+        <StyledKey key={digit} type="button" onClick={() => handleDigit(digit)}>
           {digit}
         </StyledKey>
       ))}

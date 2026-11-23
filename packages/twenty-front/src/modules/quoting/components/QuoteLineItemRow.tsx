@@ -14,20 +14,35 @@ import { themeCssVariables } from 'twenty-ui/theme-constants';
 
 const StyledRow = styled.div`
   align-items: flex-end;
-  background-color: ${themeCssVariables.background.secondary};
+  background-color: ${themeCssVariables.background.primary};
   border: 1px solid ${themeCssVariables.border.color.light};
-  border-radius: ${themeCssVariables.border.radius.md};
+  border-radius: 14px;
+  box-shadow:
+    0 1px 2px ${themeCssVariables.color.transparent.gray2},
+    0 6px 18px -14px ${themeCssVariables.color.transparent.gray5},
+    inset 0 1px 0 ${themeCssVariables.color.transparent.gray2};
   display: flex;
   gap: ${themeCssVariables.spacing[3]};
-  padding: ${themeCssVariables.spacing[3]};
+  padding: 14px 16px;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+
+  &:hover {
+    border-color: ${themeCssVariables.color.iris6};
+    box-shadow:
+      0 8px 20px -14px ${themeCssVariables.color.transparent.iris5},
+      inset 0 1px 0 ${themeCssVariables.color.transparent.gray2};
+  }
 `;
 
 const StyledItemPicker = styled.div`
   flex: 1;
+  min-width: 0;
 `;
 
 const StyledNumberField = styled.div`
-  width: 90px;
+  width: 92px;
 `;
 
 const StyledLineTotal = styled.div`
@@ -35,9 +50,11 @@ const StyledLineTotal = styled.div`
   align-self: stretch;
   color: ${themeCssVariables.font.color.primary};
   display: flex;
-  font-weight: ${themeCssVariables.font.weight.semiBold};
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
   justify-content: flex-end;
-  min-width: 100px;
+  letter-spacing: -0.01em;
+  min-width: 104px;
 `;
 
 type QuoteLineItemRowProps = {

@@ -26,8 +26,14 @@ const DELETE_META_ADS_CONFIG_MODAL_ID = 'delete-meta-ads-config-modal';
 
 const StyledActiveRow = styled.div`
   align-items: center;
+  background: ${themeCssVariables.background.primary};
+  border: 1px solid ${themeCssVariables.border.color.light};
+  border-radius: 12px;
   display: flex;
-  gap: ${themeCssVariables.spacing[2]};
+  font-weight: ${themeCssVariables.font.weight.medium};
+  gap: ${themeCssVariables.spacing[3]};
+  padding: 10px 14px;
+  width: fit-content;
 `;
 
 const StyledTestConnectionRow = styled.div`

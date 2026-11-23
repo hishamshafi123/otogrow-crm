@@ -14,43 +14,68 @@ type FinanceForecastProjectionSummaryProps = {
 type FinanceForecastTimelineProps = FinanceForecastProjectionSummaryProps;
 const StyledForecastTotals = styled.dl`
   display: grid;
-  gap: 20px 16px;
+  gap: 14px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   margin: 0;
+  > div {
+    background: ${themeCssVariables.background.primary};
+    border: 1px solid ${themeCssVariables.border.color.light};
+    border-radius: 14px;
+    box-shadow:
+      0 1px 2px ${themeCssVariables.color.transparent.gray2},
+      inset 0 1px 0 ${themeCssVariables.color.transparent.gray2};
+    padding: 14px 16px;
+    transition:
+      border-color 180ms ease,
+      box-shadow 180ms ease;
+  }
+  > div:hover {
+    border-color: ${themeCssVariables.color.iris6};
+    box-shadow: 0 6px 18px -12px ${themeCssVariables.color.transparent.iris5};
+  }
   dt {
-    color: ${themeCssVariables.font.color.secondary};
-    font-size: 13px;
+    color: ${themeCssVariables.font.color.tertiary};
+    font-family: ${themeCssVariables.code.font.family};
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
   }
   dd {
+    color: ${themeCssVariables.font.color.primary};
     font-size: 22px;
-    font-weight: 600;
     font-variant-numeric: tabular-nums;
-    line-height: 1.3;
-    margin: 6px 0 0;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.25;
+    margin: 8px 0 0;
     overflow-wrap: anywhere;
   }
   > div:last-child {
     align-items: baseline;
+    background: ${themeCssVariables.background.secondary};
     display: flex;
     flex-wrap: wrap;
-    gap: 4px 12px;
+    gap: 6px 14px;
     grid-column: 1 / -1;
     dd {
       font-size: 14px;
+      font-weight: 600;
       margin: 0;
     }
   }
   > div[data-shortfall='true'] {
     background: ${themeCssVariables.color.orange3};
     border: 1px solid ${themeCssVariables.color.orange6};
-    border-radius: 10px;
-    padding: 12px 16px;
+    border-radius: 14px;
+    padding: 14px 18px;
     dt {
       color: ${themeCssVariables.color.orange11};
-      font-size: 14px;
+      font-size: 12px;
       font-weight: 600;
     }
     dd {
+      color: ${themeCssVariables.color.orange11};
       font-size: 22px;
     }
   }
@@ -62,17 +87,40 @@ const StyledForecastTotals = styled.dl`
   }
 `;
 const StyledForecastDays = styled.ol`
+  background: ${themeCssVariables.background.primary};
+  border: 1px solid ${themeCssVariables.border.color.light};
+  border-radius: 14px;
   list-style: none;
   margin: 0;
+  overflow: hidden;
   padding: 0;
 `;
 const StyledForecastDay = styled.li`
+  align-items: center;
   border-top: 1px solid ${themeCssVariables.border.color.light};
   display: grid;
+  font-variant-numeric: tabular-nums;
   gap: 8px 16px;
   grid-template-columns: minmax(100px, 1fr) repeat(3, minmax(0, 1fr));
   overflow-wrap: anywhere;
-  padding: 12px 0;
+  padding: 12px 16px;
+  transition: background-color 140ms ease;
+  &:first-child {
+    border-top: 0;
+  }
+  &:hover {
+    background: ${themeCssVariables.background.secondary};
+  }
+  time {
+    color: ${themeCssVariables.font.color.secondary};
+    font-family: ${themeCssVariables.code.font.family};
+    font-size: 12px;
+    font-weight: 600;
+  }
+  strong {
+    color: ${themeCssVariables.font.color.primary};
+    font-weight: 600;
+  }
   @media (max-width: 600px) {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     time,

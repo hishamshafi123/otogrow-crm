@@ -16,25 +16,43 @@ import {
 } from '@/delivery/client-workspace/useCompanyProfile';
 
 const StyledProfile = styled.section`
-  background: ${themeCssVariables.background.primary};
+  background:
+    radial-gradient(
+      ellipse 55% 45% at 100% 0%,
+      ${themeCssVariables.color.transparent.iris2} 0%,
+      transparent 72%
+    ),
+    ${themeCssVariables.background.primary};
   border: 1px solid ${themeCssVariables.border.color.light};
-  border-radius: 16px;
+  border-radius: 18px;
+  box-shadow:
+    0 1px 2px ${themeCssVariables.color.transparent.gray2},
+    0 10px 30px -20px ${themeCssVariables.color.transparent.gray5},
+    inset 0 1px 0 ${themeCssVariables.color.transparent.gray2};
   min-width: 0;
-  padding: 24px;
+  padding: 24px 26px;
   @media (max-width: 600px) {
     padding: 16px;
   }
 `;
 const StyledHeader = styled.div`
   align-items: center;
+  border-bottom: 1px solid ${themeCssVariables.border.color.light};
   display: flex;
   flex-wrap: wrap;
   gap: 16px;
   justify-content: space-between;
+  padding-bottom: 14px;
+  &:last-child {
+    border-bottom: 0;
+    border-top: 1px solid ${themeCssVariables.border.color.light};
+    padding-bottom: 0;
+    padding-top: 14px;
+  }
 `;
 const StyledGrid = styled.div`
   display: grid;
-  gap: 20px 32px;
+  gap: 18px 28px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   @media (max-width: 600px) {
     grid-template-columns: minmax(0, 1fr);
@@ -43,16 +61,43 @@ const StyledGrid = styled.div`
 const StyledField = styled.div`
   min-width: 0;
   overflow-wrap: anywhere;
+  small {
+    color: ${themeCssVariables.font.color.tertiary};
+    display: block;
+    font-family: ${themeCssVariables.code.font.family};
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
   label {
-    font-size: 13px;
     color: ${themeCssVariables.font.color.secondary};
+    display: flex;
+    flex-direction: column;
+    font-size: 13px;
+    font-weight: 500;
+    gap: 6px;
   }
   input,
   textarea {
-    width: 100%;
+    background: ${themeCssVariables.background.secondary};
+    border: 1px solid ${themeCssVariables.border.color.medium};
+    border-radius: 10px;
     color: ${themeCssVariables.font.color.primary};
+    padding: 8px 12px;
+    transition:
+      border-color 150ms ease,
+      box-shadow 150ms ease;
+    width: 100%;
+  }
+  input:focus,
+  textarea:focus {
+    border-color: ${themeCssVariables.color.iris8};
+    box-shadow: 0 0 0 3px ${themeCssVariables.color.transparent.iris3};
+    outline: none;
   }
   p {
+    color: ${themeCssVariables.font.color.primary};
     margin-top: 6px;
     white-space: pre-wrap;
   }

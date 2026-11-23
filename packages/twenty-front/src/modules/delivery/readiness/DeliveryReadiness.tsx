@@ -15,19 +15,42 @@ import {
 } from '@/delivery/deliveryStyles';
 
 const StyledCapabilities = styled.ul`
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   list-style: none;
   margin: 0;
   padding: 0;
   > li {
-    border-top: 1px solid ${themeCssVariables.border.color.light};
-    padding: 16px 0;
+    background: ${themeCssVariables.background.primary};
+    border: 1px solid ${themeCssVariables.border.color.light};
+    border-radius: 14px;
+    box-shadow:
+      0 1px 2px ${themeCssVariables.color.transparent.gray2},
+      inset 0 1px 0 ${themeCssVariables.color.transparent.gray2};
+    padding: 16px 18px;
+    transition:
+      border-color 180ms ease,
+      box-shadow 180ms ease,
+      transform 180ms ease;
   }
-  > li:first-child {
-    border-top: 0;
+  > li:hover {
+    border-color: ${themeCssVariables.color.iris6};
+    box-shadow:
+      0 6px 18px -12px ${themeCssVariables.color.transparent.iris5},
+      inset 0 1px 0 ${themeCssVariables.color.transparent.gray2};
+    transform: translateY(-1px);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    > li,
+    > li:hover {
+      transform: none;
+      transition: none;
+    }
   }
 `;
 const StyledCapabilityHeading = styled.div`
-  align-items: baseline;
+  align-items: center;
   display: flex;
   flex-wrap: wrap;
   gap: 8px 16px;
@@ -36,9 +59,16 @@ const StyledCapabilityHeading = styled.div`
   overflow-wrap: anywhere;
 `;
 const StyledState = styled.span`
-  border: 1px solid ${themeCssVariables.border.color.medium};
-  border-radius: 6px;
-  padding: 2px 8px;
+  background: ${themeCssVariables.color.transparent.iris2};
+  border: 1px solid ${themeCssVariables.color.iris5};
+  border-radius: 999px;
+  color: ${themeCssVariables.color.iris11};
+  font-family: ${themeCssVariables.code.font.family};
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 3px 10px;
+  text-transform: uppercase;
   white-space: nowrap;
 `;
 export const DeliveryReadiness = () => {

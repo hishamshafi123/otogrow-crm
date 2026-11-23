@@ -14,13 +14,18 @@ import { themeCssVariables } from 'twenty-ui/theme-constants';
 import { H2Title } from 'twenty-ui/typography';
 
 const StyledTotalsGrid = styled.div`
+  background: ${themeCssVariables.background.secondary};
+  border: 1px solid ${themeCssVariables.border.color.medium};
+  border-radius: 14px;
   display: flex;
   flex-direction: column;
   gap: ${themeCssVariables.spacing[3]};
+  padding: 18px 20px;
 `;
 
 const StyledEditorsRow = styled.div`
   display: flex;
+  flex-wrap: wrap;
   gap: ${themeCssVariables.spacing[3]};
 `;
 
@@ -31,12 +36,18 @@ const StyledEditorField = styled.div`
 const StyledTotalRow = styled.div`
   color: ${themeCssVariables.font.color.secondary};
   display: flex;
+  font-variant-numeric: tabular-nums;
   justify-content: space-between;
+  padding: 2px 0;
 `;
 
 const StyledGrandTotalRow = styled(StyledTotalRow)`
+  border-top: 1px solid ${themeCssVariables.border.color.medium};
   color: ${themeCssVariables.font.color.primary};
+  font-size: 16px;
   font-weight: ${themeCssVariables.font.weight.semiBold};
+  margin-top: 4px;
+  padding-top: 10px;
 `;
 
 type QuoteTotalsSectionProps = {

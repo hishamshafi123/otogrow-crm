@@ -14,8 +14,11 @@ import { useQuery } from '@apollo/client/react';
 import { GetFormsDocument } from '~/generated-metadata/graphql';
 
 const StyledTableBodyContainer = styled.div`
-  border-bottom: 1px solid ${themeCssVariables.border.color.light};
-  max-height: 260px;
+  background: ${themeCssVariables.background.primary};
+  border: 1px solid ${themeCssVariables.border.color.light};
+  border-radius: 12px;
+  margin-top: 4px;
+  max-height: 280px;
   overflow-y: auto;
 `;
 

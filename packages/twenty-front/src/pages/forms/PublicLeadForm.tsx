@@ -28,38 +28,81 @@ type PageState = 'loading' | 'not-found' | 'ready' | 'submitted';
 
 const StyledPage = styled.div`
   align-items: center;
+  background-color: ${themeCssVariables.background.secondary};
+  background-image:
+    radial-gradient(
+      820px 420px at 20% 0%,
+      ${themeCssVariables.color.transparent.iris3},
+      transparent 58%
+    ),
+    radial-gradient(
+      680px 360px at 84% 100%,
+      ${themeCssVariables.color.transparent.cyan2},
+      transparent 56%
+    );
   display: flex;
   flex: 1;
   justify-content: center;
   min-height: 0;
   overflow-y: auto;
-  padding: ${themeCssVariables.spacing[4]};
+  padding: ${themeCssVariables.spacing[6]} ${themeCssVariables.spacing[4]};
   width: 100%;
 `;
 
 const StyledCard = styled.div`
   background-color: ${themeCssVariables.background.primary};
-  border: 1px solid ${themeCssVariables.border.color.light};
-  border-radius: ${themeCssVariables.border.radius.md};
+  background-image: radial-gradient(
+    420px circle at 50% 0%,
+    ${themeCssVariables.color.transparent.iris2},
+    transparent 56%
+  );
+  border: 1px solid ${themeCssVariables.border.color.medium};
+  border-radius: 20px;
+  box-shadow:
+    inset 0 1px 0 ${themeCssVariables.color.transparent.gray2},
+    0 2px 4px ${themeCssVariables.boxShadow.color},
+    0 24px 54px -26px ${themeCssVariables.boxShadow.color};
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: ${themeCssVariables.spacing[4]};
-  max-width: 480px;
-  padding: ${themeCssVariables.spacing[6]};
+  gap: ${themeCssVariables.spacing[5]};
+  max-width: 500px;
+  overflow: hidden;
+  padding: 32px;
+  position: relative;
   width: 100%;
+
+  &::before {
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      ${themeCssVariables.color.iris8} 35%,
+      ${themeCssVariables.color.cyan8} 65%,
+      transparent 100%
+    );
+    content: '';
+    height: 2px;
+    inset: 0 0 auto;
+    pointer-events: none;
+    position: absolute;
+  }
 `;
 
 const StyledLogo = styled.img`
   align-self: center;
-  height: 48px;
-  width: 48px;
+  border: 1px solid ${themeCssVariables.border.color.medium};
+  border-radius: 14px;
+  box-shadow: 0 8px 20px -10px ${themeCssVariables.color.transparent.iris7};
+  height: 52px;
+  padding: 6px;
+  width: 52px;
 `;
 
 const StyledTitle = styled.h1`
   color: ${themeCssVariables.font.color.primary};
-  font-size: ${themeCssVariables.font.size.xl};
+  font-size: 24px;
   font-weight: ${themeCssVariables.font.weight.semiBold};
+  letter-spacing: -0.025em;
   margin: 0;
   text-align: center;
 `;
@@ -67,12 +110,17 @@ const StyledTitle = styled.h1`
 const StyledMessage = styled.div`
   color: ${themeCssVariables.font.color.secondary};
   font-size: ${themeCssVariables.font.size.md};
+  line-height: 1.5;
   text-align: center;
 `;
 
 const StyledErrorMessage = styled.div`
-  color: ${themeCssVariables.font.color.danger};
+  background: ${themeCssVariables.color.transparent.red2};
+  border: 1px solid ${themeCssVariables.color.transparent.red6};
+  border-radius: 10px;
+  color: ${themeCssVariables.color.red11};
   font-size: ${themeCssVariables.font.size.sm};
+  padding: 10px 12px;
   text-align: center;
 `;
 

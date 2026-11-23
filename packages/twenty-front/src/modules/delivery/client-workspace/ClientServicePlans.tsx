@@ -32,17 +32,45 @@ const CHANGE_CLIENT_SERVICE = gql`
   }
 `;
 const StyledClientServicePlan = styled.div`
-  border-top: 1px solid ${themeCssVariables.border.color.light};
+  background: ${themeCssVariables.background.primary};
+  border: 1px solid ${themeCssVariables.border.color.light};
+  border-radius: 16px;
+  box-shadow:
+    0 1px 2px ${themeCssVariables.color.transparent.gray2},
+    0 8px 24px -18px ${themeCssVariables.color.transparent.gray5},
+    inset 0 1px 0 ${themeCssVariables.color.transparent.gray2};
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 20px 0;
+  padding: 20px 22px;
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+  &:hover {
+    border-color: ${themeCssVariables.color.iris6};
+    box-shadow:
+      0 8px 24px -14px ${themeCssVariables.color.transparent.iris5},
+      inset 0 1px 0 ${themeCssVariables.color.transparent.gray2};
+    transform: translateY(-1px);
+  }
   p {
     max-width: 72ch;
   }
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+    &:hover {
+      transform: none;
+    }
+  }
 `;
 const StyledClientServiceScope = styled.p`
+  background: ${themeCssVariables.background.secondary};
+  border: 1px solid ${themeCssVariables.border.color.light};
+  border-radius: 10px;
+  line-height: 1.55;
   overflow-wrap: anywhere;
+  padding: 12px 14px;
   white-space: pre-wrap;
 `;
 const StyledClientServiceBoundary = styled.fieldset`

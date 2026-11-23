@@ -21,12 +21,37 @@ const StyledRow = styled.div`
   display: grid;
   gap: ${themeCssVariables.spacing[3]};
   grid-template-columns: 1.4fr 0.5fr 0.9fr 0.7fr 0.7fr 0.7fr 1.3fr auto;
-  padding: ${themeCssVariables.spacing[3]} ${themeCssVariables.spacing[2]};
+  padding: 12px 14px;
+  transition: background-color 140ms ease;
+
+  &:first-child {
+    background: ${themeCssVariables.background.secondary};
+    color: ${themeCssVariables.font.color.tertiary};
+    font-family: ${themeCssVariables.code.font.family};
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  &:not(:first-child):hover {
+    background: ${themeCssVariables.color.transparent.iris1};
+  }
+
+  &:last-child {
+    border-bottom: 0;
+  }
 `;
 
 const StyledMemberCell = styled.div`
   display: flex;
   flex-direction: column;
+  gap: 2px;
+
+  > span:first-child {
+    color: ${themeCssVariables.font.color.primary};
+    font-weight: ${themeCssVariables.font.weight.medium};
+  }
 `;
 
 const StyledMemberEmail = styled.span`

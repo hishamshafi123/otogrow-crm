@@ -19,9 +19,17 @@ import { themeCssVariables } from 'twenty-ui/theme-constants';
 import { H2Title } from 'twenty-ui/typography';
 
 const StyledForm = styled.div`
+  background: ${themeCssVariables.background.primary};
+  border: 1px solid ${themeCssVariables.border.color.light};
+  border-radius: 16px;
+  box-shadow:
+    0 1px 2px ${themeCssVariables.color.transparent.gray2},
+    0 8px 24px -18px ${themeCssVariables.color.transparent.gray5},
+    inset 0 1px 0 ${themeCssVariables.color.transparent.gray2};
   display: flex;
   flex-direction: column;
   gap: ${themeCssVariables.spacing[4]};
+  padding: 18px 20px;
 `;
 
 export const SequenceSettingsSection = ({

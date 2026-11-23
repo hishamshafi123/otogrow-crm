@@ -22,8 +22,15 @@ import { H2Title } from 'twenty-ui/typography';
 
 const StyledActiveRow = styled.div`
   align-items: center;
+  background: ${themeCssVariables.background.primary};
+  border: 1px solid ${themeCssVariables.border.color.light};
+  border-radius: 12px;
   display: flex;
-  gap: ${themeCssVariables.spacing[2]};
+  font-size: ${themeCssVariables.font.size.md};
+  font-weight: ${themeCssVariables.font.weight.medium};
+  gap: ${themeCssVariables.spacing[3]};
+  padding: 10px 14px;
+  width: fit-content;
 `;
 
 const StyledTestConnectionRow = styled.div`
@@ -33,8 +40,14 @@ const StyledTestConnectionRow = styled.div`
 `;
 
 const StyledTableContainer = styled.div`
+  background: ${themeCssVariables.background.primary};
   border: 1px solid ${themeCssVariables.border.color.light};
-  border-radius: ${themeCssVariables.border.radius.sm};
+  border-radius: 16px;
+  box-shadow:
+    0 1px 2px ${themeCssVariables.color.transparent.gray2},
+    0 8px 24px -18px ${themeCssVariables.color.transparent.gray5},
+    inset 0 1px 0 ${themeCssVariables.color.transparent.gray2};
+  overflow-x: auto;
 `;
 
 export const SettingsSettersTelegram = () => {

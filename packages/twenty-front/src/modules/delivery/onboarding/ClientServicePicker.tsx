@@ -10,7 +10,7 @@ import { useServiceCatalog } from '@/delivery/onboarding/useServiceCatalog';
 
 const StyledServiceChoices = styled.div`
   display: grid;
-  gap: 4px 12px;
+  gap: 8px 10px;
   grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
   margin-block: 12px;
   max-height: 280px;
@@ -18,13 +18,27 @@ const StyledServiceChoices = styled.div`
   padding: 4px;
   > label {
     align-items: center;
+    background: ${themeCssVariables.background.primary};
+    border: 1px solid ${themeCssVariables.border.color.light};
+    border-radius: 12px;
     cursor: pointer;
     display: flex;
-    gap: 8px;
+    gap: 10px;
     min-height: 44px;
     overflow-wrap: anywhere;
+    padding: 8px 12px;
+    transition:
+      background-color 150ms ease,
+      border-color 150ms ease,
+      box-shadow 150ms ease;
+  }
+  > label:hover {
+    background: ${themeCssVariables.color.transparent.iris1};
+    border-color: ${themeCssVariables.color.iris6};
+    box-shadow: 0 4px 12px -8px ${themeCssVariables.color.transparent.iris5};
   }
   input[type='checkbox'] {
+    accent-color: ${themeCssVariables.color.iris9};
     flex: 0 0 auto;
     margin: 0;
   }
@@ -38,30 +52,37 @@ const StyledSelectedServices = styled.ul`
   padding: 0;
   li {
     align-items: center;
-    background: ${themeCssVariables.background.secondary};
-    border: 1px solid ${themeCssVariables.border.color.light};
-    border-radius: 9px;
+    background: ${themeCssVariables.color.transparent.iris2};
+    border: 1px solid ${themeCssVariables.color.iris5};
+    border-radius: 999px;
+    color: ${themeCssVariables.color.iris11};
     display: flex;
     flex-wrap: wrap;
+    font-size: 13px;
+    font-weight: 500;
     gap: 8px;
     max-width: 100%;
-    padding: 6px 8px 6px 12px;
+    padding: 4px 6px 4px 14px;
   }
   li > span {
     overflow-wrap: anywhere;
   }
   li > button {
-    min-height: 32px;
-    padding: 4px 8px;
+    border-radius: 999px;
+    min-height: 28px;
+    padding: 4px 10px;
   }
 `;
 const StyledCustomService = styled.div`
-  border-left: 3px solid ${themeCssVariables.color.blue8};
+  background: ${themeCssVariables.color.transparent.iris1};
+  border: 1px solid ${themeCssVariables.color.iris5};
+  border-left: 3px solid ${themeCssVariables.color.iris9};
+  border-radius: 12px;
   display: flex;
   flex-direction: column;
   gap: 12px;
   margin: 12px 0;
-  padding: 4px 0 4px 16px;
+  padding: 14px 16px;
 `;
 const serviceKey = (value: string) =>
   value.trim().toLowerCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ');

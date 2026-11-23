@@ -31,26 +31,48 @@ type SettingsLeadFormFormProps = {
 
 const StyledFieldRow = styled.div`
   align-items: center;
+  background: ${themeCssVariables.background.primary};
+  border: 1px solid ${themeCssVariables.border.color.light};
+  border-radius: 12px;
   display: grid;
   gap: ${themeCssVariables.spacing[2]};
   grid-template-columns: 40px 2fr 80px 1fr;
-  padding: ${themeCssVariables.spacing[2]} 0;
+  margin-bottom: 8px;
+  padding: 10px 12px;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease;
+
+  &:hover {
+    border-color: ${themeCssVariables.color.iris6};
+    box-shadow: 0 4px 12px -8px ${themeCssVariables.color.transparent.iris5};
+  }
 `;
 
 const StyledFieldRowHeader = styled.div`
   color: ${themeCssVariables.font.color.tertiary};
   display: grid;
-  font-size: ${themeCssVariables.font.size.xs};
-  font-weight: ${themeCssVariables.font.weight.semiBold};
+  font-family: ${themeCssVariables.code.font.family};
+  font-size: 11px;
+  font-weight: 600;
   gap: ${themeCssVariables.spacing[2]};
   grid-template-columns: 40px 2fr 80px 1fr;
-  padding-bottom: ${themeCssVariables.spacing[1]};
+  letter-spacing: 0.05em;
+  padding: 0 12px ${themeCssVariables.spacing[2]};
   text-transform: uppercase;
 `;
 
 const StyledFieldType = styled.span`
-  color: ${themeCssVariables.font.color.tertiary};
-  font-size: ${themeCssVariables.font.size.sm};
+  background: ${themeCssVariables.color.transparent.iris2};
+  border: 1px solid ${themeCssVariables.color.iris5};
+  border-radius: 999px;
+  color: ${themeCssVariables.color.iris11};
+  font-family: ${themeCssVariables.code.font.family};
+  font-size: 10.5px;
+  font-weight: 600;
+  justify-self: start;
+  padding: 2px 9px;
+  text-transform: uppercase;
 `;
 
 const StyledFieldRowError = styled.div`
@@ -60,34 +82,48 @@ const StyledFieldRowError = styled.div`
 
 const StyledActiveRow = styled.div`
   align-items: center;
+  background: ${themeCssVariables.background.primary};
+  border: 1px solid ${themeCssVariables.border.color.light};
+  border-radius: 12px;
   display: flex;
-  gap: ${themeCssVariables.spacing[2]};
+  font-weight: ${themeCssVariables.font.weight.medium};
+  gap: ${themeCssVariables.spacing[3]};
+  padding: 10px 14px;
+  width: fit-content;
 `;
 
 const StyledEmbedSnippet = styled.pre`
-  background-color: ${themeCssVariables.background.tertiary};
-  border: 1px solid ${themeCssVariables.border.color.light};
-  border-radius: ${themeCssVariables.border.radius.md};
-  color: ${themeCssVariables.font.color.secondary};
-  font-size: ${themeCssVariables.font.size.sm};
+  background-color: ${themeCssVariables.background.secondary};
+  border: 1px solid ${themeCssVariables.color.iris5};
+  border-radius: 12px;
+  color: ${themeCssVariables.font.color.primary};
+  font-family: ${themeCssVariables.code.font.family};
+  font-size: 12px;
+  line-height: 1.5;
   margin: 0;
   overflow-x: auto;
-  padding: ${themeCssVariables.spacing[2]};
+  padding: 12px 14px;
   white-space: pre-wrap;
+  width: 100%;
   word-break: break-all;
 `;
 
 const StyledEmbedContainer = styled.div`
   display: flex;
   flex-direction: column;
-  gap: ${themeCssVariables.spacing[3]};
+  gap: ${themeCssVariables.spacing[4]};
 `;
 
 const StyledEmbedRow = styled.div`
   align-items: flex-start;
+  background: ${themeCssVariables.background.primary};
+  border: 1px solid ${themeCssVariables.border.color.light};
+  border-radius: 14px;
+  box-shadow: 0 1px 2px ${themeCssVariables.color.transparent.gray2};
   display: flex;
   flex-direction: column;
   gap: ${themeCssVariables.spacing[2]};
+  padding: 14px 16px;
 `;
 
 export const SettingsLeadFormForm = ({

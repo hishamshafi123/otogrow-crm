@@ -15,37 +15,51 @@ import { useObjectMetadataItem } from '@/object-metadata/hooks/useObjectMetadata
 import { Select } from '@/ui/input/components/Select';
 
 const StyledPanel = styled.section`
-  background: ${themeCssVariables.background.secondary};
+  background-color: ${themeCssVariables.background.primary};
+  background-image: radial-gradient(
+    420px circle at 0% 0%,
+    ${themeCssVariables.color.transparent.iris2},
+    transparent 56%
+  );
   border: 1px solid ${themeCssVariables.border.color.medium};
-  border-radius: 12px;
+  border-radius: 18px;
+  box-shadow:
+    inset 0 1px 0 ${themeCssVariables.color.transparent.gray2},
+    0 14px 32px -20px ${themeCssVariables.boxShadow.color};
   display: grid;
   gap: 20px;
   margin: 20px 0;
   padding: 24px;
 `;
+
 const StyledHeader = styled.div`
   align-items: center;
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
   justify-content: space-between;
+
   h2 {
+    letter-spacing: -0.02em;
     margin: 0;
   }
 `;
+
 const StyledActions = styled.div`
   align-items: center;
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 10px;
 `;
+
 const StyledColumns = styled.div`
   display: grid;
   gap: 24px;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 `;
+
 const StyledError = styled.p`
-  color: ${themeCssVariables.color.red};
+  color: ${themeCssVariables.color.red11};
 `;
 
 type MetaLeadDetailPanelProps = { lead: MetaSheetLead; onClose: () => void };

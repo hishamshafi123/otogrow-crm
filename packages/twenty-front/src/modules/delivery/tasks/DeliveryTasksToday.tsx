@@ -9,14 +9,28 @@ import { deliveryTaskSelection } from '@/delivery/delivery-task-navigation';
 import { DeliveryAssignedReviewsToday } from '@/delivery/reviews/DeliveryAssignedReviewsToday';
 
 const StyledOverview = styled.section`
-  background: ${themeCssVariables.background.primary};
-  border: 1px solid ${themeCssVariables.border.color.light};
-  border-radius: 16px;
+  background-color: ${themeCssVariables.background.primary};
+  background-image:
+    radial-gradient(
+      460px circle at 0% 0%,
+      ${themeCssVariables.color.transparent.iris2},
+      transparent 54%
+    ),
+    radial-gradient(
+      360px circle at 100% 0%,
+      ${themeCssVariables.color.transparent.cyan2},
+      transparent 52%
+    );
+  border: 1px solid ${themeCssVariables.border.color.medium};
+  border-radius: 18px;
+  box-shadow:
+    inset 0 1px 0 ${themeCssVariables.color.transparent.gray2},
+    0 12px 30px -20px ${themeCssVariables.boxShadow.color};
   min-width: 0;
-  padding: 16px 20px;
+  padding: 20px 22px;
 
   &[data-empty='true'] {
-    padding: 12px 16px;
+    padding: 14px 18px;
 
     &:not(:has(section)) {
       display: none;
@@ -29,15 +43,19 @@ const StyledOverview = styled.section`
 `;
 
 const StyledScope = styled.p`
-  color: ${themeCssVariables.font.color.secondary};
-  font-size: 12px;
+  color: ${themeCssVariables.font.color.tertiary};
+  font-family: ${themeCssVariables.code.font.family};
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
   line-height: 16px;
-  padding-bottom: 10px;
+  padding-bottom: 12px;
+  text-transform: uppercase;
 `;
 
 const StyledMetrics = styled.div`
   display: grid;
-  gap: 24px;
+  gap: 14px;
   grid-template-columns: repeat(3, minmax(0, 1fr));
 
   &:has(> section) {
@@ -45,7 +63,8 @@ const StyledMetrics = styled.div`
   }
 
   @media (max-width: 700px) {
-    gap: 16px;
+    gap: 12px;
+
     &:has(> section) {
       grid-template-columns: repeat(3, minmax(0, 1fr));
     }
@@ -57,13 +76,21 @@ const StyledMetrics = styled.div`
 `;
 
 const StyledMetric = styled(Link)`
-  border-radius: 8px;
+  background: ${themeCssVariables.background.secondary};
+  border: 1px solid ${themeCssVariables.border.color.light};
+  border-radius: 14px;
   display: flex;
   flex-direction: column;
   gap: 6px;
   min-height: 44px;
   min-width: 0;
+  padding: 14px 16px;
   text-decoration: none;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    transform 150ms ease;
 
   dl {
     display: flex;
@@ -73,23 +100,30 @@ const StyledMetric = styled(Link)`
   }
 
   dt {
-    color: ${themeCssVariables.color.blue11};
-    font-size: 13px;
+    color: ${themeCssVariables.color.iris11};
+    font-size: 12.5px;
+    font-weight: 500;
   }
 
   dd {
     color: ${themeCssVariables.font.color.primary};
-    font-size: 24px;
+    font-size: 28px;
     font-variant-numeric: tabular-nums;
-    font-weight: 600;
-    letter-spacing: -1px;
-    line-height: 1.15;
+    font-weight: 650;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
     margin: 0;
   }
 
+  &:hover {
+    background: ${themeCssVariables.background.primary};
+    border-color: ${themeCssVariables.color.iris7};
+    box-shadow: 0 8px 20px -14px ${themeCssVariables.color.transparent.iris7};
+    transform: translateY(-2px);
+  }
+
   &:hover dt {
-    text-decoration: underline;
-    text-underline-offset: 3px;
+    color: ${themeCssVariables.color.iris12};
   }
 `;
 

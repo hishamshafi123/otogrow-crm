@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { isNonEmptyString } from '@sniptt/guards';
 import { isDefined } from 'twenty-shared/utils';
 import { IconPhone, IconX } from 'twenty-ui/icon';
+import { GRAY_SCALE_LIGHT } from 'twenty-ui/theme';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
 
 import { ActiveCallControls } from '@/calling/components/ActiveCallControls';
@@ -28,35 +29,58 @@ import { useAtomStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomState
 
 const StyledFab = styled.button`
   align-items: center;
-  background: ${themeCssVariables.color.blue};
-  border: none;
+  background: linear-gradient(
+    135deg,
+    ${themeCssVariables.color.iris9} 0%,
+    ${themeCssVariables.color.violet9} 100%
+  );
+  border: 1px solid ${themeCssVariables.color.transparent.iris8};
   border-radius: 50%;
   bottom: ${themeCssVariables.spacing[5]};
-  box-shadow: ${themeCssVariables.boxShadow.strong};
-  color: ${themeCssVariables.font.color.inverted};
+  box-shadow:
+    inset 0 1px 0 ${themeCssVariables.color.transparent.gray4},
+    0 12px 28px -8px ${themeCssVariables.color.iris9};
+  color: ${GRAY_SCALE_LIGHT.gray1};
   cursor: pointer;
   display: flex;
-  height: ${themeCssVariables.spacing[12]};
+  height: 52px;
   justify-content: center;
   position: fixed;
   right: ${themeCssVariables.spacing[5]};
-  width: ${themeCssVariables.spacing[12]};
+  transition:
+    box-shadow 160ms ease,
+    transform 160ms ease;
+  width: 52px;
   z-index: 1000;
+
+  &:hover {
+    box-shadow:
+      inset 0 1px 0 ${themeCssVariables.color.transparent.gray5},
+      0 16px 34px -8px ${themeCssVariables.color.iris9};
+    transform: translateY(-2px);
+  }
 `;
 
 const StyledPanel = styled.div`
-  background: ${themeCssVariables.background.primary};
-  border: 1px solid ${themeCssVariables.border.color.light};
-  border-radius: ${themeCssVariables.border.radius.md};
+  background-color: ${themeCssVariables.background.primary};
+  background-image: radial-gradient(
+    280px circle at 100% 0%,
+    ${themeCssVariables.color.transparent.iris2},
+    transparent 56%
+  );
+  border: 1px solid ${themeCssVariables.border.color.medium};
+  border-radius: 20px;
   bottom: ${themeCssVariables.spacing[5]};
-  box-shadow: ${themeCssVariables.boxShadow.strong};
+  box-shadow:
+    inset 0 1px 0 ${themeCssVariables.color.transparent.gray2},
+    0 24px 56px -18px ${themeCssVariables.boxShadow.color};
   display: flex;
   flex-direction: column;
   gap: ${themeCssVariables.spacing[3]};
-  padding: ${themeCssVariables.spacing[4]};
+  padding: 18px;
   position: fixed;
   right: ${themeCssVariables.spacing[5]};
-  width: 300px;
+  width: 312px;
   z-index: 1000;
 `;
 
@@ -69,41 +93,81 @@ const StyledHeader = styled.div`
 const StyledTitle = styled.span`
   color: ${themeCssVariables.font.color.primary};
   font-size: ${themeCssVariables.font.size.md};
-  font-weight: ${themeCssVariables.font.weight.medium};
+  font-weight: ${themeCssVariables.font.weight.semiBold};
+  letter-spacing: -0.015em;
 `;
 
 const StyledCloseButton = styled.button`
+  align-items: center;
   background: transparent;
   border: none;
+  border-radius: 8px;
   color: ${themeCssVariables.font.color.tertiary};
   cursor: pointer;
   display: flex;
-  padding: ${themeCssVariables.spacing[1]};
+  justify-content: center;
+  padding: 6px;
+  transition:
+    background-color 140ms ease,
+    color 140ms ease;
+
+  &:hover {
+    background: ${themeCssVariables.background.tertiary};
+    color: ${themeCssVariables.font.color.primary};
+  }
 `;
 
 const StyledNumberInput = styled.input`
   background: ${themeCssVariables.background.secondary};
-  border: 1px solid ${themeCssVariables.border.color.light};
-  border-radius: ${themeCssVariables.border.radius.sm};
+  border: 1px solid ${themeCssVariables.border.color.medium};
+  border-radius: 10px;
+  box-sizing: border-box;
   color: ${themeCssVariables.font.color.primary};
   font-size: ${themeCssVariables.font.size.md};
-  padding: ${themeCssVariables.spacing[2]};
+  font-variant-numeric: tabular-nums;
+  padding: 10px 12px;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
   width: 100%;
+
+  &:focus {
+    border-color: ${themeCssVariables.color.iris9};
+    box-shadow: 0 0 0 3px ${themeCssVariables.color.transparent.iris3};
+    outline: none;
+  }
 `;
 
 const StyledCallButton = styled.button`
   align-items: center;
-  background: ${themeCssVariables.color.green};
-  border: none;
-  border-radius: ${themeCssVariables.border.radius.sm};
-  color: ${themeCssVariables.font.color.inverted};
+  background: linear-gradient(
+    135deg,
+    ${themeCssVariables.color.jade9} 0%,
+    ${themeCssVariables.color.green9} 100%
+  );
+  border: 1px solid ${themeCssVariables.color.transparent.jade8};
+  border-radius: 10px;
+  box-shadow:
+    inset 0 1px 0 ${themeCssVariables.color.transparent.gray4},
+    0 8px 20px -10px ${themeCssVariables.color.jade9};
+  color: ${GRAY_SCALE_LIGHT.gray1};
   cursor: pointer;
   display: flex;
   font-size: ${themeCssVariables.font.size.md};
-  font-weight: ${themeCssVariables.font.weight.medium};
+  font-weight: ${themeCssVariables.font.weight.semiBold};
   gap: ${themeCssVariables.spacing[2]};
   justify-content: center;
-  padding: ${themeCssVariables.spacing[2]};
+  padding: 10px 14px;
+  transition:
+    box-shadow 150ms ease,
+    transform 150ms ease;
+
+  &:hover:not(:disabled) {
+    box-shadow:
+      inset 0 1px 0 ${themeCssVariables.color.transparent.gray5},
+      0 10px 24px -10px ${themeCssVariables.color.jade9};
+    transform: translateY(-1px);
+  }
 
   &:disabled {
     cursor: not-allowed;
@@ -112,7 +176,7 @@ const StyledCallButton = styled.button`
 `;
 
 const StyledError = styled.div`
-  color: ${themeCssVariables.color.red};
+  color: ${themeCssVariables.color.red11};
   font-size: ${themeCssVariables.font.size.sm};
 `;
 

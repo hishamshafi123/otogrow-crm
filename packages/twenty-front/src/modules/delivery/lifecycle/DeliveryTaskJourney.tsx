@@ -12,15 +12,21 @@ import {
 import { type TaskReviewSnapshot } from '@/delivery/reviews/review.types';
 
 const StyledJourney = styled.section`
-  background: ${themeCssVariables.background.primary};
-  border: 1px solid ${themeCssVariables.border.color.light};
-  border-radius: 12px;
+  background-color: ${themeCssVariables.background.primary};
+  background-image: radial-gradient(
+    360px circle at 0% 0%,
+    ${themeCssVariables.color.transparent.iris2},
+    transparent 56%
+  );
+  border: 1px solid ${themeCssVariables.border.color.medium};
+  border-radius: 16px;
+  box-shadow: inset 0 1px 0 ${themeCssVariables.color.transparent.gray2};
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
   min-width: 0;
   overflow-wrap: anywhere;
-  padding: 16px;
+  padding: 18px 20px;
 
   > p {
     max-width: 72ch;
@@ -35,31 +41,38 @@ const StyledJourney = styled.section`
   > details {
     border-top: 1px solid ${themeCssVariables.border.color.light};
     margin-top: 4px;
-    padding-top: 8px;
+    padding-top: 10px;
   }
 
   > details > summary {
     color: ${themeCssVariables.font.color.secondary};
     font-size: 13px;
+    font-weight: 500;
   }
 `;
 
 const StyledSteps = styled.ol`
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
   list-style: none;
   margin: 0;
   padding: 0;
 
   li {
     align-items: baseline;
-    border-left: 2px solid ${themeCssVariables.border.color.light};
+    border-left: 2px solid ${themeCssVariables.border.color.medium};
+    border-radius: 0 10px 10px 0;
     display: flex;
     flex-wrap: wrap;
     gap: 4px 12px;
     justify-content: space-between;
-    padding: 8px 12px;
+    padding: 8px 14px;
 
     &[aria-current='step'] {
-      border-color: ${themeCssVariables.color.blue11};
+      background: ${themeCssVariables.color.transparent.iris2};
+      border-color: ${themeCssVariables.color.iris9};
+      color: ${themeCssVariables.color.iris11};
       font-weight: 600;
     }
   }

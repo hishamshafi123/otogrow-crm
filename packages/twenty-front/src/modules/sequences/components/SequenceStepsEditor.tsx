@@ -13,7 +13,8 @@ import { H2Title } from 'twenty-ui/typography';
 const StyledStepList = styled.div`
   display: flex;
   flex-direction: column;
-  gap: ${themeCssVariables.spacing[3]};
+  gap: ${themeCssVariables.spacing[4]};
+  padding-top: ${themeCssVariables.spacing[1]};
 `;
 
 export const SequenceStepsEditor = ({ sequenceId }: { sequenceId: string }) => {

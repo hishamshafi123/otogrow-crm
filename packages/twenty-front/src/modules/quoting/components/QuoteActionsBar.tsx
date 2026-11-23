@@ -18,12 +18,35 @@ const StyledActionsRow = styled.div`
 
 const StyledStatusBadge = styled.span`
   background-color: ${themeCssVariables.background.tertiary};
-  border-radius: ${themeCssVariables.border.radius.sm};
+  border: 1px solid ${themeCssVariables.border.color.medium};
+  border-radius: 999px;
   color: ${themeCssVariables.font.color.secondary};
-  font-size: ${themeCssVariables.font.size.sm};
+  font-family: ${themeCssVariables.code.font.family};
+  font-size: 11.5px;
   font-weight: ${themeCssVariables.font.weight.semiBold};
+  letter-spacing: 0.05em;
   margin-right: auto;
-  padding: ${themeCssVariables.spacing[1]} ${themeCssVariables.spacing[2]};
+  padding: 4px 12px;
+  text-transform: uppercase;
+
+  &[data-status='SENT'] {
+    background-color: ${themeCssVariables.color.transparent.iris3};
+    border-color: ${themeCssVariables.color.transparent.iris6};
+    color: ${themeCssVariables.color.iris11};
+  }
+
+  &[data-status='ACCEPTED'] {
+    background-color: ${themeCssVariables.color.transparent.jade3};
+    border-color: ${themeCssVariables.color.transparent.jade6};
+    color: ${themeCssVariables.color.jade11};
+  }
+
+  &[data-status='REJECTED'],
+  &[data-status='EXPIRED'] {
+    background-color: ${themeCssVariables.color.transparent.red3};
+    border-color: ${themeCssVariables.color.transparent.red6};
+    color: ${themeCssVariables.color.red11};
+  }
 `;
 
 type QuoteActionsBarProps = {
@@ -59,7 +82,9 @@ export const QuoteActionsBar = ({
         }
       />
       <StyledActionsRow>
-        <StyledStatusBadge>{quote.status}</StyledStatusBadge>
+        <StyledStatusBadge data-status={quote.status}>
+          {quote.status}
+        </StyledStatusBadge>
         {quote.status !== 'SENT' && (
           <Button
             Icon={IconSend}

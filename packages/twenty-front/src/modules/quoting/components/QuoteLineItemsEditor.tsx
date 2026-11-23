@@ -17,6 +17,7 @@ const StyledLineItemList = styled.div`
   display: flex;
   flex-direction: column;
   gap: ${themeCssVariables.spacing[3]};
+  padding-top: ${themeCssVariables.spacing[1]};
 `;
 
 type QuoteLineItemsEditorProps = {

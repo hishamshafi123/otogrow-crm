@@ -4,6 +4,7 @@ import {
 } from '@/delivery/onboarding/ClientServicePicker';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { styled } from '@linaria/react';
+import { themeCssVariables } from 'twenty-ui/theme-constants';
 import {
   type ServicePlanValues,
   type ServicePlanQuestion,
@@ -23,7 +24,17 @@ const StyledServicePlanFields = styled.div`
   gap: 20px;
   min-width: 0;
   fieldset {
+    background: ${themeCssVariables.background.secondary};
+    border: 1px solid ${themeCssVariables.border.color.light};
+    border-radius: 14px;
     min-inline-size: 0;
+    padding: 16px 18px;
+  }
+  legend {
+    color: ${themeCssVariables.font.color.primary};
+    font-size: 13px;
+    font-weight: 600;
+    padding: 0 6px;
   }
 `;
 

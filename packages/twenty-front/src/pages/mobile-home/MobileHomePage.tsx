@@ -12,6 +12,18 @@ import { themeCssVariables } from 'twenty-ui/theme-constants';
 import { PermissionFlagType } from '~/generated-metadata/graphql';
 
 const StyledContainer = styled.div`
+  background:
+    radial-gradient(
+      ellipse 90% 45% at 50% 0%,
+      ${themeCssVariables.color.transparent.iris2} 0%,
+      transparent 72%
+    ),
+    radial-gradient(
+      ellipse 60% 35% at 100% 10%,
+      ${themeCssVariables.color.transparent.cyan2} 0%,
+      transparent 70%
+    ),
+    ${themeCssVariables.background.primary};
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -25,7 +37,7 @@ const StyledContainer = styled.div`
 const StyledSections = styled.div`
   display: flex;
   flex-direction: column;
-  gap: ${themeCssVariables.spacing[3]};
+  gap: ${themeCssVariables.spacing[4]};
 `;
 
 export const MobileHomePage = () => {
