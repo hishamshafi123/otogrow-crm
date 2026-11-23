@@ -9,6 +9,10 @@ import {
   isPositiveMicros,
 } from '@/delivery/founder/performance/admin-dashboard-metrics';
 import {
+  handleCardSpotlightLeave,
+  handleCardSpotlightMove,
+} from '@/delivery/founder/performance/cardSpotlight';
+import {
   StyledChartAxisLabels,
   StyledChartFrame,
   StyledCompactList,
@@ -44,7 +48,12 @@ export const AdminCashForecastPanel = ({
 
   if (error) {
     return (
-      <StyledAdminPanel aria-label={t`${currency} 90-day cash forecast`}>
+      <StyledAdminPanel
+        aria-label={t`${currency} 90-day cash forecast`}
+        data-tone="warning"
+        onPointerLeave={handleCardSpotlightLeave}
+        onPointerMove={handleCardSpotlightMove}
+      >
         <StyledDeliveryStack>
           <StyledAdminSectionHeader>
             <h2>
@@ -67,7 +76,12 @@ export const AdminCashForecastPanel = ({
 
   if (loading && !forecast) {
     return (
-      <StyledAdminPanel aria-label={t`${currency} 90-day cash forecast`}>
+      <StyledAdminPanel
+        aria-label={t`${currency} 90-day cash forecast`}
+        data-accent="cyan"
+        onPointerLeave={handleCardSpotlightLeave}
+        onPointerMove={handleCardSpotlightMove}
+      >
         <StyledDeliveryStack>
           <StyledAdminSectionHeader>
             <h2>
@@ -90,12 +104,16 @@ export const AdminCashForecastPanel = ({
       ? formatFinanceAmountMicros(value, forecast.currency)
       : t`Not confirmed`;
   const hasShortfall = isDefined(forecast.firstNegativeDate);
-  const strokeColor = hasShortfall
+  const gradientPrefix = `cash-forecast-${forecast.currency.toLowerCase()}`;
+  const areaGradientId = `${gradientPrefix}-area`;
+  const lineGradientId = `${gradientPrefix}-line`;
+  const glowFilterId = `${gradientPrefix}-glow`;
+  const primaryStopColor = hasShortfall
     ? themeCssVariables.color.red9
-    : themeCssVariables.color.blue9;
-  const fillColor = hasShortfall
-    ? themeCssVariables.color.red3
-    : themeCssVariables.color.blue3;
+    : themeCssVariables.color.cyan9;
+  const secondaryStopColor = hasShortfall
+    ? themeCssVariables.color.orange9
+    : themeCssVariables.color.iris9;
 
   const upcomingItems = forecast.items
     .filter((item) => item.status === 'OPEN')
@@ -107,7 +125,13 @@ export const AdminCashForecastPanel = ({
     isPositiveMicros(forecast.unappliedActualOutflowMicros);
 
   return (
-    <StyledAdminPanel aria-label={t`${forecast.currency} 90-day cash forecast`}>
+    <StyledAdminPanel
+      aria-label={t`${forecast.currency} 90-day cash forecast`}
+      data-accent={hasShortfall ? undefined : 'cyan'}
+      data-tone={hasShortfall ? 'danger' : undefined}
+      onPointerLeave={handleCardSpotlightLeave}
+      onPointerMove={handleCardSpotlightMove}
+    >
       <StyledDeliveryStack>
         <StyledAdminSectionHeader>
           <div>
@@ -193,7 +217,55 @@ export const AdminCashForecastPanel = ({
               aria-label={t`90-day projected closing cash curve for ${forecast.currency}`}
               preserveAspectRatio="none"
             >
-              <path d={geometry.areaPath} fill={fillColor} opacity="0.65" />
+              <defs>
+                <linearGradient id={areaGradientId} x1="0" y1="0" x2="0" y2="1">
+                  <stop
+                    offset="0%"
+                    stopColor={primaryStopColor}
+                    stopOpacity="0.34"
+                  />
+                  <stop
+                    offset="60%"
+                    stopColor={secondaryStopColor}
+                    stopOpacity="0.1"
+                  />
+                  <stop
+                    offset="100%"
+                    stopColor={secondaryStopColor}
+                    stopOpacity="0"
+                  />
+                </linearGradient>
+                <linearGradient id={lineGradientId} x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stopColor={secondaryStopColor} />
+                  <stop offset="100%" stopColor={primaryStopColor} />
+                </linearGradient>
+                <filter
+                  id={glowFilterId}
+                  x="-10%"
+                  y="-30%"
+                  width="120%"
+                  height="160%"
+                >
+                  <feGaussianBlur stdDeviation="2.5" result="blur" />
+                  <feMerge>
+                    <feMergeNode in="blur" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
+              </defs>
+              {[28, 74, 120].map((gridY) => (
+                <line
+                  key={gridY}
+                  x1="8"
+                  x2="552"
+                  y1={gridY}
+                  y2={gridY}
+                  stroke={themeCssVariables.border.color.light}
+                  strokeDasharray="3 5"
+                  strokeWidth="1"
+                />
+              ))}
+              <path d={geometry.areaPath} fill={`url(#${areaGradientId})`} />
               {geometry.zeroLineY !== null && (
                 <line
                   x1="8"
@@ -208,10 +280,21 @@ export const AdminCashForecastPanel = ({
               <path
                 d={geometry.linePath}
                 fill="none"
-                stroke={strokeColor}
-                strokeWidth="2.25"
+                stroke={`url(#${lineGradientId})`}
+                strokeWidth="2.5"
                 strokeLinecap="round"
                 strokeLinejoin="round"
+                filter={`url(#${glowFilterId})`}
+              />
+              <circle
+                cx={geometry.minPoint.x}
+                cy={geometry.minPoint.y}
+                r="8"
+                fill={
+                  geometry.hasNegative
+                    ? themeCssVariables.color.transparent.red4
+                    : themeCssVariables.color.transparent.cyan4
+                }
               />
               <circle
                 cx={geometry.minPoint.x}
@@ -220,8 +303,18 @@ export const AdminCashForecastPanel = ({
                 fill={
                   geometry.hasNegative
                     ? themeCssVariables.color.red9
-                    : themeCssVariables.color.blue11
+                    : themeCssVariables.color.cyan9
                 }
+                stroke={themeCssVariables.background.primary}
+                strokeWidth="1.75"
+              />
+              <circle
+                cx={geometry.endPoint.x}
+                cy={geometry.endPoint.y}
+                r="3.5"
+                fill={primaryStopColor}
+                stroke={themeCssVariables.background.primary}
+                strokeWidth="1.5"
               />
             </svg>
             <StyledChartAxisLabels>

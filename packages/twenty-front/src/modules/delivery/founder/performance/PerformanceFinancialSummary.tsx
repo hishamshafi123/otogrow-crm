@@ -11,6 +11,10 @@ import {
   calculateMonthDelta,
 } from '@/delivery/founder/performance/admin-dashboard-metrics';
 import {
+  handleCardSpotlightLeave,
+  handleCardSpotlightMove,
+} from '@/delivery/founder/performance/cardSpotlight';
+import {
   StyledCostBarSegment,
   StyledCostBarTrack,
   StyledCostLegend,
@@ -47,7 +51,10 @@ export const PerformanceFinancialSummary = ({
   };
   if (!currencies.length)
     return (
-      <StyledAdminPanel>
+      <StyledAdminPanel
+        onPointerLeave={handleCardSpotlightLeave}
+        onPointerMove={handleCardSpotlightMove}
+      >
         <StyledDeliveryStack>
           <StyledAdminSectionHeader>
             <h2>
@@ -126,6 +133,8 @@ export const PerformanceFinancialSummary = ({
           <StyledAdminPanel
             key={summary.currency}
             aria-label={t`${summary.currency} financial performance`}
+            onPointerLeave={handleCardSpotlightLeave}
+            onPointerMove={handleCardSpotlightMove}
           >
             <StyledDeliveryStack>
               <StyledAdminSectionHeader>

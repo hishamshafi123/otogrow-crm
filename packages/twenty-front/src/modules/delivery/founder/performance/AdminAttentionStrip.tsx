@@ -10,6 +10,10 @@ import { useFounderLabels } from '@/delivery/founder/useFounderLabels';
 import { useFinanceLabels } from '@/delivery/finance/useFinanceLabels';
 import { useReadinessLabels } from '@/delivery/readiness/useReadinessLabels';
 import {
+  handleCardSpotlightLeave,
+  handleCardSpotlightMove,
+} from '@/delivery/founder/performance/cardSpotlight';
+import {
   StyledCompactList,
   StyledCompactListItem,
   StyledQuickLinks,
@@ -63,7 +67,18 @@ export const AdminAttentionStrip = ({
   };
 
   return (
-    <StyledAdminPanel aria-label={t`Needs attention now`}>
+    <StyledAdminPanel
+      aria-label={t`Needs attention now`}
+      data-tone={
+        degradedConnections.length > 0
+          ? 'danger'
+          : totalOpen > 0
+            ? 'warning'
+            : 'positive'
+      }
+      onPointerLeave={handleCardSpotlightLeave}
+      onPointerMove={handleCardSpotlightMove}
+    >
       <StyledDeliveryStack>
         <StyledAdminSectionHeader>
           <div>

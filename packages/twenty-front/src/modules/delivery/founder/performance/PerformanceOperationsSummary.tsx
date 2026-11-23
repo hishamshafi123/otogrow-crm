@@ -1,6 +1,10 @@
 import { Trans, useLingui } from '@lingui/react/macro';
 import { type DeliveryFounderPerformanceQuery } from '~/generated-metadata/graphql';
 import { formatPerformanceRate } from '@/delivery/founder/performance/performance-format';
+import {
+  handleCardSpotlightLeave,
+  handleCardSpotlightMove,
+} from '@/delivery/founder/performance/cardSpotlight';
 import { StyledPerformanceMetrics } from '@/delivery/founder/performance/performanceStyles';
 import {
   StyledAdminPanel,
@@ -38,7 +42,12 @@ export const PerformanceOperationsSummary = ({
     ],
   ];
   return (
-    <StyledAdminPanel aria-label={t`Delivery performance`}>
+    <StyledAdminPanel
+      aria-label={t`Delivery performance`}
+      data-accent="violet"
+      onPointerLeave={handleCardSpotlightLeave}
+      onPointerMove={handleCardSpotlightMove}
+    >
       <StyledDeliveryStack>
         <StyledAdminSectionHeader>
           <h2>

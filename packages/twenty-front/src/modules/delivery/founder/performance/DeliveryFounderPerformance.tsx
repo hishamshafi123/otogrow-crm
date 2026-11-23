@@ -37,7 +37,12 @@ import { AdminPipelineAndRenewalDeck } from '@/delivery/founder/performance/Admi
 import { buildExecutiveCsv } from '@/delivery/founder/performance/admin-dashboard-metrics';
 import { useAdminExecutiveSignals } from '@/delivery/founder/performance/useAdminExecutiveSignals';
 import {
+  handleCardSpotlightLeave,
+  handleCardSpotlightMove,
+} from '@/delivery/founder/performance/cardSpotlight';
+import {
   StyledAdminControlRow,
+  StyledAdminEyebrow,
   StyledAdminPanel,
   StyledAdminExportButton,
   StyledAdminHeroBar,
@@ -46,6 +51,8 @@ import {
   StyledCurrencyPill,
   StyledCurrencyPills,
   StyledDataHealthDrawer,
+  StyledHeroBeam,
+  StyledLiveDot,
   StyledQuickLinks,
   StyledStatusPill,
 } from '@/delivery/founder/performance/adminDashboardStyles';
@@ -238,9 +245,18 @@ const PerformanceWorkspace = ({
     );
   return (
     <StyledDeliverySectionStack>
-      <StyledAdminHeroBar aria-label={t`Admin dashboard controls`}>
+      <StyledAdminHeroBar
+        aria-label={t`Admin dashboard controls`}
+        onPointerLeave={handleCardSpotlightLeave}
+        onPointerMove={handleCardSpotlightMove}
+      >
+        <StyledHeroBeam aria-hidden="true" />
         <StyledAdminHeroTop>
           <div>
+            <StyledAdminEyebrow>
+              <StyledLiveDot aria-hidden="true" />
+              <Trans>Company overview</Trans>
+            </StyledAdminEyebrow>
             <h2>
               <Trans>Executive command center</Trans>
             </h2>

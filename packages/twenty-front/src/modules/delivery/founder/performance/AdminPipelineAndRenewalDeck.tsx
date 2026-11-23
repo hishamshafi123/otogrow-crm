@@ -7,6 +7,10 @@ import {
   type DeliveryFounderSalesFunnel,
 } from '@/delivery/founder/performance/delivery-founder-executive-insights.graphql';
 import {
+  handleCardSpotlightLeave,
+  handleCardSpotlightMove,
+} from '@/delivery/founder/performance/cardSpotlight';
+import {
   StyledAdminTwoColumn,
   StyledCompactList,
   StyledCompactListItem,
@@ -45,7 +49,12 @@ export const AdminPipelineAndRenewalDeck = ({
     <StyledAdminTwoColumn
       aria-label={t`Sales pipeline, renewals and inbox SLA`}
     >
-      <StyledAdminPanel aria-label={t`CRM sales funnel and expiring quotes`}>
+      <StyledAdminPanel
+        aria-label={t`CRM sales funnel and expiring quotes`}
+        data-tone={salesFunnel.expiringQuotesCount > 0 ? 'warning' : undefined}
+        onPointerLeave={handleCardSpotlightLeave}
+        onPointerMove={handleCardSpotlightMove}
+      >
         <StyledDeliveryStack>
           <StyledAdminSectionHeader>
             <div>
@@ -201,7 +210,25 @@ export const AdminPipelineAndRenewalDeck = ({
         </StyledDeliveryStack>
       </StyledAdminPanel>
 
-      <StyledAdminPanel aria-label={t`Retainer renewals and client inbox SLA`}>
+      <StyledAdminPanel
+        aria-label={t`Retainer renewals and client inbox SLA`}
+        data-accent={
+          inboxSla.failedRepliesCount === 0 &&
+          renewals.length === 0 &&
+          inboxAlertCount === 0
+            ? 'cyan'
+            : undefined
+        }
+        data-tone={
+          inboxSla.failedRepliesCount > 0
+            ? 'danger'
+            : renewals.length > 0 || inboxAlertCount > 0
+              ? 'warning'
+              : undefined
+        }
+        onPointerLeave={handleCardSpotlightLeave}
+        onPointerMove={handleCardSpotlightMove}
+      >
         <StyledDeliveryStack>
           <StyledAdminSectionHeader>
             <div>

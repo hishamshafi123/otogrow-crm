@@ -12,6 +12,13 @@ import {
 } from '@/delivery/founder/performance/performance-format';
 import { classifyClientHealth } from '@/delivery/founder/performance/admin-dashboard-metrics';
 import {
+  getDirectoryAccent,
+  getDirectoryMonogram,
+  handleCardSpotlightLeave,
+  handleCardSpotlightMove,
+} from '@/delivery/founder/performance/cardSpotlight';
+import {
+  StyledDirectoryAvatar,
   StyledFilterTab,
   StyledFilterTabs,
   StyledStatusPill,
@@ -63,7 +70,11 @@ export const PerformanceClients = ({
         : clients;
 
   return (
-    <StyledAdminPanel aria-label={t`Client performance`}>
+    <StyledAdminPanel
+      aria-label={t`Client performance`}
+      onPointerLeave={handleCardSpotlightLeave}
+      onPointerMove={handleCardSpotlightMove}
+    >
       <StyledDeliveryStack>
         <StyledAdminSectionHeader>
           <div>
@@ -130,33 +141,52 @@ export const PerformanceClients = ({
                 ? `/delivery?view=clients&clientCompany=${client.companyId}&clientProject=${client.projectId}`
                 : workDestination;
               return (
-                <article key={client.projectId} aria-label={client.projectName}>
+                <article
+                  key={client.projectId}
+                  aria-label={client.projectName}
+                  onPointerLeave={handleCardSpotlightLeave}
+                  onPointerMove={handleCardSpotlightMove}
+                >
                   <StyledPerformanceRecord>
                     <StyledDeliveryStack>
-                      <div>
-                        <StyledDeliveryRow>
-                          <h3>{client.projectName}</h3>
-                          <StyledStatusPill
-                            data-tone={
-                              health === 'attention'
-                                ? 'warning'
+                      <div
+                        style={{
+                          alignItems: 'flex-start',
+                          display: 'flex',
+                          gap: '12px',
+                        }}
+                      >
+                        <StyledDirectoryAvatar
+                          aria-hidden="true"
+                          data-accent={getDirectoryAccent(client.projectId)}
+                        >
+                          {getDirectoryMonogram(client.projectName)}
+                        </StyledDirectoryAvatar>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <StyledDeliveryRow>
+                            <h3>{client.projectName}</h3>
+                            <StyledStatusPill
+                              data-tone={
+                                health === 'attention'
+                                  ? 'warning'
+                                  : health === 'watch'
+                                    ? 'accent'
+                                    : 'positive'
+                              }
+                            >
+                              {health === 'attention'
+                                ? t`Needs attention`
                                 : health === 'watch'
-                                  ? 'accent'
-                                  : 'positive'
-                            }
-                          >
-                            {health === 'attention'
-                              ? t`Needs attention`
-                              : health === 'watch'
-                                ? t`Open receivables`
-                                : t`Steady`}
-                          </StyledStatusPill>
-                        </StyledDeliveryRow>
-                        <small>
-                          {client.teamCount === 1
-                            ? t`1 active team member`
-                            : t`${client.teamCount} active team members`}
-                        </small>
+                                  ? t`Open receivables`
+                                  : t`Steady`}
+                            </StyledStatusPill>
+                          </StyledDeliveryRow>
+                          <small>
+                            {client.teamCount === 1
+                              ? t`1 active team member`
+                              : t`${client.teamCount} active team members`}
+                          </small>
+                        </div>
                       </div>
                       <StyledDeliveryRow>
                         <Link to={clientDestination}>
@@ -317,7 +347,12 @@ export const PerformanceEmployees = ({
 }) => {
   const { t } = useLingui();
   return (
-    <StyledAdminPanel aria-label={t`Employee performance`}>
+    <StyledAdminPanel
+      aria-label={t`Employee performance`}
+      data-accent="violet"
+      onPointerLeave={handleCardSpotlightLeave}
+      onPointerMove={handleCardSpotlightMove}
+    >
       <StyledDeliveryStack>
         <StyledAdminSectionHeader>
           <h2>
@@ -343,17 +378,36 @@ export const PerformanceEmployees = ({
         ) : (
           <StyledPerformanceList>
             {employees.map((employee) => (
-              <article key={employee.memberId} aria-label={employee.name}>
+              <article
+                key={employee.memberId}
+                aria-label={employee.name}
+                onPointerLeave={handleCardSpotlightLeave}
+                onPointerMove={handleCardSpotlightMove}
+              >
                 <StyledPerformanceRecord>
                   <StyledDeliveryStack>
-                    <div>
-                      <h3>{employee.name}</h3>
-                      <small>
-                        {employee.roleLabel || t`Team member`} ·{' '}
-                        {employee.clientCount === 1
-                          ? t`1 client project`
-                          : t`${employee.clientCount} client projects`}
-                      </small>
+                    <div
+                      style={{
+                        alignItems: 'flex-start',
+                        display: 'flex',
+                        gap: '12px',
+                      }}
+                    >
+                      <StyledDirectoryAvatar
+                        aria-hidden="true"
+                        data-accent={getDirectoryAccent(employee.memberId)}
+                      >
+                        {getDirectoryMonogram(employee.name)}
+                      </StyledDirectoryAvatar>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <h3>{employee.name}</h3>
+                        <small>
+                          {employee.roleLabel || t`Team member`} ·{' '}
+                          {employee.clientCount === 1
+                            ? t`1 client project`
+                            : t`${employee.clientCount} client projects`}
+                        </small>
+                      </div>
                     </div>
                     <div>
                       <Link

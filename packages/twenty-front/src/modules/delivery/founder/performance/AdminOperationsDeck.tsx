@@ -12,6 +12,10 @@ import {
   summarizeCapacity,
 } from '@/delivery/founder/performance/admin-dashboard-metrics';
 import {
+  handleCardSpotlightLeave,
+  handleCardSpotlightMove,
+} from '@/delivery/founder/performance/cardSpotlight';
+import {
   StyledAdminThreeColumn,
   StyledCompactList,
   StyledCompactListItem,
@@ -71,7 +75,17 @@ export const AdminOperationsDeck = ({
     <StyledAdminThreeColumn
       aria-label={t`Operations, AI spend and system health`}
     >
-      <StyledAdminPanel aria-label={t`Team capacity and review load`}>
+      <StyledAdminPanel
+        aria-label={t`Team capacity and review load`}
+        data-accent={
+          (capacitySummary?.overloadedMembers ?? 0) === 0 ? 'violet' : undefined
+        }
+        data-tone={
+          (capacitySummary?.overloadedMembers ?? 0) > 0 ? 'warning' : undefined
+        }
+        onPointerLeave={handleCardSpotlightLeave}
+        onPointerMove={handleCardSpotlightMove}
+      >
         <StyledDeliveryStack>
           <StyledAdminSectionHeader>
             <h3>
@@ -138,7 +152,19 @@ export const AdminOperationsDeck = ({
         </StyledDeliveryStack>
       </StyledAdminPanel>
 
-      <StyledAdminPanel aria-label={t`AI spend and caps`}>
+      <StyledAdminPanel
+        aria-label={t`AI spend and caps`}
+        data-accent="cyan"
+        data-tone={
+          aiSummary &&
+          (aiSummary.unresolvedCount > 0 ||
+            (aiSummary.utilizationPercent ?? 0) >= 85)
+            ? 'warning'
+            : undefined
+        }
+        onPointerLeave={handleCardSpotlightLeave}
+        onPointerMove={handleCardSpotlightMove}
+      >
         <StyledDeliveryStack>
           <StyledAdminSectionHeader>
             <h3>
@@ -212,7 +238,18 @@ export const AdminOperationsDeck = ({
         </StyledDeliveryStack>
       </StyledAdminPanel>
 
-      <StyledAdminPanel aria-label={t`System and connection readiness`}>
+      <StyledAdminPanel
+        aria-label={t`System and connection readiness`}
+        data-tone={
+          attentionConnections.length > 0
+            ? 'danger'
+            : readiness
+              ? 'positive'
+              : undefined
+        }
+        onPointerLeave={handleCardSpotlightLeave}
+        onPointerMove={handleCardSpotlightMove}
+      >
         <StyledDeliveryStack>
           <StyledAdminSectionHeader>
             <h3>

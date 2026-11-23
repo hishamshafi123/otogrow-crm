@@ -84,6 +84,8 @@ jest.mock('@/delivery/founder/performance/adminDashboardStyles', () => ({
   StyledAdminPanel: 'section',
   StyledAdminSectionHeader: 'div',
   StyledAdminEyebrow: 'span',
+  StyledLiveDot: 'span',
+  StyledHeroBeam: 'span',
   StyledAdminExportButton: 'button',
   StyledAdminHeroBar: 'section',
   StyledAdminHeroTop: 'div',
@@ -112,6 +114,7 @@ jest.mock('@/delivery/founder/performance/adminDashboardStyles', () => ({
   StyledFilterTabs: 'div',
   StyledFilterTab: 'button',
   StyledDataHealthDrawer: 'details',
+  StyledDirectoryAvatar: 'span',
 }));
 jest.mock('@apollo/client/react', () => ({
   useQuery: (...args: unknown[]) => mockQuery(...args),

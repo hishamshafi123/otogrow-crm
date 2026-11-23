@@ -16,6 +16,10 @@ import {
   isPositiveMicros,
 } from '@/delivery/founder/performance/admin-dashboard-metrics';
 import {
+  handleCardSpotlightLeave,
+  handleCardSpotlightMove,
+} from '@/delivery/founder/performance/cardSpotlight';
+import {
   StyledPulseCard,
   StyledPulseFoot,
   StyledPulseGrid,
@@ -95,11 +99,14 @@ export const AdminDashboardPulse = ({
       {data.canReadFinance && (
         <>
           <StyledPulseCard
+            data-featured="true"
             data-tone={
               isNegativeMicros(primarySummary?.resultMicros)
                 ? 'warning'
                 : undefined
             }
+            onPointerLeave={handleCardSpotlightLeave}
+            onPointerMove={handleCardSpotlightMove}
           >
             <StyledPulseLabelRow>
               <span>
@@ -144,7 +151,11 @@ export const AdminDashboardPulse = ({
             </StyledPulseFoot>
           </StyledPulseCard>
 
-          <StyledPulseCard>
+          <StyledPulseCard
+            data-accent="cyan"
+            onPointerLeave={handleCardSpotlightLeave}
+            onPointerMove={handleCardSpotlightMove}
+          >
             <StyledPulseLabelRow>
               <span>
                 <Trans>Cash collected (MTD)</Trans>
@@ -179,6 +190,9 @@ export const AdminDashboardPulse = ({
           </StyledPulseCard>
 
           <StyledPulseCard
+            data-accent={
+              !hasShortfall && !forecast?.endingCashMicros ? 'cyan' : undefined
+            }
             data-tone={
               hasShortfall
                 ? 'danger'
@@ -188,6 +202,8 @@ export const AdminDashboardPulse = ({
                     ? 'positive'
                     : undefined
             }
+            onPointerLeave={handleCardSpotlightLeave}
+            onPointerMove={handleCardSpotlightMove}
           >
             <StyledPulseLabelRow>
               <span>
@@ -234,6 +250,8 @@ export const AdminDashboardPulse = ({
 
           <StyledPulseCard
             data-tone={hasOverdueReceivables ? 'danger' : undefined}
+            onPointerLeave={handleCardSpotlightLeave}
+            onPointerMove={handleCardSpotlightMove}
           >
             <StyledPulseLabelRow>
               <span>
@@ -273,6 +291,7 @@ export const AdminDashboardPulse = ({
       )}
 
       <StyledPulseCard
+        data-accent={deliveryRiskCount === 0 ? 'violet' : undefined}
         data-tone={
           deliveryRiskCount > 0
             ? data.operations.blockedTaskCount > 0
@@ -280,6 +299,8 @@ export const AdminDashboardPulse = ({
               : 'warning'
             : undefined
         }
+        onPointerLeave={handleCardSpotlightLeave}
+        onPointerMove={handleCardSpotlightMove}
       >
         <StyledPulseLabelRow>
           <span>
@@ -306,7 +327,11 @@ export const AdminDashboardPulse = ({
         </StyledPulseFoot>
       </StyledPulseCard>
 
-      <StyledPulseCard data-tone={totalAlerts > 0 ? 'warning' : 'positive'}>
+      <StyledPulseCard
+        data-tone={totalAlerts > 0 ? 'warning' : 'positive'}
+        onPointerLeave={handleCardSpotlightLeave}
+        onPointerMove={handleCardSpotlightMove}
+      >
         <StyledPulseLabelRow>
           <span>
             <Trans>Needs attention & systems</Trans>

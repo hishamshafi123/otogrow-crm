@@ -9,6 +9,10 @@ import {
   summarizePendingHandoffs,
 } from '@/delivery/founder/performance/admin-dashboard-metrics';
 import {
+  handleCardSpotlightLeave,
+  handleCardSpotlightMove,
+} from '@/delivery/founder/performance/cardSpotlight';
+import {
   StyledCompactList,
   StyledCompactListItem,
   StyledStatusPill,
@@ -55,7 +59,13 @@ export const AdminGrowthHandoffCard = ({
     (handoffSummary?.pendingCount ?? 0) > 0;
 
   return (
-    <StyledAdminPanel aria-label={t`Sales intake and client handoffs`}>
+    <StyledAdminPanel
+      aria-label={t`Sales intake and client handoffs`}
+      data-accent={hasAlerts ? undefined : 'cyan'}
+      data-tone={hasAlerts ? 'warning' : undefined}
+      onPointerLeave={handleCardSpotlightLeave}
+      onPointerMove={handleCardSpotlightMove}
+    >
       <StyledDeliveryStack>
         <StyledAdminSectionHeader>
           <div>
