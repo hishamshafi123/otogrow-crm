@@ -81,6 +81,10 @@ jest.mock('@/delivery/founder/performance/performanceStyles', () => ({
   StyledPerformanceMuted: 'span',
 }));
 jest.mock('@/delivery/founder/performance/adminDashboardStyles', () => ({
+  StyledAdminPanel: 'section',
+  StyledAdminSectionHeader: 'div',
+  StyledAdminEyebrow: 'span',
+  StyledAdminExportButton: 'button',
   StyledAdminHeroBar: 'section',
   StyledAdminHeroTop: 'div',
   StyledAdminControlRow: 'div',

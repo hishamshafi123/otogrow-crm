@@ -18,9 +18,10 @@ import {
   StyledProgressFill,
   StyledProgressTrack,
   StyledStatusPill,
+  StyledAdminPanel,
+  StyledAdminSectionHeader,
 } from '@/delivery/founder/performance/adminDashboardStyles';
 import {
-  StyledDeliveryCard,
   StyledDeliveryRow,
   StyledDeliveryStack,
 } from '@/delivery/deliveryStyles';
@@ -70,16 +71,16 @@ export const AdminOperationsDeck = ({
     <StyledAdminThreeColumn
       aria-label={t`Operations, AI spend and system health`}
     >
-      <StyledDeliveryCard aria-label={t`Team capacity and review load`}>
+      <StyledAdminPanel aria-label={t`Team capacity and review load`}>
         <StyledDeliveryStack>
-          <StyledDeliveryRow>
+          <StyledAdminSectionHeader>
             <h3>
               <Trans>Team capacity (7 days)</Trans>
             </h3>
             <Link to="/delivery?view=planner&plannerView=capacity">
               <Trans>Open capacity</Trans>
             </Link>
-          </StyledDeliveryRow>
+          </StyledAdminSectionHeader>
 
           {capacitySummary ? (
             <>
@@ -135,18 +136,18 @@ export const AdminOperationsDeck = ({
               : t`No revision rounds recorded in the selected month.`}
           </small>
         </StyledDeliveryStack>
-      </StyledDeliveryCard>
+      </StyledAdminPanel>
 
-      <StyledDeliveryCard aria-label={t`AI spend and caps`}>
+      <StyledAdminPanel aria-label={t`AI spend and caps`}>
         <StyledDeliveryStack>
-          <StyledDeliveryRow>
+          <StyledAdminSectionHeader>
             <h3>
               <Trans>AI spend & caps (USD)</Trans>
             </h3>
             <Link to="/delivery?view=agents&agentView=spending">
               <Trans>Manage AI budget</Trans>
             </Link>
-          </StyledDeliveryRow>
+          </StyledAdminSectionHeader>
 
           {aiSummary ? (
             <>
@@ -209,18 +210,18 @@ export const AdminOperationsDeck = ({
             </p>
           )}
         </StyledDeliveryStack>
-      </StyledDeliveryCard>
+      </StyledAdminPanel>
 
-      <StyledDeliveryCard aria-label={t`System and connection readiness`}>
+      <StyledAdminPanel aria-label={t`System and connection readiness`}>
         <StyledDeliveryStack>
-          <StyledDeliveryRow>
+          <StyledAdminSectionHeader>
             <h3>
               <Trans>Connections & readiness</Trans>
             </h3>
             <Link to="#company-readiness">
               <Trans>Inspect all</Trans>
             </Link>
-          </StyledDeliveryRow>
+          </StyledAdminSectionHeader>
 
           {readiness ? (
             <>
@@ -257,7 +258,7 @@ export const AdminOperationsDeck = ({
             </p>
           )}
         </StyledDeliveryStack>
-      </StyledDeliveryCard>
+      </StyledAdminPanel>
     </StyledAdminThreeColumn>
   );
 };

@@ -16,10 +16,11 @@ import {
   StyledCostLegend,
   StyledLegendDot,
   StyledStatusPill,
+  StyledAdminPanel,
+  StyledAdminSectionHeader,
 } from '@/delivery/founder/performance/adminDashboardStyles';
 import { StyledPerformanceMetrics } from '@/delivery/founder/performance/performanceStyles';
 import {
-  StyledDeliveryCard,
   StyledDeliveryRow,
   StyledDeliveryStack,
 } from '@/delivery/deliveryStyles';
@@ -46,11 +47,13 @@ export const PerformanceFinancialSummary = ({
   };
   if (!currencies.length)
     return (
-      <StyledDeliveryCard>
+      <StyledAdminPanel>
         <StyledDeliveryStack>
-          <h2>
-            <Trans>Financial performance</Trans>
-          </h2>
+          <StyledAdminSectionHeader>
+            <h2>
+              <Trans>Financial performance</Trans>
+            </h2>
+          </StyledAdminSectionHeader>
           <p>
             <Trans>
               No posted monthly finance or cash records are available in this
@@ -63,7 +66,7 @@ export const PerformanceFinancialSummary = ({
             <Trans>Open monthly finance</Trans>
           </Link>
         </StyledDeliveryStack>
-      </StyledDeliveryCard>
+      </StyledAdminPanel>
     );
   return (
     <StyledDeliveryStack>
@@ -120,12 +123,12 @@ export const PerformanceFinancialSummary = ({
           },
         ];
         return (
-          <StyledDeliveryCard
+          <StyledAdminPanel
             key={summary.currency}
             aria-label={t`${summary.currency} financial performance`}
           >
             <StyledDeliveryStack>
-              <StyledDeliveryRow>
+              <StyledAdminSectionHeader>
                 <div>
                   <h2>
                     {summary.currency} · {formatPerformanceMonth(month)}
@@ -161,7 +164,7 @@ export const PerformanceFinancialSummary = ({
                     <Trans>Review monthly records</Trans>
                   </Link>
                 </StyledDeliveryRow>
-              </StyledDeliveryRow>
+              </StyledAdminSectionHeader>
               <StyledPerformanceMetrics>
                 {metrics.map((metric) => (
                   <div key={metric.label}>
@@ -270,7 +273,7 @@ export const PerformanceFinancialSummary = ({
                 </StyledDeliveryStack>
               </details>
             </StyledDeliveryStack>
-          </StyledDeliveryCard>
+          </StyledAdminPanel>
         );
       })}
     </StyledDeliveryStack>

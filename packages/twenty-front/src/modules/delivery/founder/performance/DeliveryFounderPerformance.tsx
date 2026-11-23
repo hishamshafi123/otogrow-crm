@@ -38,6 +38,8 @@ import { buildExecutiveCsv } from '@/delivery/founder/performance/admin-dashboar
 import { useAdminExecutiveSignals } from '@/delivery/founder/performance/useAdminExecutiveSignals';
 import {
   StyledAdminControlRow,
+  StyledAdminPanel,
+  StyledAdminExportButton,
   StyledAdminHeroBar,
   StyledAdminHeroTop,
   StyledAdminTwoColumn,
@@ -53,7 +55,6 @@ import {
 } from '@/delivery/founder/performance/performanceStyles';
 import {
   StyledDeliveryButton,
-  StyledDeliveryCard,
   StyledDeliveryRow,
   StyledDeliverySectionStack,
   StyledDeliveryStack,
@@ -210,7 +211,7 @@ const PerformanceWorkspace = ({
   );
   if (!permission.ready)
     return (
-      <StyledDeliveryCard>
+      <StyledAdminPanel>
         <p role={permission.error ? 'alert' : 'status'}>
           {permission.error
             ? t`Company performance access could not be verified. Previous figures are hidden.`
@@ -223,17 +224,17 @@ const PerformanceWorkspace = ({
             <Trans>Retry access</Trans>
           </StyledDeliveryButton>
         )}
-      </StyledDeliveryCard>
+      </StyledAdminPanel>
     );
   if (!permission.canManageRoles)
     return (
-      <StyledDeliveryCard>
+      <StyledAdminPanel>
         <p>
           <Trans>
             Current administrator access is required for company performance.
           </Trans>
         </p>
-      </StyledDeliveryCard>
+      </StyledAdminPanel>
     );
   return (
     <StyledDeliverySectionStack>
@@ -268,7 +269,7 @@ const PerformanceWorkspace = ({
               <Trans>Team & access</Trans>
             </Link>
             {data && (
-              <StyledDeliveryButton
+              <StyledAdminExportButton
                 type="button"
                 onClick={() => {
                   const csv = buildExecutiveCsv({
@@ -292,7 +293,7 @@ const PerformanceWorkspace = ({
                 }}
               >
                 <Trans>Export CSV</Trans>
-              </StyledDeliveryButton>
+              </StyledAdminExportButton>
             )}
           </StyledQuickLinks>
         </StyledAdminHeroTop>
@@ -416,7 +417,7 @@ const PerformanceWorkspace = ({
                 ))}
               </select>
             </label>
-            <StyledDeliveryButton type="submit" data-primary="true">
+            <StyledDeliveryButton type="submit">
               <Trans>Apply reporting period</Trans>
             </StyledDeliveryButton>
           </StyledPerformanceFilters>
@@ -424,7 +425,7 @@ const PerformanceWorkspace = ({
       </StyledAdminHeroBar>
 
       {query.error ? (
-        <StyledDeliveryCard>
+        <StyledAdminPanel>
           <StyledDeliveryStack>
             <p role="alert">
               {query.error.message.includes('reporting limit') ||
@@ -440,13 +441,13 @@ const PerformanceWorkspace = ({
               <Trans>Retry performance</Trans>
             </StyledDeliveryButton>
           </StyledDeliveryStack>
-        </StyledDeliveryCard>
+        </StyledAdminPanel>
       ) : !data ? (
-        <StyledDeliveryCard>
+        <StyledAdminPanel>
           <p role="status">
             <Trans>Checking current company performance…</Trans>
           </p>
-        </StyledDeliveryCard>
+        </StyledAdminPanel>
       ) : (
         <>
           {needsCoverageReview && (
@@ -498,7 +499,7 @@ const PerformanceWorkspace = ({
               />
             )
           ) : (
-            <StyledDeliveryCard>
+            <StyledAdminPanel>
               <StyledDeliveryStack>
                 <h2>
                   <Trans>Financial figures are restricted</Trans>
@@ -511,7 +512,7 @@ const PerformanceWorkspace = ({
                   </Trans>
                 </p>
               </StyledDeliveryStack>
-            </StyledDeliveryCard>
+            </StyledAdminPanel>
           )}
 
           {data.canReadFinance && signals.executiveInsights && (

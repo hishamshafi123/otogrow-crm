@@ -14,10 +14,11 @@ import {
   StyledCompactList,
   StyledCompactListItem,
   StyledStatusPill,
+  StyledAdminPanel,
+  StyledAdminSectionHeader,
 } from '@/delivery/founder/performance/adminDashboardStyles';
 import { StyledPerformanceRecordMetrics } from '@/delivery/founder/performance/performanceStyles';
 import {
-  StyledDeliveryCard,
   StyledDeliveryRow,
   StyledDeliveryStack,
 } from '@/delivery/deliveryStyles';
@@ -43,16 +44,16 @@ export const AdminCashForecastPanel = ({
 
   if (error) {
     return (
-      <StyledDeliveryCard aria-label={t`${currency} 90-day cash forecast`}>
+      <StyledAdminPanel aria-label={t`${currency} 90-day cash forecast`}>
         <StyledDeliveryStack>
-          <StyledDeliveryRow>
+          <StyledAdminSectionHeader>
             <h2>
               <Trans>90-day cash forecast</Trans> · {currency}
             </h2>
             <Link to={destination}>
               <Trans>Open cash forecast</Trans>
             </Link>
-          </StyledDeliveryRow>
+          </StyledAdminSectionHeader>
           <p role="status">
             <Trans>
               Cash forecast details could not be loaded right now. Open the full
@@ -60,22 +61,24 @@ export const AdminCashForecastPanel = ({
             </Trans>
           </p>
         </StyledDeliveryStack>
-      </StyledDeliveryCard>
+      </StyledAdminPanel>
     );
   }
 
   if (loading && !forecast) {
     return (
-      <StyledDeliveryCard aria-label={t`${currency} 90-day cash forecast`}>
+      <StyledAdminPanel aria-label={t`${currency} 90-day cash forecast`}>
         <StyledDeliveryStack>
-          <h2>
-            <Trans>90-day cash forecast</Trans> · {currency}
-          </h2>
+          <StyledAdminSectionHeader>
+            <h2>
+              <Trans>90-day cash forecast</Trans> · {currency}
+            </h2>
+          </StyledAdminSectionHeader>
           <p role="status">
             <Trans>Checking 90-day cash forecast…</Trans>
           </p>
         </StyledDeliveryStack>
-      </StyledDeliveryCard>
+      </StyledAdminPanel>
     );
   }
 
@@ -104,11 +107,9 @@ export const AdminCashForecastPanel = ({
     isPositiveMicros(forecast.unappliedActualOutflowMicros);
 
   return (
-    <StyledDeliveryCard
-      aria-label={t`${forecast.currency} 90-day cash forecast`}
-    >
+    <StyledAdminPanel aria-label={t`${forecast.currency} 90-day cash forecast`}>
       <StyledDeliveryStack>
-        <StyledDeliveryRow>
+        <StyledAdminSectionHeader>
           <div>
             <h2>
               <Trans>90-day cash forecast</Trans> · {forecast.currency}
@@ -139,7 +140,7 @@ export const AdminCashForecastPanel = ({
               <Trans>Manage forecast</Trans>
             </Link>
           </StyledDeliveryRow>
-        </StyledDeliveryRow>
+        </StyledAdminSectionHeader>
 
         <StyledPerformanceRecordMetrics>
           <div>
@@ -310,12 +311,12 @@ export const AdminCashForecastPanel = ({
 
         {upcomingItems.length > 0 && (
           <StyledDeliveryStack>
-            <StyledDeliveryRow>
+            <StyledAdminSectionHeader>
               <h3>
                 <Trans>Upcoming scheduled cash movements</Trans>
               </h3>
               <small>{t`${forecast.itemCount} tracked items`}</small>
-            </StyledDeliveryRow>
+            </StyledAdminSectionHeader>
             <StyledCompactList>
               {upcomingItems.map((item) => (
                 <StyledCompactListItem key={item.id}>
@@ -340,6 +341,6 @@ export const AdminCashForecastPanel = ({
           </StyledDeliveryStack>
         )}
       </StyledDeliveryStack>
-    </StyledDeliveryCard>
+    </StyledAdminPanel>
   );
 };

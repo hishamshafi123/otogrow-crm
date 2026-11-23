@@ -14,9 +14,10 @@ import {
   StyledCostLegend,
   StyledLegendDot,
   StyledStatusPill,
+  StyledAdminPanel,
+  StyledAdminSectionHeader,
 } from '@/delivery/founder/performance/adminDashboardStyles';
 import {
-  StyledDeliveryCard,
   StyledDeliveryRow,
   StyledDeliverySectionStack,
   StyledDeliveryStack,
@@ -44,12 +45,12 @@ export const AdminSixMonthTrendPanel = ({
         const latest = series.points[series.points.length - 1];
         const latestNegative = isNegativeMicros(latest.resultMicros);
         return (
-          <StyledDeliveryCard
+          <StyledAdminPanel
             key={series.currency}
             aria-label={t`${series.currency} 6-month revenue and cost trend`}
           >
             <StyledDeliveryStack>
-              <StyledDeliveryRow>
+              <StyledAdminSectionHeader>
                 <div>
                   <h2>
                     <Trans>6-month financial trend</Trans> · {series.currency}
@@ -73,7 +74,7 @@ export const AdminSixMonthTrendPanel = ({
                     <Trans>Inspect ledger</Trans>
                   </Link>
                 </StyledDeliveryRow>
-              </StyledDeliveryRow>
+              </StyledAdminSectionHeader>
 
               <StyledChartFrame>
                 <svg
@@ -147,13 +148,13 @@ export const AdminSixMonthTrendPanel = ({
 
               <StyledCostLegend>
                 <li>
-                  <StyledLegendDot data-segment="salary" />
+                  <StyledLegendDot data-segment="revenue" />
                   <span>
                     <Trans>Recognized revenue</Trans>
                   </span>
                 </li>
                 <li>
-                  <StyledLegendDot data-segment="overhead" />
+                  <StyledLegendDot data-segment="cost" />
                   <span>
                     <Trans>Recognized costs</Trans>
                   </span>
@@ -166,7 +167,7 @@ export const AdminSixMonthTrendPanel = ({
                 </li>
               </StyledCostLegend>
             </StyledDeliveryStack>
-          </StyledDeliveryCard>
+          </StyledAdminPanel>
         );
       })}
     </StyledDeliverySectionStack>

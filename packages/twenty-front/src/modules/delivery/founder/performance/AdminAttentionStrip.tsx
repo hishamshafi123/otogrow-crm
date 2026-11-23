@@ -14,9 +14,10 @@ import {
   StyledCompactListItem,
   StyledQuickLinks,
   StyledStatusPill,
+  StyledAdminPanel,
+  StyledAdminSectionHeader,
 } from '@/delivery/founder/performance/adminDashboardStyles';
 import {
-  StyledDeliveryCard,
   StyledDeliveryRow,
   StyledDeliveryStack,
 } from '@/delivery/deliveryStyles';
@@ -62,9 +63,9 @@ export const AdminAttentionStrip = ({
   };
 
   return (
-    <StyledDeliveryCard aria-label={t`Needs attention now`}>
+    <StyledAdminPanel aria-label={t`Needs attention now`}>
       <StyledDeliveryStack>
-        <StyledDeliveryRow>
+        <StyledAdminSectionHeader>
           <div>
             <h2>
               <Trans>Needs attention now</Trans>
@@ -88,7 +89,7 @@ export const AdminAttentionStrip = ({
                 : t`Open attention queue`}
             </Link>
           </StyledDeliveryRow>
-        </StyledDeliveryRow>
+        </StyledAdminSectionHeader>
 
         {exceptions && exceptions.counts.length > 0 && (
           <StyledQuickLinks aria-label={t`Exception areas`}>
@@ -183,6 +184,6 @@ export const AdminAttentionStrip = ({
           )
         )}
       </StyledDeliveryStack>
-    </StyledDeliveryCard>
+    </StyledAdminPanel>
   );
 };

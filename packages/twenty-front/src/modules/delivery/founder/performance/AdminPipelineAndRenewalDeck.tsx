@@ -13,10 +13,11 @@ import {
   StyledProgressFill,
   StyledProgressTrack,
   StyledStatusPill,
+  StyledAdminPanel,
+  StyledAdminSectionHeader,
 } from '@/delivery/founder/performance/adminDashboardStyles';
 import { StyledPerformanceRecordMetrics } from '@/delivery/founder/performance/performanceStyles';
 import {
-  StyledDeliveryCard,
   StyledDeliveryRow,
   StyledDeliveryStack,
 } from '@/delivery/deliveryStyles';
@@ -44,9 +45,9 @@ export const AdminPipelineAndRenewalDeck = ({
     <StyledAdminTwoColumn
       aria-label={t`Sales pipeline, renewals and inbox SLA`}
     >
-      <StyledDeliveryCard aria-label={t`CRM sales funnel and expiring quotes`}>
+      <StyledAdminPanel aria-label={t`CRM sales funnel and expiring quotes`}>
         <StyledDeliveryStack>
-          <StyledDeliveryRow>
+          <StyledAdminSectionHeader>
             <div>
               <h2>
                 <Trans>Sales pipeline & quotes</Trans>
@@ -74,7 +75,7 @@ export const AdminPipelineAndRenewalDeck = ({
                 <Trans>Opportunities</Trans>
               </Link>
             </StyledDeliveryRow>
-          </StyledDeliveryRow>
+          </StyledAdminSectionHeader>
 
           {salesFunnel.restricted ? (
             <p>
@@ -198,13 +199,11 @@ export const AdminPipelineAndRenewalDeck = ({
             </>
           )}
         </StyledDeliveryStack>
-      </StyledDeliveryCard>
+      </StyledAdminPanel>
 
-      <StyledDeliveryCard
-        aria-label={t`Retainer renewals and client inbox SLA`}
-      >
+      <StyledAdminPanel aria-label={t`Retainer renewals and client inbox SLA`}>
         <StyledDeliveryStack>
-          <StyledDeliveryRow>
+          <StyledAdminSectionHeader>
             <div>
               <h2>
                 <Trans>Renewal radar & inbox SLA</Trans>
@@ -234,7 +233,7 @@ export const AdminPipelineAndRenewalDeck = ({
                 <Trans>Open inbox</Trans>
               </Link>
             </StyledDeliveryRow>
-          </StyledDeliveryRow>
+          </StyledAdminSectionHeader>
 
           <StyledPerformanceRecordMetrics>
             <div>
@@ -343,7 +342,7 @@ export const AdminPipelineAndRenewalDeck = ({
             </StyledDeliveryStack>
           )}
         </StyledDeliveryStack>
-      </StyledDeliveryCard>
+      </StyledAdminPanel>
     </StyledAdminTwoColumn>
   );
 };

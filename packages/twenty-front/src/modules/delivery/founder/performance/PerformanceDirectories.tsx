@@ -15,6 +15,8 @@ import {
   StyledFilterTab,
   StyledFilterTabs,
   StyledStatusPill,
+  StyledAdminPanel,
+  StyledAdminSectionHeader,
 } from '@/delivery/founder/performance/adminDashboardStyles';
 import {
   StyledPerformanceList,
@@ -23,7 +25,6 @@ import {
   StyledPerformanceRecordMetrics,
 } from '@/delivery/founder/performance/performanceStyles';
 import {
-  StyledDeliveryCard,
   StyledDeliveryRow,
   StyledDeliveryStack,
 } from '@/delivery/deliveryStyles';
@@ -62,9 +63,9 @@ export const PerformanceClients = ({
         : clients;
 
   return (
-    <StyledDeliveryCard aria-label={t`Client performance`}>
+    <StyledAdminPanel aria-label={t`Client performance`}>
       <StyledDeliveryStack>
-        <StyledDeliveryRow>
+        <StyledAdminSectionHeader>
           <div>
             <h2>
               <Trans>Clients</Trans>
@@ -100,7 +101,7 @@ export const PerformanceClients = ({
               )}
             </StyledFilterTabs>
           )}
-        </StyledDeliveryRow>
+        </StyledAdminSectionHeader>
         <p>
           <Trans>
             Recorded contribution by client project. Company and unassigned
@@ -297,7 +298,7 @@ export const PerformanceClients = ({
           </StyledPerformanceList>
         )}
       </StyledDeliveryStack>
-    </StyledDeliveryCard>
+    </StyledAdminPanel>
   );
 };
 
@@ -316,9 +317,9 @@ export const PerformanceEmployees = ({
 }) => {
   const { t } = useLingui();
   return (
-    <StyledDeliveryCard aria-label={t`Employee performance`}>
+    <StyledAdminPanel aria-label={t`Employee performance`}>
       <StyledDeliveryStack>
-        <StyledDeliveryRow>
+        <StyledAdminSectionHeader>
           <h2>
             <Trans>Employees</Trans>
           </h2>
@@ -327,7 +328,7 @@ export const PerformanceEmployees = ({
               ? t`1 active team member`
               : t`${total} active team members`}
           </StyledPerformanceMuted>
-        </StyledDeliveryRow>
+        </StyledAdminSectionHeader>
         <p>
           <Trans>
             Factual workload and selected-month evidence on current assignments,
@@ -429,6 +430,6 @@ export const PerformanceEmployees = ({
           </StyledPerformanceList>
         )}
       </StyledDeliveryStack>
-    </StyledDeliveryCard>
+    </StyledAdminPanel>
   );
 };

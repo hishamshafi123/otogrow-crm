@@ -12,10 +12,11 @@ import {
   StyledCompactList,
   StyledCompactListItem,
   StyledStatusPill,
+  StyledAdminPanel,
+  StyledAdminSectionHeader,
 } from '@/delivery/founder/performance/adminDashboardStyles';
 import { StyledPerformanceRecordMetrics } from '@/delivery/founder/performance/performanceStyles';
 import {
-  StyledDeliveryCard,
   StyledDeliveryRow,
   StyledDeliveryStack,
 } from '@/delivery/deliveryStyles';
@@ -54,9 +55,9 @@ export const AdminGrowthHandoffCard = ({
     (handoffSummary?.pendingCount ?? 0) > 0;
 
   return (
-    <StyledDeliveryCard aria-label={t`Sales intake and client handoffs`}>
+    <StyledAdminPanel aria-label={t`Sales intake and client handoffs`}>
       <StyledDeliveryStack>
-        <StyledDeliveryRow>
+        <StyledAdminSectionHeader>
           <div>
             <h2>
               <Trans>Sales intake & handoffs</Trans>
@@ -76,7 +77,7 @@ export const AdminGrowthHandoffCard = ({
               <Trans>Open clients</Trans>
             </Link>
           </StyledDeliveryRow>
-        </StyledDeliveryRow>
+        </StyledAdminSectionHeader>
 
         <StyledPerformanceRecordMetrics>
           <div>
@@ -159,6 +160,6 @@ export const AdminGrowthHandoffCard = ({
           )
         )}
       </StyledDeliveryStack>
-    </StyledDeliveryCard>
+    </StyledAdminPanel>
   );
 };

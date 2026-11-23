@@ -3,9 +3,10 @@ import { type DeliveryFounderPerformanceQuery } from '~/generated-metadata/graph
 import { formatPerformanceRate } from '@/delivery/founder/performance/performance-format';
 import { StyledPerformanceMetrics } from '@/delivery/founder/performance/performanceStyles';
 import {
-  StyledDeliveryCard,
-  StyledDeliveryStack,
-} from '@/delivery/deliveryStyles';
+  StyledAdminPanel,
+  StyledAdminSectionHeader,
+} from '@/delivery/founder/performance/adminDashboardStyles';
+import { StyledDeliveryStack } from '@/delivery/deliveryStyles';
 
 type PerformanceOperations =
   DeliveryFounderPerformanceQuery['deliveryFounderPerformance']['operations'];
@@ -37,9 +38,9 @@ export const PerformanceOperationsSummary = ({
     ],
   ];
   return (
-    <StyledDeliveryCard aria-label={t`Delivery performance`}>
+    <StyledAdminPanel aria-label={t`Delivery performance`}>
       <StyledDeliveryStack>
-        <div>
+        <StyledAdminSectionHeader>
           <h2>
             <Trans>Delivery performance</Trans>
           </h2>
@@ -48,7 +49,7 @@ export const PerformanceOperationsSummary = ({
               Current open work plus selected-month approval evidence.
             </Trans>
           </small>
-        </div>
+        </StyledAdminSectionHeader>
         <StyledPerformanceMetrics>
           {metrics.map(([label, value]) => (
             <div key={label}>
@@ -63,6 +64,6 @@ export const PerformanceOperationsSummary = ({
           {t`${operations.internalRevisionCount} classified as internal defects`}
         </p>
       </StyledDeliveryStack>
-    </StyledDeliveryCard>
+    </StyledAdminPanel>
   );
 };
