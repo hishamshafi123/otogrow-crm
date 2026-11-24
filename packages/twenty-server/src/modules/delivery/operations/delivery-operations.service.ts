@@ -1076,24 +1076,28 @@ export class DeliveryOperationsService {
     workspaceId: string,
     update: TelegramUpdate,
     now = new Date(),
-  ) {
+  ): Promise<
+    'LINKED' | 'EXPIRED_OR_INVALID' | 'ALREADY_LINKED_TO_OTHER' | 'IGNORED'
+  > {
     const message = update.message;
-    const match = message?.text?.match(
-      /^\/start(?:@\w+)? delivery_([a-f0-9]{48})$/,
+    if (!message || message.chat.id <= 0 || !message.text) return 'IGNORED';
+    if (!/^\/start(?:@\w+)?\s+delivery_/.test(message.text)) return 'IGNORED';
+    const match = message.text.match(
+      /^\/start(?:@\w+)?\s+delivery_([a-f0-9]{48})$/,
     );
-    if (!match || !message || message.chat.id <= 0) return;
+    if (!match) return 'EXPIRED_OR_INVALID';
     const workspace = await this.dataSource
       .getRepository(WorkspaceEntity)
       .findOneBy({ id: workspaceId });
-    if (!workspace) return;
-    await this.transact(workspaceId, async (state, manager) => {
+    if (!workspace) return 'IGNORED';
+    return this.transact(workspaceId, async (state, manager) => {
       const token = state.linkTokens.find(
         (item) =>
           item.hash === hashToken(match[1]) &&
           item.expiresAt > now.toISOString(),
       );
       if (!token || !(await this.active(workspace, token.memberId, manager)))
-        return;
+        return 'EXPIRED_OR_INVALID' as const;
       if (
         Object.entries(state.connections).some(
           ([id, connection]) =>
@@ -1101,7 +1105,7 @@ export class DeliveryOperationsService {
             connection.chatId === String(message.chat.id),
         )
       )
-        return;
+        return 'ALREADY_LINKED_TO_OTHER' as const;
       const previousConnection = state.connections[token.memberId];
       state.connections[token.memberId] = {
         chatId: String(message.chat.id),
@@ -1128,6 +1132,7 @@ export class DeliveryOperationsService {
       state.linkTokens = state.linkTokens.filter(
         (item) => item.hash !== token.hash,
       );
+      return 'LINKED' as const;
     });
   }
 

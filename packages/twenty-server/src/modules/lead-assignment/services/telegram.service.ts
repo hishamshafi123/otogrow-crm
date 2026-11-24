@@ -91,11 +91,17 @@ export class TelegramService {
     const text = update.message?.text;
     const chatId = update.message?.chat.id;
 
-    if (!isDefined(text) || !text.startsWith('/start') || !isDefined(chatId)) {
+    if (!isDefined(text) || !isDefined(chatId)) {
       return;
     }
 
-    const workspaceMemberId = text.slice('/start'.length).trim();
+    const match = text.match(/^\/start(?:@\w+)?(?:\s+(.*))?$/);
+
+    if (!match) {
+      return;
+    }
+
+    const workspaceMemberId = (match[1] ?? '').trim();
     const botToken = this.telegramConfigService.decryptBotToken(config);
 
     if (!isNonEmptyString(workspaceMemberId)) {

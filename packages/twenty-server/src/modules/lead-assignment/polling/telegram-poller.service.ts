@@ -84,10 +84,32 @@ export class TelegramPollerService implements OnModuleInit, OnModuleDestroy {
         for (const update of updates) {
           offset = update.update_id + 1;
           if (update.message?.text?.includes('delivery_')) {
-            await this.deliveryOperations.handleTelegramUpdate(
+            const outcome = await this.deliveryOperations.handleTelegramUpdate(
               workspaceId,
               update,
             );
+            const chatId = update.message.chat.id;
+
+            if (chatId > 0 && outcome !== 'IGNORED') {
+              const replyText =
+                outcome === 'LINKED'
+                  ? 'Telegram linked. You will now receive Delivery notifications and reminders here.'
+                  : outcome === 'ALREADY_LINKED_TO_OTHER'
+                    ? 'This Telegram account is already linked to another member in this workspace. Unlink it first from Delivery → Delivery & reminders.'
+                    : 'This link is invalid or expired. Create a new private link in Delivery → Delivery & reminders and open it within 10 minutes.';
+
+              try {
+                await this.telegramService.sendMessage(
+                  botToken,
+                  String(chatId),
+                  replyText,
+                );
+              } catch (replyError) {
+                this.logger.warn(
+                  `Failed to send Delivery Telegram link reply for workspace ${workspaceId}: ${replyError instanceof Error ? replyError.message : String(replyError)}`,
+                );
+              }
+            }
           } else {
             await this.telegramService.handleUpdate(config, update);
           }

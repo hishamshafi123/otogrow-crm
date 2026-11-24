@@ -133,6 +133,27 @@ describe('TelegramService', () => {
     expect(body.text).toContain('Telegram linked');
   });
 
+  it('links the chat id on /start@bot_username <workspaceMemberId>', async () => {
+    const fetchMock = mockTelegramApi({ message_id: 1 });
+    const { service, setterProfileService } = buildService();
+
+    await service.handleUpdate(CONFIG as never, {
+      update_id: 2,
+      message: {
+        message_id: 2,
+        chat: { id: 99 },
+        text: '/start@otogrow_bot member-2',
+      },
+    });
+
+    expect(setterProfileService.setTelegramChatId).toHaveBeenCalledWith(
+      WORKSPACE_ID,
+      'member-2',
+      '99',
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('replies with guidance on bare /start', async () => {
     const fetchMock = mockTelegramApi({ message_id: 1 });
     const { service, setterProfileService } = buildService();
