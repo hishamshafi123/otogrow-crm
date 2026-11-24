@@ -11,6 +11,7 @@ import {
   formatRatioPercent,
   getMonthRange,
   getQuarterRange,
+  isFinanceV2AmountMicrosWithinLimit,
   isFinanceV2Currency,
   isValidDiscountPercent,
   isValidHttpUrl,
@@ -227,5 +228,20 @@ describe('finance-v2-currency helpers', () => {
     expect(
       computeDefaultReversalDate('2026-11-24', '2026-11-28', '2026-11-15'),
     ).toBe('2026-11-28');
+  });
+
+  it('enforces the Finance V2 9e18 micros cap without affecting legacy int64 finance-money limits', () => {
+    expect(isFinanceV2AmountMicrosWithinLimit('0')).toBe(true);
+    expect(isFinanceV2AmountMicrosWithinLimit('9000000000000000000')).toBe(
+      true,
+    );
+    expect(isFinanceV2AmountMicrosWithinLimit('9000000000000000001')).toBe(
+      false,
+    );
+    expect(isFinanceV2AmountMicrosWithinLimit('9223372036854775807')).toBe(
+      false,
+    );
+    expect(isFinanceV2AmountMicrosWithinLimit('-1')).toBe(false);
+    expect(isFinanceV2AmountMicrosWithinLimit('01')).toBe(false);
   });
 });

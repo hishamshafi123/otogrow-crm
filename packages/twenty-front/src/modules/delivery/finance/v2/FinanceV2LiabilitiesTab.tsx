@@ -4,11 +4,11 @@ import { StyledDeliveryButton } from '@/delivery/deliveryStyles';
 import {
   financeAmountMicrosToDecimal,
   formatFinanceAmountMicros,
-  isFinanceAmountMicrosWithinLimit,
   parseFinanceAmountMicros,
 } from '@/delivery/finance/finance-money';
 import {
   createFinanceV2RequestId,
+  isFinanceV2AmountMicrosWithinLimit,
   isValidPositiveFxRate,
 } from '@/delivery/finance/v2/finance-v2-currency';
 import {
@@ -119,7 +119,7 @@ export const FinanceV2LiabilitiesTab = ({
     if (
       !micros ||
       BigInt(micros) <= 0n ||
-      !isFinanceAmountMicrosWithinLimit(micros)
+      !isFinanceV2AmountMicrosWithinLimit(micros)
     ) {
       setFormError(t`Enter a valid positive amount.`);
       return;

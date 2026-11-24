@@ -5,13 +5,13 @@ import { StyledDeliveryButton } from '@/delivery/deliveryStyles';
 import {
   financeAmountMicrosToDecimal,
   formatFinanceAmountMicros,
-  isFinanceAmountMicrosWithinLimit,
   parseFinanceAmountMicros,
 } from '@/delivery/finance/finance-money';
 import {
   calculateDraftDocumentTotals,
   computeDefaultReversalDate,
   createFinanceV2RequestId,
+  isFinanceV2AmountMicrosWithinLimit,
   isValidDiscountPercent,
   isValidPositiveFxRate,
   isValidPositiveQuantity,
@@ -338,7 +338,7 @@ export const FinanceV2QuotesInvoicesTab = ({
         return null;
       }
       const unitMicros = parseMoney(line.unitPrice);
-      if (!unitMicros || !isFinanceAmountMicrosWithinLimit(unitMicros)) {
+      if (!unitMicros || !isFinanceV2AmountMicrosWithinLimit(unitMicros)) {
         setFormError(t`Enter a valid numeric rate for "${line.label}".`);
         return null;
       }
@@ -1947,7 +1947,7 @@ export const FinanceV2QuotesInvoicesTab = ({
                                       if (
                                         !micros ||
                                         BigInt(micros) <= 0n ||
-                                        !isFinanceAmountMicrosWithinLimit(
+                                        !isFinanceV2AmountMicrosWithinLimit(
                                           micros,
                                         )
                                       ) {

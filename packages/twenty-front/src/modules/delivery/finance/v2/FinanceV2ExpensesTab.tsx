@@ -4,12 +4,12 @@ import { StyledDeliveryButton } from '@/delivery/deliveryStyles';
 import {
   financeAmountMicrosToDecimal,
   formatFinanceAmountMicros,
-  isFinanceAmountMicrosWithinLimit,
   parseFinanceAmountMicros,
 } from '@/delivery/finance/finance-money';
 import {
   computeDefaultReversalDate,
   createFinanceV2RequestId,
+  isFinanceV2AmountMicrosWithinLimit,
   isValidHttpUrl,
   isValidPositiveFxRate,
   sanitizeExternalUrl,
@@ -385,7 +385,7 @@ export const FinanceV2ExpensesTab = ({
     if (
       !micros ||
       BigInt(micros) <= 0n ||
-      !isFinanceAmountMicrosWithinLimit(micros)
+      !isFinanceV2AmountMicrosWithinLimit(micros)
     ) {
       setFormError(t`Enter a valid positive amount.`);
       return;
@@ -443,7 +443,7 @@ export const FinanceV2ExpensesTab = ({
     if (
       !micros ||
       BigInt(micros) <= 0n ||
-      !isFinanceAmountMicrosWithinLimit(micros)
+      !isFinanceV2AmountMicrosWithinLimit(micros)
     ) {
       setFormError(t`Enter a valid positive monthly amount.`);
       return;

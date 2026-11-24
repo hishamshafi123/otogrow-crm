@@ -4,7 +4,6 @@ import { StyledDeliveryButton } from '@/delivery/deliveryStyles';
 import {
   financeAmountMicrosToDecimal,
   formatFinanceAmountMicros,
-  isFinanceAmountMicrosWithinLimit,
   parseFinanceAmountMicros,
 } from '@/delivery/finance/finance-money';
 import {
@@ -12,6 +11,7 @@ import {
   convertAedMicrosToDisplay,
   convertCurrencyMicros,
   formatRatioPercent,
+  isFinanceV2AmountMicrosWithinLimit,
   isValidYearMonth,
   roundMicrosToCents,
   shiftYearMonth,
@@ -371,7 +371,7 @@ export const FinanceV2PayrollTab = ({
     if (
       !micros ||
       BigInt(micros) <= 0n ||
-      !isFinanceAmountMicrosWithinLimit(micros)
+      !isFinanceV2AmountMicrosWithinLimit(micros)
     ) {
       setProfileFormError(t`Enter a valid positive base salary.`);
       return;
@@ -1157,7 +1157,7 @@ export const FinanceV2PayrollTab = ({
                 entryKind === 'BONUS' &&
                 (!bonusMicros ||
                   BigInt(bonusMicros) <= 0n ||
-                  !isFinanceAmountMicrosWithinLimit(bonusMicros))
+                  !isFinanceV2AmountMicrosWithinLimit(bonusMicros))
               ) {
                 setEntryFormError(t`Enter a valid positive bonus amount.`);
                 return;

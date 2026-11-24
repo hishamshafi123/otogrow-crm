@@ -19,6 +19,15 @@ export const FINANCE_V2_FALLBACK_FX_RATES: Record<FinanceV2Currency, string> = {
 };
 
 const DECIMAL_PATTERN = /^(?:\d+(?:\.\d{1,6})?|\.\d{1,6})$/;
+const CANONICAL_UNSIGNED_MICROS = /^(?:0|[1-9]\d*)$/;
+
+export const MAX_FINANCE_V2_ENTRY_MICROS = 9_000_000_000_000_000_000n;
+
+export const isFinanceV2AmountMicrosWithinLimit = (value: string): boolean =>
+  value.length > 0 &&
+  value.length <= 19 &&
+  CANONICAL_UNSIGNED_MICROS.test(value) &&
+  BigInt(value) <= MAX_FINANCE_V2_ENTRY_MICROS;
 
 export const isFinanceV2Currency = (
   value: string | null | undefined,

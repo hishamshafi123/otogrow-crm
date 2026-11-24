@@ -7,11 +7,11 @@ import { StyledDeliveryButton } from '@/delivery/deliveryStyles';
 import {
   financeAmountMicrosToDecimal,
   formatFinanceAmountMicros,
-  isFinanceAmountMicrosWithinLimit,
   parseFinanceAmountMicros,
 } from '@/delivery/finance/finance-money';
 import {
   createFinanceV2RequestId,
+  isFinanceV2AmountMicrosWithinLimit,
   isValidIsoDate,
   isValidPositiveFxRate,
 } from '@/delivery/finance/v2/finance-v2-currency';
@@ -325,7 +325,7 @@ export const FinanceV2SetupTab = ({
     if (
       !micros ||
       BigInt(micros) <= 0n ||
-      !isFinanceAmountMicrosWithinLimit(micros)
+      !isFinanceV2AmountMicrosWithinLimit(micros)
     ) {
       setFormError(t`Enter a valid positive opening amount.`);
       return;
@@ -372,10 +372,10 @@ export const FinanceV2SetupTab = ({
     if (
       !fromMicros ||
       BigInt(fromMicros) <= 0n ||
-      !isFinanceAmountMicrosWithinLimit(fromMicros) ||
+      !isFinanceV2AmountMicrosWithinLimit(fromMicros) ||
       !toMicros ||
       BigInt(toMicros) <= 0n ||
-      !isFinanceAmountMicrosWithinLimit(toMicros)
+      !isFinanceV2AmountMicrosWithinLimit(toMicros)
     ) {
       setFormError(t`Enter valid positive amounts for both currencies.`);
       return;
@@ -720,7 +720,7 @@ export const FinanceV2SetupTab = ({
                           if (
                             !newRateName.trim() ||
                             !micros ||
-                            !isFinanceAmountMicrosWithinLimit(micros)
+                            !isFinanceV2AmountMicrosWithinLimit(micros)
                           ) {
                             setFormError(
                               t`Enter a service name and valid numeric rate.`,
