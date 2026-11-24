@@ -56,6 +56,7 @@ jest.mock('@/delivery/finance/v2/finance-v2.styles', () => ({
   StyledFinanceV2Pill: 'span',
   StyledFinanceV2Notice: 'p',
   StyledFinanceV2LogoPreview: 'img',
+  StyledFinanceV2InlineEditor: 'div',
 }));
 
 const sampleSnapshot: FinanceV2Snapshot = {
@@ -509,9 +510,15 @@ describe('DeliveryFinanceV2Workspace (G6 & G8)', () => {
       },
     });
 
-    // H11 & H15: Edit Payroll Profile allows setting 0 paid leaves
+    // H11 & H15: Edit Payroll Profile opens inline under the employee row and allows setting 0 paid leaves
     await user.click(screen.getByRole('link', { name: /^Payroll$/i }));
-    await user.click(screen.getByRole('button', { name: /^Edit$/i }));
+    const editButton = screen.getByRole('button', { name: /^Edit$/i });
+    const payrollTable = editButton.closest('table');
+    expect(payrollTable).not.toBeNull();
+    await user.click(editButton);
+    const baseSalaryInput = screen.getByLabelText(/^Monthly Base Salary/i);
+    expect(payrollTable).toContainElement(baseSalaryInput);
+    expect(baseSalaryInput).toHaveFocus();
     const paidLeavesInput = screen.getByLabelText(
       /Internal paid leaves \/ month/i,
     );

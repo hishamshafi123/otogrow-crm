@@ -211,3 +211,13 @@ export const StyledFinanceV2LogoPreview = styled.img`
   padding: 4px;
   width: 52px;
 `;
+
+export const StyledFinanceV2InlineEditor = styled.div`
+  background: ${themeCssVariables.background.secondary};
+  border: 1px solid ${themeCssVariables.border.color.medium};
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 18px;
+`;

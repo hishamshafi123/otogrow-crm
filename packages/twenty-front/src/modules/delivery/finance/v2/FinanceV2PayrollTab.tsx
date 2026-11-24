@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { Fragment, useCallback, useState } from 'react';
 import { Trans, useLingui } from '@lingui/react/macro';
 import {
   StyledDeliveryButton,
@@ -12,6 +12,7 @@ import {
 import {
   StyledFinanceV2FormGrid,
   StyledFinanceV2HeaderRow,
+  StyledFinanceV2InlineEditor,
   StyledFinanceV2Notice,
   StyledFinanceV2Panel,
   StyledFinanceV2Pill,
@@ -47,7 +48,8 @@ export const FinanceV2PayrollTab = ({
   onRunCommand,
 }: FinanceV2PayrollTabProps) => {
   const { t } = useLingui();
-  const [formError, setFormError] = useState('');
+  const [profileFormError, setProfileFormError] = useState('');
+  const [entryFormError, setEntryFormError] = useState('');
   const [monthInput, setMonthInput] = useState(data.payrollMonth);
   const [showEmployeeForm, setShowEmployeeForm] = useState(false);
   const [editingProfileId, setEditingProfileId] = useState<string | null>(null);
@@ -96,9 +98,34 @@ export const FinanceV2PayrollTab = ({
     (p) => p.id === resolvedEntryProfileId,
   );
 
+  const editingProfileInTable =
+    showEmployeeForm &&
+    editingProfileId !== null &&
+    data.payrollSummaries.some((row) => row.profileId === editingProfileId);
+
+  const attachInlineEditor = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (!node || editingProfileId === null) return;
+      node.scrollIntoView?.({
+        block: 'nearest',
+        behavior: 'smooth',
+      });
+      node
+        .querySelector<HTMLInputElement>('input[name="baseSalary"]')
+        ?.focus({ preventScroll: true });
+    },
+    [editingProfileId],
+  );
+
+  const closeProfileForm = () => {
+    setProfileFormError('');
+    setEditingProfileId(null);
+    setShowEmployeeForm(false);
+  };
+
   const openNewProfile = () => {
-    setFormError('');
-    const wasEditing = Boolean(editingProfileId);
+    setProfileFormError('');
+    const wasEditing = editingProfileId !== null;
     setEditingProfileId(null);
     setEmployeeMemberId('');
     setEmployeeName('');
@@ -114,7 +141,11 @@ export const FinanceV2PayrollTab = ({
   };
 
   const openEditProfile = (prof: FinanceV2PayrollProfile) => {
-    setFormError('');
+    setProfileFormError('');
+    if (showEmployeeForm && editingProfileId === prof.id) {
+      closeProfileForm();
+      return;
+    }
     setEditingProfileId(prof.id);
     setEmployeeMemberId(prof.employeeMemberId ?? '');
     setEmployeeName(prof.employeeName);
@@ -128,6 +159,216 @@ export const FinanceV2PayrollTab = ({
     setProfileActive(prof.active);
     setShowEmployeeForm(true);
   };
+
+  const renderProfileFormContent = () => (
+    <>
+      <StyledFinanceV2HeaderRow>
+        <h3>
+          {editingProfileId !== null
+            ? t`Edit Employee Salary Profile`
+            : t`Add Employee Salary Profile`}
+        </h3>
+      </StyledFinanceV2HeaderRow>
+      {profileFormError && (
+        <StyledFinanceV2Notice data-tone="danger" role="alert">
+          {profileFormError}
+        </StyledFinanceV2Notice>
+      )}
+      <StyledFinanceV2FormGrid>
+        <label>
+          <Trans>Team member (optional link)</Trans>
+          <select
+            value={employeeMemberId}
+            onChange={(e) => {
+              const id = e.target.value;
+              setEmployeeMemberId(id);
+              const member = data.members.find((m) => m.id === id);
+              if (member) setEmployeeName(member.name);
+            }}
+          >
+            <option value="">{t`Custom / External staff`}</option>
+            {data.members.map((member) => (
+              <option key={member.id} value={member.id}>
+                {member.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <Trans>Employee name</Trans>
+          <input
+            value={employeeName}
+            placeholder={t`e.g. Arjun`}
+            onChange={(e) => setEmployeeName(e.target.value)}
+          />
+        </label>
+        <label>
+          <Trans>Role</Trans>
+          <input
+            value={roleLabel}
+            placeholder={t`e.g. Video Editor`}
+            onChange={(e) => setRoleLabel(e.target.value)}
+          />
+        </label>
+        <label>
+          <Trans>Currency</Trans>
+          <select
+            value={currency}
+            onChange={(e) => setCurrency(e.target.value as FinanceV2Currency)}
+          >
+            {FINANCE_V2_CURRENCIES.map((code) => (
+              <option key={code} value={code}>
+                {code}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          {t`Monthly Base Salary (${currency})`}
+          <input
+            name="baseSalary"
+            value={baseSalary}
+            placeholder="15000"
+            onChange={(e) => setBaseSalary(e.target.value)}
+          />
+        </label>
+        <label>
+          <Trans>Working days divisor</Trans>
+          <input
+            type="number"
+            min={1}
+            max={31}
+            value={workingDays}
+            onChange={(e) => setWorkingDays(e.target.value)}
+          />
+        </label>
+        <label>
+          <Trans>Internal paid leaves / month</Trans>
+          <input
+            type="number"
+            min={0}
+            max={31}
+            value={paidLeaves}
+            onChange={(e) => setPaidLeaves(e.target.value)}
+          />
+        </label>
+        <label>
+          <Trans>Payday (day of month, e.g. 28)</Trans>
+          <input
+            type="number"
+            min={1}
+            max={31}
+            value={payDay}
+            onChange={(e) => setPayDay(e.target.value)}
+          />
+        </label>
+        <label>
+          <Trans>Charged From</Trans>
+          <select
+            value={resolvedFundingId}
+            onChange={(e) => setFundingAccountId(e.target.value)}
+          >
+            {fundingOptions.map((account) => (
+              <option key={account.id} value={account.id}>
+                {account.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        {editingProfileId !== null && (
+          <label>
+            <input
+              type="checkbox"
+              checked={profileActive}
+              onChange={(e) => setProfileActive(e.target.checked)}
+            />
+            <Trans>Active (auto-posts monthly base salary)</Trans>
+          </label>
+        )}
+      </StyledFinanceV2FormGrid>
+      <StyledDeliveryRow>
+        <StyledDeliveryButton
+          data-primary="true"
+          disabled={busy}
+          onClick={async () => {
+            setProfileFormError('');
+            const micros = parseMoney(baseSalary);
+            const parsedWorkingDays = Number.parseInt(workingDays, 10);
+            const parsedPaidLeaves = Number.parseInt(paidLeaves, 10);
+            const parsedPayDay = Number.parseInt(payDay, 10);
+            if (!employeeName.trim()) {
+              setProfileFormError(t`Enter the employee's name.`);
+              return;
+            }
+            if (!micros || BigInt(micros) <= 0n) {
+              setProfileFormError(t`Enter a valid positive base salary.`);
+              return;
+            }
+            if (
+              !Number.isInteger(parsedWorkingDays) ||
+              parsedWorkingDays < 1 ||
+              parsedWorkingDays > 31
+            ) {
+              setProfileFormError(
+                t`Working days divisor must be between 1 and 31.`,
+              );
+              return;
+            }
+            if (
+              !Number.isInteger(parsedPaidLeaves) ||
+              parsedPaidLeaves < 0 ||
+              parsedPaidLeaves > 31
+            ) {
+              setProfileFormError(
+                t`Paid leaves per month must be between 0 and 31.`,
+              );
+              return;
+            }
+            if (
+              !Number.isInteger(parsedPayDay) ||
+              parsedPayDay < 1 ||
+              parsedPayDay > 31
+            ) {
+              setProfileFormError(t`Payday must be between 1 and 31.`);
+              return;
+            }
+            if (!resolvedFundingId) {
+              setProfileFormError(t`Select a Charged From account.`);
+              return;
+            }
+            const res = await onRunCommand({
+              action: 'savePayrollProfile',
+              ...(editingProfileId !== null ? { id: editingProfileId } : {}),
+              employeeMemberId: employeeMemberId || null,
+              employeeName: employeeName.trim(),
+              roleLabel: roleLabel.trim(),
+              currency,
+              baseSalaryMicros: micros,
+              workingDaysPerMonth: parsedWorkingDays,
+              paidLeavesPerMonth: parsedPaidLeaves,
+              payDayOfMonth: parsedPayDay,
+              fundingAccountId: resolvedFundingId,
+              startMonth: data.payrollMonth,
+              active: profileActive,
+            });
+            if (res) {
+              setEditingProfileId(null);
+              setEmployeeName('');
+              setBaseSalary('');
+              setShowEmployeeForm(false);
+            }
+          }}
+        >
+          {editingProfileId !== null
+            ? t`Update Salary Profile`
+            : t`Save Salary & Link Recurring Expense`}
+        </StyledDeliveryButton>
+        <StyledDeliveryButton type="button" onClick={closeProfileForm}>
+          <Trans>Cancel</Trans>
+        </StyledDeliveryButton>
+      </StyledDeliveryRow>
+    </>
+  );
 
   return (
     <StyledFinanceV2Stack>
@@ -182,219 +423,9 @@ export const FinanceV2PayrollTab = ({
         </StyledFinanceV2Notice>
       </StyledFinanceV2Panel>
 
-      {formError && (
-        <StyledFinanceV2Notice data-tone="danger" role="alert">
-          {formError}
-        </StyledFinanceV2Notice>
-      )}
-
-      {showEmployeeForm && (
+      {showEmployeeForm && !editingProfileInTable && (
         <StyledFinanceV2Panel>
-          <h3>
-            {editingProfileId
-              ? t`Edit Employee Salary Profile`
-              : t`Add Employee Salary Profile`}
-          </h3>
-          <StyledFinanceV2FormGrid>
-            <label>
-              <Trans>Team member (optional link)</Trans>
-              <select
-                value={employeeMemberId}
-                onChange={(e) => {
-                  const id = e.target.value;
-                  setEmployeeMemberId(id);
-                  const member = data.members.find((m) => m.id === id);
-                  if (member) setEmployeeName(member.name);
-                }}
-              >
-                <option value="">{t`Custom / External staff`}</option>
-                {data.members.map((member) => (
-                  <option key={member.id} value={member.id}>
-                    {member.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <Trans>Employee name</Trans>
-              <input
-                value={employeeName}
-                placeholder={t`e.g. Arjun`}
-                onChange={(e) => setEmployeeName(e.target.value)}
-              />
-            </label>
-            <label>
-              <Trans>Role</Trans>
-              <input
-                value={roleLabel}
-                placeholder={t`e.g. Video Editor`}
-                onChange={(e) => setRoleLabel(e.target.value)}
-              />
-            </label>
-            <label>
-              <Trans>Currency</Trans>
-              <select
-                value={currency}
-                onChange={(e) =>
-                  setCurrency(e.target.value as FinanceV2Currency)
-                }
-              >
-                {FINANCE_V2_CURRENCIES.map((code) => (
-                  <option key={code} value={code}>
-                    {code}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              {t`Monthly Base Salary (${currency})`}
-              <input
-                value={baseSalary}
-                placeholder="15000"
-                onChange={(e) => setBaseSalary(e.target.value)}
-              />
-            </label>
-            <label>
-              <Trans>Working days divisor</Trans>
-              <input
-                type="number"
-                min={1}
-                max={31}
-                value={workingDays}
-                onChange={(e) => setWorkingDays(e.target.value)}
-              />
-            </label>
-            <label>
-              <Trans>Internal paid leaves / month</Trans>
-              <input
-                type="number"
-                min={0}
-                max={31}
-                value={paidLeaves}
-                onChange={(e) => setPaidLeaves(e.target.value)}
-              />
-            </label>
-            <label>
-              <Trans>Payday (day of month, e.g. 28)</Trans>
-              <input
-                type="number"
-                min={1}
-                max={31}
-                value={payDay}
-                onChange={(e) => setPayDay(e.target.value)}
-              />
-            </label>
-            <label>
-              <Trans>Charged From</Trans>
-              <select
-                value={resolvedFundingId}
-                onChange={(e) => setFundingAccountId(e.target.value)}
-              >
-                {fundingOptions.map((account) => (
-                  <option key={account.id} value={account.id}>
-                    {account.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {editingProfileId && (
-              <label>
-                <input
-                  type="checkbox"
-                  checked={profileActive}
-                  onChange={(e) => setProfileActive(e.target.checked)}
-                />
-                <Trans>Active (auto-posts monthly base salary)</Trans>
-              </label>
-            )}
-          </StyledFinanceV2FormGrid>
-          <StyledDeliveryRow>
-            <StyledDeliveryButton
-              data-primary="true"
-              disabled={busy}
-              onClick={async () => {
-                setFormError('');
-                const micros = parseMoney(baseSalary);
-                const parsedWorkingDays = Number.parseInt(workingDays, 10);
-                const parsedPaidLeaves = Number.parseInt(paidLeaves, 10);
-                const parsedPayDay = Number.parseInt(payDay, 10);
-                if (!employeeName.trim()) {
-                  setFormError(t`Enter the employee's name.`);
-                  return;
-                }
-                if (!micros || BigInt(micros) <= 0n) {
-                  setFormError(t`Enter a valid positive base salary.`);
-                  return;
-                }
-                if (
-                  !Number.isInteger(parsedWorkingDays) ||
-                  parsedWorkingDays < 1 ||
-                  parsedWorkingDays > 31
-                ) {
-                  setFormError(
-                    t`Working days divisor must be between 1 and 31.`,
-                  );
-                  return;
-                }
-                if (
-                  !Number.isInteger(parsedPaidLeaves) ||
-                  parsedPaidLeaves < 0 ||
-                  parsedPaidLeaves > 31
-                ) {
-                  setFormError(
-                    t`Paid leaves per month must be between 0 and 31.`,
-                  );
-                  return;
-                }
-                if (
-                  !Number.isInteger(parsedPayDay) ||
-                  parsedPayDay < 1 ||
-                  parsedPayDay > 31
-                ) {
-                  setFormError(t`Payday must be between 1 and 31.`);
-                  return;
-                }
-                if (!resolvedFundingId) {
-                  setFormError(t`Select a Charged From account.`);
-                  return;
-                }
-                const res = await onRunCommand({
-                  action: 'savePayrollProfile',
-                  ...(editingProfileId ? { id: editingProfileId } : {}),
-                  employeeMemberId: employeeMemberId || null,
-                  employeeName: employeeName.trim(),
-                  roleLabel: roleLabel.trim(),
-                  currency,
-                  baseSalaryMicros: micros,
-                  workingDaysPerMonth: parsedWorkingDays,
-                  paidLeavesPerMonth: parsedPaidLeaves,
-                  payDayOfMonth: parsedPayDay,
-                  fundingAccountId: resolvedFundingId,
-                  startMonth: data.payrollMonth,
-                  active: profileActive,
-                });
-                if (res) {
-                  setEditingProfileId(null);
-                  setEmployeeName('');
-                  setBaseSalary('');
-                  setShowEmployeeForm(false);
-                }
-              }}
-            >
-              {editingProfileId
-                ? t`Update Salary Profile`
-                : t`Save Salary & Link Recurring Expense`}
-            </StyledDeliveryButton>
-            <StyledDeliveryButton
-              type="button"
-              onClick={() => {
-                setEditingProfileId(null);
-                setShowEmployeeForm(false);
-              }}
-            >
-              <Trans>Cancel</Trans>
-            </StyledDeliveryButton>
-          </StyledDeliveryRow>
+          {renderProfileFormContent()}
         </StyledFinanceV2Panel>
       )}
 
@@ -447,94 +478,113 @@ export const FinanceV2PayrollTab = ({
                   const prof = data.payrollProfiles.find(
                     (p) => p.id === row.profileId,
                   );
+                  const isEditingThisRow =
+                    editingProfileInTable && editingProfileId === row.profileId;
                   return (
-                    <tr key={row.profileId}>
-                      <td>
-                        <strong>{row.employeeName}</strong>
-                        {prof && (
-                          <div>
-                            <small>
-                              {prof.roleLabel ? `${prof.roleLabel} · ` : ''}
-                              {t`Payday ${prof.payDayOfMonth} · ${prof.fundingAccountName}`}
-                              {!prof.active ? ` · ${t`Paused`}` : ''}
-                            </small>
-                          </div>
-                        )}
-                      </td>
-                      <td data-numeric="true">
-                        {formatFinanceAmountMicros(
-                          row.baseSalaryMicros,
-                          row.currency,
-                        )}
-                      </td>
-                      <td data-numeric="true">
-                        {formatFinanceAmountMicros(
-                          row.perDayMicros,
-                          row.currency,
-                        )}
-                        <div>
-                          <small>÷{row.workingDaysPerMonth}d</small>
-                        </div>
-                      </td>
-                      <td>
-                        <div>
-                          {t`Taken: ${row.leavesTakenDays}d · Swaps: ${row.swapsDays}d`}
-                        </div>
-                        <small>
-                          {t`Paid left: ${row.paidLeavesRemainingDays}/${row.paidLeavesPerMonth}d · Unpaid: ${row.unpaidLeaveDays}d`}
-                        </small>
-                      </td>
-                      <td data-numeric="true">
-                        {row.unpaidLeaveDeductionMicros !== '0'
-                          ? `-${formatFinanceAmountMicros(row.unpaidLeaveDeductionMicros, row.currency)}`
-                          : '—'}
-                      </td>
-                      <td data-numeric="true">
-                        {row.overtimePayMicros !== '0'
-                          ? `+${formatFinanceAmountMicros(row.overtimePayMicros, row.currency)} (${row.overtimeDays}d)`
-                          : '—'}
-                      </td>
-                      <td data-numeric="true">
-                        {row.bonusTotalMicros !== '0'
-                          ? `+${formatFinanceAmountMicros(row.bonusTotalMicros, row.currency)}`
-                          : '—'}
-                      </td>
-                      <td data-numeric="true">
-                        <strong>
+                    <Fragment key={row.profileId}>
+                      <tr>
+                        <td>
+                          <strong>{row.employeeName}</strong>
+                          {prof && (
+                            <div>
+                              <small>
+                                {prof.roleLabel ? `${prof.roleLabel} · ` : ''}
+                                {t`Payday ${prof.payDayOfMonth} · ${prof.fundingAccountName}`}
+                                {!prof.active ? ` · ${t`Paused`}` : ''}
+                              </small>
+                            </div>
+                          )}
+                        </td>
+                        <td data-numeric="true">
                           {formatFinanceAmountMicros(
-                            row.netPayableMicros,
+                            row.baseSalaryMicros,
                             row.currency,
                           )}
-                        </strong>
-                      </td>
-                      <td>
-                        {data.canManage && (
-                          <StyledDeliveryRow>
-                            {prof && (
+                        </td>
+                        <td data-numeric="true">
+                          {formatFinanceAmountMicros(
+                            row.perDayMicros,
+                            row.currency,
+                          )}
+                          <div>
+                            <small>÷{row.workingDaysPerMonth}d</small>
+                          </div>
+                        </td>
+                        <td>
+                          <div>
+                            {t`Taken: ${row.leavesTakenDays}d · Swaps: ${row.swapsDays}d`}
+                          </div>
+                          <small>
+                            {t`Paid left: ${row.paidLeavesRemainingDays}/${row.paidLeavesPerMonth}d · Unpaid: ${row.unpaidLeaveDays}d`}
+                          </small>
+                        </td>
+                        <td data-numeric="true">
+                          {row.unpaidLeaveDeductionMicros !== '0'
+                            ? `-${formatFinanceAmountMicros(row.unpaidLeaveDeductionMicros, row.currency)}`
+                            : '—'}
+                        </td>
+                        <td data-numeric="true">
+                          {row.overtimePayMicros !== '0'
+                            ? `+${formatFinanceAmountMicros(row.overtimePayMicros, row.currency)} (${row.overtimeDays}d)`
+                            : '—'}
+                        </td>
+                        <td data-numeric="true">
+                          {row.bonusTotalMicros !== '0'
+                            ? `+${formatFinanceAmountMicros(row.bonusTotalMicros, row.currency)}`
+                            : '—'}
+                        </td>
+                        <td data-numeric="true">
+                          <strong>
+                            {formatFinanceAmountMicros(
+                              row.netPayableMicros,
+                              row.currency,
+                            )}
+                          </strong>
+                        </td>
+                        <td>
+                          {data.canManage && (
+                            <StyledDeliveryRow>
+                              {prof && (
+                                <StyledDeliveryButton
+                                  disabled={busy}
+                                  onClick={() => openEditProfile(prof)}
+                                >
+                                  {isEditingThisRow ? (
+                                    <Trans>Close</Trans>
+                                  ) : (
+                                    <Trans>Edit</Trans>
+                                  )}
+                                </StyledDeliveryButton>
+                              )}
                               <StyledDeliveryButton
                                 disabled={busy}
-                                onClick={() => openEditProfile(prof)}
+                                onClick={() =>
+                                  void onRunCommand({
+                                    action: 'postPayrollAdjustments',
+                                    profileId: row.profileId,
+                                    month: data.payrollMonth,
+                                    forceResync: true,
+                                  })
+                                }
                               >
-                                <Trans>Edit</Trans>
+                                <Trans>Post to Expenses</Trans>
                               </StyledDeliveryButton>
-                            )}
-                            <StyledDeliveryButton
-                              disabled={busy}
-                              onClick={() =>
-                                void onRunCommand({
-                                  action: 'postPayrollAdjustments',
-                                  profileId: row.profileId,
-                                  month: data.payrollMonth,
-                                  forceResync: true,
-                                })
-                              }
+                            </StyledDeliveryRow>
+                          )}
+                        </td>
+                      </tr>
+                      {isEditingThisRow && (
+                        <tr>
+                          <td colSpan={9}>
+                            <StyledFinanceV2InlineEditor
+                              ref={attachInlineEditor}
                             >
-                              <Trans>Post to Expenses</Trans>
-                            </StyledDeliveryButton>
-                          </StyledDeliveryRow>
-                        )}
-                      </td>
-                    </tr>
+                              {renderProfileFormContent()}
+                            </StyledFinanceV2InlineEditor>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                   );
                 })}
               </tbody>
@@ -548,6 +598,11 @@ export const FinanceV2PayrollTab = ({
           <h3>
             <Trans>Log Leave, Sunday Swap, Overtime, or Bonus</Trans>
           </h3>
+          {entryFormError && (
+            <StyledFinanceV2Notice data-tone="danger" role="alert">
+              {entryFormError}
+            </StyledFinanceV2Notice>
+          )}
           <StyledFinanceV2FormGrid>
             <label>
               <Trans>Employee</Trans>
@@ -634,13 +689,15 @@ export const FinanceV2PayrollTab = ({
               data-primary="true"
               disabled={busy}
               onClick={async () => {
-                setFormError('');
+                setEntryFormError('');
                 if (!resolvedEntryProfileId) {
-                  setFormError(t`Select an employee.`);
+                  setEntryFormError(t`Select an employee.`);
                   return;
                 }
                 if (eventDate.slice(0, 7) !== data.payrollMonth) {
-                  setFormError(t`Choose a date inside ${data.payrollMonth}.`);
+                  setEntryFormError(
+                    t`Choose a date inside ${data.payrollMonth}.`,
+                  );
                   return;
                 }
                 const bonusMicros =
@@ -649,11 +706,13 @@ export const FinanceV2PayrollTab = ({
                   entryKind === 'BONUS' &&
                   (!bonusMicros || BigInt(bonusMicros) <= 0n)
                 ) {
-                  setFormError(t`Enter a valid positive bonus amount.`);
+                  setEntryFormError(t`Enter a valid positive bonus amount.`);
                   return;
                 }
                 if (entryKind !== 'BONUS' && !entryDays.trim()) {
-                  setFormError(t`Enter the number of days (e.g. 1 or 0.5).`);
+                  setEntryFormError(
+                    t`Enter the number of days (e.g. 1 or 0.5).`,
+                  );
                   return;
                 }
                 const res = await onRunCommand({
