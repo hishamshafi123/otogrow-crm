@@ -206,6 +206,7 @@ import { AddCompetitorSourceRegistryFastInstanceCommand } from 'src/database/com
 import { AddNativeAiRecoveryIndexFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1793806940710-add-native-ai-recovery-index';
 import { AddContentPostingWorkflowFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1793810789786-add-content-posting-workflow';
 import { AddKnowledgeBrandFilesFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1793845992011-add-knowledge-brand-files';
+import { AddDeliveryFinanceV2FastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1795508400000-add-delivery-finance-v2';
 
 export const INSTANCE_COMMANDS = [
   AddViewFieldGroupIdIndexOnViewFieldFastInstanceCommand,
@@ -414,4 +415,5 @@ export const INSTANCE_COMMANDS = [
   AddNativeAiRecoveryIndexFastInstanceCommand,
   AddContentPostingWorkflowFastInstanceCommand,
   AddKnowledgeBrandFilesFastInstanceCommand,
+  AddDeliveryFinanceV2FastInstanceCommand,
 ];
