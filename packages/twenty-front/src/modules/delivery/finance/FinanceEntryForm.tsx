@@ -122,7 +122,11 @@ export const FinanceEntryForm = ({
   const attachForm = useCallback(
     (form: HTMLFormElement | null) => {
       registerForm(form);
-      form?.querySelector<HTMLInputElement>('[name="title"]')?.focus();
+      if (!form) return;
+      form
+        .querySelector<HTMLInputElement>('[name="title"]')
+        ?.focus({ preventScroll: true });
+      form.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
     },
     [registerForm],
   );

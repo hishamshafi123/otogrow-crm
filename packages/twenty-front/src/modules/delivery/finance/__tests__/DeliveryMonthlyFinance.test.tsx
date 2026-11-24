@@ -682,9 +682,7 @@ it('discards a prior void reason before targeting a different selected entry', a
     screen.getByRole('textbox', { name: 'Reason for voiding' }),
     'Reason intended for the first entry',
   );
-  await userEvent.click(
-    screen.getAllByRole('link', { name: 'Review entry' })[1],
-  );
+  await userEvent.click(screen.getByRole('link', { name: 'Review entry' }));
   await userEvent.click(
     screen.getByRole('button', { name: 'Discard and continue' }),
   );
@@ -933,4 +931,62 @@ it('resets the month review after a saved status change when the selected month 
   expect(
     await screen.findByRole('textbox', { name: 'Reason for locking' }),
   ).toHaveValue('');
+});
+
+it('edits a staff salary plan inline inside its own card with one click', async () => {
+  mockSnapshot.plans = [
+    {
+      id: PLAN_ID,
+      revision: 2,
+      type: 'SALARY',
+      name: 'Editor monthly pay',
+      currency: 'USD',
+      monthlyAmountMicros: '1000000000',
+      memberId: MEMBER_ID,
+      memberName: 'Active editor',
+      memberActive: true,
+      startMonth: '2026-10',
+      endMonth: null,
+      dueDay: 31,
+      active: true,
+      createdAt: '2026-10-01T00:00:00Z',
+      updatedAt: '2026-10-01T00:00:00Z',
+    },
+  ];
+  mockSnapshot.planTotal = 1;
+  const page = setup('');
+  await act(async () => {
+    await page.router.navigate(
+      '/delivery?view=finance&financeView=plans&financeMonth=2026-10',
+    );
+  });
+  const editButton = await screen.findByRole('button', {
+    name: 'Edit Editor monthly pay',
+  });
+  const planCard = editButton.closest('section');
+  expect(planCard).not.toBeNull();
+  await userEvent.click(editButton);
+  const amountInput = screen.getByRole('textbox', { name: 'Monthly amount' });
+  expect(planCard).toContainElement(amountInput);
+  expect(amountInput).toHaveFocus();
+  await userEvent.clear(amountInput);
+  await userEvent.type(amountInput, '1250.00');
+  await userEvent.click(
+    screen.getByRole('button', { name: 'Save monthly plan' }),
+  );
+  await waitFor(() =>
+    expect(mockMutation).toHaveBeenCalledWith('SaveDeliveryFinancePlan', {
+      variables: {
+        input: expect.objectContaining({
+          id: PLAN_ID,
+          revision: 2,
+          monthlyAmountMicros: '1250000000',
+        }),
+      },
+    }),
+  );
+  const savedStatus = await screen.findByText(
+    'Monthly cost plan saved. No payment was recorded.',
+  );
+  expect(planCard).toContainElement(savedStatus);
 });

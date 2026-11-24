@@ -8,7 +8,26 @@ export const CLIENT_SECTIONS = [
   'projects',
   'portal',
 ] as const;
+
 export type ClientSection = (typeof CLIENT_SECTIONS)[number];
+
+export const PRIMARY_CLIENT_SECTIONS = [
+  'overview',
+  'projects',
+  'services',
+  'profile',
+] as const;
+
+export type PrimaryClientSection = (typeof PRIMARY_CLIENT_SECTIONS)[number];
+
+export const normalizePrimaryClientSection = (
+  section: ClientSection,
+): PrimaryClientSection => {
+  if (section === 'portal') return 'services';
+  if (section === 'contacts') return 'profile';
+  return section;
+};
+
 export const clientWorkspaceSelection = (params: URLSearchParams) => {
   const companyId = params.get('clientCompany');
   const projectId = params.get('clientProject');

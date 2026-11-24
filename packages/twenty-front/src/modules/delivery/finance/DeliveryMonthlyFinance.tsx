@@ -4,6 +4,7 @@ import { Trans, useLingui } from '@lingui/react/macro';
 import { Link, useSearchParams } from 'react-router-dom';
 import { styled } from '@linaria/react';
 import { isDefined } from 'twenty-shared/utils';
+import { themeCssVariables } from 'twenty-ui/theme-constants';
 import {
   type DeliveryFinanceQuery,
   type DeliveryFinancePlanInput,
@@ -62,6 +63,11 @@ const StyledFinanceBoundary = styled.fieldset`
   &[hidden] {
     display: none;
   }
+`;
+const StyledInlinePanel = styled.div`
+  border-top: 1px solid ${themeCssVariables.border.color.medium};
+  margin-top: 14px;
+  padding-top: 14px;
 `;
 const currentMonth = () => {
   const now = new Date();
@@ -146,9 +152,11 @@ const MonthlyFinanceWorkspace = ({
   const [historyEntryId, setHistoryEntryId] = useState<string | null>(() =>
     params.has('financeHistoryBefore') ? selectedEntryId : null,
   );
-  const [notice, setNotice] = useState<{ text: string; to?: string } | null>(
-    null,
-  );
+  const [notice, setNotice] = useState<{
+    text: string;
+    to?: string;
+    targetId?: string;
+  } | null>(null);
   const [preparation, setPreparation] = useState<
     PrepareDeliveryFinanceMonthMutation['prepareDeliveryFinanceMonth'] | null
   >(null);
@@ -229,6 +237,7 @@ const MonthlyFinanceWorkspace = ({
     setNotice({
       text: t`Monthly cost plan saved. No payment was recorded.`,
       to: destination({ financeView: 'plans', financePlan: id }),
+      targetId: id,
     });
     return true;
   };
@@ -240,9 +249,17 @@ const MonthlyFinanceWorkspace = ({
     setNotice({
       text: t`Monthly draft saved. Review and post it to include it in results.`,
       to: destination({ financeView: 'monthly', financeEntry: id }),
+      targetId: id,
     });
     return true;
   };
+  const noticeShownInline =
+    available &&
+    Boolean(notice?.targetId) &&
+    ((view === 'plans' &&
+      Boolean(data?.plans.some((plan) => plan.id === notice?.targetId))) ||
+      (view === 'monthly' &&
+        Boolean(data?.entries.some((entry) => entry.id === notice?.targetId))));
   const prepareMonth = async (afterPlanId: string | null) => {
     const result = await perform(() =>
       prepare({
@@ -370,8 +387,8 @@ const MonthlyFinanceWorkspace = ({
           <Trans>Choose a valid service month and supported currency.</Trans>
         </p>
       )}
-      {error && <p role="alert">{error}</p>}
-      {editor && permission.ready && !canManage && (
+      {error && (!editor || !available) && <p role="alert">{error}</p>}
+      {editor && !available && permission.ready && !canManage && (
         <p role="status">
           <Trans>
             Your edit permission changed. This draft is preserved with read-only
@@ -380,7 +397,7 @@ const MonthlyFinanceWorkspace = ({
           </Trans>
         </p>
       )}
-      {notice && (
+      {notice && !noticeShownInline && (
         <p role="status">
           {notice.text}
           {notice.to && (
@@ -523,600 +540,802 @@ const MonthlyFinanceWorkspace = ({
               </StyledDeliveryStack>
             </StyledDeliveryCard>
           )}
-          {editor?.kind === 'PLAN' && (
-            <StyledDeliveryCard>
-              <FinancePlanForm
-                key={
-                  editor.initial
-                    ? `${editor.initial.id}:${editor.initial.revision}`
-                    : 'new-plan'
-                }
-                month={month}
-                initial={editor.initial}
-                members={data?.members ?? []}
-                busy={busy}
-                readOnly={!canManage || !available || query.loading}
-                latestRevision={
-                  editor.initial
-                    ? data?.selectedPlan?.id === editor.initial.id
-                      ? (data?.selectedPlan?.revision ?? -1)
-                      : (data?.plans.find(
-                          (plan) => plan.id === editor.initial?.id,
-                        )?.revision ?? -1)
-                    : 0
-                }
-                onSave={savePlanDraft}
-                onCancel={() => setEditor(null)}
-                onReload={() => {
-                  const current =
-                    data?.selectedPlan &&
-                    data.selectedPlan.id === editor.initial?.id
-                      ? data.selectedPlan
-                      : data?.plans.find(
-                          (plan) => plan.id === editor.initial?.id,
+          {(() => {
+            const selectedPlanInList =
+              view === 'plans' &&
+              Boolean(
+                selectedPlan &&
+                data?.plans.some((plan) => plan.id === selectedPlan.id),
+              );
+            const editingPlanInList =
+              view === 'plans' &&
+              Boolean(
+                editor?.kind === 'PLAN' &&
+                editor.initial &&
+                data?.plans.some((plan) => plan.id === editor.initial?.id),
+              );
+            const editingSelectedPlanStandalone =
+              view === 'plans' &&
+              Boolean(
+                editor?.kind === 'PLAN' &&
+                editor.initial &&
+                !editingPlanInList &&
+                selectedPlan?.id === editor.initial.id,
+              );
+            const showTopPlanEditor =
+              editor?.kind === 'PLAN' &&
+              !editingPlanInList &&
+              !editingSelectedPlanStandalone;
+
+            const selectedEntryInList =
+              view === 'monthly' &&
+              Boolean(
+                selectedEntry &&
+                data?.entries.some((entry) => entry.id === selectedEntry.id),
+              );
+            const editingEntryInList =
+              view === 'monthly' &&
+              Boolean(
+                editor?.kind === 'ENTRY' &&
+                editor.initial &&
+                data?.entries.some((entry) => entry.id === editor.initial?.id),
+              );
+            const editingSelectedEntryStandalone =
+              view === 'monthly' &&
+              Boolean(
+                editor?.kind === 'ENTRY' &&
+                editor.initial &&
+                !editingEntryInList &&
+                selectedEntry?.id === editor.initial.id,
+              );
+            const showTopEntryEditor =
+              editor?.kind === 'ENTRY' &&
+              !editingEntryInList &&
+              !editingSelectedEntryStandalone;
+
+            const renderEditorBanners = () => (
+              <>
+                {error && <p role="alert">{error}</p>}
+                {permission.ready && !canManage && (
+                  <p role="status">
+                    <Trans>
+                      Your edit permission changed. This draft is preserved with
+                      read-only access; an administrator must restore editing
+                      before it can be saved.
+                    </Trans>
+                  </p>
+                )}
+              </>
+            );
+
+            const renderPlanEditor = () => {
+              if (editor?.kind !== 'PLAN') return null;
+              return (
+                <StyledDeliveryStack>
+                  {renderEditorBanners()}
+                  <FinancePlanForm
+                    key={
+                      editor.initial
+                        ? `${editor.initial.id}:${editor.initial.revision}`
+                        : 'new-plan'
+                    }
+                    month={month}
+                    initial={editor.initial}
+                    members={data?.members ?? []}
+                    busy={busy}
+                    readOnly={!canManage || !available || query.loading}
+                    latestRevision={
+                      editor.initial
+                        ? data?.selectedPlan?.id === editor.initial.id
+                          ? (data?.selectedPlan?.revision ?? -1)
+                          : (data?.plans.find(
+                              (plan) => plan.id === editor.initial?.id,
+                            )?.revision ?? -1)
+                        : 0
+                    }
+                    onSave={savePlanDraft}
+                    onCancel={() => setEditor(null)}
+                    onReload={() => {
+                      const current =
+                        data?.selectedPlan &&
+                        data.selectedPlan.id === editor.initial?.id
+                          ? data.selectedPlan
+                          : data?.plans.find(
+                              (plan) => plan.id === editor.initial?.id,
+                            );
+                      if (current)
+                        setEditor({ kind: 'PLAN', initial: current });
+                      else
+                        setError(
+                          t`This plan is not available in the current source view. Your draft is still preserved.`,
                         );
-                  if (current) setEditor({ kind: 'PLAN', initial: current });
-                  else
-                    setError(
-                      t`This plan is not available in the current source view. Your draft is still preserved.`,
-                    );
-                }}
-              />
-            </StyledDeliveryCard>
-          )}
-          {editor?.kind === 'ENTRY' && (
-            <StyledDeliveryCard>
-              <FinanceEntryForm
-                key={
-                  editor.initial
-                    ? `${editor.initial.id}:${editor.initial.revision}`
-                    : 'new-entry'
-                }
-                month={month}
-                initial={editor.initial}
-                projects={data?.projects ?? []}
-                busy={busy}
-                readOnly={!canManage || !available || query.loading}
-                latestRevision={
-                  editor.initial
-                    ? data?.selectedEntry?.id === editor.initial.id
-                      ? (data?.selectedEntry?.revision ?? -1)
-                      : (data?.entries.find(
-                          (entry) => entry.id === editor.initial?.id,
-                        )?.revision ?? -1)
-                    : 0
-                }
-                onSave={saveEntryDraft}
-                onCancel={() => setEditor(null)}
-                onReload={() => {
-                  const current =
-                    data?.selectedEntry &&
-                    data.selectedEntry.id === editor.initial?.id
-                      ? data.selectedEntry
-                      : data?.entries.find(
-                          (entry) => entry.id === editor.initial?.id,
+                    }}
+                  />
+                </StyledDeliveryStack>
+              );
+            };
+
+            const renderEntryEditor = () => {
+              if (editor?.kind !== 'ENTRY') return null;
+              return (
+                <StyledDeliveryStack>
+                  {renderEditorBanners()}
+                  <FinanceEntryForm
+                    key={
+                      editor.initial
+                        ? `${editor.initial.id}:${editor.initial.revision}`
+                        : 'new-entry'
+                    }
+                    month={month}
+                    initial={editor.initial}
+                    projects={data?.projects ?? []}
+                    busy={busy}
+                    readOnly={!canManage || !available || query.loading}
+                    latestRevision={
+                      editor.initial
+                        ? data?.selectedEntry?.id === editor.initial.id
+                          ? (data?.selectedEntry?.revision ?? -1)
+                          : (data?.entries.find(
+                              (entry) => entry.id === editor.initial?.id,
+                            )?.revision ?? -1)
+                        : 0
+                    }
+                    onSave={saveEntryDraft}
+                    onCancel={() => setEditor(null)}
+                    onReload={() => {
+                      const current =
+                        data?.selectedEntry &&
+                        data.selectedEntry.id === editor.initial?.id
+                          ? data.selectedEntry
+                          : data?.entries.find(
+                              (entry) => entry.id === editor.initial?.id,
+                            );
+                      if (current)
+                        setEditor({ kind: 'ENTRY', initial: current });
+                      else
+                        setError(
+                          t`This entry is not available in the current source view. Your draft is still preserved.`,
                         );
-                  if (current) setEditor({ kind: 'ENTRY', initial: current });
-                  else
-                    setError(
-                      t`This entry is not available in the current source view. Your draft is still preserved.`,
-                    );
-                }}
-              />
-            </StyledDeliveryCard>
-          )}
-          {view === 'monthly' && (
-            <FinanceMonthlyResults summaries={data?.summaries ?? []} />
-          )}
-          {view === 'plans' ? (
-            <>
-              <h3>{t`Cost plans (${data?.planTotal ?? 0})`}</h3>
-              {!data?.plans.length && (
+                    }}
+                  />
+                </StyledDeliveryStack>
+              );
+            };
+
+            const renderPlanDetails = (
+              plan: FinancePlan,
+              isEditingThis: boolean,
+              includeHeading: boolean,
+            ) => (
+              <StyledDeliveryStack>
+                {includeHeading && <h3>{plan.name}</h3>}
+                <p>
+                  {formatFinanceAmountMicros(
+                    plan.monthlyAmountMicros,
+                    plan.currency,
+                  )}{' '}
+                  · {t`Expected due day ${plan.dueDay}`}
+                </p>
                 <p>
                   <Trans>
-                    No cost plans in this view. Add salary or overhead with an
-                    explicit amount, currency and effective month.
+                    Shorter months use their last calendar day. Preparation
+                    creates a draft, never a payment.
                   </Trans>
                 </p>
-              )}
-              {data?.plans.map((plan) => (
-                <StyledDeliveryCard key={plan.id}>
-                  <StyledDeliveryRow>
-                    <div>
-                      <strong>{plan.name}</strong>
-                      <p>
-                        {labels.planTypes[plan.type] ?? plan.type} ·{' '}
-                        {formatFinanceAmountMicros(
-                          plan.monthlyAmountMicros,
-                          plan.currency,
-                        )}{' '}
-                        · {plan.active ? t`Active` : t`Inactive`}
-                      </p>
-                      <p>
-                        {plan.memberName ?? t`Company overhead`} ·{' '}
-                        {plan.startMonth}
-                        {plan.endMonth ? ` → ${plan.endMonth}` : ''}
-                      </p>
-                    </div>
+                {plan.memberId && plan.memberActive === false && (
+                  <p role="status">
+                    <Trans>
+                      This employee is no longer active. Historical obligations
+                      remain available for review.
+                    </Trans>
+                  </p>
+                )}
+                {canManage && !isEditingThis && (
+                  <StyledDeliveryButton
+                    type="button"
+                    onClick={() => editPlan(plan)}
+                  >
+                    <Trans>Edit cost plan</Trans>
+                  </StyledDeliveryButton>
+                )}
+              </StyledDeliveryStack>
+            );
+
+            const renderEntryDetails = (
+              entry: FinanceEntry,
+              isEditingThis: boolean,
+            ) => (
+              <StyledDeliveryStack>
+                <h3>{entry.title}</h3>
+                <p>
+                  {entry.month} ·{' '}
+                  {labels.entryStatuses[entry.status] ?? entry.status} ·{' '}
+                  {formatFinanceAmountMicros(
+                    entry.amountMicros,
+                    entry.currency,
+                  )}
+                </p>
+                {(entry.month !== month ||
+                  (currency && entry.currency !== currency)) && (
+                  <p>
+                    <Trans>
+                      This source is outside the selected month or currency.
+                    </Trans>{' '}
                     <Link
                       to={destination({
-                        financePlan: plan.id,
-                        financeEntry: null,
+                        financeMonth: entry.month,
+                        financeCurrency: entry.currency,
+                        financeEntriesAfter: null,
+                        financePlansAfter: null,
                       })}
                     >
-                      <Trans>Review plan</Trans>
+                      <Trans>Open its month and currency</Trans>
                     </Link>
-                  </StyledDeliveryRow>
-                </StyledDeliveryCard>
-              ))}
-              <StyledDeliveryRow>
-                {data?.nextPlanId && (
+                  </p>
+                )}
+                <p>
+                  {labels.sourceTypes[entry.sourceType] ?? entry.sourceType}
+                  {entry.sourcePlan
+                    ? ` · ${entry.sourcePlan.name} · v${entry.sourcePlan.revision}`
+                    : ''}
+                </p>
+                {entry.status !== 'DRAFT' && (
                   <Link
-                    to={destination({
-                      financePlansAfter: data.nextPlanId,
-                      financePlan: null,
+                    to={financePaymentDestination({
+                      entryId: entry.id,
+                      currency: entry.currency,
                     })}
                   >
-                    <Trans>More cost plans</Trans>
+                    <Trans>Review payments matched to this entry</Trans>
                   </Link>
                 )}
-                {params.has('financePlansAfter') && (
-                  <Link to={destination({ financePlansAfter: null })}>
-                    <Trans>First cost plans</Trans>
-                  </Link>
-                )}
-              </StyledDeliveryRow>
-              {selectedPlanId && !selectedPlan && (
-                <p>
-                  <Trans>
-                    This cost plan is unavailable or outside your access.
-                  </Trans>
-                </p>
-              )}
-              {selectedPlan && (
-                <StyledDeliveryCard>
+                {entry.sourcePlan && (
                   <StyledDeliveryStack>
-                    <h3>{selectedPlan.name}</h3>
+                    <h4>
+                      <Trans>Saved cost-plan source</Trans>
+                    </h4>
                     <p>
+                      {entry.sourcePlan.name} ·{' '}
+                      {t`Revision ${entry.sourcePlan.revision}`} ·{' '}
                       {formatFinanceAmountMicros(
-                        selectedPlan.monthlyAmountMicros,
-                        selectedPlan.currency,
-                      )}{' '}
-                      · {t`Expected due day ${selectedPlan.dueDay}`}
+                        entry.sourcePlan.monthlyAmountMicros,
+                        entry.currency,
+                      )}
                     </p>
                     <p>
-                      <Trans>
-                        Shorter months use their last calendar day. Preparation
-                        creates a draft, never a payment.
-                      </Trans>
+                      {entry.sourcePlan.memberName ?? t`Company overhead`} ·{' '}
+                      {entry.sourcePlan.startMonth}
+                      {entry.sourcePlan.endMonth
+                        ? ` → ${entry.sourcePlan.endMonth}`
+                        : ''}
                     </p>
-                    {selectedPlan.memberId &&
-                      selectedPlan.memberActive === false && (
-                        <p role="status">
-                          <Trans>
-                            This employee is no longer active. Historical
-                            obligations remain available for review.
-                          </Trans>
-                        </p>
-                      )}
-                    {canManage && (
-                      <StyledDeliveryButton
-                        onClick={() => editPlan(selectedPlan)}
-                      >
-                        <Trans>Edit cost plan</Trans>
-                      </StyledDeliveryButton>
-                    )}
-                  </StyledDeliveryStack>
-                </StyledDeliveryCard>
-              )}
-            </>
-          ) : (
-            <>
-              <h3>{t`Monthly entries (${data?.entryTotal ?? 0})`}</h3>
-              {!data?.entries.length && (
-                <p>
-                  <Trans>No monthly entries in this view.</Trans>
-                </p>
-              )}
-              {data?.entries.map((entry) => (
-                <StyledDeliveryCard key={entry.id}>
-                  <StyledDeliveryRow>
-                    <div>
-                      <strong>{entry.title}</strong>
-                      <p>
-                        {labels.entryStatuses[entry.status] ?? entry.status} ·{' '}
-                        {labels.entryKinds[entry.kind] ?? entry.kind} ·{' '}
-                        {formatFinanceAmountMicros(
-                          entry.amountMicros,
-                          entry.currency,
-                        )}
-                      </p>
-                      {entry.status === 'DRAFT' &&
-                        entry.remainingAllocationMicros !== '0' && (
-                          <small>
-                            {t`Still to allocate`}:{' '}
-                            {formatFinanceAmountMicros(
-                              entry.remainingAllocationMicros,
-                              entry.currency,
-                            )}
-                          </small>
-                        )}
-                    </div>
+                    <p>{t`Original expected due day ${entry.sourcePlan.dueDay}`}</p>
                     <Link
                       to={destination({
-                        financeEntry: entry.id,
-                        financePlan: null,
+                        financeView: 'plans',
+                        financePlan: entry.sourcePlan.planId,
+                        financeEntry: null,
                         financeHistoryBefore: null,
                       })}
                     >
-                      <Trans>Review entry</Trans>
+                      <Trans>Review current cost plan</Trans>
                     </Link>
-                  </StyledDeliveryRow>
-                </StyledDeliveryCard>
-              ))}
-              <StyledDeliveryRow>
-                {data?.nextEntryId && (
-                  <Link
-                    to={destination({
-                      financeEntriesAfter: data.nextEntryId,
-                      financeEntry: null,
-                    })}
-                  >
-                    <Trans>More monthly entries</Trans>
-                  </Link>
+                  </StyledDeliveryStack>
                 )}
-                {params.has('financeEntriesAfter') && (
-                  <Link to={destination({ financeEntriesAfter: null })}>
-                    <Trans>First monthly entries</Trans>
-                  </Link>
+                {entry.sourceAiSpend && (
+                  <FinanceAiCostOrigin origin={entry.sourceAiSpend} />
                 )}
-              </StyledDeliveryRow>
-              {selectedEntryId && !selectedEntry && (
-                <p>
-                  <Trans>
-                    This monthly entry is unavailable or outside your access.
-                  </Trans>
-                </p>
-              )}
-              {selectedEntry && (
-                <StyledDeliveryCard key={selectedEntry.id}>
-                  <StyledDeliveryStack>
-                    <h3>{selectedEntry.title}</h3>
-                    <p>
-                      {selectedEntry.month} ·{' '}
-                      {labels.entryStatuses[selectedEntry.status] ??
-                        selectedEntry.status}{' '}
-                      ·{' '}
-                      {formatFinanceAmountMicros(
-                        selectedEntry.amountMicros,
-                        selectedEntry.currency,
-                      )}
-                    </p>
-                    {(selectedEntry.month !== month ||
-                      (currency && selectedEntry.currency !== currency)) && (
-                      <p>
-                        <Trans>
-                          This source is outside the selected month or currency.
-                        </Trans>{' '}
-                        <Link
-                          to={destination({
-                            financeMonth: selectedEntry.month,
-                            financeCurrency: selectedEntry.currency,
-                            financeEntriesAfter: null,
-                            financePlansAfter: null,
-                          })}
-                        >
-                          <Trans>Open its month and currency</Trans>
-                        </Link>
-                      </p>
+                {entry.dueDate && (
+                  <p>
+                    {t`Expected payment date`}: {entry.dueDate} ·{' '}
+                    <Trans>No payment is recorded by this entry.</Trans>
+                  </p>
+                )}
+                {entry.note && <p>{entry.note}</p>}
+                {entry.evidenceUrl && (
+                  <a href={entry.evidenceUrl} target="_blank" rel="noreferrer">
+                    <Trans>Open source evidence</Trans>
+                  </a>
+                )}
+                {entry.allocations.map((allocation) => (
+                  <p key={allocation.projectId ?? 'company'}>
+                    {allocation.projectName ?? t`Company / unassigned`}:{' '}
+                    {formatFinanceAmountMicros(
+                      allocation.amountMicros,
+                      entry.currency,
                     )}
-                    <p>
-                      {labels.sourceTypes[selectedEntry.sourceType] ??
-                        selectedEntry.sourceType}
-                      {selectedEntry.sourcePlan
-                        ? ` · ${selectedEntry.sourcePlan.name} · v${selectedEntry.sourcePlan.revision}`
-                        : ''}
-                    </p>
-                    {selectedEntry.status !== 'DRAFT' && (
+                  </p>
+                ))}
+                {entry.voidReason && (
+                  <p>
+                    {t`Voided because`}: {entry.voidReason}
+                  </p>
+                )}
+                {(entry.lockedMonths ?? []).length > 0 && (
+                  <p role="status">
+                    <Trans>
+                      This entry affects locked monthly results. Reopen each
+                      listed month before editing, posting or voiding it.
+                    </Trans>{' '}
+                    {entry.lockedMonths.map((lockedMonth) => (
                       <Link
-                        to={financePaymentDestination({
-                          entryId: selectedEntry.id,
-                          currency: selectedEntry.currency,
+                        key={lockedMonth}
+                        to={destination({
+                          financeView: 'monthly',
+                          financeMonth: lockedMonth,
+                          financeCurrency: null,
                         })}
                       >
-                        <Trans>Review payments matched to this entry</Trans>
+                        {t`Review reopening ${lockedMonth}`}{' '}
                       </Link>
-                    )}
-                    {selectedEntry.sourcePlan && (
-                      <StyledDeliveryStack>
-                        <h4>
-                          <Trans>Saved cost-plan source</Trans>
-                        </h4>
-                        <p>
-                          {selectedEntry.sourcePlan.name} ·{' '}
-                          {t`Revision ${selectedEntry.sourcePlan.revision}`} ·{' '}
-                          {formatFinanceAmountMicros(
-                            selectedEntry.sourcePlan.monthlyAmountMicros,
-                            selectedEntry.currency,
-                          )}
-                        </p>
-                        <p>
-                          {selectedEntry.sourcePlan.memberName ??
-                            t`Company overhead`}{' '}
-                          · {selectedEntry.sourcePlan.startMonth}
-                          {selectedEntry.sourcePlan.endMonth
-                            ? ` → ${selectedEntry.sourcePlan.endMonth}`
-                            : ''}
-                        </p>
-                        <p>{t`Original expected due day ${selectedEntry.sourcePlan.dueDay}`}</p>
-                        <Link
-                          to={destination({
-                            financeView: 'plans',
-                            financePlan: selectedEntry.sourcePlan.planId,
-                            financeEntry: null,
-                            financeHistoryBefore: null,
-                          })}
-                        >
-                          <Trans>Review current cost plan</Trans>
-                        </Link>
-                      </StyledDeliveryStack>
-                    )}
-                    {selectedEntry.sourceAiSpend && (
-                      <FinanceAiCostOrigin
-                        origin={selectedEntry.sourceAiSpend}
-                      />
-                    )}
-                    {selectedEntry.dueDate && (
-                      <p>
-                        {t`Expected payment date`}: {selectedEntry.dueDate} ·{' '}
-                        <Trans>No payment is recorded by this entry.</Trans>
-                      </p>
-                    )}
-                    {selectedEntry.note && <p>{selectedEntry.note}</p>}
-                    {selectedEntry.evidenceUrl && (
-                      <a
-                        href={selectedEntry.evidenceUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        <Trans>Open source evidence</Trans>
-                      </a>
-                    )}
-                    {selectedEntry.allocations.map((allocation) => (
-                      <p key={allocation.projectId ?? 'company'}>
-                        {allocation.projectName ?? t`Company / unassigned`}:{' '}
-                        {formatFinanceAmountMicros(
-                          allocation.amountMicros,
-                          selectedEntry.currency,
-                        )}
-                      </p>
                     ))}
-                    {selectedEntry.voidReason && (
-                      <p>
-                        {t`Voided because`}: {selectedEntry.voidReason}
-                      </p>
+                  </p>
+                )}
+                {entry.status === 'DRAFT' && (
+                  <>
+                    {canManage && !isEditingThis && (
+                      <StyledDeliveryButton
+                        type="button"
+                        disabled={(entry.lockedMonths ?? []).length > 0}
+                        onClick={() => editEntry(entry)}
+                      >
+                        <Trans>Edit monthly draft</Trans>
+                      </StyledDeliveryButton>
                     )}
-                    {(selectedEntry.lockedMonths ?? []).length > 0 && (
-                      <p role="status">
-                        <Trans>
-                          This entry affects locked monthly results. Reopen each
-                          listed month before editing, posting or voiding it.
-                        </Trans>{' '}
-                        {selectedEntry.lockedMonths.map((lockedMonth) => (
-                          <Link
-                            key={lockedMonth}
-                            to={destination({
-                              financeView: 'monthly',
-                              financeMonth: lockedMonth,
-                              financeCurrency: null,
-                            })}
-                          >
-                            {t`Review reopening ${lockedMonth}`}{' '}
-                          </Link>
-                        ))}
-                      </p>
-                    )}
-                    {selectedEntry.status === 'DRAFT' && (
-                      <>
-                        {canManage && (
-                          <StyledDeliveryButton
-                            disabled={
-                              (selectedEntry.lockedMonths ?? []).length > 0
-                            }
-                            onClick={() => editEntry(selectedEntry)}
-                          >
-                            <Trans>Edit monthly draft</Trans>
-                          </StyledDeliveryButton>
-                        )}
-                        {selectedEntry.sourceType === 'AI_SPEND' ? (
-                          <FinanceAiCostPostForm
-                            entry={selectedEntry}
-                            canManage={canManage}
-                            busy={busy}
-                            disabled={
-                              editor !== null ||
-                              (selectedEntry.lockedMonths ?? []).length > 0 ||
-                              selectedEntry.remainingAllocationMicros !== '0'
-                            }
-                            onPost={async (input) => {
-                              const result = await perform(() =>
-                                postAiCost({ variables: { input } }),
-                              );
-                              const saved =
-                                result?.data?.postDeliveryFinanceAiCost;
-                              if (saved)
-                                setNotice({
-                                  text:
-                                    saved.status === 'POSTED'
-                                      ? saved.replayed
-                                        ? t`This AI cost is already posted. Cash and AI spending remain unchanged.`
-                                        : selectedEntry.sourceAiSpend
-                                              ?.replacesEntryId
-                                          ? t`Correction posted. The prior entry was voided and its monthly payment matches were reversed. Cash and AI spending remain unchanged.`
-                                          : t`AI cost posted. Cash and AI spending remain unchanged.`
-                                      : t`This request was already processed. Review the entry’s current status and history before another change.`,
-                                });
-                              return Boolean(saved);
-                            }}
-                          />
-                        ) : (
-                          canManage && (
-                            <DeliveryGuardedForm
-                              key={`post:${selectedEntry.id}`}
-                              revision={selectedEntry.revision}
-                              snapshot={JSON.stringify({
-                                id: selectedEntry.id,
-                                revision: selectedEntry.revision,
-                                sourceReviewToken:
-                                  selectedEntry.sourceReviewToken,
-                              })}
-                              busy={busy}
-                              disabled={
-                                editor !== null ||
-                                (selectedEntry.lockedMonths ?? []).length > 0 ||
-                                selectedEntry.remainingAllocationMicros !== '0'
-                              }
-                              onSave={async (fields, revision) => {
-                                const result = await perform(() =>
-                                  post({
-                                    variables: {
-                                      input: {
-                                        id: selectedEntry.id,
-                                        revision,
-                                        acknowledgeSourceWarnings:
-                                          fields.get('acknowledge') === 'on',
-                                        expectedSourceReviewToken:
-                                          selectedEntry.sourceReviewToken,
-                                      },
-                                    },
-                                  }),
-                                );
-                                if (result)
-                                  setNotice({
-                                    text: t`Entry posted to monthly results. Cash and payments remain separate.`,
-                                  });
-                                return Boolean(result);
-                              }}
-                            >
-                              <StyledDeliveryStack>
-                                {selectedEntry.sourceWarnings.map((warning) => (
-                                  <p key={warning} role="status">
-                                    {labels.warning(warning)}
-                                  </p>
-                                ))}
-                                {selectedEntry.sourceWarnings.length > 0 && (
-                                  <label>
-                                    <input
-                                      type="checkbox"
-                                      name="acknowledge"
-                                      required
-                                    />
-                                    <Trans>
-                                      I reviewed the changed source and confirm
-                                      this saved obligation belongs in this
-                                      month.
-                                    </Trans>
-                                  </label>
-                                )}
-                                {selectedEntry.remainingAllocationMicros !==
-                                  '0' && (
-                                  <p>
-                                    <Trans>
-                                      Allocate the full amount before posting,
-                                      including any explicit company share.
-                                    </Trans>
-                                  </p>
-                                )}
-                                <StyledDeliveryButton type="submit">
-                                  <Trans>Post reviewed entry</Trans>
-                                </StyledDeliveryButton>
-                              </StyledDeliveryStack>
-                            </DeliveryGuardedForm>
-                          )
-                        )}
-                      </>
-                    )}
-                    {canManage && selectedEntry.status !== 'VOID' && (
-                      <details>
-                        <summary>{t`Void this entry`}</summary>
+                    {entry.sourceType === 'AI_SPEND' ? (
+                      <FinanceAiCostPostForm
+                        entry={entry}
+                        canManage={canManage}
+                        busy={busy}
+                        disabled={
+                          editor !== null ||
+                          (entry.lockedMonths ?? []).length > 0 ||
+                          entry.remainingAllocationMicros !== '0'
+                        }
+                        onPost={async (input) => {
+                          const result = await perform(() =>
+                            postAiCost({ variables: { input } }),
+                          );
+                          const saved = result?.data?.postDeliveryFinanceAiCost;
+                          if (saved)
+                            setNotice({
+                              text:
+                                saved.status === 'POSTED'
+                                  ? saved.replayed
+                                    ? t`This AI cost is already posted. Cash and AI spending remain unchanged.`
+                                    : entry.sourceAiSpend?.replacesEntryId
+                                      ? t`Correction posted. The prior entry was voided and its monthly payment matches were reversed. Cash and AI spending remain unchanged.`
+                                      : t`AI cost posted. Cash and AI spending remain unchanged.`
+                                  : t`This request was already processed. Review the entry’s current status and history before another change.`,
+                            });
+                          return Boolean(saved);
+                        }}
+                      />
+                    ) : (
+                      canManage && (
                         <DeliveryGuardedForm
-                          key={`void:${selectedEntry.id}`}
-                          revision={selectedEntry.revision}
+                          key={`post:${entry.id}`}
+                          revision={entry.revision}
                           snapshot={JSON.stringify({
-                            id: selectedEntry.id,
-                            revision: selectedEntry.revision,
-                            status: selectedEntry.status,
+                            id: entry.id,
+                            revision: entry.revision,
+                            sourceReviewToken: entry.sourceReviewToken,
                           })}
                           busy={busy}
                           disabled={
                             editor !== null ||
-                            (selectedEntry.lockedMonths ?? []).length > 0
+                            (entry.lockedMonths ?? []).length > 0 ||
+                            entry.remainingAllocationMicros !== '0'
                           }
                           onSave={async (fields, revision) => {
                             const result = await perform(() =>
-                              voidEntry({
+                              post({
                                 variables: {
                                   input: {
-                                    id: selectedEntry.id,
+                                    id: entry.id,
                                     revision,
-                                    reason: String(fields.get('reason') ?? ''),
+                                    acknowledgeSourceWarnings:
+                                      fields.get('acknowledge') === 'on',
+                                    expectedSourceReviewToken:
+                                      entry.sourceReviewToken,
                                   },
                                 },
                               }),
                             );
                             if (result)
                               setNotice({
-                                text: t`Entry voided. Its source and history remain available; cash is unchanged.`,
+                                text: t`Entry posted to monthly results. Cash and payments remain separate.`,
                               });
                             return Boolean(result);
                           }}
                         >
                           <StyledDeliveryStack>
-                            <label>
-                              <Trans>Reason for voiding</Trans>
-                              <textarea
-                                name="reason"
-                                required
-                                maxLength={2000}
-                              />
-                            </label>
-                            <p>
-                              <Trans>
-                                The source and history stay available. Posted
-                                amounts stop contributing to monthly results. No
-                                cash entry is changed.
-                              </Trans>
-                            </p>
+                            {entry.sourceWarnings.map((warning) => (
+                              <p key={warning} role="status">
+                                {labels.warning(warning)}
+                              </p>
+                            ))}
+                            {entry.sourceWarnings.length > 0 && (
+                              <label>
+                                <input
+                                  type="checkbox"
+                                  name="acknowledge"
+                                  required
+                                />
+                                <Trans>
+                                  I reviewed the changed source and confirm this
+                                  saved obligation belongs in this month.
+                                </Trans>
+                              </label>
+                            )}
+                            {entry.remainingAllocationMicros !== '0' && (
+                              <p>
+                                <Trans>
+                                  Allocate the full amount before posting,
+                                  including any explicit company share.
+                                </Trans>
+                              </p>
+                            )}
                             <StyledDeliveryButton type="submit">
-                              <Trans>Void entry and retain history</Trans>
+                              <Trans>Post reviewed entry</Trans>
                             </StyledDeliveryButton>
                           </StyledDeliveryStack>
                         </DeliveryGuardedForm>
-                      </details>
+                      )
                     )}
-                    <details
-                      key={selectedEntry.id}
-                      open={historyEntryId === selectedEntry.id}
-                      onToggle={(event) =>
-                        setHistoryEntryId(
-                          event.currentTarget.open ? selectedEntry.id : null,
-                        )
+                  </>
+                )}
+                {canManage && entry.status !== 'VOID' && (
+                  <details>
+                    <summary>{t`Void this entry`}</summary>
+                    <DeliveryGuardedForm
+                      key={`void:${entry.id}`}
+                      revision={entry.revision}
+                      snapshot={JSON.stringify({
+                        id: entry.id,
+                        revision: entry.revision,
+                        status: entry.status,
+                      })}
+                      busy={busy}
+                      disabled={
+                        editor !== null || (entry.lockedMonths ?? []).length > 0
                       }
+                      onSave={async (fields, revision) => {
+                        const result = await perform(() =>
+                          voidEntry({
+                            variables: {
+                              input: {
+                                id: entry.id,
+                                revision,
+                                reason: String(fields.get('reason') ?? ''),
+                              },
+                            },
+                          }),
+                        );
+                        if (result)
+                          setNotice({
+                            text: t`Entry voided. Its source and history remain available; cash is unchanged.`,
+                          });
+                        return Boolean(result);
+                      }}
                     >
-                      <summary>{t`Source and correction history`}</summary>
-                      {historyEntryId === selectedEntry.id && (
-                        <FinanceEntryHistory
-                          key={selectedEntry.id}
-                          entryId={selectedEntry.id}
-                          currency={selectedEntry.currency}
-                        />
+                      <StyledDeliveryStack>
+                        <label>
+                          <Trans>Reason for voiding</Trans>
+                          <textarea name="reason" required maxLength={2000} />
+                        </label>
+                        <p>
+                          <Trans>
+                            The source and history stay available. Posted
+                            amounts stop contributing to monthly results. No
+                            cash entry is changed.
+                          </Trans>
+                        </p>
+                        <StyledDeliveryButton type="submit">
+                          <Trans>Void entry and retain history</Trans>
+                        </StyledDeliveryButton>
+                      </StyledDeliveryStack>
+                    </DeliveryGuardedForm>
+                  </details>
+                )}
+                <details
+                  key={entry.id}
+                  open={historyEntryId === entry.id}
+                  onToggle={(event) =>
+                    setHistoryEntryId(
+                      event.currentTarget.open ? entry.id : null,
+                    )
+                  }
+                >
+                  <summary>{t`Source and correction history`}</summary>
+                  {historyEntryId === entry.id && (
+                    <FinanceEntryHistory
+                      key={entry.id}
+                      entryId={entry.id}
+                      currency={entry.currency}
+                    />
+                  )}
+                </details>
+              </StyledDeliveryStack>
+            );
+
+            return (
+              <>
+                {showTopPlanEditor && (
+                  <StyledDeliveryCard>{renderPlanEditor()}</StyledDeliveryCard>
+                )}
+                {showTopEntryEditor && (
+                  <StyledDeliveryCard>{renderEntryEditor()}</StyledDeliveryCard>
+                )}
+                {view === 'monthly' && (
+                  <FinanceMonthlyResults summaries={data?.summaries ?? []} />
+                )}
+                {view === 'plans' ? (
+                  <>
+                    <h3>{t`Cost plans (${data?.planTotal ?? 0})`}</h3>
+                    {selectedPlanId && !selectedPlan && (
+                      <p>
+                        <Trans>
+                          This cost plan is unavailable or outside your access.
+                        </Trans>
+                      </p>
+                    )}
+                    {selectedPlan && !selectedPlanInList && (
+                      <StyledDeliveryCard key={`selected-${selectedPlan.id}`}>
+                        {renderPlanDetails(
+                          selectedPlan,
+                          editingSelectedPlanStandalone,
+                          true,
+                        )}
+                        {editingSelectedPlanStandalone && (
+                          <StyledInlinePanel>
+                            {renderPlanEditor()}
+                          </StyledInlinePanel>
+                        )}
+                      </StyledDeliveryCard>
+                    )}
+                    {!data?.plans.length && (
+                      <p>
+                        <Trans>
+                          No cost plans in this view. Add salary or overhead
+                          with an explicit amount, currency and effective month.
+                        </Trans>
+                      </p>
+                    )}
+                    {data?.plans.map((plan) => {
+                      const isSelected = selectedPlan?.id === plan.id;
+                      const isEditing =
+                        editor?.kind === 'PLAN' &&
+                        editor.initial?.id === plan.id;
+                      return (
+                        <StyledDeliveryCard key={plan.id}>
+                          <StyledDeliveryRow>
+                            <div>
+                              <strong>{plan.name}</strong>
+                              <p>
+                                {labels.planTypes[plan.type] ?? plan.type} ·{' '}
+                                {formatFinanceAmountMicros(
+                                  plan.monthlyAmountMicros,
+                                  plan.currency,
+                                )}{' '}
+                                · {plan.active ? t`Active` : t`Inactive`}
+                              </p>
+                              <p>
+                                {plan.memberName ?? t`Company overhead`} ·{' '}
+                                {plan.startMonth}
+                                {plan.endMonth ? ` → ${plan.endMonth}` : ''}
+                              </p>
+                            </div>
+                            <StyledDeliveryRow>
+                              {canManage && !isEditing && (
+                                <StyledDeliveryButton
+                                  type="button"
+                                  aria-label={t`Edit ${plan.name}`}
+                                  onClick={() => editPlan(plan)}
+                                >
+                                  <Trans>Edit</Trans>
+                                </StyledDeliveryButton>
+                              )}
+                              {isSelected ? (
+                                <Link
+                                  to={destination({
+                                    financePlan: null,
+                                    financeEntry: null,
+                                  })}
+                                >
+                                  <Trans>Hide details</Trans>
+                                </Link>
+                              ) : (
+                                <Link
+                                  to={destination({
+                                    financePlan: plan.id,
+                                    financeEntry: null,
+                                  })}
+                                >
+                                  <Trans>Review plan</Trans>
+                                </Link>
+                              )}
+                            </StyledDeliveryRow>
+                          </StyledDeliveryRow>
+                          {noticeShownInline &&
+                            notice &&
+                            notice.targetId === plan.id && (
+                              <StyledInlinePanel>
+                                <p role="status">{notice.text}</p>
+                              </StyledInlinePanel>
+                            )}
+                          {isSelected &&
+                            !isEditing &&
+                            isDefined(selectedPlan) && (
+                              <StyledInlinePanel>
+                                {renderPlanDetails(selectedPlan, false, false)}
+                              </StyledInlinePanel>
+                            )}
+                          {isEditing && (
+                            <StyledInlinePanel>
+                              {renderPlanEditor()}
+                            </StyledInlinePanel>
+                          )}
+                        </StyledDeliveryCard>
+                      );
+                    })}
+                    <StyledDeliveryRow>
+                      {data?.nextPlanId && (
+                        <Link
+                          to={destination({
+                            financePlansAfter: data.nextPlanId,
+                            financePlan: null,
+                          })}
+                        >
+                          <Trans>More cost plans</Trans>
+                        </Link>
                       )}
-                    </details>
-                  </StyledDeliveryStack>
-                </StyledDeliveryCard>
-              )}
-            </>
-          )}
+                      {params.has('financePlansAfter') && (
+                        <Link to={destination({ financePlansAfter: null })}>
+                          <Trans>First cost plans</Trans>
+                        </Link>
+                      )}
+                    </StyledDeliveryRow>
+                  </>
+                ) : (
+                  <>
+                    <h3>{t`Monthly entries (${data?.entryTotal ?? 0})`}</h3>
+                    {selectedEntryId && !selectedEntry && (
+                      <p>
+                        <Trans>
+                          This monthly entry is unavailable or outside your
+                          access.
+                        </Trans>
+                      </p>
+                    )}
+                    {selectedEntry && !selectedEntryInList && (
+                      <StyledDeliveryCard key={selectedEntry.id}>
+                        {renderEntryDetails(
+                          selectedEntry,
+                          editingSelectedEntryStandalone,
+                        )}
+                        {editingSelectedEntryStandalone && (
+                          <StyledInlinePanel>
+                            {renderEntryEditor()}
+                          </StyledInlinePanel>
+                        )}
+                      </StyledDeliveryCard>
+                    )}
+                    {!data?.entries.length && (
+                      <p>
+                        <Trans>No monthly entries in this view.</Trans>
+                      </p>
+                    )}
+                    {data?.entries.map((entry) => {
+                      const isSelected = selectedEntry?.id === entry.id;
+                      const isEditing =
+                        editor?.kind === 'ENTRY' &&
+                        editor.initial?.id === entry.id;
+                      const canQuickEdit =
+                        canManage &&
+                        entry.status === 'DRAFT' &&
+                        (entry.lockedMonths ?? []).length === 0;
+                      return (
+                        <StyledDeliveryCard key={entry.id}>
+                          <StyledDeliveryRow>
+                            <div>
+                              <strong>{entry.title}</strong>
+                              <p>
+                                {labels.entryStatuses[entry.status] ??
+                                  entry.status}{' '}
+                                · {labels.entryKinds[entry.kind] ?? entry.kind}{' '}
+                                ·{' '}
+                                {formatFinanceAmountMicros(
+                                  entry.amountMicros,
+                                  entry.currency,
+                                )}
+                              </p>
+                              {entry.status === 'DRAFT' &&
+                                entry.remainingAllocationMicros !== '0' && (
+                                  <small>
+                                    {t`Still to allocate`}:{' '}
+                                    {formatFinanceAmountMicros(
+                                      entry.remainingAllocationMicros,
+                                      entry.currency,
+                                    )}
+                                  </small>
+                                )}
+                            </div>
+                            <StyledDeliveryRow>
+                              {canQuickEdit && !isSelected && !isEditing && (
+                                <StyledDeliveryButton
+                                  type="button"
+                                  aria-label={t`Edit ${entry.title}`}
+                                  onClick={() => editEntry(entry)}
+                                >
+                                  <Trans>Edit</Trans>
+                                </StyledDeliveryButton>
+                              )}
+                              {isSelected ? (
+                                <Link
+                                  to={destination({
+                                    financeEntry: null,
+                                    financePlan: null,
+                                    financeHistoryBefore: null,
+                                  })}
+                                >
+                                  <Trans>Hide details</Trans>
+                                </Link>
+                              ) : (
+                                <Link
+                                  to={destination({
+                                    financeEntry: entry.id,
+                                    financePlan: null,
+                                    financeHistoryBefore: null,
+                                  })}
+                                >
+                                  <Trans>Review entry</Trans>
+                                </Link>
+                              )}
+                            </StyledDeliveryRow>
+                          </StyledDeliveryRow>
+                          {noticeShownInline &&
+                            notice &&
+                            notice.targetId === entry.id && (
+                              <StyledInlinePanel>
+                                <p role="status">{notice.text}</p>
+                              </StyledInlinePanel>
+                            )}
+                          {isSelected && isDefined(selectedEntry) && (
+                            <StyledInlinePanel key={selectedEntry.id}>
+                              {renderEntryDetails(selectedEntry, isEditing)}
+                            </StyledInlinePanel>
+                          )}
+                          {isEditing && (
+                            <StyledInlinePanel>
+                              {renderEntryEditor()}
+                            </StyledInlinePanel>
+                          )}
+                        </StyledDeliveryCard>
+                      );
+                    })}
+                    <StyledDeliveryRow>
+                      {data?.nextEntryId && (
+                        <Link
+                          to={destination({
+                            financeEntriesAfter: data.nextEntryId,
+                            financeEntry: null,
+                          })}
+                        >
+                          <Trans>More monthly entries</Trans>
+                        </Link>
+                      )}
+                      {params.has('financeEntriesAfter') && (
+                        <Link to={destination({ financeEntriesAfter: null })}>
+                          <Trans>First monthly entries</Trans>
+                        </Link>
+                      )}
+                    </StyledDeliveryRow>
+                  </>
+                )}
+              </>
+            );
+          })()}
         </StyledDeliveryStack>
       </StyledFinanceBoundary>
     </StyledDeliveryStack>

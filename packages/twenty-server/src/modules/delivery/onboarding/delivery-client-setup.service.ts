@@ -262,24 +262,10 @@ export class DeliveryClientSetupService {
         };
         if (
           !command.companySearch &&
-          operationsRecord?.state?.clientRoster &&
           typeof this.companies.listByIds === 'function'
         ) {
-          const projectRepo = manager.getRepository(DeliveryProjectEntity);
-          const allProjects =
-            projectRepo && typeof projectRepo.find === 'function'
-              ? await projectRepo.find({
-                  where: { workspaceId: workspace.id },
-                  select: { id: true, companyId: true },
-                })
-              : [];
-          const engagementCompanyIds = (
-            operationsRecord.state.clients?.engagements ?? []
-          ).map((engagement) => engagement.companyId);
           const effectiveClientIds = resolveEffectiveClientCompanyIds(
-            operationsRecord.state.clientRoster,
-            allProjects.map((project) => project.companyId),
-            engagementCompanyIds,
+            operationsRecord?.state?.clientRoster,
           );
           const designatedCompanies = effectiveClientIds.length
             ? await this.companies.listByIds(auth, effectiveClientIds)

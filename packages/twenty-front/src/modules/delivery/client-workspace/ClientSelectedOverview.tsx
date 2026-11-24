@@ -1,14 +1,18 @@
 import { Link } from 'react-router-dom';
 import { Trans, useLingui } from '@lingui/react/macro';
-import { type ClientHubItem } from '@/delivery/client-workspace/client-hub.types';
+import {
+  type ClientHubItem,
+  type ClientRosterUpdateInput,
+} from '@/delivery/client-workspace/client-hub.types';
 import {
   formatBillingMode,
   formatCurrencyTotals,
   formatDueLabel,
+  formatFeeCadenceShort,
+  formatMoneyMinor,
   formatTaskStatus,
 } from '@/delivery/client-workspace/client-hub-format';
-import { clientWorkspaceDestination } from '@/delivery/client-workspace/client-workspace-navigation';
-import { ClientSetupLink } from '@/delivery/onboarding/ClientSetupLink';
+import { ClientBillingSection } from '@/delivery/client-workspace/ClientBillingSection';
 import {
   StyledClientKpiCard,
   StyledClientKpiGrid,
@@ -25,12 +29,20 @@ import {
 
 type ClientSelectedOverviewProps = {
   companyId: string;
+  companyName: string;
   hubClient: ClientHubItem | null;
+  updatingRoster: boolean;
+  onUpdateRoster: (input: ClientRosterUpdateInput) => Promise<boolean>;
+  onRefreshHub: () => Promise<unknown>;
 };
 
 export const ClientSelectedOverview = ({
   companyId,
+  companyName,
   hubClient,
+  updatingRoster,
+  onUpdateRoster,
+  onRefreshHub,
 }: ClientSelectedOverviewProps) => {
   const { t } = useLingui();
 
@@ -43,8 +55,9 @@ export const ClientSelectedOverview = ({
           </h3>
           <p>
             <Trans>
-              Use the tabs above to update this client’s profile, manage
-              contacts, configure services, and open their projects or portal.
+              Add this business to your Clients list above to track its due
+              deliverables, agreed fee, invoices, and client portal in one
+              place.
             </Trans>
           </p>
         </StyledDeliveryStack>
@@ -57,6 +70,12 @@ export const ClientSelectedOverview = ({
     : '';
   const collectedText = hubClient.finance
     ? formatCurrencyTotals(hubClient.finance.collectedByCurrency)
+    : '';
+  const feeText = hubClient.finance?.fee
+    ? `${formatMoneyMinor(
+        hubClient.finance.fee.amount,
+        hubClient.finance.fee.currency,
+      )}${formatFeeCadenceShort(hubClient.finance.fee.cadence)}`
     : '';
 
   const signals: {
@@ -103,7 +122,7 @@ export const ClientSelectedOverview = ({
     signals.push({
       key: 'receivables',
       tone: 'danger',
-      text: t`${hubClient.finance?.overdueReceivablesCount} client receivables are past due.`,
+      text: t`${hubClient.finance?.overdueReceivablesCount} client invoices are past due.`,
     });
   }
   if (hubClient.projects.length === 0) {
@@ -172,17 +191,21 @@ export const ClientSelectedOverview = ({
             }
           >
             <span>
-              <Trans>Receivables &amp; collected</Trans>
+              <Trans>Billing &amp; collected</Trans>
             </span>
-            <strong>{openReceivablesText || collectedText || '—'}</strong>
+            <strong>
+              {collectedText || feeText || openReceivablesText || '—'}
+            </strong>
             <small>
               {openReceivablesText
-                ? collectedText
-                  ? t`Open · Collected ${collectedText}`
-                  : t`Open client receivables`
+                ? t`Open invoices: ${openReceivablesText}`
                 : collectedText
-                  ? t`Total collected`
-                  : t`No finance entries linked yet`}
+                  ? feeText
+                    ? t`Total collected · Fee ${feeText}`
+                    : t`Total collected`
+                  : feeText
+                    ? t`Agreed fee · No payments yet`
+                    : t`Set fee or record payment below`}
             </small>
           </StyledClientKpiCard>
         )}
@@ -205,7 +228,7 @@ export const ClientSelectedOverview = ({
         <StyledDeliveryCard>
           <StyledDeliveryStack>
             <h3>
-              <Trans>Important signals</Trans>
+              <Trans>Attention needed</Trans>
             </h3>
             <StyledClientTagRow>
               {signals.map((signal) => (
@@ -218,11 +241,22 @@ export const ClientSelectedOverview = ({
         </StyledDeliveryCard>
       )}
 
+      {hubClient.finance && (
+        <ClientBillingSection
+          companyId={companyId}
+          companyName={companyName}
+          hubClient={hubClient}
+          updatingRoster={updatingRoster}
+          onUpdateRoster={onUpdateRoster}
+          onRefreshHub={onRefreshHub}
+        />
+      )}
+
       <StyledDeliveryCard>
         <StyledDeliveryStack>
           <StyledDeliveryRow>
             <h3>
-              <Trans>Due work &amp; upcoming tasks</Trans>
+              <Trans>Due work &amp; upcoming deliverables</Trans>
             </h3>
             {hubClient.projects.length > 0 && (
               <Link
@@ -275,40 +309,6 @@ export const ClientSelectedOverview = ({
               <Trans>No open tasks scheduled for this client right now.</Trans>
             </p>
           )}
-        </StyledDeliveryStack>
-      </StyledDeliveryCard>
-
-      <StyledDeliveryCard>
-        <StyledDeliveryStack>
-          <h3>
-            <Trans>Quick client actions</Trans>
-          </h3>
-          <StyledDeliveryRow>
-            <ClientSetupLink companyId={companyId}>
-              <Trans>Add project or service</Trans>
-            </ClientSetupLink>
-            <Link
-              to={clientWorkspaceDestination({
-                companyId,
-                section: 'contacts',
-              })}
-            >
-              <Trans>Manage contacts</Trans>
-            </Link>
-            <Link
-              to={clientWorkspaceDestination({
-                companyId,
-                section: 'portal',
-              })}
-            >
-              <Trans>Portal &amp; commitments</Trans>
-            </Link>
-            {hubClient.finance && (
-              <Link to="/delivery?view=finance">
-                <Trans>Record client payment or receivable</Trans>
-              </Link>
-            )}
-          </StyledDeliveryRow>
         </StyledDeliveryStack>
       </StyledDeliveryCard>
     </StyledDeliveryStack>

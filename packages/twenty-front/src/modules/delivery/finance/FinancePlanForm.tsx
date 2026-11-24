@@ -77,12 +77,18 @@ export const FinancePlanForm = ({
     busy: busy || saving,
   });
   const registerForm = draft.formRef;
+  const isEditing = initial !== null;
   const attachForm = useCallback(
     (form: HTMLFormElement | null) => {
       registerForm(form);
-      form?.querySelector<HTMLInputElement>('[name="name"]')?.focus();
+      if (!form) return;
+      const target = form.querySelector<HTMLInputElement>(
+        isEditing ? '[name="monthlyAmount"]' : '[name="name"]',
+      );
+      target?.focus({ preventScroll: true });
+      form.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
     },
-    [registerForm],
+    [isEditing, registerForm],
   );
   const stale = initial !== null && latestRevision !== openedRevision;
   const monthlyAmountMicros = parseFinanceAmountMicros(values.monthlyAmount);

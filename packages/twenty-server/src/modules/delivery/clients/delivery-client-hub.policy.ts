@@ -5,7 +5,12 @@ import {
   type ClientEngagement,
   type ClientShare,
 } from 'src/modules/delivery/clients/delivery-clients.types';
-import { type BusinessRecord } from 'src/modules/delivery/business/delivery-business.types';
+import {
+  deliveryCurrencySchema,
+  deliveryMoneySchema,
+  type BusinessRecord,
+} from 'src/modules/delivery/business/delivery-business.types';
+import { type ClientFeeSetting } from 'src/modules/delivery/operations/delivery-operations.types';
 import { type DeliveryDetails } from 'src/modules/delivery/delivery.types';
 
 const identifier = z.uuid();
@@ -37,6 +42,22 @@ export const clientRosterUpdateSchema = z.discriminatedUnion('action', [
       removeIds: z.array(identifier).max(200),
     })
     .strict(),
+  z
+    .object({
+      action: z.literal('setFee'),
+      companyId: identifier,
+      amount: deliveryMoneySchema,
+      currency: deliveryCurrencySchema,
+      cadence: z.enum(['MONTHLY', 'QUARTERLY', 'ONE_TIME']),
+      notes: z.string().trim().max(500).optional(),
+    })
+    .strict(),
+  z
+    .object({
+      action: z.literal('clearFee'),
+      companyId: identifier,
+    })
+    .strict(),
 ]);
 
 export type ClientRosterUpdateCommand = z.infer<
@@ -61,22 +82,17 @@ export const normalizeClientRoster = (
   excludedIds: [...new Set(roster?.excludedIds ?? [])],
 });
 
+// Strict opt-in roster: only companies explicitly added or onboarded appear as clients.
 export const resolveEffectiveClientCompanyIds = (
   roster: Partial<ClientRosterState> | null | undefined,
-  projectCompanyIds: (string | null | undefined)[],
-  engagementCompanyIds: (string | null | undefined)[],
+  _projectCompanyIds?: (string | null | undefined)[],
+  _engagementCompanyIds?: (string | null | undefined)[],
 ): string[] => {
   const normalized = normalizeClientRoster(roster);
   const excluded = new Set(normalized.excludedIds);
   const effective = new Set<string>();
   for (const id of normalized.includedIds) {
     if (!excluded.has(id)) effective.add(id);
-  }
-  for (const id of projectCompanyIds) {
-    if (id && !excluded.has(id)) effective.add(id);
-  }
-  for (const id of engagementCompanyIds) {
-    if (id && !excluded.has(id)) effective.add(id);
   }
   return [...effective].sort();
 };
@@ -86,6 +102,9 @@ export const applyClientRosterUpdate = (
   command: ClientRosterUpdateCommand,
 ): ClientRosterState => {
   const normalized = normalizeClientRoster(current);
+  if (command.action === 'setFee' || command.action === 'clearFee') {
+    return normalized;
+  }
   const included = new Set(normalized.includedIds);
   const excluded = new Set(normalized.excludedIds);
 
@@ -167,6 +186,31 @@ export type ClientHubCurrencyTotal = {
   count: number;
 };
 
+export type ClientHubFinanceEntry = {
+  id: string;
+  revision: number;
+  title: string;
+  category: 'INCOME' | 'RECEIVABLE';
+  status: string;
+  currency: string;
+  amount: number;
+  date: string;
+  dueDate: string | null;
+  projectId: string | null;
+  projectName: string | null;
+  externalReference: string;
+  notes: string;
+};
+
+export type ClientHubFinanceSnapshot = {
+  canManage: boolean;
+  fee: ClientFeeSetting | null;
+  openReceivablesByCurrency: ClientHubCurrencyTotal[];
+  overdueReceivablesCount: number;
+  collectedByCurrency: ClientHubCurrencyTotal[];
+  entries: ClientHubFinanceEntry[];
+};
+
 export type ClientHubItem = {
   id: string;
   name: string;
@@ -212,11 +256,7 @@ export type ClientHubItem = {
     pendingSubmissionsCount: number;
     pendingClientReviewsCount: number;
   };
-  finance: {
-    openReceivablesByCurrency: ClientHubCurrencyTotal[];
-    overdueReceivablesCount: number;
-    collectedByCurrency: ClientHubCurrencyTotal[];
-  } | null;
+  finance: ClientHubFinanceSnapshot | null;
 };
 
 export type ClientHubSummary = {
@@ -230,6 +270,7 @@ export type ClientHubSummary = {
   totalBlockedTasks: number;
   totalPendingOnboarding: number;
   canReadFinance: boolean;
+  canManageFinance: boolean;
   totalOpenReceivablesByCurrency: ClientHubCurrencyTotal[];
 };
 
@@ -255,6 +296,7 @@ const toCurrencyList = (
 export const buildClientHubSnapshot = ({
   companies,
   roster,
+  clientFees,
   projects,
   tasks,
   engagements,
@@ -263,10 +305,12 @@ export const buildClientHubSnapshot = ({
   businessRecords,
   memberNamesById,
   canReadFinance,
+  canManageFinance = false,
   now = new Date(),
 }: {
   companies: ClientDirectoryCompany[];
   roster?: Partial<ClientRosterState> | null;
+  clientFees?: Record<string, ClientFeeSetting> | null;
   projects: ClientHubProjectSource[];
   tasks: ClientHubTaskSource[];
   engagements: ClientEngagement[];
@@ -275,6 +319,7 @@ export const buildClientHubSnapshot = ({
   businessRecords: BusinessRecord[];
   memberNamesById: Map<string, string>;
   canReadFinance: boolean;
+  canManageFinance?: boolean;
   now?: Date;
 }): { clients: ClientHubItem[]; summary: ClientHubSummary } => {
   const normalizedRoster = normalizeClientRoster(roster);
@@ -332,6 +377,7 @@ export const buildClientHubSnapshot = ({
       openReceivables: Map<string, { amount: number; count: number }>;
       collected: Map<string, { amount: number; count: number }>;
       overdueReceivablesCount: number;
+      entries: ClientHubFinanceEntry[];
     }
   >();
 
@@ -341,20 +387,68 @@ export const buildClientHubSnapshot = ({
   >();
 
   if (canReadFinance) {
-    for (const record of businessRecords) {
-      if (record.kind !== 'FINANCE' || record.status === 'VOID') continue;
-      if (!record.projectId) continue;
-      const project = projectById.get(record.projectId);
-      if (!project?.companyId) continue;
+    const activeFinanceRecords = businessRecords.filter(
+      (record) => record.kind === 'FINANCE' && record.status !== 'VOID',
+    );
+    const linkedReceiptReceivableIds = new Set<string>();
+    const receivableIds = new Set<string>();
+    for (const record of activeFinanceRecords) {
+      if (record.kind !== 'FINANCE') continue;
+      if (record.category === 'RECEIVABLE') {
+        receivableIds.add(record.id);
+      }
+      if (
+        record.category === 'INCOME' &&
+        record.externalReference.startsWith('receivable:')
+      ) {
+        linkedReceiptReceivableIds.add(
+          record.externalReference.slice('receivable:'.length),
+        );
+      }
+    }
 
-      let bucket = financeByCompany.get(project.companyId);
+    for (const record of activeFinanceRecords) {
+      if (record.kind !== 'FINANCE') continue;
+      if (record.category !== 'RECEIVABLE' && record.category !== 'INCOME')
+        continue;
+      const project = record.projectId
+        ? projectById.get(record.projectId)
+        : undefined;
+      const targetCompanyId = project?.companyId ?? record.companyId ?? null;
+      if (!targetCompanyId) continue;
+
+      let bucket = financeByCompany.get(targetCompanyId);
       if (!bucket) {
         bucket = {
           openReceivables: new Map(),
           collected: new Map(),
           overdueReceivablesCount: 0,
+          entries: [],
         };
-        financeByCompany.set(project.companyId, bucket);
+        financeByCompany.set(targetCompanyId, bucket);
+      }
+
+      const isAutoReceiptForVisibleReceivable =
+        record.category === 'INCOME' &&
+        record.externalReference.startsWith('receivable:') &&
+        receivableIds.has(record.externalReference.slice('receivable:'.length));
+
+      if (!isAutoReceiptForVisibleReceivable) {
+        bucket.entries.push({
+          id: record.id,
+          revision: record.revision,
+          title: record.title,
+          category: record.category,
+          status: record.status,
+          currency: record.currency,
+          amount: record.amount,
+          date: record.date,
+          dueDate: record.dueDate ?? null,
+          projectId: record.projectId ?? null,
+          projectName: project?.name ?? null,
+          externalReference: record.externalReference,
+          notes: record.notes,
+        });
       }
 
       if (record.category === 'RECEIVABLE' && record.status !== 'PAID') {
@@ -379,7 +473,9 @@ export const buildClientHubSnapshot = ({
         }
       } else if (
         record.category === 'INCOME' ||
-        (record.category === 'RECEIVABLE' && record.status === 'PAID')
+        (record.category === 'RECEIVABLE' &&
+          record.status === 'PAID' &&
+          !linkedReceiptReceivableIds.has(record.id))
       ) {
         const entry = bucket.collected.get(record.currency) ?? {
           amount: 0,
@@ -389,6 +485,19 @@ export const buildClientHubSnapshot = ({
         entry.count += 1;
         bucket.collected.set(record.currency, entry);
       }
+    }
+
+    for (const bucket of financeByCompany.values()) {
+      bucket.entries.sort((left, right) => {
+        const leftOpen =
+          left.category === 'RECEIVABLE' && left.status !== 'PAID';
+        const rightOpen =
+          right.category === 'RECEIVABLE' && right.status !== 'PAID';
+        if (leftOpen !== rightOpen) return leftOpen ? -1 : 1;
+        const dateDiff = right.date.localeCompare(left.date);
+        if (dateDiff !== 0) return dateDiff;
+        return left.title.localeCompare(right.title);
+      });
     }
   }
 
@@ -533,8 +642,11 @@ export const buildClientHubSnapshot = ({
       ? financeByCompany.get(company.id)
       : undefined;
     const overdueReceivablesCount = financeBucket?.overdueReceivablesCount ?? 0;
+    const clientFee = clientFees?.[company.id] ?? null;
     const finance = canReadFinance
       ? {
+          canManage: canManageFinance,
+          fee: clientFee,
           openReceivablesByCurrency: financeBucket
             ? toCurrencyList(financeBucket.openReceivables)
             : [],
@@ -542,6 +654,7 @@ export const buildClientHubSnapshot = ({
           collectedByCurrency: financeBucket
             ? toCurrencyList(financeBucket.collected)
             : [],
+          entries: (financeBucket?.entries ?? []).slice(0, 20),
         }
       : null;
 
@@ -619,6 +732,7 @@ export const buildClientHubSnapshot = ({
       totalBlockedTasks,
       totalPendingOnboarding,
       canReadFinance,
+      canManageFinance: canReadFinance && canManageFinance,
       totalOpenReceivablesByCurrency: canReadFinance
         ? toCurrencyList(totalOpenReceivables)
         : [],

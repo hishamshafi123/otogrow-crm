@@ -85,12 +85,20 @@ export type DeliveryAlert = {
   acknowledgedAt: string | null;
   resolvedAt: string | null;
 };
+export type ClientFeeSetting = {
+  amount: number;
+  currency: string;
+  cadence: 'MONTHLY' | 'QUARTERLY' | 'ONE_TIME';
+  notes: string;
+  updatedAt: string;
+};
 export type DeliveryOperations = {
   serviceCatalog?: string[];
   clientRoster?: {
     includedIds: string[];
     excludedIds: string[];
   };
+  clientFees?: Record<string, ClientFeeSetting>;
   founderEscalationRouting?: {
     mode: 'RULES';
     revision: number;

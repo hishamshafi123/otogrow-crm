@@ -99,6 +99,7 @@ export const businessRecordSchema = z.discriminatedUnion('kind', [
       ...base,
       kind: z.literal('FINANCE'),
       projectId: identifier.nullable(),
+      companyId: identifier.nullable().optional(),
       title,
       currency,
       amount: money,

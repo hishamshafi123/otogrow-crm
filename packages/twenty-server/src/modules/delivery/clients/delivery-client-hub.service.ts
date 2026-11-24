@@ -9,7 +9,10 @@ import { type WorkspaceAuthContext } from 'src/engine/core-modules/auth/types/wo
 import { WorkspaceEntity } from 'src/engine/core-modules/workspace/workspace.entity';
 import { DeliveryService } from 'src/modules/delivery/delivery.service';
 import { DeliveryNativeTaskAccessService } from 'src/modules/delivery/delivery-native-task-access.service';
-import { canReadFinance } from 'src/modules/delivery/business/delivery-business.policy';
+import {
+  canManageFinance,
+  canReadFinance,
+} from 'src/modules/delivery/business/delivery-business.policy';
 import { DeliveryOperationsEntity } from 'src/modules/delivery/entities/delivery-operations.entity';
 import { DeliveryProjectEntity } from 'src/modules/delivery/entities/delivery-project.entity';
 import { newDeliveryOperations } from 'src/modules/delivery/operations/delivery-operations.types';
@@ -87,12 +90,9 @@ export class DeliveryClientHubService {
         const shares = operations?.state.clients?.shares ?? [];
         const businessRecords = operations?.state.business?.records ?? [];
         const roster = normalizeClientRoster(operations?.state.clientRoster);
+        const clientFees = operations?.state.clientFees ?? {};
 
-        const effectiveClientIds = resolveEffectiveClientCompanyIds(
-          roster,
-          projects.map((project) => project.companyId),
-          engagements.map((engagement) => engagement.companyId),
-        );
+        const effectiveClientIds = resolveEffectiveClientCompanyIds(roster);
 
         const designatedCompanies = effectiveClientIds.length
           ? await this.companies.listByIds(auth, effectiveClientIds)
@@ -146,9 +146,11 @@ export class DeliveryClientHubService {
         );
 
         const financeReadable = canReadFinance(actor);
+        const financeManageable = canManageFinance(actor);
         const snapshot = buildClientHubSnapshot({
           companies: designatedCompanies,
           roster,
+          clientFees,
           projects: projects.map((project) => ({
             id: project.id,
             name: project.name,
@@ -167,6 +169,7 @@ export class DeliveryClientHubService {
           businessRecords,
           memberNamesById,
           canReadFinance: financeReadable,
+          canManageFinance: financeManageable,
         });
 
         return {
@@ -222,11 +225,7 @@ export class DeliveryClientHubService {
         );
 
         const effectiveClientSet = new Set(
-          resolveEffectiveClientCompanyIds(
-            roster,
-            projects.map((project) => project.companyId),
-            engagements.map((engagement) => engagement.companyId),
-          ),
+          resolveEffectiveClientCompanyIds(roster),
         );
 
         const directory = await this.companies.searchDirectory(
@@ -235,24 +234,33 @@ export class DeliveryClientHubService {
           100,
         );
 
+        const mapped = directory.companies.map((company) => {
+          const projectsCount = projectsCountByCompany.get(company.id) ?? 0;
+          return {
+            id: company.id,
+            name: company.name,
+            domainName: company.domainName,
+            sourceToken: company.sourceToken,
+            isClient: effectiveClientSet.has(company.id),
+            isExplicitClient: includedSet.has(company.id),
+            hasDeliveryWork:
+              projectsCount > 0 || engagementCompanySet.has(company.id),
+            projectsCount,
+          };
+        });
+
+        mapped.sort((left, right) => {
+          if (left.isClient !== right.isClient) return left.isClient ? -1 : 1;
+          if (left.hasDeliveryWork !== right.hasDeliveryWork)
+            return left.hasDeliveryWork ? -1 : 1;
+          return left.name.localeCompare(right.name);
+        });
+
         return {
           ...identity,
           search: search.trim(),
           hasMore: directory.hasMore,
-          companies: directory.companies.map((company) => {
-            const projectsCount = projectsCountByCompany.get(company.id) ?? 0;
-            return {
-              id: company.id,
-              name: company.name,
-              domainName: company.domainName,
-              sourceToken: company.sourceToken,
-              isClient: effectiveClientSet.has(company.id),
-              isExplicitClient: includedSet.has(company.id),
-              hasDeliveryWork:
-                projectsCount > 0 || engagementCompanySet.has(company.id),
-              projectsCount,
-            };
-          }),
+          companies: mapped,
         };
       },
     );
@@ -267,7 +275,9 @@ export class DeliveryClientHubService {
         ? command.companyIds
         : command.action === 'set'
           ? command.addIds
-          : [];
+          : command.action === 'setFee'
+            ? [command.companyId]
+            : [];
     if (idsToVerify.length) {
       const readable = await this.companies.listByIds(auth, idsToVerify);
       const readableSet = new Set(readable.map((company) => company.id));
@@ -283,7 +293,7 @@ export class DeliveryClientHubService {
         'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
         [`delivery:${identity.workspaceId}`],
       );
-      const { workspace } = await this.authorize(auth, manager);
+      const { workspace, actor } = await this.authorize(auth, manager);
       const repository = manager.getRepository(DeliveryOperationsEntity);
       const record =
         (await repository.findOneBy({ workspaceId: workspace.id })) ??
@@ -293,8 +303,31 @@ export class DeliveryClientHubService {
         });
 
       const before = normalizeClientRoster(record.state.clientRoster);
-      const next = applyClientRosterUpdate(before, command);
-      record.state.clientRoster = next;
+      let next = before;
+
+      if (command.action === 'setFee' || command.action === 'clearFee') {
+        if (!canManageFinance(actor)) {
+          throw new ForbiddenException(
+            'Finance management access is required to update client billing terms.',
+          );
+        }
+        const fees = { ...(record.state.clientFees ?? {}) };
+        if (command.action === 'setFee') {
+          fees[command.companyId] = {
+            amount: command.amount,
+            currency: command.currency,
+            cadence: command.cadence,
+            notes: command.notes ?? '',
+            updatedAt: new Date().toISOString(),
+          };
+        } else {
+          delete fees[command.companyId];
+        }
+        record.state.clientFees = fees;
+      } else {
+        next = applyClientRosterUpdate(before, command);
+        record.state.clientRoster = next;
+      }
 
       if (JSON.stringify(record.state).length > 10000000)
         throw new BadRequestException(
@@ -303,39 +336,56 @@ export class DeliveryClientHubService {
 
       await repository.save(record);
 
-      const projects = await manager.getRepository(DeliveryProjectEntity).find({
-        where: { workspaceId: workspace.id },
-        select: { id: true, companyId: true },
-      });
-      const engagements = record.state.clients?.engagements ?? [];
-      const effectiveClientIds = resolveEffectiveClientCompanyIds(
-        next,
-        projects.map((project) => project.companyId),
-        engagements.map((engagement) => engagement.companyId),
-      );
+      const effectiveClientIds = resolveEffectiveClientCompanyIds(next);
 
-      await recordOtogrowActivity(manager, {
-        workspaceId: workspace.id,
-        actorId: identity.memberId,
-        category: 'CLIENT',
-        action: 'CLIENT_ROSTER_UPDATED',
-        outcome: 'RECORDED',
-        summary: 'Updated which CRM companies appear in the Clients roster.',
-        sourceType: 'settings',
-        sourceId: workspace.id,
-        changes: [
-          {
-            field: 'includedClientCount',
-            before: String(before.includedIds.length),
-            after: String(next.includedIds.length),
-          },
-          {
-            field: 'excludedClientCount',
-            before: String(before.excludedIds.length),
-            after: String(next.excludedIds.length),
-          },
-        ],
-      });
+      if (command.action === 'setFee' || command.action === 'clearFee') {
+        await recordOtogrowActivity(manager, {
+          workspaceId: workspace.id,
+          actorId: identity.memberId,
+          category: 'CLIENT',
+          action: 'CLIENT_FEE_UPDATED',
+          outcome: 'RECORDED',
+          summary:
+            command.action === 'setFee'
+              ? 'Updated agreed client billing fee.'
+              : 'Cleared agreed client billing fee.',
+          sourceType: 'settings',
+          sourceId: command.companyId,
+          changes:
+            command.action === 'setFee'
+              ? [
+                  {
+                    field: 'clientFee',
+                    before: null,
+                    after: `${command.currency} ${command.amount / 100} (${command.cadence})`,
+                  },
+                ]
+              : [{ field: 'clientFee', before: 'configured', after: null }],
+        });
+      } else {
+        await recordOtogrowActivity(manager, {
+          workspaceId: workspace.id,
+          actorId: identity.memberId,
+          category: 'CLIENT',
+          action: 'CLIENT_ROSTER_UPDATED',
+          outcome: 'RECORDED',
+          summary: 'Updated which CRM companies appear in the Clients roster.',
+          sourceType: 'settings',
+          sourceId: workspace.id,
+          changes: [
+            {
+              field: 'includedClientCount',
+              before: String(before.includedIds.length),
+              after: String(next.includedIds.length),
+            },
+            {
+              field: 'excludedClientCount',
+              before: String(before.excludedIds.length),
+              after: String(next.excludedIds.length),
+            },
+          ],
+        });
+      }
 
       return {
         ...identity,

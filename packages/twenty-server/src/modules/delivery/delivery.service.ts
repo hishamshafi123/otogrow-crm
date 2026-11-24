@@ -211,15 +211,10 @@ export class DeliveryService {
           const operationsRecord = await manager
             .getRepository(DeliveryOperationsEntity)
             .findOneBy({ workspaceId: workspace.id });
-          const engagementCompanyIds = (
-            operationsRecord?.state.clients?.engagements ?? []
-          ).map((engagement) => engagement.companyId);
           managerClientCompanyIds = [
             ...new Set([
               ...resolveEffectiveClientCompanyIds(
                 operationsRecord?.state.clientRoster,
-                projectCompanyIds,
-                engagementCompanyIds,
               ),
               ...projectCompanyIds,
             ]),

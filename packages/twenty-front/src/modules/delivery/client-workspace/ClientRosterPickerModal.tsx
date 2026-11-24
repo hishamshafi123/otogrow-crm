@@ -157,13 +157,13 @@ export const ClientRosterPickerModal = ({
         <StyledRosterModalHeader>
           <div>
             <h2 id="client-roster-modal-title">
-              <Trans>Select your clients from CRM</Trans>
+              <Trans>Add clients from CRM</Trans>
             </h2>
             <p>
               <Trans>
-                Pick only the companies that are real agency clients. Companies
-                synced from Gmail stay hidden from your Clients view and
-                dropdowns unless you check them here.
+                Check only the businesses that are real agency clients. Every
+                other CRM or Gmail-synced company stays out of your Clients list
+                until you explicitly select it here.
               </Trans>
             </p>
           </div>

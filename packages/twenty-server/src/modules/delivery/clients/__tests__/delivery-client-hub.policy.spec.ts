@@ -27,7 +27,7 @@ const makeDetails = (
 });
 
 describe('delivery-client-hub.policy', () => {
-  it('resolves designated clients from explicit roster plus delivery work while honoring exclusions', () => {
+  it('enforces a strict opt-in roster that never auto-pulls project or engagement companies', () => {
     const explicitId = randomUUID();
     const projectId = randomUUID();
     const engagementId = randomUUID();
@@ -42,11 +42,13 @@ describe('delivery-client-hub.policy', () => {
       [engagementId],
     );
 
-    expect(effective).toEqual([explicitId, projectId, engagementId].sort());
+    expect(effective).toEqual([explicitId]);
     expect(effective).not.toContain(excludedId);
+    expect(effective).not.toContain(projectId);
+    expect(effective).not.toContain(engagementId);
   });
 
-  it('applies add, remove, and batch set roster updates cleanly', () => {
+  it('applies add, remove, batch set, and parses fee commands cleanly', () => {
     const a = randomUUID();
     const b = randomUUID();
     const c = randomUUID();
@@ -68,14 +70,26 @@ describe('delivery-client-hub.policy', () => {
     );
     expect(updated.includedIds).toEqual([a, c].sort());
     expect(updated.excludedIds).toEqual([b]);
+
+    const feeCmd = parseClientRosterUpdate({
+      action: 'setFee',
+      companyId: a,
+      amount: 350000,
+      currency: 'USD',
+      cadence: 'MONTHLY',
+      notes: 'Due on 1st',
+    });
+    expect(feeCmd.action).toBe('setFee');
+    expect(applyClientRosterUpdate(updated, feeCmd)).toEqual(updated);
   });
 
-  it('aggregates due/overdue work, portal status, and finance only when finance access is granted', () => {
+  it('aggregates due/overdue work, portal status, fees, and deduplicated finance only when finance access is granted', () => {
     const companyA = randomUUID();
     const companyB = randomUUID();
     const projectA = randomUUID();
     const engagementA = randomUUID();
     const memberId = randomUUID();
+    const paidReceivableId = randomUUID();
     const now = new Date('2026-11-24T12:00:00.000Z');
 
     const companies = [
@@ -129,25 +143,75 @@ describe('delivery-client-hub.policy', () => {
         projectId: projectA,
         title: 'November Retainer',
         currency: 'USD',
-        amount: 4500,
+        amount: 450000,
         date: '2026-11-01',
         category: 'RECEIVABLE',
         dueDate: '2026-11-15',
         externalReference: 'INV-101',
         evidenceUrl: null,
         notes: '',
-        status: 'APPROVED',
+        status: 'OPEN',
         createdBy: memberId,
         createdAt: now.toISOString(),
         updatedAt: now.toISOString(),
-        updatedBy: memberId,
+        history: [],
+      },
+      {
+        id: paidReceivableId,
+        revision: 2,
+        kind: 'FINANCE',
+        projectId: null,
+        companyId: companyB,
+        title: 'October Retainer',
+        currency: 'USD',
+        amount: 200000,
+        date: '2026-10-01',
+        category: 'RECEIVABLE',
+        dueDate: '2026-10-10',
+        externalReference: 'INV-099',
+        evidenceUrl: null,
+        notes: '',
+        status: 'PAID',
+        createdBy: memberId,
+        createdAt: now.toISOString(),
+        updatedAt: now.toISOString(),
+        history: [],
+      },
+      {
+        id: randomUUID(),
+        revision: 1,
+        kind: 'FINANCE',
+        projectId: null,
+        companyId: companyB,
+        title: 'Payment receipt: October Retainer',
+        currency: 'USD',
+        amount: 200000,
+        date: '2026-10-09',
+        category: 'INCOME',
+        dueDate: null,
+        externalReference: `receivable:${paidReceivableId}`,
+        evidenceUrl: null,
+        notes: '',
+        status: 'POSTED',
+        createdBy: memberId,
+        createdAt: now.toISOString(),
+        updatedAt: now.toISOString(),
         history: [],
       },
     ] as unknown as BusinessRecord[];
 
     const baseInput = {
       companies,
-      roster: { includedIds: [companyB], excludedIds: [] },
+      roster: { includedIds: [companyA, companyB], excludedIds: [] },
+      clientFees: {
+        [companyA]: {
+          amount: 450000,
+          currency: 'USD',
+          cadence: 'MONTHLY' as const,
+          notes: '1st of every month',
+          updatedAt: now.toISOString(),
+        },
+      },
       projects: [
         {
           id: projectA,
@@ -200,6 +264,7 @@ describe('delivery-client-hub.policy', () => {
     const withFinance = buildClientHubSnapshot({
       ...baseInput,
       canReadFinance: true,
+      canManageFinance: true,
     });
     expect(withFinance.summary.totalClients).toBe(2);
     expect(withFinance.summary.clientsNeedingAttention).toBe(1);
@@ -207,8 +272,9 @@ describe('delivery-client-hub.policy', () => {
     expect(withFinance.summary.totalDueSoonTasks).toBe(1);
     expect(withFinance.summary.totalBlockedTasks).toBe(1);
     expect(withFinance.summary.totalPendingOnboarding).toBe(1);
+    expect(withFinance.summary.canManageFinance).toBe(true);
     expect(withFinance.summary.totalOpenReceivablesByCurrency).toEqual([
-      { currency: 'USD', amount: 4500, count: 1 },
+      { currency: 'USD', amount: 450000, count: 1 },
     ]);
 
     const acme = withFinance.clients[0];
@@ -219,10 +285,20 @@ describe('delivery-client-hub.policy', () => {
     expect(acme.portal.activeLinksCount).toBe(1);
     expect(acme.portal.pendingSubmissionsCount).toBe(1);
     expect(acme.finance?.overdueReceivablesCount).toBe(1);
+    expect(acme.finance?.fee?.amount).toBe(450000);
+    expect(acme.finance?.entries).toHaveLength(1);
+
+    const beta = withFinance.clients[1];
+    expect(beta.id).toBe(companyB);
+    expect(beta.finance?.collectedByCurrency).toEqual([
+      { currency: 'USD', amount: 200000, count: 1 },
+    ]);
+    expect(beta.finance?.entries).toHaveLength(1);
 
     const withoutFinance = buildClientHubSnapshot({
       ...baseInput,
       canReadFinance: false,
+      canManageFinance: false,
     });
     expect(withoutFinance.summary.canReadFinance).toBe(false);
     expect(withoutFinance.summary.totalOpenReceivablesByCurrency).toEqual([]);

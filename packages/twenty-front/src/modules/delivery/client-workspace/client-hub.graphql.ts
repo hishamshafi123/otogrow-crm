@@ -17,3 +17,9 @@ export const UPDATE_CLIENT_ROSTER = gql`
     updateDeliveryClientRoster(input: $input)
   }
 `;
+
+export const CHANGE_CLIENT_BUSINESS = gql`
+  mutation ChangeDeliveryBusinessFromClient($input: JSON!) {
+    changeDeliveryBusiness(input: $input)
+  }
+`;

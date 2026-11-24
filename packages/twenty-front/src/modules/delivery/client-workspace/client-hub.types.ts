@@ -1,3 +1,33 @@
+export const DELIVERY_CURRENCIES = [
+  'INR',
+  'USD',
+  'QAR',
+  'AED',
+  'EUR',
+  'GBP',
+  'SGD',
+  'AUD',
+  'CAD',
+] as const;
+
+export type DeliveryCurrency = (typeof DELIVERY_CURRENCIES)[number];
+
+export const CLIENT_FEE_CADENCES = [
+  'MONTHLY',
+  'QUARTERLY',
+  'ONE_TIME',
+] as const;
+
+export type ClientFeeCadence = (typeof CLIENT_FEE_CADENCES)[number];
+
+export type ClientHubFee = {
+  amount: number;
+  currency: DeliveryCurrency;
+  cadence: ClientFeeCadence;
+  notes: string;
+  updatedAt: string;
+};
+
 export type ClientHubDueTask = {
   id: string;
   title: string;
@@ -18,6 +48,31 @@ export type ClientHubCurrencyTotal = {
   currency: string;
   amount: number;
   count: number;
+};
+
+export type ClientHubFinanceEntry = {
+  id: string;
+  revision: number;
+  title: string;
+  category: 'INCOME' | 'RECEIVABLE';
+  status: string;
+  currency: string;
+  amount: number;
+  date: string;
+  dueDate: string | null;
+  projectId: string | null;
+  projectName: string | null;
+  externalReference: string;
+  notes: string;
+};
+
+export type ClientHubFinanceSnapshot = {
+  canManage: boolean;
+  fee: ClientHubFee | null;
+  openReceivablesByCurrency: ClientHubCurrencyTotal[];
+  overdueReceivablesCount: number;
+  collectedByCurrency: ClientHubCurrencyTotal[];
+  entries: ClientHubFinanceEntry[];
 };
 
 export type ClientHubProject = {
@@ -69,11 +124,7 @@ export type ClientHubItem = {
     pendingSubmissionsCount: number;
     pendingClientReviewsCount: number;
   };
-  finance: {
-    openReceivablesByCurrency: ClientHubCurrencyTotal[];
-    overdueReceivablesCount: number;
-    collectedByCurrency: ClientHubCurrencyTotal[];
-  } | null;
+  finance: ClientHubFinanceSnapshot | null;
 };
 
 export type ClientHubSummary = {
@@ -87,6 +138,7 @@ export type ClientHubSummary = {
   totalBlockedTasks: number;
   totalPendingOnboarding: number;
   canReadFinance: boolean;
+  canManageFinance: boolean;
   totalOpenReceivablesByCurrency: ClientHubCurrencyTotal[];
 };
 
@@ -125,4 +177,13 @@ export type ClientDirectoryCandidatesSnapshot = {
 export type ClientRosterUpdateInput =
   | { action: 'add'; companyIds: string[] }
   | { action: 'remove'; companyIds: string[] }
-  | { action: 'set'; addIds: string[]; removeIds: string[] };
+  | { action: 'set'; addIds: string[]; removeIds: string[] }
+  | {
+      action: 'setFee';
+      companyId: string;
+      amount: number;
+      currency: DeliveryCurrency;
+      cadence: ClientFeeCadence;
+      notes?: string;
+    }
+  | { action: 'clearFee'; companyId: string };
