@@ -23,7 +23,13 @@ import {
   StyledFinanceV2Panel,
 } from '@/delivery/finance/v2/finance-v2.styles';
 import {
+  isFinanceV2Currency,
+  isValidIsoDate,
+  isValidYearMonth,
+} from '@/delivery/finance/v2/finance-v2-currency';
+import {
   type FinanceV2CommandRunner,
+  type FinanceV2Currency,
   type FinanceV2Snapshot,
 } from '@/delivery/finance/v2/finance-v2.types';
 import { useWorkflowAccess } from '@/delivery/workflows/useWorkflowAccess';
@@ -43,6 +49,28 @@ const FINANCE_V2_TABS = [
 
 type FinanceV2TabId = (typeof FINANCE_V2_TABS)[number];
 
+const LEGACY_FINANCE_VIEW_ALIASES: Record<string, FinanceV2TabId> = {
+  monthly: 'dashboard',
+  forecast: 'dashboard',
+  cash: 'dashboard',
+  payments: 'documents',
+  reconciliation: 'documents',
+  'ai-costs': 'expenses',
+  plans: 'expenses',
+  exports: 'setup',
+};
+
+const monthBounds = (
+  yearMonth: string,
+): { fromDate: string; toDate: string } => {
+  const [year, month] = yearMonth.split('-').map(Number);
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return {
+    fromDate: `${yearMonth}-01`,
+    toDate: `${yearMonth}-${String(lastDay).padStart(2, '0')}`,
+  };
+};
+
 export const DeliveryFinanceV2Workspace = ({
   onChanged,
 }: DeliveryFinanceV2WorkspaceProps) => {
@@ -56,12 +84,26 @@ export const DeliveryFinanceV2Workspace = ({
     requestedTab as FinanceV2TabId,
   )
     ? (requestedTab as FinanceV2TabId)
-    : 'dashboard';
+    : requestedTab && requestedTab in LEGACY_FINANCE_VIEW_ALIASES
+      ? LEGACY_FINANCE_VIEW_ALIASES[requestedTab]
+      : 'dashboard';
 
-  const fromDate = params.get('financeFrom') ?? undefined;
-  const toDate = params.get('financeTo') ?? undefined;
-  const asOfDate = params.get('financeAsOf') ?? undefined;
-  const payrollMonth = params.get('financePayrollMonth') ?? undefined;
+  const legacyMonthParam = params.get('financeMonth');
+  const legacyMonthRange =
+    legacyMonthParam && isValidYearMonth(legacyMonthParam)
+      ? monthBounds(legacyMonthParam)
+      : null;
+
+  const fromDate =
+    params.get('financeFrom') ?? legacyMonthRange?.fromDate ?? undefined;
+  const toDate =
+    params.get('financeTo') ?? legacyMonthRange?.toDate ?? undefined;
+  const asOfDate =
+    params.get('financeAsOf') ?? legacyMonthRange?.toDate ?? undefined;
+  const payrollMonth =
+    params.get('financePayrollMonth') ??
+    (legacyMonthRange ? legacyMonthParam! : undefined);
+  const requestedCurrency = params.get('financeCurrency');
 
   const query = useQuery<{ deliveryFinanceV2: FinanceV2Snapshot }>(
     GET_DELIVERY_FINANCE_V2,
@@ -97,6 +139,19 @@ export const DeliveryFinanceV2Workspace = ({
 
   const data = query.data?.deliveryFinanceV2;
   const showPayrollTab = data ? data.canViewPayroll : false;
+  const baseCurrency: FinanceV2Currency = data?.profile.baseCurrency ?? 'AED';
+  const displayCurrency: FinanceV2Currency = isFinanceV2Currency(
+    requestedCurrency,
+  )
+    ? requestedCurrency
+    : baseCurrency;
+
+  const setDisplayCurrency = (nextCurrency: FinanceV2Currency) => {
+    const next = new URLSearchParams(params);
+    if (nextCurrency === baseCurrency) next.delete('financeCurrency');
+    else next.set('financeCurrency', nextCurrency);
+    setParams(next);
+  };
 
   const tabOptions: { value: FinanceV2TabId; label: string }[] = [
     { value: 'dashboard', label: t`Dashboard (P&L & Balance Sheet)` },
@@ -114,6 +169,7 @@ export const DeliveryFinanceV2Workspace = ({
     next.set('view', 'finance');
     if (nextTab === 'dashboard') next.delete('financeView');
     else next.set('financeView', nextTab);
+    if (nextTab !== 'expenses') next.delete('financeCategory');
     return `/delivery?${next.toString()}`;
   };
 
@@ -150,6 +206,10 @@ export const DeliveryFinanceV2Workspace = ({
         return t`Payment recorded — Company Cash and P&L Revenue updated.`;
       case 'saveCompanyProfile':
         return t`Company branding and PDF template saved.`;
+      case 'setPeriodLock':
+        return payload?.lockedThroughDate
+          ? t`Accounting period locked through ${String(payload.lockedThroughDate)}.`
+          : t`Accounting period lock cleared.`;
       case 'saveExchangeRates':
         return t`Default AED exchange rates updated.`;
       case 'savePayrollProfile':
@@ -162,6 +222,8 @@ export const DeliveryFinanceV2Workspace = ({
         return t`Imported ${Number(payload?.importedCount ?? 0)} AI cost(s) into Direct Expenses.`;
       case 'voidJournal':
         return t`Ledger entry voided — P&L and Balance Sheet recalculated.`;
+      case 'reverseJournal':
+        return t`Reversing journal entry posted — P&L and Balance Sheet updated.`;
       default:
         return t`Saved successfully.`;
     }
@@ -281,6 +343,7 @@ export const DeliveryFinanceV2Workspace = ({
                   next.delete('financeFrom');
                   next.delete('financeTo');
                   next.delete('financeAsOf');
+                  next.delete('financeMonth');
                   next.delete('financePayrollMonth');
                   setParams(next);
                 }}
@@ -305,13 +368,26 @@ export const DeliveryFinanceV2Workspace = ({
           key={`${data.fromDate}:${data.toDate}:${data.asOfDate}`}
           data={data}
           busy={busy}
+          displayCurrency={displayCurrency}
+          onChangeDisplayCurrency={setDisplayCurrency}
+          onSelectExpenseCategory={(category) => {
+            const next = new URLSearchParams(params);
+            next.set('view', 'finance');
+            next.set('financeView', 'expenses');
+            next.set('financeCategory', category);
+            setParams(next);
+          }}
           onRunCommand={runCommand}
           onFilterDates={({
             fromDate: nextFrom,
             toDate: nextTo,
             asOfDate: nextAsOf,
           }) => {
-            if (!nextFrom || !nextTo || !nextAsOf) {
+            if (
+              !isValidIsoDate(nextFrom) ||
+              !isValidIsoDate(nextTo) ||
+              !isValidIsoDate(nextAsOf)
+            ) {
               setError(t`Choose valid From, To, and As-of dates.`);
               return;
             }
@@ -321,6 +397,7 @@ export const DeliveryFinanceV2Workspace = ({
             }
             setError('');
             const next = new URLSearchParams(params);
+            next.delete('financeMonth');
             next.set('financeFrom', nextFrom);
             next.set('financeTo', nextTo);
             next.set('financeAsOf', nextAsOf);
@@ -341,6 +418,12 @@ export const DeliveryFinanceV2Workspace = ({
         <FinanceV2ExpensesTab
           data={data}
           busy={busy}
+          selectedCategory={params.get('financeCategory')}
+          onClearCategory={() => {
+            const next = new URLSearchParams(params);
+            next.delete('financeCategory');
+            setParams(next);
+          }}
           onRunCommand={runCommand}
         />
       )}
@@ -352,6 +435,8 @@ export const DeliveryFinanceV2Workspace = ({
             key={data.payrollMonth}
             data={data}
             busy={busy}
+            displayCurrency={displayCurrency}
+            onChangeDisplayCurrency={setDisplayCurrency}
             onRunCommand={runCommand}
             onChangePayrollMonth={(month) => {
               const next = new URLSearchParams(params);

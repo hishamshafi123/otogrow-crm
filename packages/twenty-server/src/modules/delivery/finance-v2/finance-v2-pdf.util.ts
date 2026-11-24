@@ -534,6 +534,17 @@ export const buildFinanceV2PdfDocument = (
   );
 };
 
-export const renderFinanceV2PdfBuffer = (
+export const renderFinanceV2PdfBuffer = async (
   payload: FinanceV2PdfPayload,
-): Promise<Buffer> => renderToBuffer(buildFinanceV2PdfDocument(payload));
+): Promise<Buffer> => {
+  try {
+    return await renderToBuffer(buildFinanceV2PdfDocument(payload));
+  } catch (error) {
+    if (payload.logoDataUrl) {
+      return renderToBuffer(
+        buildFinanceV2PdfDocument({ ...payload, logoDataUrl: null }),
+      );
+    }
+    throw error;
+  }
+};

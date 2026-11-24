@@ -1,7 +1,7 @@
 import { Request } from 'cross-fetch';
 import { i18n } from '@lingui/core';
 import { I18nProvider } from '@lingui/react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { DeliveryFinanceV2Workspace } from '@/delivery/finance/v2/DeliveryFinanceV2Workspace';
@@ -57,6 +57,15 @@ jest.mock('@/delivery/finance/v2/finance-v2.styles', () => ({
   StyledFinanceV2Notice: 'p',
   StyledFinanceV2LogoPreview: 'img',
   StyledFinanceV2InlineEditor: 'div',
+  StyledFinanceV2ActionGroup: 'div',
+  StyledFinanceV2BarTrack: 'span',
+  StyledFinanceV2BarFill: 'span',
+  StyledFinanceV2TrendGrid: 'div',
+  StyledFinanceV2TrendItem: 'div',
+  StyledFinanceV2BreakdownButton: 'button',
+  StyledFinanceV2BreakdownHeader: 'span',
+  StyledFinanceV2ReadinessGrid: 'div',
+  StyledFinanceV2ReadinessCard: 'div',
 }));
 
 const sampleSnapshot: FinanceV2Snapshot = {
@@ -117,6 +126,7 @@ const sampleSnapshot: FinanceV2Snapshot = {
     grossProfitAedMicros: '17362500000',
     grossMarginPercent: '94.55',
     indirectExpenseAedMicros: '500000000',
+    totalExpenseAedMicros: '1500000000',
     fxGainLossAedMicros: '0',
     netProfitAedMicros: '16862500000',
     netMarginPercent: '91.83',
@@ -157,6 +167,96 @@ const sampleSnapshot: FinanceV2Snapshot = {
     totalEquityAedMicros: '53587500000',
     isBalanced: true,
     imbalanceAedMicros: '0',
+  },
+  analytics: {
+    previousPeriod: {
+      fromDate: '2026-10-01',
+      toDate: '2026-10-31',
+      revenueAedMicros: '10000000000',
+      totalExpenseAedMicros: '1000000000',
+      grossProfitAedMicros: '9500000000',
+      netProfitAedMicros: '9000000000',
+    },
+    monthlyTrend: [
+      {
+        month: '2026-06',
+        revenueAedMicros: '0',
+        directExpenseAedMicros: '0',
+        indirectExpenseAedMicros: '0',
+        totalExpenseAedMicros: '0',
+        netProfitAedMicros: '0',
+        netMarginPercent: null,
+      },
+      {
+        month: '2026-07',
+        revenueAedMicros: '0',
+        directExpenseAedMicros: '0',
+        indirectExpenseAedMicros: '0',
+        totalExpenseAedMicros: '0',
+        netProfitAedMicros: '0',
+        netMarginPercent: null,
+      },
+      {
+        month: '2026-08',
+        revenueAedMicros: '0',
+        directExpenseAedMicros: '0',
+        indirectExpenseAedMicros: '0',
+        totalExpenseAedMicros: '0',
+        netProfitAedMicros: '0',
+        netMarginPercent: null,
+      },
+      {
+        month: '2026-09',
+        revenueAedMicros: '0',
+        directExpenseAedMicros: '0',
+        indirectExpenseAedMicros: '0',
+        totalExpenseAedMicros: '0',
+        netProfitAedMicros: '0',
+        netMarginPercent: null,
+      },
+      {
+        month: '2026-10',
+        revenueAedMicros: '10000000000',
+        directExpenseAedMicros: '500000000',
+        indirectExpenseAedMicros: '500000000',
+        totalExpenseAedMicros: '1000000000',
+        netProfitAedMicros: '9000000000',
+        netMarginPercent: '90',
+      },
+      {
+        month: '2026-11',
+        revenueAedMicros: '18362500000',
+        directExpenseAedMicros: '1000000000',
+        indirectExpenseAedMicros: '500000000',
+        totalExpenseAedMicros: '1500000000',
+        netProfitAedMicros: '16862500000',
+        netMarginPercent: '91.83',
+      },
+    ],
+    burnAndRunway: {
+      periodNetCashFlowAedMicros: '16862500000',
+      avgMonthlyExpense3mAedMicros: '833333333',
+      avgMonthlyNetBurn3mAedMicros: '0',
+      estimatedRunwayMonths: null,
+    },
+    invoiceAging: [
+      { key: 'NOT_DUE', count: 0, aedMicros: '0' },
+      { key: 'DAYS_1_15', count: 1, aedMicros: '7345000000' },
+      { key: 'DAYS_16_30', count: 0, aedMicros: '0' },
+      { key: 'DAYS_31_PLUS', count: 0, aedMicros: '0' },
+    ],
+    upcomingCommitments30d: {
+      windowStart: '2026-11-24',
+      windowEnd: '2026-12-24',
+      recurringExpensesAedMicros: '0',
+      recurringExpenseCount: 0,
+      payrollAedMicros: '652500000',
+      payrollCount: 1,
+      expectedReceivablesAedMicros: '0',
+      expectedReceivableCount: 0,
+    },
+    payrollMonthRevenueAedMicros: '18362500000',
+    projectProfitability: [],
   },
   pendingReceivables: {
     count: 1,
@@ -561,5 +661,576 @@ describe('DeliveryFinanceV2Workspace (G6 & G8)', () => {
     await user.click(screen.getByRole('button', { name: /Reset filters/i }));
     expect(router.state.location.search).not.toContain('financeFrom=');
     expect(router.state.location.search).not.toContain('financeTo=');
+  });
+
+  it('M6: shows unified-currency Payroll totals with live currency switcher and cash-readiness check, plus Dashboard monthly presets, margins & currency switch', async () => {
+    const user = userEvent.setup();
+    const router = renderWorkspace('/delivery?view=finance');
+
+    // Dashboard shows Total Revenue, Total Expenses, Gross/Net Margins, 6-month trend & Aging
+    expect(screen.getByText(/Total Revenue \(2026-11-01/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Total Expenses \(2026-11-01/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Gross margin 94\.55%/i)).toBeInTheDocument();
+    expect(screen.getByText(/Net margin 91\.83%/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/6-Month Performance Trend \(AED\)/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Invoice Aging Buckets/i)).toBeInTheDocument();
+
+    // Clicking "Last Month" preset updates URL to 2026-10-01 .. 2026-10-31
+    await user.click(screen.getByRole('button', { name: /Last Month/i }));
+    expect(router.state.location.search).toContain('financeFrom=2026-10-01');
+    expect(router.state.location.search).toContain('financeTo=2026-10-31');
+
+    // Switch Dashboard display currency to USD -> persists in URL and updates overview heading
+    await user.selectOptions(
+      screen.getByLabelText(/Dashboard display currency/i),
+      'USD',
+    );
+    expect(router.state.location.search).toContain('financeCurrency=USD');
+    expect(screen.getByText(/Financial Overview \(USD\)/i)).toBeInTheDocument();
+
+    // Navigate to Payroll tab -> displayCurrency=USD persists, unified totals & INR cash shortfall shown
+    await user.click(screen.getByRole('link', { name: /^Payroll$/i }));
+    expect(screen.getByText(/Total Net Payroll \(USD\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/Active Total \(USD\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/Shortfall ₹15,000\.00/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/\$177\.67/).length).toBeGreaterThan(0);
+
+    // Switch Payroll display currency to INR -> exact native total INR 15,000.00 (zero FX drift)
+    await user.selectOptions(
+      screen.getByLabelText(/Payroll display currency/i),
+      'INR',
+    );
+    expect(router.state.location.search).toContain('financeCurrency=INR');
+    expect(screen.getByText(/Total Net Payroll \(INR\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/Active Total \(INR\)/i)).toBeInTheDocument();
+  });
+
+  it('M6 rework: drills down from Dashboard Expense Breakdown into filtered Expenses ledger, clears filter, and shows No burn recorded when zero burn/cashflow', async () => {
+    const user = userEvent.setup();
+    mockUseQuery.mockReturnValue({
+      data: {
+        deliveryFinanceV2: {
+          ...sampleSnapshot,
+          analytics: {
+            ...sampleSnapshot.analytics!,
+            burnAndRunway: {
+              periodNetCashFlowAedMicros: '0',
+              avgMonthlyExpense3mAedMicros: '0',
+              avgMonthlyNetBurn3mAedMicros: '0',
+              estimatedRunwayMonths: null,
+            },
+          },
+          journals: [
+            ...sampleSnapshot.journals,
+            {
+              id: 'j-sub',
+              entryDate: '2026-11-12',
+              entryType: 'EXPENSE',
+              category: 'DIRECT_SUBSCRIPTION',
+              title: 'Figma Team Plan',
+              currency: 'USD',
+              amountMicros: '100000000',
+              fxRateToAed: '3.6725',
+              aedAmountMicros: '367250000',
+              fundingAccountId: 'cash-usd',
+              fundingAccountName: 'Company Cash (USD)',
+              projectId: null,
+              receiptUrl: null,
+              notes: '',
+              status: 'POSTED',
+              voidReason: null,
+              createdAt: '2026-11-12T00:00:00Z',
+            },
+          ],
+        },
+      },
+      error: undefined,
+      refetch: jest.fn(),
+    });
+
+    const router = renderWorkspace('/delivery?view=finance');
+    expect(screen.getByText(/No burn recorded/i)).toBeInTheDocument();
+
+    // Click Subscriptions & tools in Expense Breakdown -> navigates to Expenses filtered to DIRECT_SUBSCRIPTION
+    await user.click(
+      screen.getByRole('button', { name: /Subscriptions & tools/i }),
+    );
+    expect(router.state.location.search).toContain(
+      'financeCategory=DIRECT_SUBSCRIPTION',
+    );
+    expect(screen.getByText('Figma Team Plan')).toBeInTheDocument();
+    expect(
+      screen.queryByText(/Arjun — Unpaid Leave Reduction/i),
+    ).not.toBeInTheDocument();
+
+    // Clear category filter restores other expenses and removes URL param
+    await user.click(
+      screen.getByRole('button', { name: /Clear category filter/i }),
+    );
+    expect(router.state.location.search).not.toContain('financeCategory=');
+    expect(
+      screen.getByText(/Arjun — Unpaid Leave Reduction/i),
+    ).toBeInTheDocument();
+  });
+
+  it('M7: clears stale FX rate on currency switch, sends clientRequestId, and blocks/sanitizes unsafe receipt URLs', async () => {
+    const user = userEvent.setup();
+    mockUseQuery.mockReturnValue({
+      data: {
+        deliveryFinanceV2: {
+          ...sampleSnapshot,
+          journals: [
+            ...sampleSnapshot.journals,
+            {
+              id: 'j-xss',
+              entryDate: '2026-11-15',
+              entryType: 'EXPENSE',
+              category: 'DIRECT_SUBSCRIPTION',
+              title: 'Suspicious Receipt Item',
+              currency: 'AED',
+              amountMicros: '50000000',
+              fxRateToAed: '1',
+              aedAmountMicros: '50000000',
+              fundingAccountId: 'cash-aed',
+              fundingAccountName: 'Company Cash (AED)',
+              projectId: null,
+              receiptUrl: ['javascript', 'alert(1)'].join(':'),
+              notes: '',
+              status: 'POSTED',
+              voidReason: null,
+              createdAt: '2026-11-15T00:00:00Z',
+            },
+          ],
+        },
+      },
+      error: undefined,
+      refetch: jest.fn(),
+    });
+
+    renderWorkspace('/delivery?view=finance&financeView=expenses');
+
+    // Stored javascript: URL must NOT render a clickable link
+    expect(screen.getByText('Suspicious Receipt Item')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: /Receipt/i }),
+    ).not.toBeInTheDocument();
+
+    // Open the Add Expense form
+    await user.click(
+      screen.getByRole('button', { name: /\+ Record Expense or Asset/i }),
+    );
+
+    // Fill expense form with USD + custom FX rate, then switch currency to AED
+    const titleInput = screen.getByPlaceholderText(
+      /e\.g\. MacBook Pro or Team Lunch/i,
+    );
+    const expenseForm = titleInput.closest('form')!;
+    await user.type(titleInput, 'Office Supplies');
+    await user.type(within(expenseForm).getByPlaceholderText('250'), '100');
+    const currencySelect = within(expenseForm).getByLabelText(/^Currency$/i);
+    await user.selectOptions(currencySelect, 'USD');
+    const fxInput = within(expenseForm).getByLabelText(/FX Rate \(USD/i);
+    await user.type(fxInput, '3.80');
+    expect(fxInput).toHaveValue('3.80');
+
+    // Switch back to AED -> FX input disappears and stale rate must not be submitted
+    await user.selectOptions(currencySelect, 'AED');
+    expect(
+      within(expenseForm).queryByLabelText(/FX Rate/i),
+    ).not.toBeInTheDocument();
+
+    // Try submitting javascript: receiptUrl -> blocked client-side before mutation
+    const receiptInput =
+      within(expenseForm).getByPlaceholderText('https://...');
+    await user.type(receiptInput, ['javascript', 'alert(1)'].join(':'));
+    await user.click(
+      within(expenseForm).getByRole('button', { name: /Save Entry/i }),
+    );
+    expect(
+      screen.getByText(/Receipt link must start with https:\/\/ or http:\/\//i),
+    ).toBeInTheDocument();
+    expect(mockMutate).not.toHaveBeenCalled();
+
+    // Fix receiptUrl to valid https -> submits without fxRateToAed and includes clientRequestId
+    await user.clear(receiptInput);
+    await user.type(receiptInput, 'https://example.com/receipt.pdf');
+    await user.click(
+      within(expenseForm).getByRole('button', { name: /Save Entry/i }),
+    );
+
+    expect(mockMutate).toHaveBeenCalledTimes(1);
+    const submittedPayload = mockMutate.mock.calls[0][0].variables.input;
+    expect(submittedPayload.action).toBe('recordExpenseOrAsset');
+    expect(submittedPayload.currency).toBe('AED');
+    expect(submittedPayload.fxRateToAed).toBeUndefined();
+    expect(submittedPayload.receiptUrl).toBe('https://example.com/receipt.pdf');
+    expect(typeof submittedPayload.clientRequestId).toBe('string');
+    expect(submittedPayload.clientRequestId.length).toBeGreaterThanOrEqual(8);
+  });
+
+  it('M8: supports inline Mark Paid with overpayment guard, read-only Details on PAID invoice, live draft totals, non-USD AI spend, Liabilities inline Repay & History, Setup read-only guards, and Payroll confirmation', async () => {
+    const user = userEvent.setup();
+    mockUseQuery.mockReturnValue({
+      data: {
+        deliveryFinanceV2: {
+          ...sampleSnapshot,
+          projects: [{ id: 'proj-1', name: 'Acme Retainer' }],
+          invoices: [
+            ...sampleSnapshot.invoices,
+            {
+              ...sampleSnapshot.invoices[0],
+              id: 'inv-paid',
+              invoiceNumber: 'INV-2026-0002',
+              clientName: 'Paid Client Ltd',
+              projectId: 'proj-1',
+              totalMicros: '1000000000',
+              paidMicros: '1000000000',
+              outstandingMicros: '0',
+              overdueDays: 0,
+              status: 'PAID',
+              lineItems: [
+                {
+                  id: 'li-1',
+                  label: 'Brand Retainer',
+                  quantity: '1',
+                  unitPriceMicros: '1000000000',
+                  discountPercent: '0',
+                  lineTotalMicros: '1000000000',
+                },
+              ],
+            },
+          ],
+          balanceSheet: {
+            ...sampleSnapshot.balanceSheet,
+            liabilitiesByPerson: [
+              {
+                accountId: 'liab-hisham',
+                personName: 'Hisham',
+                personEmail: 'hisham@otogrow.com',
+                totalBorrowedAedMicros: '5500000000',
+                totalRepaidAedMicros: '0',
+                balanceOwedAedMicros: '5500000000',
+                byCurrency: [
+                  {
+                    currency: 'USD',
+                    borrowedMicros: '1500000000',
+                    repaidMicros: '0',
+                    balanceOwedMicros: '1500000000',
+                  },
+                ],
+              },
+            ],
+          },
+          journals: [
+            ...sampleSnapshot.journals,
+            {
+              id: 'j-loan',
+              entryDate: '2026-11-05',
+              entryType: 'LOAN_IN',
+              category: 'LOAN_IN',
+              title: 'Founder seed loan',
+              notes: '',
+              currency: 'USD',
+              amountMicros: '1500000000',
+              fxRateToAed: '3.6725',
+              aedAmountMicros: '5508750000',
+              fundingAccountId: 'liab-hisham',
+              fundingAccountName: 'Owed to Hisham',
+              targetAccountName: 'Company Cash (USD)',
+              projectId: null,
+              receiptUrl: null,
+              status: 'POSTED',
+              voidReason: null,
+            },
+          ],
+          aiSpendCandidates: [
+            {
+              id: 'ai-eur-1',
+              sourceKind: 'AI_STUDIO',
+              clientName: 'Anthropic EU',
+              taskName: 'Claude API',
+              currency: 'EUR',
+              amountMicros: '250000000',
+              occurredAt: '2026-11-18T12:00:00Z',
+            },
+          ],
+        },
+      },
+      error: undefined,
+      refetch: jest.fn(),
+    });
+
+    renderWorkspace('/delivery?view=finance&financeView=documents');
+
+    // 1. Inline Mark Paid blocks overpayment above $2,000 outstanding
+    const markPaidBtn = screen.getByRole('button', { name: /Mark Paid/i });
+    const invoicesTable = markPaidBtn.closest('table');
+    expect(invoicesTable).not.toBeNull();
+    await user.click(markPaidBtn);
+    const amountPaidInput = screen.getByLabelText(/Amount received \(USD\)/i);
+    expect(invoicesTable).toContainElement(amountPaidInput);
+    await user.clear(amountPaidInput);
+    await user.type(amountPaidInput, '2500');
+    await user.click(
+      screen.getByRole('button', { name: /Confirm Payment Received/i }),
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      /cannot exceed the remaining balance due/i,
+    );
+    expect(mockMutate).not.toHaveBeenCalled();
+
+    // 2. Read-only Details panel opens inline on PAID invoice
+    const paidRow = screen.getByText('INV-2026-0002').closest('tr')!;
+    await user.click(
+      within(paidRow).getByRole('button', { name: /^Details$/i }),
+    );
+    expect(
+      screen.getByText(/Invoice INV-2026-0002 Details/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Brand Retainer')).toBeInTheDocument();
+    // Single-panel exclusivity: Mark Paid panel closed automatically
+    expect(
+      screen.queryByLabelText(/Amount received \(USD\)/i),
+    ).not.toBeInTheDocument();
+
+    // 3. New Invoice displays live Grand Total calculation and defaultInvoiceNotes
+    await user.click(screen.getByRole('button', { name: /\+ New Invoice/i }));
+    expect(screen.getByDisplayValue('Thank you')).toBeInTheDocument();
+    await user.type(
+      screen.getByPlaceholderText(/Monthly Creative Retainer/i),
+      'Design Sprint',
+    );
+    const unitPriceInput = screen.getByPlaceholderText('2500');
+    await user.type(unitPriceInput, '1000');
+    expect(screen.getByText(/Grand Total: \$1,000\.00/i)).toBeInTheDocument();
+
+    // 4. Expenses -> AI Costs respects EUR currency (not hardcoded USD)
+    await user.click(screen.getByRole('link', { name: /Expenses/i }));
+    await user.click(screen.getByRole('button', { name: /AI Costs \(1\)/i }));
+    expect(screen.getByText(/Claude API/i)).toBeInTheDocument();
+    expect(screen.getByText(/€250\.00/)).toBeInTheDocument();
+
+    // 5. Liabilities -> inline Repay pre-fills owed USD 1500 & inline History shows loan
+    await user.click(screen.getByRole('link', { name: /Liabilities/i }));
+    await user.click(screen.getByRole('button', { name: /^Repay$/i }));
+    expect(screen.getByDisplayValue('1500')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /History \(1\)/i }));
+    expect(screen.getByText('Founder seed loan')).toBeInTheDocument();
+
+    // 6. Payroll -> Post to Expenses asks for inline confirmation before calling forceResync
+    await user.click(screen.getByRole('link', { name: /^Payroll$/i }));
+    await user.click(screen.getByRole('button', { name: /Post to Expenses/i }));
+    expect(mockMutate).not.toHaveBeenCalled();
+    expect(
+      screen.getByText(/Post or re-sync Arjun's 2026-11 payroll adjustments/i),
+    ).toBeInTheDocument();
+    await user.click(
+      screen.getByRole('button', { name: /Confirm Post to Expenses/i }),
+    );
+    expect(mockMutate).toHaveBeenCalledWith({
+      variables: {
+        input: {
+          action: 'postPayrollAdjustments',
+          profileId: 'pay-1',
+          month: '2026-11',
+          forceResync: true,
+        },
+      },
+    });
+
+    // 7. Setup -> shows recorded Opening Balances table & active export date range labels
+    await user.click(screen.getByRole('link', { name: /Setup & Exports/i }));
+    expect(screen.getByText('Existing USD profits')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', {
+        name: /Profit & Loss \(2026-11-01 → 2026-11-30\)/i,
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it('M9: normalizes legacy V1 URLs, supports payroll payTiming/startMonth, period lock, cached logo KEEP, and locked-period Reversal', async () => {
+    const user = userEvent.setup();
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 404,
+      blob: jest.fn(),
+    }) as unknown as typeof fetch;
+
+    try {
+      const snapshotWithLock: FinanceV2Snapshot = {
+        ...sampleSnapshot,
+        profile: {
+          ...sampleSnapshot.profile,
+          logoDataUrl: null,
+          hasLogo: true,
+          logoUpdatedAt: 'abc123def4567890',
+          timezone: 'Asia/Dubai',
+          lockedThroughDate: '2026-11-15',
+        },
+        payrollProfiles: [
+          {
+            ...sampleSnapshot.payrollProfiles[0],
+            payTiming: 'SAME_MONTH' as const,
+            startMonth: '2026-09',
+          },
+        ],
+        invoices: [
+          {
+            ...sampleSnapshot.invoices[0],
+            payments: [
+              {
+                journalId: 'j-inv-pay-locked',
+                paymentDate: '2026-11-10',
+                amountMicros: '500000000',
+                aedAmountMicros: '1836250000',
+                currency: 'USD',
+                status: 'POSTED',
+                reversed: false,
+              },
+              {
+                journalId: 'j-inv-pay-rev',
+                paymentDate: '2026-11-08',
+                amountMicros: '100000000',
+                aedAmountMicros: '367250000',
+                currency: 'USD',
+                status: 'POSTED',
+                reversed: true,
+              },
+            ],
+          },
+        ],
+        journals: [
+          ...sampleSnapshot.journals,
+          {
+            id: 'j-locked-exp',
+            entryDate: '2026-11-10',
+            entryType: 'EXPENSE',
+            category: 'INDIRECT_SOFTWARE',
+            title: 'Closed period SaaS bill',
+            notes: '',
+            currency: 'AED' as const,
+            amountMicros: '250000000',
+            fxRateToAed: '1',
+            aedAmountMicros: '250000000',
+            fundingAccountId: 'cash-usd',
+            fundingAccountName: 'Company Cash (AED)',
+            targetAccountName: 'Indirect Expense',
+            projectId: null,
+            receiptUrl: null,
+            status: 'POSTED' as const,
+            reversalOfJournalId: null,
+            voidReason: null,
+          },
+        ],
+      };
+      mockUseQuery.mockReturnValue({
+        data: { deliveryFinanceV2: snapshotWithLock },
+        loading: false,
+        error: undefined,
+        refetch: jest.fn(),
+      });
+
+      // 1. Legacy V1 financeView=payments normalizes to Quotes & Invoices (documents) + propagates financeMonth
+      renderWorkspace(
+        '/delivery?view=finance&financeView=payments&financeMonth=2026-10',
+      );
+      expect(
+        screen.getByRole('link', { name: /Quotes & Invoices/i }),
+      ).toHaveAttribute('aria-current', 'page');
+      expect(mockUseQuery).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          variables: {
+            input: {
+              fromDate: '2026-10-01',
+              toDate: '2026-10-31',
+              asOfDate: '2026-10-31',
+              payrollMonth: '2026-10',
+            },
+          },
+        }),
+      );
+      // Locked invoice payment offers Reverse (not Void), and reversed payment shows Reversed pill
+      expect(screen.getByText(/^Reversed$/i)).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: /^Reverse$/i }),
+      ).toBeInTheDocument();
+
+      // 2. Expenses -> locked entry hides Void and offers Reverse; posts reverseJournal
+      await user.click(screen.getByRole('link', { name: /Expenses/i }));
+      const lockedRow = screen
+        .getByText('Closed period SaaS bill')
+        .closest('tr')!;
+      expect(
+        within(lockedRow).queryByRole('button', { name: /^Void$/i }),
+      ).not.toBeInTheDocument();
+      await user.click(
+        within(lockedRow).getByRole('button', { name: /^Reverse$/i }),
+      );
+      const reasonInput = screen.getByLabelText(/Reason for reversal/i);
+      await user.type(reasonInput, 'Entered twice in October close');
+      await user.click(screen.getByRole('button', { name: /Post Reversal/i }));
+      expect(mockMutate).toHaveBeenCalledWith({
+        variables: {
+          input: {
+            action: 'reverseJournal',
+            journalId: 'j-locked-exp',
+            reversalDate: '2026-11-24',
+            reason: 'Entered twice in October close',
+          },
+        },
+      });
+      mockMutate.mockClear();
+
+      // 3. Payroll -> Edit preserves startMonth & payTiming, blocks paidLeaves > workingDays
+      await user.click(screen.getByRole('link', { name: /^Payroll$/i }));
+      await user.click(screen.getByRole('button', { name: /^Edit$/i }));
+      expect(screen.getByLabelText(/Payroll start month/i)).toHaveValue(
+        '2026-09',
+      );
+      expect(screen.getByLabelText(/Pay timing/i)).toHaveValue('SAME_MONTH');
+      const paidLeavesInput = screen.getByLabelText(/Internal paid leaves/i);
+      await user.clear(paidLeavesInput);
+      await user.type(paidLeavesInput, '28');
+      await user.click(
+        screen.getByRole('button', { name: /Update Salary Profile/i }),
+      );
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        /cannot exceed working days/i,
+      );
+      expect(mockMutate).not.toHaveBeenCalled();
+
+      // 4. Setup -> timezone selector, omits logoDataUrl when unchanged, and Period Lock submits setPeriodLock
+      await user.click(screen.getByRole('link', { name: /Setup & Exports/i }));
+      const tzSelect = screen.getByLabelText(/Workspace timezone/i);
+      await user.selectOptions(tzSelect, 'Asia/Kolkata');
+      await user.click(
+        screen.getByRole('button', {
+          name: /Save Company Profile & PDF Branding/i,
+        }),
+      );
+      const saveProfileCall = mockMutate.mock.calls[0]?.[0]?.variables?.input;
+      expect(saveProfileCall.action).toBe('saveCompanyProfile');
+      expect(saveProfileCall.timezone).toBe('Asia/Kolkata');
+      expect('logoDataUrl' in saveProfileCall).toBe(false);
+
+      mockMutate.mockClear();
+      await user.click(screen.getByRole('button', { name: /Unlock Period/i }));
+      expect(mockMutate).toHaveBeenCalledWith({
+        variables: {
+          input: {
+            action: 'setPeriodLock',
+            lockedThroughDate: null,
+          },
+        },
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 });

@@ -8,6 +8,8 @@ import {
   financeV2MonthSchema,
   financeV2NonNegativeMicrosSchema,
   financeV2PositiveMicrosSchema,
+  isValidIanaTimezone,
+  validateLogoDataUrl,
 } from 'src/modules/delivery/finance-v2/finance-v2.policy';
 
 const nonEmptyText = z.string().trim().min(1).max(240);
@@ -33,13 +35,18 @@ const optionalUrl = z
   .max(2000)
   .nullish()
   .transform((value) => value || null)
-  .refine(
-    (value) =>
-      value === null ||
-      value.startsWith('https://') ||
-      value.startsWith('http://'),
-    'Enter a valid http(s) link.',
-  );
+  .refine((value) => {
+    if (value === null) return true;
+    try {
+      const parsed = new URL(value);
+      return (
+        (parsed.protocol === 'https:' || parsed.protocol === 'http:') &&
+        Boolean(parsed.hostname)
+      );
+    } catch {
+      return false;
+    }
+  }, 'Enter a valid http(s) link.');
 const optionalUuid = z
   .uuid()
   .nullish()
@@ -49,6 +56,16 @@ const patchableUuid = z.uuid().nullable().optional();
 const patchableText = z.string().trim().max(4000).optional();
 const patchableMonth = financeV2MonthSchema.nullable().optional();
 const dayOfMonth = z.number().int().min(1).max(31);
+const optionalTimezone = z
+  .string()
+  .trim()
+  .min(1)
+  .max(80)
+  .refine(
+    isValidIanaTimezone,
+    'Select a valid IANA timezone (e.g. Asia/Dubai).',
+  )
+  .optional();
 
 export const financeV2SnapshotQuerySchema = z
   .object({
@@ -87,6 +104,33 @@ const rateCardItemSchema = z
   })
   .strict();
 
+const optionalClientRequestId = z
+  .string()
+  .trim()
+  .min(8, 'Request idempotency key is too short.')
+  .max(120, 'Request idempotency key is too long.')
+  .regex(/^[A-Za-z0-9._:-]+$/, 'Invalid request idempotency key.')
+  .optional();
+
+const patchableLogoDataUrl = z
+  .union([z.null(), z.string().trim().max(1_500_000)])
+  .optional()
+  .transform((value) => (value === '' ? null : value))
+  .superRefine((value, ctx) => {
+    if (value === undefined || value === null) return;
+    try {
+      validateLogoDataUrl(value);
+    } catch (error) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          error instanceof Error
+            ? error.message
+            : 'Logo must be a valid PNG or JPG image.',
+      });
+    }
+  });
+
 export const financeV2CommandSchema = z.discriminatedUnion('action', [
   z
     .object({
@@ -96,22 +140,18 @@ export const financeV2CommandSchema = z.discriminatedUnion('action', [
       email: optionalEmail,
       phone: optionalText,
       website: optionalText,
-      logoDataUrl: z
-        .string()
-        .trim()
-        .max(1_500_000)
-        .nullish()
-        .transform((value) => value || null)
-        .refine(
-          (value) =>
-            value === null ||
-            /^data:image\/(?:png|jpeg|jpg);base64,[A-Za-z0-9+/=]+$/.test(value),
-          'Logo must be a PNG or JPG image.',
-        ),
+      logoDataUrl: patchableLogoDataUrl,
       bankDetails: optionalText,
       defaultQuoteTerms: optionalText,
       defaultInvoiceNotes: optionalText,
+      timezone: optionalTimezone,
       rateCard: z.array(rateCardItemSchema).max(100).optional(),
+    })
+    .strict(),
+  z
+    .object({
+      action: z.literal('setPeriodLock'),
+      lockedThroughDate: financeV2IsoDateSchema.nullable(),
     })
     .strict(),
   z
@@ -131,6 +171,7 @@ export const financeV2CommandSchema = z.discriminatedUnion('action', [
       fxRateToAed: financeV2FxRateSchema.optional(),
       personAccountId: optionalUuid,
       notes: optionalText,
+      clientRequestId: optionalClientRequestId,
     })
     .strict(),
   z
@@ -144,6 +185,7 @@ export const financeV2CommandSchema = z.discriminatedUnion('action', [
       toAmountMicros: financeV2PositiveMicrosSchema,
       toFxRateToAed: financeV2FxRateSchema.optional(),
       notes: optionalText,
+      clientRequestId: optionalClientRequestId,
     })
     .strict(),
   z
@@ -152,9 +194,8 @@ export const financeV2CommandSchema = z.discriminatedUnion('action', [
       id: optionalUuid,
       personName: nonEmptyText,
       personEmail: optionalEmail,
-      currency: financeV2CurrencySchema
-        .nullish()
-        .transform((value) => value ?? null),
+      currency: financeV2CurrencySchema.nullable().optional(),
+      active: z.boolean().optional(),
     })
     .strict(),
   z
@@ -167,6 +208,7 @@ export const financeV2CommandSchema = z.discriminatedUnion('action', [
       fxRateToAed: financeV2FxRateSchema.optional(),
       title: optionalText,
       notes: optionalText,
+      clientRequestId: optionalClientRequestId,
     })
     .strict(),
   z
@@ -180,6 +222,7 @@ export const financeV2CommandSchema = z.discriminatedUnion('action', [
       liabilityBookFxRateToAed: financeV2FxRateSchema.optional(),
       title: optionalText,
       notes: optionalText,
+      clientRequestId: optionalClientRequestId,
     })
     .strict(),
   z
@@ -200,12 +243,21 @@ export const financeV2CommandSchema = z.discriminatedUnion('action', [
       projectId: optionalUuid,
       receiptUrl: optionalUrl,
       notes: optionalText,
+      clientRequestId: optionalClientRequestId,
     })
     .strict(),
   z
     .object({
       action: z.literal('voidJournal'),
       journalId: z.uuid(),
+      reason: nonEmptyText,
+    })
+    .strict(),
+  z
+    .object({
+      action: z.literal('reverseJournal'),
+      journalId: z.uuid(),
+      reversalDate: financeV2IsoDateSchema,
       reason: nonEmptyText,
     })
     .strict(),
@@ -258,11 +310,16 @@ export const financeV2CommandSchema = z.discriminatedUnion('action', [
       workingDaysPerMonth: z.number().int().min(1).max(31).default(26),
       paidLeavesPerMonth: z.number().int().min(0).max(31).default(2),
       payDayOfMonth: dayOfMonth,
+      payTiming: z.enum(['SAME_MONTH', 'FOLLOWING_MONTH']).optional(),
       fundingAccountId: z.uuid(),
       startMonth: financeV2MonthSchema.optional(),
       active: z.boolean().default(true),
     })
-    .strict(),
+    .strict()
+    .refine(
+      (data) => data.paidLeavesPerMonth <= data.workingDaysPerMonth,
+      'Paid leaves per month cannot exceed working days per month.',
+    ),
   z
     .object({
       action: z.literal('addPayrollEntry'),
@@ -407,6 +464,7 @@ export const financeV2CommandSchema = z.discriminatedUnion('action', [
       amountMicros: financeV2PositiveMicrosSchema,
       fxRateToAed: financeV2FxRateSchema.optional(),
       notes: optionalText,
+      clientRequestId: optionalClientRequestId,
     })
     .strict(),
   z

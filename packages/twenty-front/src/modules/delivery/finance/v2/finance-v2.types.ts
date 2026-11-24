@@ -64,11 +64,68 @@ export type FinanceV2ProfitAndLoss = {
   grossProfitAedMicros: string;
   grossMarginPercent: string | null;
   indirectExpenseAedMicros: string;
+  totalExpenseAedMicros?: string;
   fxGainLossAedMicros: string;
   netProfitAedMicros: string;
   netMarginPercent: string | null;
   directBreakdown: { category: string; aedMicros: string }[];
   indirectBreakdown: { category: string; aedMicros: string }[];
+};
+
+export type FinanceV2MonthlyTrendPoint = {
+  month: string;
+  revenueAedMicros: string;
+  directExpenseAedMicros: string;
+  indirectExpenseAedMicros: string;
+  totalExpenseAedMicros: string;
+  netProfitAedMicros: string;
+  netMarginPercent: string | null;
+};
+
+export type FinanceV2InvoiceAgingBucket = {
+  key: 'NOT_DUE' | 'DAYS_1_15' | 'DAYS_16_30' | 'DAYS_31_PLUS';
+  count: number;
+  aedMicros: string;
+};
+
+export type FinanceV2ProjectProfitabilityRow = {
+  projectId: string | null;
+  projectName: string;
+  revenueAedMicros: string;
+  directExpenseAedMicros: string;
+  grossProfitAedMicros: string;
+  grossMarginPercent: string | null;
+};
+
+export type FinanceV2Analytics = {
+  previousPeriod: {
+    fromDate: string;
+    toDate: string;
+    revenueAedMicros: string;
+    totalExpenseAedMicros: string;
+    grossProfitAedMicros: string;
+    netProfitAedMicros: string;
+  };
+  monthlyTrend: FinanceV2MonthlyTrendPoint[];
+  burnAndRunway: {
+    periodNetCashFlowAedMicros: string;
+    avgMonthlyExpense3mAedMicros: string;
+    avgMonthlyNetBurn3mAedMicros: string;
+    estimatedRunwayMonths: string | null;
+  };
+  invoiceAging: FinanceV2InvoiceAgingBucket[];
+  upcomingCommitments30d: {
+    windowStart: string;
+    windowEnd: string;
+    recurringExpensesAedMicros: string;
+    recurringExpenseCount: number;
+    payrollAedMicros: string | null;
+    payrollCount: number | null;
+    expectedReceivablesAedMicros: string;
+    expectedReceivableCount: number;
+  };
+  payrollMonthRevenueAedMicros: string | null;
+  projectProfitability: FinanceV2ProjectProfitabilityRow[];
 };
 
 export type FinanceV2PersonLiabilityBalance = {
@@ -119,10 +176,13 @@ export type FinanceV2Journal = {
   aedAmountMicros: string;
   fundingAccountId: string | null;
   fundingAccountName: string | null;
+  targetAccountId?: string | null;
   targetAccountName: string | null;
   projectId: string | null;
   receiptUrl: string | null;
   status: 'POSTED' | 'VOID';
+  reversalOfJournalId?: string | null;
+  isReversed?: boolean;
   voidReason: string | null;
 };
 
@@ -154,6 +214,8 @@ export type FinanceV2PayrollProfile = {
   workingDaysPerMonth: number;
   paidLeavesPerMonth: number;
   payDayOfMonth: number;
+  payTiming?: 'SAME_MONTH' | 'FOLLOWING_MONTH';
+  startMonth?: string | null;
   fundingAccountId: string;
   fundingAccountName: string;
   recurringExpenseId: string | null;
@@ -267,6 +329,7 @@ export type FinanceV2Invoice = {
     aedAmountMicros: string;
     currency: FinanceV2Currency;
     status: string;
+    reversed?: boolean;
   }[];
 };
 
@@ -289,6 +352,10 @@ export type FinanceV2Snapshot = {
     phone: string;
     website: string;
     logoDataUrl: string | null;
+    hasLogo?: boolean;
+    logoUpdatedAt?: string | null;
+    timezone?: string;
+    lockedThroughDate?: string | null;
     bankDetails: string;
     defaultQuoteTerms: string;
     defaultInvoiceNotes: string;
@@ -299,6 +366,7 @@ export type FinanceV2Snapshot = {
   accounts: FinanceV2Account[];
   profitAndLoss: FinanceV2ProfitAndLoss;
   balanceSheet: FinanceV2BalanceSheet;
+  analytics?: FinanceV2Analytics;
   pendingReceivables: {
     count: number;
     totalAedMicros: string;

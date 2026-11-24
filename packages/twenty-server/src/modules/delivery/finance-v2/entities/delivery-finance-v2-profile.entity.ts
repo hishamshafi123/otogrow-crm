@@ -26,6 +26,8 @@ export class DeliveryFinanceV2ProfileEntity extends WorkspaceRelatedEntity {
   @Column({ type: 'text', default: '' }) defaultQuoteTerms: string;
   @Column({ type: 'text', default: '' }) defaultInvoiceNotes: string;
   @Column({ type: 'text', default: 'AED' }) baseCurrency: FinanceV2Currency;
+  @Column({ type: 'text', default: 'Asia/Dubai' }) timezone: string;
+  @Column({ type: 'date', nullable: true }) lockedThroughDate: string | null;
   @Column({ type: 'integer', default: 1 }) quoteSequence: number;
   @Column({ type: 'integer', default: 1 }) invoiceSequence: number;
   @Column({ type: 'jsonb', default: () => "'[]'::jsonb" })

@@ -6,6 +6,23 @@ import {
 } from '@/delivery/deliveryStyles';
 import { formatFinanceAmountMicros } from '@/delivery/finance/finance-money';
 import {
+  addDaysIso,
+  buildExchangeRateNote,
+  convertAedMicrosToDisplay,
+  detectPeriodPreset,
+  formatPercentDelta,
+  formatRatioPercent,
+  getMonthRange,
+  getQuarterRange,
+  isValidYearMonth,
+  shiftYearMonth,
+} from '@/delivery/finance/v2/finance-v2-currency';
+import {
+  StyledFinanceV2ActionGroup,
+  StyledFinanceV2BarFill,
+  StyledFinanceV2BarTrack,
+  StyledFinanceV2BreakdownButton,
+  StyledFinanceV2BreakdownHeader,
   StyledFinanceV2FormGrid,
   StyledFinanceV2HeaderRow,
   StyledFinanceV2HeroGrid,
@@ -16,15 +33,26 @@ import {
   StyledFinanceV2Stack,
   StyledFinanceV2StatCard,
   StyledFinanceV2StatementRow,
+  StyledFinanceV2SubTabButton,
+  StyledFinanceV2SubTabs,
+  StyledFinanceV2Table,
+  StyledFinanceV2TableWrap,
+  StyledFinanceV2TrendGrid,
+  StyledFinanceV2TrendItem,
 } from '@/delivery/finance/v2/finance-v2.styles';
 import {
+  FINANCE_V2_CURRENCIES,
   type FinanceV2CommandRunner,
+  type FinanceV2Currency,
   type FinanceV2Snapshot,
 } from '@/delivery/finance/v2/finance-v2.types';
 
 type FinanceV2DashboardTabProps = {
   data: FinanceV2Snapshot;
   busy: boolean;
+  displayCurrency: FinanceV2Currency;
+  onChangeDisplayCurrency: (currency: FinanceV2Currency) => void;
+  onSelectExpenseCategory?: (category: string) => void;
   onFilterDates: (next: {
     fromDate: string;
     toDate: string;
@@ -36,6 +64,9 @@ type FinanceV2DashboardTabProps = {
 export const FinanceV2DashboardTab = ({
   data,
   busy,
+  displayCurrency,
+  onChangeDisplayCurrency,
+  onSelectExpenseCategory,
   onFilterDates,
   onRunCommand,
 }: FinanceV2DashboardTabProps) => {
@@ -43,7 +74,54 @@ export const FinanceV2DashboardTab = ({
   const [fromDate, setFromDate] = useState(data.fromDate);
   const [toDate, setToDate] = useState(data.toDate);
   const [asOfDate, setAsOfDate] = useState(data.asOfDate);
-  const { profitAndLoss: pnl, balanceSheet: bs, pendingReceivables } = data;
+  const [customAsOf, setCustomAsOf] = useState(data.asOfDate !== data.toDate);
+  const [selectedMonth, setSelectedMonth] = useState(data.fromDate.slice(0, 7));
+
+  const {
+    profitAndLoss: pnl,
+    balanceSheet: bs,
+    pendingReceivables,
+    analytics,
+  } = data;
+  const exchangeRates = data.profile.exchangeRates;
+
+  const formatDisplay = (aedMicros: string | bigint): string =>
+    formatFinanceAmountMicros(
+      convertAedMicrosToDisplay(aedMicros, displayCurrency, exchangeRates),
+      displayCurrency,
+    );
+
+  const totalExpenseAedMicros =
+    pnl.totalExpenseAedMicros ??
+    (
+      BigInt(pnl.directExpenseAedMicros) + BigInt(pnl.indirectExpenseAedMicros)
+    ).toString();
+
+  const activePreset = detectPeriodPreset(
+    data.fromDate,
+    data.toDate,
+    data.today,
+  );
+
+  const applyRange = (nextFrom: string, nextTo: string) => {
+    const resolvedAsOf = customAsOf ? asOfDate : nextTo;
+    setFromDate(nextFrom);
+    setToDate(nextTo);
+    setAsOfDate(resolvedAsOf);
+    setSelectedMonth(nextFrom.slice(0, 7));
+    onFilterDates({
+      fromDate: nextFrom,
+      toDate: nextTo,
+      asOfDate: resolvedAsOf,
+    });
+  };
+
+  const applyMonth = (month: string) => {
+    if (!isValidYearMonth(month)) return;
+    const range = getMonthRange(month);
+    const nextTo = month === data.today.slice(0, 7) ? data.today : range.toDate;
+    applyRange(range.fromDate, nextTo);
+  };
 
   const categoryLabel = (category: string): string => {
     switch (category) {
@@ -78,35 +156,243 @@ export const FinanceV2DashboardTab = ({
     }
   };
 
+  const agingLabel = (
+    key: 'NOT_DUE' | 'DAYS_1_15' | 'DAYS_16_30' | 'DAYS_31_PLUS',
+  ): string => {
+    switch (key) {
+      case 'NOT_DUE':
+        return t`Not yet due`;
+      case 'DAYS_1_15':
+        return t`1–15 days overdue`;
+      case 'DAYS_16_30':
+        return t`16–30 days overdue`;
+      case 'DAYS_31_PLUS':
+        return t`31+ days overdue`;
+    }
+  };
+
+  const revenueDelta = analytics
+    ? formatPercentDelta(
+        pnl.revenueAedMicros,
+        analytics.previousPeriod.revenueAedMicros,
+      )
+    : null;
+  const expenseDelta = analytics
+    ? formatPercentDelta(
+        totalExpenseAedMicros,
+        analytics.previousPeriod.totalExpenseAedMicros,
+      )
+    : null;
+  const grossDelta = analytics
+    ? formatPercentDelta(
+        pnl.grossProfitAedMicros,
+        analytics.previousPeriod.grossProfitAedMicros,
+      )
+    : null;
+  const netDelta = analytics
+    ? formatPercentDelta(
+        pnl.netProfitAedMicros,
+        analytics.previousPeriod.netProfitAedMicros,
+      )
+    : null;
+
+  const combinedExpenseBreakdown = [
+    ...pnl.directBreakdown.map((item) => ({
+      ...item,
+      group: 'DIRECT' as const,
+    })),
+    ...pnl.indirectBreakdown.map((item) => ({
+      ...item,
+      group: 'INDIRECT' as const,
+    })),
+  ].sort((left, right) => {
+    const leftVal = BigInt(left.aedMicros);
+    const rightVal = BigInt(right.aedMicros);
+    const leftAbs = leftVal < 0n ? -leftVal : leftVal;
+    const rightAbs = rightVal < 0n ? -rightVal : rightVal;
+    return rightAbs > leftAbs ? 1 : rightAbs < leftAbs ? -1 : 0;
+  });
+
+  const totalExpenseBig = BigInt(totalExpenseAedMicros);
+  const totalRevenueBig = BigInt(pnl.revenueAedMicros);
+  const maxCategoryAbs = combinedExpenseBreakdown.reduce((max, item) => {
+    const raw = BigInt(item.aedMicros);
+    const abs = raw < 0n ? -raw : raw;
+    return abs > max ? abs : max;
+  }, 0n);
+  const breakdownBarDenominator =
+    totalExpenseBig > 0n ? totalExpenseBig : maxCategoryAbs;
+  const fxNote = buildExchangeRateNote([], displayCurrency, exchangeRates);
+  const safeSelectedMonth = isValidYearMonth(selectedMonth)
+    ? selectedMonth
+    : data.fromDate.slice(0, 7);
+
+  const trendPoints = analytics?.monthlyTrend ?? [];
+  const maxTrendMagnitude = trendPoints.reduce((max, point) => {
+    const rev = BigInt(point.revenueAedMicros);
+    const exp = BigInt(point.totalExpenseAedMicros);
+    const revAbs = rev < 0n ? -rev : rev;
+    const expAbs = exp < 0n ? -exp : exp;
+    const larger = revAbs > expAbs ? revAbs : expAbs;
+    return larger > max ? larger : max;
+  }, 0n);
+
+  const barPercent = (value: string, max: bigint): number => {
+    if (max <= 0n) return 0;
+    const raw = BigInt(value);
+    const abs = raw < 0n ? -raw : raw;
+    const pct = Number((abs * 100n) / max);
+    return Math.min(100, Math.max(abs > 0n ? 4 : 0, pct));
+  };
+
   return (
     <StyledFinanceV2Stack>
       <StyledFinanceV2Panel>
         <StyledFinanceV2HeaderRow>
           <div>
-            <h2>
-              <Trans>Financial Overview (AED)</Trans>
-            </h2>
+            <h2>{t`Financial Overview (${displayCurrency})`}</h2>
             <small>
-              <Trans>
-                All currencies automatically roll up into AED. Revenue counts
-                when client payments arrive.
-              </Trans>
+              {displayCurrency === 'AED' ? (
+                <Trans>
+                  All currencies automatically roll up into AED. Revenue counts
+                  when client payments arrive.
+                </Trans>
+              ) : (
+                t`Canonical ledger is in AED, displayed in ${displayCurrency} via workspace FX (${fxNote}).`
+              )}
             </small>
           </div>
-          {data.canManage && (
-            <StyledDeliveryButton
-              disabled={busy}
+          <StyledFinanceV2ActionGroup>
+            <label>
+              <Trans>Display currency</Trans>
+              <select
+                aria-label={t`Dashboard display currency`}
+                value={displayCurrency}
+                onChange={(event) =>
+                  onChangeDisplayCurrency(
+                    event.target.value as FinanceV2Currency,
+                  )
+                }
+              >
+                {FINANCE_V2_CURRENCIES.map((code) => (
+                  <option key={code} value={code}>
+                    {code}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {data.canManage && data.canViewPayroll && (
+              <StyledDeliveryButton
+                disabled={busy}
+                onClick={() =>
+                  void onRunCommand({
+                    action: 'runDueAutomation',
+                    asOfDate: data.today,
+                  })
+                }
+              >
+                <Trans>Run due recurring items now</Trans>
+              </StyledDeliveryButton>
+            )}
+          </StyledFinanceV2ActionGroup>
+        </StyledFinanceV2HeaderRow>
+
+        <StyledFinanceV2HeaderRow>
+          <StyledFinanceV2SubTabs>
+            <StyledFinanceV2SubTabButton
+              type="button"
+              aria-pressed={activePreset === 'thisMonth'}
+              data-active={activePreset === 'thisMonth' ? 'true' : undefined}
+              onClick={() => {
+                const currentMonth = data.today.slice(0, 7);
+                applyRange(`${currentMonth}-01`, data.today);
+              }}
+            >
+              <Trans>This Month</Trans>
+            </StyledFinanceV2SubTabButton>
+            <StyledFinanceV2SubTabButton
+              type="button"
+              aria-pressed={activePreset === 'lastMonth'}
+              data-active={activePreset === 'lastMonth' ? 'true' : undefined}
               onClick={() =>
-                void onRunCommand({
-                  action: 'runDueAutomation',
-                  asOfDate: data.today,
-                })
+                applyMonth(shiftYearMonth(data.today.slice(0, 7), -1))
               }
             >
-              <Trans>Run due recurring items now</Trans>
+              <Trans>Last Month</Trans>
+            </StyledFinanceV2SubTabButton>
+            <StyledFinanceV2SubTabButton
+              type="button"
+              aria-pressed={activePreset === 'last30Days'}
+              data-active={activePreset === 'last30Days' ? 'true' : undefined}
+              onClick={() =>
+                applyRange(addDaysIso(data.today, -29), data.today)
+              }
+            >
+              <Trans>Last 30 Days</Trans>
+            </StyledFinanceV2SubTabButton>
+            <StyledFinanceV2SubTabButton
+              type="button"
+              aria-pressed={activePreset === 'thisQuarter'}
+              data-active={activePreset === 'thisQuarter' ? 'true' : undefined}
+              onClick={() => {
+                const q = getQuarterRange(data.today);
+                applyRange(q.fromDate, q.toDate);
+              }}
+            >
+              <Trans>This Quarter</Trans>
+            </StyledFinanceV2SubTabButton>
+            <StyledFinanceV2SubTabButton
+              type="button"
+              aria-pressed={activePreset === 'ytd'}
+              data-active={activePreset === 'ytd' ? 'true' : undefined}
+              onClick={() =>
+                applyRange(`${data.today.slice(0, 4)}-01-01`, data.today)
+              }
+            >
+              <Trans>Year to Date</Trans>
+            </StyledFinanceV2SubTabButton>
+            <StyledFinanceV2SubTabButton
+              type="button"
+              aria-pressed={activePreset === 'allTime'}
+              data-active={activePreset === 'allTime' ? 'true' : undefined}
+              onClick={() => applyRange('2000-01-01', data.today)}
+            >
+              <Trans>All Time</Trans>
+            </StyledFinanceV2SubTabButton>
+          </StyledFinanceV2SubTabs>
+
+          <StyledFinanceV2ActionGroup>
+            <StyledDeliveryButton
+              type="button"
+              aria-label={t`Previous month`}
+              onClick={() => applyMonth(shiftYearMonth(safeSelectedMonth, -1))}
+            >
+              ←
             </StyledDeliveryButton>
-          )}
+            <label>
+              <Trans>Month</Trans>
+              <input
+                type="month"
+                aria-label={t`Report month`}
+                value={selectedMonth}
+                onChange={(event) => {
+                  setSelectedMonth(event.target.value);
+                  if (isValidYearMonth(event.target.value)) {
+                    applyMonth(event.target.value);
+                  }
+                }}
+              />
+            </label>
+            <StyledDeliveryButton
+              type="button"
+              aria-label={t`Next month`}
+              onClick={() => applyMonth(shiftYearMonth(safeSelectedMonth, 1))}
+            >
+              →
+            </StyledDeliveryButton>
+          </StyledFinanceV2ActionGroup>
         </StyledFinanceV2HeaderRow>
+
         <StyledFinanceV2FormGrid>
           <label>
             <Trans>P&amp;L from</Trans>
@@ -121,21 +407,43 @@ export const FinanceV2DashboardTab = ({
             <input
               type="date"
               value={toDate}
-              onChange={(event) => setToDate(event.target.value)}
+              onChange={(event) => {
+                setToDate(event.target.value);
+                if (!customAsOf) setAsOfDate(event.target.value);
+              }}
             />
           </label>
           <label>
             <Trans>Balance sheet as of</Trans>
             <input
               type="date"
-              value={asOfDate}
+              value={customAsOf ? asOfDate : toDate}
+              disabled={!customAsOf}
               onChange={(event) => setAsOfDate(event.target.value)}
             />
           </label>
+          <label style={{ alignSelf: 'end' }}>
+            <input
+              type="checkbox"
+              checked={customAsOf}
+              onChange={(event) => {
+                setCustomAsOf(event.target.checked);
+                if (!event.target.checked) setAsOfDate(toDate);
+              }}
+            />
+            <Trans>Custom balance sheet date</Trans>
+          </label>
           <div style={{ alignSelf: 'end' }}>
             <StyledDeliveryButton
+              data-primary="true"
               disabled={busy}
-              onClick={() => onFilterDates({ fromDate, toDate, asOfDate })}
+              onClick={() =>
+                onFilterDates({
+                  fromDate,
+                  toDate,
+                  asOfDate: customAsOf ? asOfDate : toDate,
+                })
+              }
             >
               <Trans>Update reports</Trans>
             </StyledDeliveryButton>
@@ -144,13 +452,50 @@ export const FinanceV2DashboardTab = ({
       </StyledFinanceV2Panel>
 
       <StyledFinanceV2HeroGrid>
+        <StyledFinanceV2StatCard data-highlight="true">
+          <small>{t`Total Revenue (${pnl.fromDate} → ${pnl.toDate})`}</small>
+          <strong>{formatDisplay(pnl.revenueAedMicros)}</strong>
+          <p>
+            {revenueDelta
+              ? t`${revenueDelta.label} vs previous period`
+              : t`Paid client invoices in range`}
+          </p>
+        </StyledFinanceV2StatCard>
+
+        <StyledFinanceV2StatCard>
+          <small>{t`Total Expenses (${pnl.fromDate} → ${pnl.toDate})`}</small>
+          <strong>{formatDisplay(totalExpenseAedMicros)}</strong>
+          <p>
+            {t`Direct ${formatDisplay(pnl.directExpenseAedMicros)} · Indirect ${formatDisplay(pnl.indirectExpenseAedMicros)}`}
+            {expenseDelta ? ` (${expenseDelta.label} prev)` : ''}
+          </p>
+        </StyledFinanceV2StatCard>
+
         <StyledFinanceV2StatCard>
           <small>
-            <Trans>Company Cash (AED total)</Trans>
+            <Trans>Gross Profit &amp; Margin</Trans>
           </small>
-          <strong>
-            {formatFinanceAmountMicros(bs.totalCashAedMicros, 'AED')}
-          </strong>
+          <strong>{formatDisplay(pnl.grossProfitAedMicros)}</strong>
+          <p>
+            {pnl.grossMarginPercent !== null
+              ? t`Gross margin ${pnl.grossMarginPercent}%${grossDelta ? ` · ${grossDelta.label} prev` : ''}`
+              : t`No paid revenue in this period`}
+          </p>
+        </StyledFinanceV2StatCard>
+
+        <StyledFinanceV2StatCard>
+          <small>{t`Net Profit & Margin (${pnl.fromDate} → ${pnl.toDate})`}</small>
+          <strong>{formatDisplay(pnl.netProfitAedMicros)}</strong>
+          <p>
+            {pnl.netMarginPercent !== null
+              ? t`Net margin ${pnl.netMarginPercent}%${netDelta ? ` · ${netDelta.label} prev` : ''}`
+              : t`No paid revenue in this period`}
+          </p>
+        </StyledFinanceV2StatCard>
+
+        <StyledFinanceV2StatCard>
+          <small>{t`Company Cash (${displayCurrency} total)`}</small>
+          <strong>{formatDisplay(bs.totalCashAedMicros)}</strong>
           <p>
             {bs.cashByCurrency.length > 0
               ? bs.cashByCurrency
@@ -167,33 +512,12 @@ export const FinanceV2DashboardTab = ({
 
         <StyledFinanceV2StatCard>
           <small>
-            <Trans>
-              Net Profit ({pnl.fromDate} → {pnl.toDate})
-            </Trans>
-          </small>
-          <strong>
-            {formatFinanceAmountMicros(pnl.netProfitAedMicros, 'AED')}
-          </strong>
-          <p>
-            {pnl.grossMarginPercent !== null
-              ? t`Gross margin ${pnl.grossMarginPercent}%`
-              : t`No paid revenue in this period`}
-          </p>
-        </StyledFinanceV2StatCard>
-
-        <StyledFinanceV2StatCard>
-          <small>
             <Trans>Unpaid Client Invoices</Trans>
           </small>
-          <strong>
-            {formatFinanceAmountMicros(
-              pendingReceivables.totalAedMicros,
-              'AED',
-            )}
-          </strong>
+          <strong>{formatDisplay(pendingReceivables.totalAedMicros)}</strong>
           <p>
             {pendingReceivables.overdueCount > 0
-              ? t`${pendingReceivables.overdueCount} overdue (${formatFinanceAmountMicros(pendingReceivables.overdueAedMicros, 'AED')})`
+              ? t`${pendingReceivables.overdueCount} overdue (${formatDisplay(pendingReceivables.overdueAedMicros)})`
               : t`${pendingReceivables.count} unpaid · none overdue`}
           </p>
         </StyledFinanceV2StatCard>
@@ -202,19 +526,284 @@ export const FinanceV2DashboardTab = ({
           <small>
             <Trans>Owed to People (Liabilities)</Trans>
           </small>
-          <strong>
-            {formatFinanceAmountMicros(bs.totalLiabilitiesAedMicros, 'AED')}
-          </strong>
+          <strong>{formatDisplay(bs.totalLiabilitiesAedMicros)}</strong>
           <p>{t`${bs.liabilitiesByPerson.length} people tracked`}</p>
         </StyledFinanceV2StatCard>
       </StyledFinanceV2HeroGrid>
 
+      {analytics && (
+        <StyledFinanceV2SplitGrid>
+          <StyledFinanceV2Panel>
+            <StyledFinanceV2HeaderRow>
+              <div>
+                <h3>{t`6-Month Performance Trend (${displayCurrency})`}</h3>
+                <small>
+                  <Trans>
+                    Monthly paid revenue vs total expenses and net margin.
+                  </Trans>
+                </small>
+              </div>
+              <StyledFinanceV2ActionGroup>
+                <StyledFinanceV2Pill data-tone="success">
+                  <Trans>Revenue</Trans>
+                </StyledFinanceV2Pill>
+                <StyledFinanceV2Pill data-tone="danger">
+                  <Trans>Expenses</Trans>
+                </StyledFinanceV2Pill>
+              </StyledFinanceV2ActionGroup>
+            </StyledFinanceV2HeaderRow>
+            <StyledFinanceV2TrendGrid>
+              {trendPoints.map((point) => {
+                const revPct = barPercent(
+                  point.revenueAedMicros,
+                  maxTrendMagnitude,
+                );
+                const expPct = barPercent(
+                  point.totalExpenseAedMicros,
+                  maxTrendMagnitude,
+                );
+                const isPositiveProfit = BigInt(point.netProfitAedMicros) > 0n;
+                return (
+                  <StyledFinanceV2TrendItem key={point.month}>
+                    <div
+                      aria-hidden="true"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'flex-end',
+                        gap: '4px',
+                        height: '88px',
+                        width: '100%',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <div
+                        title={`${point.month} Revenue: ${formatDisplay(point.revenueAedMicros)}`}
+                        style={{
+                          width: '16px',
+                          height: `${revPct}%`,
+                          borderRadius: '4px 4px 0 0',
+                          background: 'var(--t-color-green9)',
+                        }}
+                      />
+                      <div
+                        title={`${point.month} Expenses: ${formatDisplay(point.totalExpenseAedMicros)}`}
+                        style={{
+                          width: '16px',
+                          height: `${expPct}%`,
+                          borderRadius: '4px 4px 0 0',
+                          background: 'var(--t-color-red9)',
+                        }}
+                      />
+                    </div>
+                    <strong>{point.month}</strong>
+                    <small>
+                      {isPositiveProfit ? '+' : ''}
+                      {formatDisplay(point.netProfitAedMicros)}
+                    </small>
+                    <small>
+                      {point.netMarginPercent !== null
+                        ? `${point.netMarginPercent}%`
+                        : '—'}
+                    </small>
+                  </StyledFinanceV2TrendItem>
+                );
+              })}
+            </StyledFinanceV2TrendGrid>
+            <StyledFinanceV2TableWrap>
+              <StyledFinanceV2Table>
+                <thead>
+                  <tr>
+                    <th>
+                      <Trans>Month</Trans>
+                    </th>
+                    <th data-numeric="true">
+                      <Trans>Revenue</Trans>
+                    </th>
+                    <th data-numeric="true">
+                      <Trans>Expenses</Trans>
+                    </th>
+                    <th data-numeric="true">
+                      <Trans>Net Profit</Trans>
+                    </th>
+                    <th data-numeric="true">
+                      <Trans>Margin</Trans>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {trendPoints.map((point) => (
+                    <tr key={point.month}>
+                      <td>{point.month}</td>
+                      <td data-numeric="true">
+                        {formatDisplay(point.revenueAedMicros)}
+                      </td>
+                      <td data-numeric="true">
+                        {formatDisplay(point.totalExpenseAedMicros)}
+                      </td>
+                      <td data-numeric="true">
+                        {formatDisplay(point.netProfitAedMicros)}
+                      </td>
+                      <td data-numeric="true">
+                        {point.netMarginPercent !== null
+                          ? `${point.netMarginPercent}%`
+                          : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </StyledFinanceV2Table>
+            </StyledFinanceV2TableWrap>
+          </StyledFinanceV2Panel>
+
+          <StyledFinanceV2Panel>
+            <StyledFinanceV2HeaderRow>
+              <div>
+                <h3>{t`Expense Breakdown (${displayCurrency})`}</h3>
+                <small>
+                  <Trans>
+                    Share of total expenses and paid revenue. Click a category
+                    to inspect ledger entries.
+                  </Trans>
+                </small>
+              </div>
+              <StyledFinanceV2Pill data-tone="info">
+                {formatDisplay(totalExpenseAedMicros)}
+              </StyledFinanceV2Pill>
+            </StyledFinanceV2HeaderRow>
+            {combinedExpenseBreakdown.length === 0 ? (
+              <small>
+                <Trans>No posted expenses in this period.</Trans>
+              </small>
+            ) : (
+              combinedExpenseBreakdown.map((item) => {
+                const shareOfExpenses = formatRatioPercent(
+                  item.aedMicros,
+                  totalExpenseBig,
+                );
+                const shareOfRevenue = formatRatioPercent(
+                  item.aedMicros,
+                  totalRevenueBig,
+                );
+                const isCredit = BigInt(item.aedMicros) < 0n;
+                const fillPct = barPercent(
+                  item.aedMicros,
+                  breakdownBarDenominator,
+                );
+                return (
+                  <StyledFinanceV2BreakdownButton
+                    key={`${item.group}:${item.category}`}
+                    type="button"
+                    onClick={() => onSelectExpenseCategory?.(item.category)}
+                  >
+                    <StyledFinanceV2BreakdownHeader>
+                      <span>
+                        <strong>{categoryLabel(item.category)}</strong>{' '}
+                        <small>
+                          ({item.group === 'DIRECT' ? t`Direct` : t`Indirect`})
+                        </small>
+                      </span>
+                      <span>
+                        <strong>{formatDisplay(item.aedMicros)}</strong>{' '}
+                        <small>
+                          {shareOfExpenses !== null
+                            ? `${shareOfExpenses}%`
+                            : '0%'}
+                          {shareOfRevenue !== null
+                            ? ` · ${shareOfRevenue}% rev`
+                            : ''}
+                        </small>
+                      </span>
+                    </StyledFinanceV2BreakdownHeader>
+                    <StyledFinanceV2BarTrack>
+                      <StyledFinanceV2BarFill
+                        data-tone={
+                          isCredit
+                            ? 'success'
+                            : item.group === 'DIRECT'
+                              ? 'warning'
+                              : undefined
+                        }
+                        style={{ width: `${fillPct}%` }}
+                      />
+                    </StyledFinanceV2BarTrack>
+                  </StyledFinanceV2BreakdownButton>
+                );
+              })
+            )}
+          </StyledFinanceV2Panel>
+        </StyledFinanceV2SplitGrid>
+      )}
+
+      {analytics && (
+        <StyledFinanceV2HeroGrid>
+          <StyledFinanceV2StatCard>
+            <small>
+              <Trans>Cash Flow &amp; Runway</Trans>
+            </small>
+            <strong>
+              {analytics.burnAndRunway.estimatedRunwayMonths !== null
+                ? t`${analytics.burnAndRunway.estimatedRunwayMonths} mo runway`
+                : analytics.burnAndRunway.avgMonthlyExpense3mAedMicros ===
+                      '0' &&
+                    analytics.burnAndRunway.periodNetCashFlowAedMicros === '0'
+                  ? t`No burn recorded`
+                  : t`Cash-flow positive`}
+            </strong>
+            <p>
+              {t`Period net cash flow: ${formatDisplay(analytics.burnAndRunway.periodNetCashFlowAedMicros)}`}
+            </p>
+            <p>
+              {t`3-mo avg spend: ${formatDisplay(analytics.burnAndRunway.avgMonthlyExpense3mAedMicros)}/mo`}
+              {BigInt(analytics.burnAndRunway.avgMonthlyNetBurn3mAedMicros) > 0n
+                ? ` · ${t`Burn ${formatDisplay(analytics.burnAndRunway.avgMonthlyNetBurn3mAedMicros)}/mo`}`
+                : ''}
+            </p>
+          </StyledFinanceV2StatCard>
+
+          <StyledFinanceV2StatCard>
+            <small>
+              {t`Next 30 Days Commitments (${analytics.upcomingCommitments30d.windowStart} → ${analytics.upcomingCommitments30d.windowEnd})`}
+            </small>
+            <strong>
+              {formatDisplay(
+                (
+                  BigInt(
+                    analytics.upcomingCommitments30d.recurringExpensesAedMicros,
+                  ) +
+                  BigInt(analytics.upcomingCommitments30d.payrollAedMicros ?? 0)
+                ).toString(),
+              )}
+            </strong>
+            <p>
+              {t`Recurring bills (${analytics.upcomingCommitments30d.recurringExpenseCount}): ${formatDisplay(analytics.upcomingCommitments30d.recurringExpensesAedMicros)}`}
+              {analytics.upcomingCommitments30d.payrollAedMicros !== null
+                ? ` · ${t`Payroll (${analytics.upcomingCommitments30d.payrollCount ?? 0}): ${formatDisplay(analytics.upcomingCommitments30d.payrollAedMicros)}`}`
+                : ''}
+            </p>
+            <p>
+              {t`Expected receivables (${analytics.upcomingCommitments30d.expectedReceivableCount}): ${formatDisplay(analytics.upcomingCommitments30d.expectedReceivablesAedMicros)}`}
+            </p>
+          </StyledFinanceV2StatCard>
+
+          <StyledFinanceV2StatCard>
+            <small>
+              <Trans>Invoice Aging Buckets</Trans>
+            </small>
+            <strong>{formatDisplay(pendingReceivables.totalAedMicros)}</strong>
+            {analytics.invoiceAging.map((bucket) => (
+              <p key={bucket.key}>
+                {agingLabel(bucket.key)}: {bucket.count} ·{' '}
+                {formatDisplay(bucket.aedMicros)}
+              </p>
+            ))}
+          </StyledFinanceV2StatCard>
+        </StyledFinanceV2HeroGrid>
+      )}
+
       <StyledFinanceV2SplitGrid>
         <StyledFinanceV2Panel>
           <StyledFinanceV2HeaderRow>
-            <h3>
-              <Trans>Profit &amp; Loss (AED)</Trans>
-            </h3>
+            <h3>{t`Profit & Loss (${displayCurrency})`}</h3>
             <StyledFinanceV2Pill data-tone="info">
               {pnl.fromDate} → {pnl.toDate}
             </StyledFinanceV2Pill>
@@ -224,9 +813,7 @@ export const FinanceV2DashboardTab = ({
             <span>
               <Trans>Revenue (paid invoices)</Trans>
             </span>
-            <span>
-              {formatFinanceAmountMicros(pnl.revenueAedMicros, 'AED')}
-            </span>
+            <span>{formatDisplay(pnl.revenueAedMicros)}</span>
           </StyledFinanceV2StatementRow>
 
           <small>
@@ -240,7 +827,7 @@ export const FinanceV2DashboardTab = ({
             pnl.directBreakdown.map((item) => (
               <StyledFinanceV2StatementRow key={item.category}>
                 <span>{categoryLabel(item.category)}</span>
-                <span>{formatFinanceAmountMicros(item.aedMicros, 'AED')}</span>
+                <span>{formatDisplay(item.aedMicros)}</span>
               </StyledFinanceV2StatementRow>
             ))
           )}
@@ -248,18 +835,16 @@ export const FinanceV2DashboardTab = ({
             <span>
               <Trans>Total Direct Expenses</Trans>
             </span>
-            <span>
-              {formatFinanceAmountMicros(pnl.directExpenseAedMicros, 'AED')}
-            </span>
+            <span>{formatDisplay(pnl.directExpenseAedMicros)}</span>
           </StyledFinanceV2StatementRow>
 
           <StyledFinanceV2StatementRow data-bold="true">
             <span>
-              <Trans>Gross Profit</Trans>
+              {pnl.grossMarginPercent !== null
+                ? t`Gross Profit (${pnl.grossMarginPercent}%)`
+                : t`Gross Profit`}
             </span>
-            <span>
-              {formatFinanceAmountMicros(pnl.grossProfitAedMicros, 'AED')}
-            </span>
+            <span>{formatDisplay(pnl.grossProfitAedMicros)}</span>
           </StyledFinanceV2StatementRow>
 
           <small>
@@ -273,7 +858,7 @@ export const FinanceV2DashboardTab = ({
             pnl.indirectBreakdown.map((item) => (
               <StyledFinanceV2StatementRow key={item.category}>
                 <span>{categoryLabel(item.category)}</span>
-                <span>{formatFinanceAmountMicros(item.aedMicros, 'AED')}</span>
+                <span>{formatDisplay(item.aedMicros)}</span>
               </StyledFinanceV2StatementRow>
             ))
           )}
@@ -281,9 +866,14 @@ export const FinanceV2DashboardTab = ({
             <span>
               <Trans>Total Indirect Expenses</Trans>
             </span>
+            <span>{formatDisplay(pnl.indirectExpenseAedMicros)}</span>
+          </StyledFinanceV2StatementRow>
+
+          <StyledFinanceV2StatementRow data-bold="true">
             <span>
-              {formatFinanceAmountMicros(pnl.indirectExpenseAedMicros, 'AED')}
+              <Trans>Total Expenses (Direct + Indirect)</Trans>
             </span>
+            <span>{formatDisplay(totalExpenseAedMicros)}</span>
           </StyledFinanceV2StatementRow>
 
           {pnl.fxGainLossAedMicros !== '0' && (
@@ -291,27 +881,23 @@ export const FinanceV2DashboardTab = ({
               <span>
                 <Trans>Currency Exchange Gain / Loss</Trans>
               </span>
-              <span>
-                {formatFinanceAmountMicros(pnl.fxGainLossAedMicros, 'AED')}
-              </span>
+              <span>{formatDisplay(pnl.fxGainLossAedMicros)}</span>
             </StyledFinanceV2StatementRow>
           )}
 
           <StyledFinanceV2StatementRow data-bold="true">
             <span>
-              <Trans>Net Profit</Trans>
+              {pnl.netMarginPercent !== null
+                ? t`Net Profit (${pnl.netMarginPercent}%)`
+                : t`Net Profit`}
             </span>
-            <span>
-              {formatFinanceAmountMicros(pnl.netProfitAedMicros, 'AED')}
-            </span>
+            <span>{formatDisplay(pnl.netProfitAedMicros)}</span>
           </StyledFinanceV2StatementRow>
         </StyledFinanceV2Panel>
 
         <StyledFinanceV2Panel>
           <StyledFinanceV2HeaderRow>
-            <h3>
-              <Trans>Balance Sheet (AED)</Trans>
-            </h3>
+            <h3>{t`Balance Sheet (${displayCurrency})`}</h3>
             <StyledDeliveryRow>
               <StyledFinanceV2Pill
                 data-tone={bs.isBalanced ? 'success' : 'danger'}
@@ -331,24 +917,20 @@ export const FinanceV2DashboardTab = ({
                 {t`Company Cash (${cash.currency})`} ·{' '}
                 {formatFinanceAmountMicros(cash.originalMicros, cash.currency)}
               </span>
-              <span>{formatFinanceAmountMicros(cash.aedMicros, 'AED')}</span>
+              <span>{formatDisplay(cash.aedMicros)}</span>
             </StyledFinanceV2StatementRow>
           ))}
           <StyledFinanceV2StatementRow>
             <span>
               <Trans>Equipment &amp; Assets (purchase value)</Trans>
             </span>
-            <span>
-              {formatFinanceAmountMicros(bs.fixedAssetsAedMicros, 'AED')}
-            </span>
+            <span>{formatDisplay(bs.fixedAssetsAedMicros)}</span>
           </StyledFinanceV2StatementRow>
           <StyledFinanceV2StatementRow data-bold="true">
             <span>
               <Trans>Total Assets</Trans>
             </span>
-            <span>
-              {formatFinanceAmountMicros(bs.totalAssetsAedMicros, 'AED')}
-            </span>
+            <span>{formatDisplay(bs.totalAssetsAedMicros)}</span>
           </StyledFinanceV2StatementRow>
 
           <small>
@@ -362,12 +944,7 @@ export const FinanceV2DashboardTab = ({
             bs.liabilitiesByPerson.map((person) => (
               <StyledFinanceV2StatementRow key={person.accountId}>
                 <span>{t`Owed to ${person.personName}`}</span>
-                <span>
-                  {formatFinanceAmountMicros(
-                    person.balanceOwedAedMicros,
-                    'AED',
-                  )}
-                </span>
+                <span>{formatDisplay(person.balanceOwedAedMicros)}</span>
               </StyledFinanceV2StatementRow>
             ))
           )}
@@ -375,9 +952,7 @@ export const FinanceV2DashboardTab = ({
             <span>
               <Trans>Total Liabilities</Trans>
             </span>
-            <span>
-              {formatFinanceAmountMicros(bs.totalLiabilitiesAedMicros, 'AED')}
-            </span>
+            <span>{formatDisplay(bs.totalLiabilitiesAedMicros)}</span>
           </StyledFinanceV2StatementRow>
 
           <small>
@@ -387,43 +962,96 @@ export const FinanceV2DashboardTab = ({
             <span>
               <Trans>Opening Accumulated Profits</Trans>
             </span>
-            <span>
-              {formatFinanceAmountMicros(bs.openingEquityAedMicros, 'AED')}
-            </span>
+            <span>{formatDisplay(bs.openingEquityAedMicros)}</span>
           </StyledFinanceV2StatementRow>
           <StyledFinanceV2StatementRow>
             <span>
               <Trans>Accumulated Net Profit</Trans>
             </span>
-            <span>
-              {formatFinanceAmountMicros(
-                bs.accumulatedNetProfitAedMicros,
-                'AED',
-              )}
-            </span>
+            <span>{formatDisplay(bs.accumulatedNetProfitAedMicros)}</span>
           </StyledFinanceV2StatementRow>
           <StyledFinanceV2StatementRow data-bold="true">
             <span>
               <Trans>Total Equity</Trans>
             </span>
-            <span>
-              {formatFinanceAmountMicros(bs.totalEquityAedMicros, 'AED')}
-            </span>
+            <span>{formatDisplay(bs.totalEquityAedMicros)}</span>
           </StyledFinanceV2StatementRow>
 
           <StyledFinanceV2Notice>
             <Trans>
               Pending unpaid client invoices:{' '}
-              {formatFinanceAmountMicros(
-                pendingReceivables.totalAedMicros,
-                'AED',
-              )}{' '}
-              ({pendingReceivables.count} open). Under cash-basis accounting,
+              {formatDisplay(pendingReceivables.totalAedMicros)} (
+              {pendingReceivables.count} open). Under cash-basis accounting,
               these move into Cash and Revenue once paid.
             </Trans>
           </StyledFinanceV2Notice>
         </StyledFinanceV2Panel>
       </StyledFinanceV2SplitGrid>
+
+      {analytics && analytics.projectProfitability.length > 0 && (
+        <StyledFinanceV2Panel>
+          <StyledFinanceV2HeaderRow>
+            <div>
+              <h3>{t`Client / Project Profitability (${displayCurrency})`}</h3>
+              <small>
+                <Trans>
+                  Paid revenue vs direct project expenses for the selected
+                  period.
+                </Trans>
+              </small>
+            </div>
+            <StyledFinanceV2Pill data-tone="info">
+              {pnl.fromDate} → {pnl.toDate}
+            </StyledFinanceV2Pill>
+          </StyledFinanceV2HeaderRow>
+          <StyledFinanceV2TableWrap>
+            <StyledFinanceV2Table>
+              <thead>
+                <tr>
+                  <th>
+                    <Trans>Project</Trans>
+                  </th>
+                  <th data-numeric="true">
+                    <Trans>Paid Revenue</Trans>
+                  </th>
+                  <th data-numeric="true">
+                    <Trans>Direct Expenses</Trans>
+                  </th>
+                  <th data-numeric="true">
+                    <Trans>Gross Profit</Trans>
+                  </th>
+                  <th data-numeric="true">
+                    <Trans>Gross Margin</Trans>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {analytics.projectProfitability.map((row) => (
+                  <tr key={row.projectId ?? 'unassigned'}>
+                    <td>
+                      <strong>{row.projectName}</strong>
+                    </td>
+                    <td data-numeric="true">
+                      {formatDisplay(row.revenueAedMicros)}
+                    </td>
+                    <td data-numeric="true">
+                      {formatDisplay(row.directExpenseAedMicros)}
+                    </td>
+                    <td data-numeric="true">
+                      <strong>{formatDisplay(row.grossProfitAedMicros)}</strong>
+                    </td>
+                    <td data-numeric="true">
+                      {row.grossMarginPercent !== null
+                        ? `${row.grossMarginPercent}%`
+                        : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </StyledFinanceV2Table>
+          </StyledFinanceV2TableWrap>
+        </StyledFinanceV2Panel>
+      )}
     </StyledFinanceV2Stack>
   );
 };

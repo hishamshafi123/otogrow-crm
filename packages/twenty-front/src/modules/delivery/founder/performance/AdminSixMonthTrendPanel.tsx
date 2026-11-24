@@ -80,7 +80,7 @@ export const AdminSixMonthTrendPanel = ({
                     {t`${formatPerformanceMonth(latest.month)}: ${formatFinanceAmountMicros(latest.resultMicros, series.currency)}`}
                   </StyledStatusPill>
                   <Link
-                    to={`/delivery?view=finance&financeView=monthly&financeMonth=${month}&financeCurrency=${series.currency}`}
+                    to={`/delivery?view=finance&financeView=dashboard&financeMonth=${month}&financeCurrency=${series.currency}`}
                   >
                     <Trans>Inspect ledger</Trans>
                   </Link>

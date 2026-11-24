@@ -38,6 +38,8 @@ export class DeliveryFinanceV2CronJob {
       where: { activationStatus: WorkspaceActivationStatus.ACTIVE },
     });
 
+    const failedWorkspaceIds: string[] = [];
+
     for (const workspace of activeWorkspaces) {
       try {
         const result = await this.financeV2.runDueAutomationForWorkspace(
@@ -54,10 +56,17 @@ export class DeliveryFinanceV2CronJob {
           );
         }
       } catch (error) {
+        failedWorkspaceIds.push(workspace.id);
         this.exceptionHandlerService.captureExceptions([error], {
           workspace: { id: workspace.id },
         });
       }
+    }
+
+    if (failedWorkspaceIds.length > 0) {
+      throw new Error(
+        `Finance V2 automation failed for ${failedWorkspaceIds.length} workspace(s): ${failedWorkspaceIds.join(', ')}`,
+      );
     }
   }
 }

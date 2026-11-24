@@ -84,6 +84,10 @@ export type FinanceV2JournalStatus = 'POSTED' | 'VOID';
 
 export type FinanceV2ScheduleStatus = 'ACTIVE' | 'PAUSED' | 'STOPPED';
 
+export const FINANCE_V2_DEFAULT_TIMEZONE = 'Asia/Dubai' as const;
+
+export type FinanceV2PayrollPayTiming = 'SAME_MONTH' | 'FOLLOWING_MONTH';
+
 export type FinanceV2PayrollEntryKind =
   | 'LEAVE'
   | 'SWAP_COMP_OFF'
@@ -153,6 +157,8 @@ export type FinanceV2LedgerLineRecord = {
   currency: FinanceV2Currency;
   originalSignedMicros: string;
   status: FinanceV2JournalStatus;
+  projectId?: string | null;
+  reversalOfEntryType?: FinanceV2JournalEntryType | null;
 };
 
 export type FinanceV2ProfitAndLoss = {
@@ -163,11 +169,68 @@ export type FinanceV2ProfitAndLoss = {
   grossProfitAedMicros: string;
   grossMarginPercent: string | null;
   indirectExpenseAedMicros: string;
+  totalExpenseAedMicros: string;
   fxGainLossAedMicros: string;
   netProfitAedMicros: string;
   netMarginPercent: string | null;
   directBreakdown: { category: string; aedMicros: string }[];
   indirectBreakdown: { category: string; aedMicros: string }[];
+};
+
+export type FinanceV2MonthlyTrendPoint = {
+  month: string;
+  revenueAedMicros: string;
+  directExpenseAedMicros: string;
+  indirectExpenseAedMicros: string;
+  totalExpenseAedMicros: string;
+  netProfitAedMicros: string;
+  netMarginPercent: string | null;
+};
+
+export type FinanceV2InvoiceAgingBucket = {
+  key: 'NOT_DUE' | 'DAYS_1_15' | 'DAYS_16_30' | 'DAYS_31_PLUS';
+  count: number;
+  aedMicros: string;
+};
+
+export type FinanceV2ProjectProfitabilityRow = {
+  projectId: string | null;
+  projectName: string;
+  revenueAedMicros: string;
+  directExpenseAedMicros: string;
+  grossProfitAedMicros: string;
+  grossMarginPercent: string | null;
+};
+
+export type FinanceV2Analytics = {
+  previousPeriod: {
+    fromDate: string;
+    toDate: string;
+    revenueAedMicros: string;
+    totalExpenseAedMicros: string;
+    grossProfitAedMicros: string;
+    netProfitAedMicros: string;
+  };
+  monthlyTrend: FinanceV2MonthlyTrendPoint[];
+  burnAndRunway: {
+    periodNetCashFlowAedMicros: string;
+    avgMonthlyExpense3mAedMicros: string;
+    avgMonthlyNetBurn3mAedMicros: string;
+    estimatedRunwayMonths: string | null;
+  };
+  invoiceAging: FinanceV2InvoiceAgingBucket[];
+  upcomingCommitments30d: {
+    windowStart: string;
+    windowEnd: string;
+    recurringExpensesAedMicros: string;
+    recurringExpenseCount: number;
+    payrollAedMicros: string | null;
+    payrollCount: number | null;
+    expectedReceivablesAedMicros: string;
+    expectedReceivableCount: number;
+  };
+  payrollMonthRevenueAedMicros: string | null;
+  projectProfitability: FinanceV2ProjectProfitabilityRow[];
 };
 
 export type FinanceV2CashCurrencyBalance = {

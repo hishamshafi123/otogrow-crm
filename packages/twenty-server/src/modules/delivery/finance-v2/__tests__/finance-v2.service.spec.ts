@@ -1,4 +1,9 @@
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 
 jest.mock('src/modules/delivery/finance-v2/finance-v2-pdf.util', () => ({
   renderFinanceV2PdfBuffer: jest.fn(
@@ -60,7 +65,7 @@ const createInMemoryManager = (stores: StoreMap) => {
   };
 
   return {
-    query: jest.fn(async (sql: string) => {
+    query: jest.fn(async (sql: string, params?: unknown[]) => {
       if (sql.includes('FROM core."deliveryFinanceV2JournalLine"')) {
         const lines = getList(DeliveryFinanceV2JournalLineEntity);
         const journals = new Map(
@@ -69,9 +74,113 @@ const createInMemoryManager = (stores: StoreMap) => {
         const accounts = new Map(
           getList(DeliveryFinanceV2AccountEntity).map((a) => [a.id, a]),
         );
+
+        // 1. queryAccountCarryingTotals
+        if (sql.includes('AS "origMicros"')) {
+          const [wsId, accountId, asOfDate] = (params ?? []) as [
+            string,
+            string,
+            string,
+          ];
+          let orig = BigInt('0');
+          let aed = BigInt('0');
+          for (const line of lines) {
+            const journal = journals.get(line.journalId);
+            if (
+              !journal ||
+              line.workspaceId !== wsId ||
+              line.accountId !== accountId ||
+              journal.status !== 'POSTED' ||
+              String(journal.entryDate) > asOfDate
+            ) {
+              continue;
+            }
+            orig += BigInt(String(line.originalSignedMicros));
+            aed +=
+              BigInt(String(line.debitAedMicros)) -
+              BigInt(String(line.creditAedMicros));
+          }
+          return [{ origMicros: orig.toString(), aedMicros: aed.toString() }];
+        }
+
+        // 2. queryPersonHasNonZeroBalance (GROUP BY currency)
+        if (sql.includes('GROUP BY l."currency"')) {
+          const [wsId, accountId] = (params ?? []) as [string, string];
+          const byCurrency = new Map<string, { orig: bigint; aed: bigint }>();
+          for (const line of lines) {
+            const journal = journals.get(line.journalId);
+            if (
+              !journal ||
+              line.workspaceId !== wsId ||
+              line.accountId !== accountId ||
+              journal.status !== 'POSTED'
+            ) {
+              continue;
+            }
+            const cur = String(line.currency);
+            const bucket = byCurrency.get(cur) ?? {
+              orig: BigInt('0'),
+              aed: BigInt('0'),
+            };
+            const credit = BigInt(String(line.creditAedMicros));
+            const debit = BigInt(String(line.debitAedMicros));
+            const rawOrig = BigInt(String(line.originalSignedMicros));
+            const absOrig = rawOrig < BigInt('0') ? -rawOrig : rawOrig;
+            bucket.orig += credit > BigInt('0') ? absOrig : -absOrig;
+            bucket.aed += credit - debit;
+            byCurrency.set(cur, bucket);
+          }
+          return [...byCurrency.entries()].map(([currency, bucket]) => ({
+            currency,
+            owedOrigMicros: bucket.orig.toString(),
+            owedAedMicros: bucket.aed.toString(),
+          }));
+        }
+
+        // 3. queryPersonLiabilityCarryingTotals
+        if (sql.includes('AS "owedOrigMicros"')) {
+          const [wsId, accountId, currency, asOfDate] = (params ?? []) as [
+            string,
+            string,
+            string,
+            string,
+          ];
+          let owedOrig = BigInt('0');
+          let owedAed = BigInt('0');
+          for (const line of lines) {
+            const journal = journals.get(line.journalId);
+            if (
+              !journal ||
+              line.workspaceId !== wsId ||
+              line.accountId !== accountId ||
+              line.currency !== currency ||
+              journal.status !== 'POSTED' ||
+              String(journal.entryDate) > asOfDate
+            ) {
+              continue;
+            }
+            const credit = BigInt(String(line.creditAedMicros));
+            const debit = BigInt(String(line.debitAedMicros));
+            const rawOrig = BigInt(String(line.originalSignedMicros));
+            const absOrig = rawOrig < BigInt('0') ? -rawOrig : rawOrig;
+            owedOrig += credit > BigInt('0') ? absOrig : -absOrig;
+            owedAed += credit - debit;
+          }
+          return [
+            {
+              owedOrigMicros: owedOrig.toString(),
+              owedAedMicros: owedAed.toString(),
+            },
+          ];
+        }
+
+        // 4. loadLedgerLines (full ledger scan for reports)
         return lines.map((line) => {
           const journal = journals.get(line.journalId)!;
           const account = accounts.get(line.accountId)!;
+          const origJournal = journal.reversalOfJournalId
+            ? journals.get(journal.reversalOfJournalId)
+            : undefined;
           return {
             journalId: line.journalId,
             entryDate: journal.entryDate,
@@ -88,6 +197,9 @@ const createInMemoryManager = (stores: StoreMap) => {
             currency: line.currency,
             originalSignedMicros: String(line.originalSignedMicros),
             status: journal.status,
+            projectId: (journal.projectId as string | null | undefined) ?? null,
+            reversalOfEntryType:
+              (origJournal?.entryType as string | undefined) ?? null,
           };
         });
       }
@@ -367,10 +479,10 @@ describe('DeliveryFinanceV2Service End-to-End Accounting, Payroll, Quotes & Auto
       nov24,
     );
     expect(beforePayment.profitAndLoss.revenueAedMicros).toBe('0');
-    expect(beforePayment.invoices[0]?.overdueDays).toBe(7);
+    expect(beforePayment.invoices[0]?.overdueDays).toBe(0);
     expect(beforePayment.invoices[0]?.status).toBe('READY');
 
-    // Explicit manual Send Email button emails the PDF
+    // Explicit manual Send Email button emails the PDF and activates overdue tracking
     await service.command(
       workspace,
       adminMemberId,
@@ -382,6 +494,20 @@ describe('DeliveryFinanceV2Service End-to-End Accounting, Payroll, Quotes & Auto
       nov24,
     );
     expect(sendEmail).toHaveBeenCalledTimes(1);
+    const afterSend = await service.snapshot(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        fromDate: '2026-11-01',
+        toDate: '2026-11-30',
+        asOfDate: '2026-11-30',
+        payrollMonth: '2026-11',
+      },
+      nov24,
+    );
+    expect(afterSend.invoices[0]?.status).toBe('SENT');
+    expect(afterSend.invoices[0]?.overdueDays).toBe(7);
 
     // Record full payment -> Revenue now appears on P&L and overdueDays drops to 0!
     await service.command(
@@ -1305,6 +1431,41 @@ describe('DeliveryFinanceV2Service End-to-End Accounting, Payroll, Quotes & Auto
     expect(nonAdminSnap.canViewPayroll).toBe(false);
     expect(nonAdminSnap.recurringExpenses).toEqual([]);
     expect(nonAdminSnap.journals).toEqual([]);
+    // M6: Admin analytics exposes payroll commitments & revenue; non-admin redacts payroll from commitments, P&L breakdown, PNL CSV, and payrollMonthRevenueAedMicros
+    expect(
+      afterEmailFail.analytics.upcomingCommitments30d.payrollAedMicros,
+    ).not.toBeNull();
+    expect(afterEmailFail.analytics.upcomingCommitments30d.windowEnd).toBe(
+      '2026-12-23',
+    ); // 30 inclusive days starting 2026-11-24
+    expect(afterEmailFail.analytics.monthlyTrend).toHaveLength(6);
+    expect(
+      nonAdminSnap.analytics.upcomingCommitments30d.payrollAedMicros,
+    ).toBeNull();
+    expect(
+      nonAdminSnap.analytics.upcomingCommitments30d.payrollCount,
+    ).toBeNull();
+    expect(nonAdminSnap.analytics.payrollMonthRevenueAedMicros).toBeNull();
+    expect(
+      nonAdminSnap.profitAndLoss.directBreakdown.some(
+        (b) =>
+          b.category === 'DIRECT_SALARY' || b.category.startsWith('PAYROLL_'),
+      ),
+    ).toBe(false);
+
+    const nonAdminPnlCsv = await service.command(
+      workspace,
+      staffMemberId,
+      userWorkspaceId,
+      {
+        action: 'exportCsv',
+        dataset: 'PNL',
+        fromDate: '2026-11-01',
+        toDate: '2026-11-30',
+      },
+      nov24,
+    );
+    expect(String(nonAdminPnlCsv.csv)).not.toContain('DIRECT_SALARY');
 
     const nonAdminLedgerCsv = await service.command(
       workspace,
@@ -1347,5 +1508,1538 @@ describe('DeliveryFinanceV2Service End-to-End Accounting, Payroll, Quotes & Auto
         nov24,
       ),
     ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('M7: preserves logo on profile patch, clears on empty string, rejects spoofed logos, enforces FX carrying-cost & overdraft extinguishment, RBAC locks, clientRequestId idempotency, and email race protection', async () => {
+    const { service, stores, sendEmail } = setup();
+    const nov24 = new Date('2026-11-24T09:00:00Z');
+
+    const initial = await service.snapshot(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      { fromDate: '2026-11-01', toDate: '2026-11-30', asOfDate: '2026-11-30' },
+      nov24,
+    );
+    const cashUsd = initial.accounts.find((a) => a.code === 'CASH:USD')!;
+    const cashAed = initial.accounts.find((a) => a.code === 'CASH:AED')!;
+
+    // 1. Logo preservation vs explicit wipe vs spoofed rejection
+    const sig = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    const ihdr = Buffer.alloc(25);
+    ihdr.writeUInt32BE(13, 0);
+    ihdr.write('IHDR', 4, 'ascii');
+    ihdr.writeUInt32BE(120, 8);
+    ihdr.writeUInt32BE(40, 12);
+    const idat = Buffer.alloc(16);
+    idat.writeUInt32BE(4, 0);
+    idat.write('IDAT', 4, 'ascii');
+    const iend = Buffer.alloc(12);
+    iend.writeUInt32BE(0, 0);
+    iend.write('IEND', 4, 'ascii');
+    const validLogoUrl = `data:image/png;base64,${Buffer.concat([sig, ihdr, idat, iend]).toString('base64')}`;
+
+    await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'saveCompanyProfile',
+        companyName: 'Otogrow LLC',
+        logoDataUrl: validLogoUrl,
+      },
+      nov24,
+    );
+    // Saving profile without logoDataUrl must preserve existing logo
+    await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'saveCompanyProfile',
+        companyName: 'Otogrow Holdings LLC',
+      },
+      nov24,
+    );
+    let snap = await service.snapshot(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      { fromDate: '2026-11-01', toDate: '2026-11-30', asOfDate: '2026-11-30' },
+      nov24,
+    );
+    expect(snap.profile.logoDataUrl).toBeNull();
+    expect(snap.profile.hasLogo).toBe(true);
+    expect(snap.profile.logoUpdatedAt).toBeTruthy();
+
+    const downloadedLogo = await service.downloadCompanyLogo(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+    );
+    expect(downloadedLogo.mimeType).toBe('image/png');
+    expect(
+      downloadedLogo.buffer.equals(Buffer.concat([sig, ihdr, idat, iend])),
+    ).toBe(true);
+    expect(downloadedLogo.etag).toMatch(/^"[a-f0-9]{24}"$/);
+
+    // Passing empty string clears logo
+    await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'saveCompanyProfile',
+        companyName: 'Otogrow Holdings LLC',
+        logoDataUrl: '',
+      },
+      nov24,
+    );
+    snap = await service.snapshot(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      { fromDate: '2026-11-01', toDate: '2026-11-30', asOfDate: '2026-11-30' },
+      nov24,
+    );
+    expect(snap.profile.logoDataUrl).toBeNull();
+    expect(snap.profile.hasLogo).toBe(false);
+    await expect(
+      service.downloadCompanyLogo(workspace, adminMemberId, userWorkspaceId),
+    ).rejects.toThrow(NotFoundException);
+
+    // Spoofed logo rejected
+    await expect(
+      service.command(
+        workspace,
+        adminMemberId,
+        userWorkspaceId,
+        {
+          action: 'saveCompanyProfile',
+          companyName: 'Otogrow Holdings LLC',
+          logoDataUrl: `data:image/png;base64,${Buffer.from('not-a-real-png-binary-payload-1234').toString('base64')}`,
+        },
+        nov24,
+      ),
+    ).rejects.toThrow(BadRequestException);
+
+    // 2. FX convertCurrency ignores client fromFxRateToAed bypass & leaves exact 0 AED on full liquidation
+    await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'recordOpeningBalance',
+        kind: 'CASH',
+        title: 'Opening USD',
+        entryDate: '2026-11-01',
+        currency: 'USD',
+        amountMicros: '100000000', // $100 @ 3.60 = 360 AED
+        fxRateToAed: '3.60',
+      },
+      nov24,
+    );
+    await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'convertCurrency',
+        entryDate: '2026-11-02',
+        fromCurrency: 'USD',
+        fromAmountMicros: '100000000',
+        fromFxRateToAed: '9.99', // must be ignored in favor of 3.60 carrying cost
+        toCurrency: 'AED',
+        toAmountMicros: '370000000', // 370 AED -> +10 AED FX gain
+      },
+      nov24,
+    );
+    snap = await service.snapshot(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      { fromDate: '2026-11-01', toDate: '2026-11-30', asOfDate: '2026-11-30' },
+      nov24,
+    );
+    const usdBal = snap.balanceSheet.cashByCurrency.find(
+      (c) => c.currency === 'USD',
+    )!;
+    expect(usdBal.originalMicros).toBe('0');
+    expect(usdBal.aedMicros).toBe('0');
+    expect(snap.balanceSheet.isBalanced).toBe(true);
+
+    // Overdraw USD by $50 @ 3.70 (carries -$50 / -185 AED), then receive $50 via convertCurrency at 3.60 -> must extinguish exact -185 AED
+    await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'recordExpenseOrAsset',
+        entryKind: 'DIRECT_EXPENSE',
+        entryDate: '2026-11-03',
+        title: 'USD Overdraft Spend',
+        category: 'DIRECT_SUBSCRIPTION',
+        currency: 'USD',
+        amountMicros: '50000000',
+        fxRateToAed: '3.70',
+        fundingAccountId: cashUsd.id,
+      },
+      nov24,
+    );
+    await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'convertCurrency',
+        entryDate: '2026-11-04',
+        fromCurrency: 'AED',
+        fromAmountMicros: '180000000', // 180 AED
+        toCurrency: 'USD',
+        toAmountMicros: '50000000', // $50 -> extinguishes 185 AED overdraft (+5 AED FX gain)
+        toFxRateToAed: '3.60',
+      },
+      nov24,
+    );
+    snap = await service.snapshot(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      { fromDate: '2026-11-01', toDate: '2026-11-30', asOfDate: '2026-11-30' },
+      nov24,
+    );
+    const usdAfterOverdraftClear = snap.balanceSheet.cashByCurrency.find(
+      (c) => c.currency === 'USD',
+    )!;
+    expect(usdAfterOverdraftClear.originalMicros).toBe('0');
+    expect(usdAfterOverdraftClear.aedMicros).toBe('0');
+    expect(snap.balanceSheet.isBalanced).toBe(true);
+
+    // 3. clientRequestId idempotency on recordExpenseOrAsset & recordInvoicePayment (including final-payment retry)
+    const expReqId = 'req-expense-idemp-001';
+    const firstExp = await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'recordExpenseOrAsset',
+        entryKind: 'DIRECT_EXPENSE',
+        entryDate: '2026-11-05',
+        title: 'Idempotent Hosting Bill',
+        category: 'DIRECT_SUBSCRIPTION',
+        currency: 'AED',
+        amountMicros: '100000000',
+        fundingAccountId: cashAed.id,
+        clientRequestId: expReqId,
+      },
+      nov24,
+    );
+    const retryExp = await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'recordExpenseOrAsset',
+        entryKind: 'DIRECT_EXPENSE',
+        entryDate: '2026-11-05',
+        title: 'Idempotent Hosting Bill',
+        category: 'DIRECT_SUBSCRIPTION',
+        currency: 'AED',
+        amountMicros: '100000000',
+        fundingAccountId: cashAed.id,
+        clientRequestId: expReqId,
+      },
+      nov24,
+    );
+    expect(retryExp.idempotent).toBe(true);
+    expect(retryExp.journalId).toBe(firstExp.journalId);
+
+    const invRes = await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'saveInvoice',
+        clientName: 'Idemp Client',
+        clientEmail: 'billing@idemp.example',
+        currency: 'AED',
+        issueDate: '2026-11-05',
+        dueDate: '2026-11-20',
+        lineItems: [
+          {
+            id: 'l1',
+            label: 'Retainer',
+            quantity: '1',
+            unitPriceMicros: '500000000',
+          },
+        ],
+      },
+      nov24,
+    );
+    const invId = String(invRes.invoiceId);
+    const payReqId = 'req-invoice-pay-001';
+    const firstPay = await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'recordInvoicePayment',
+        invoiceId: invId,
+        paymentDate: '2026-11-06',
+        amountMicros: '500000000',
+        clientRequestId: payReqId,
+      },
+      nov24,
+    );
+    // Retry after invoice is already PAID must succeed idempotently
+    const retryPay = await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'recordInvoicePayment',
+        invoiceId: invId,
+        paymentDate: '2026-11-06',
+        amountMicros: '500000000',
+        clientRequestId: payReqId,
+      },
+      nov24,
+    );
+    expect(retryPay.idempotent).toBe(true);
+    expect(retryPay.journalId).toBe(firstPay.journalId);
+
+    // 4. Non-admin RBAC blocks DIRECT_SALARY expense/recurring and runDueAutomation; future asOfDate rejected
+    const nonAdminHarness = setup({
+      isAdmin: false,
+      capabilities: ['finance.read', 'finance.manage'],
+    });
+    const naSnap = await nonAdminHarness.service.snapshot(
+      workspace,
+      staffMemberId,
+      userWorkspaceId,
+      {},
+      nov24,
+    );
+    const naCashAed = naSnap.accounts.find((a) => a.code === 'CASH:AED')!;
+    await expect(
+      nonAdminHarness.service.command(
+        workspace,
+        staffMemberId,
+        userWorkspaceId,
+        {
+          action: 'recordExpenseOrAsset',
+          entryKind: 'DIRECT_EXPENSE',
+          entryDate: '2026-11-06',
+          title: 'Sneaky Salary',
+          category: 'DIRECT_SALARY',
+          currency: 'AED',
+          amountMicros: '100000000',
+          fundingAccountId: naCashAed.id,
+        },
+        nov24,
+      ),
+    ).rejects.toThrow(ForbiddenException);
+
+    await expect(
+      nonAdminHarness.service.command(
+        workspace,
+        staffMemberId,
+        userWorkspaceId,
+        {
+          action: 'saveRecurringExpense',
+          expenseType: 'DIRECT_EXPENSE',
+          title: 'Recurring Salary',
+          category: 'DIRECT_SALARY',
+          currency: 'AED',
+          amountMicros: '100000000',
+          fundingAccountId: naCashAed.id,
+          dayOfMonth: 28,
+          startMonth: '2026-11',
+        },
+        nov24,
+      ),
+    ).rejects.toThrow(ForbiddenException);
+
+    await expect(
+      nonAdminHarness.service.command(
+        workspace,
+        staffMemberId,
+        userWorkspaceId,
+        {
+          action: 'runDueAutomation',
+          asOfDate: '2026-11-24',
+        },
+        nov24,
+      ),
+    ).rejects.toThrow(ForbiddenException);
+
+    await expect(
+      service.command(
+        workspace,
+        adminMemberId,
+        userWorkspaceId,
+        {
+          action: 'runDueAutomation',
+          asOfDate: '2026-12-31',
+        },
+        nov24,
+      ),
+    ).rejects.toThrow(BadRequestException);
+
+    // 5. Concurrent email lock throws ConflictException & voided-before-send check aborts dispatch
+    const inv2Res = await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'saveInvoice',
+        clientName: 'Race Client',
+        clientEmail: 'race@client.example',
+        currency: 'AED',
+        issueDate: '2026-11-10',
+        dueDate: '2026-11-25',
+        lineItems: [
+          {
+            id: 'l2',
+            label: 'Sprint',
+            quantity: '1',
+            unitPriceMicros: '250000000',
+          },
+        ],
+      },
+      nov24,
+    );
+    const inv2Id = String(inv2Res.invoiceId);
+    let releaseFirstSend!: () => void;
+    const sendStarted = new Promise<void>((resolve) => {
+      sendEmail.mockImplementationOnce(async () => {
+        resolve();
+        await new Promise<void>((done) => {
+          releaseFirstSend = done;
+        });
+      });
+    });
+    const firstSendPromise = service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      { action: 'sendInvoiceEmail', invoiceId: inv2Id },
+      nov24,
+    );
+    await sendStarted;
+    await expect(
+      service.command(
+        workspace,
+        adminMemberId,
+        userWorkspaceId,
+        { action: 'sendInvoiceEmail', invoiceId: inv2Id },
+        nov24,
+      ),
+    ).rejects.toThrow(ConflictException);
+    releaseFirstSend();
+    await firstSendPromise;
+
+    // Voiding invoice prevents subsequent send
+    const invoicesStore = stores.get(DeliveryFinanceV2InvoiceEntity) ?? [];
+    const targetInv = invoicesStore.find((r) => r.id === inv2Id)!;
+    targetInv.status = 'VOID';
+    await expect(
+      service.command(
+        workspace,
+        adminMemberId,
+        userWorkspaceId,
+        { action: 'sendInvoiceEmail', invoiceId: inv2Id },
+        nov24,
+      ),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('M7 rework: extinguishes overdraft AED on PAYROLL_LEAVE_REDUCTION (H1), blocks PAYROLL_* category bypass (H2), rejects cumulative payroll overflow before bricking snapshot (H3), and prevents voided clientRequestId resurrection (M1)', async () => {
+    const { service } = setup();
+    const nov28 = new Date('2026-11-28T12:00:00Z');
+    const initial = await service.snapshot(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      { fromDate: '2026-11-01', toDate: '2026-11-30', asOfDate: '2026-11-30' },
+      nov28,
+    );
+    const cashInr = initial.accounts.find((a) => a.code === 'CASH:INR')!;
+    const cashAed = initial.accounts.find((a) => a.code === 'CASH:AED')!;
+
+    // H1: Overdraw CASH:INR via payday base salary @ 0.044, then post 26-day unpaid leave reduction @ 0.045 -> exact 0 INR & 0 AED
+    await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'saveExchangeRates',
+        exchangeRates: { ...initial.profile.exchangeRates, INR: '0.044' },
+      },
+      nov28,
+    );
+    const ppRes = await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'savePayrollProfile',
+        employeeMemberId: staffMemberId,
+        employeeName: 'Arjun',
+        roleLabel: 'Engineer',
+        currency: 'INR',
+        baseSalaryMicros: '100000000000', // 100,000 INR
+        workingDaysPerMonth: 26,
+        paidLeavesPerMonth: 0,
+        payDayOfMonth: 28,
+        fundingAccountId: cashInr.id,
+        startMonth: '2026-11',
+      },
+      nov28,
+    );
+    const profileId = String(ppRes.payrollProfileId);
+    await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      { action: 'runDueAutomation', asOfDate: '2026-11-28' },
+      nov28,
+    );
+    // Add 26 unpaid leave days and post reduction at a different FX rate (0.045)
+    await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'addPayrollEntry',
+        profileId,
+        month: '2026-11',
+        entryKind: 'LEAVE',
+        days: '26',
+        eventDate: '2026-11-15',
+        note: 'Full unpaid month',
+      },
+      nov28,
+    );
+    await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'postPayrollAdjustments',
+        month: '2026-11',
+        profileId,
+        fxRateToAed: '0.045',
+      },
+      nov28,
+    );
+    const afterLeave = await service.snapshot(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      { fromDate: '2026-11-01', toDate: '2026-11-30', asOfDate: '2026-11-30' },
+      nov28,
+    );
+    const inrBal = afterLeave.balanceSheet.cashByCurrency.find(
+      (c) => c.currency === 'INR',
+    )!;
+    expect(inrBal.originalMicros).toBe('0');
+    expect(inrBal.aedMicros).toBe('0');
+    expect(afterLeave.balanceSheet.isBalanced).toBe(true);
+
+    // H3: Cumulative bonus overflow rejected on write without bricking snapshot
+    await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'addPayrollEntry',
+        profileId,
+        month: '2026-12',
+        entryKind: 'BONUS',
+        bonusAmountMicros: '5000000000000000000', // 5e18
+        eventDate: '2026-12-10',
+        note: 'Bonus 1',
+      },
+      nov28,
+    );
+    await expect(
+      service.command(
+        workspace,
+        adminMemberId,
+        userWorkspaceId,
+        {
+          action: 'addPayrollEntry',
+          profileId,
+          month: '2026-12',
+          entryKind: 'BONUS',
+          bonusAmountMicros: '5000000000000000000', // +5e18 = 1e19 > 9e18
+          eventDate: '2026-12-11',
+          note: 'Bonus 2 overflow',
+        },
+        nov28,
+      ),
+    ).rejects.toThrow(BadRequestException);
+    // Snapshot for 2026-12 remains healthy!
+    const decSnap = await service.snapshot(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      { payrollMonth: '2026-12' },
+      nov28,
+    );
+    expect(decSnap.payrollSummaries).toHaveLength(1);
+
+    // M1: Voided journal is NOT resurrected when clientRequestId is retried
+    const voidableReq = 'req-void-no-resurrect-01';
+    const created = await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'recordExpenseOrAsset',
+        entryKind: 'DIRECT_EXPENSE',
+        entryDate: '2026-11-20',
+        title: 'Accidental Expense',
+        category: 'DIRECT_SUBSCRIPTION',
+        currency: 'AED',
+        amountMicros: '100000000',
+        fundingAccountId: cashAed.id,
+        clientRequestId: voidableReq,
+      },
+      nov28,
+    );
+    await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'voidJournal',
+        journalId: String(created.journalId),
+        reason: 'Entered by mistake',
+      },
+      nov28,
+    );
+    const retryAfterVoid = await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'recordExpenseOrAsset',
+        entryKind: 'DIRECT_EXPENSE',
+        entryDate: '2026-11-20',
+        title: 'Accidental Expense',
+        category: 'DIRECT_SUBSCRIPTION',
+        currency: 'AED',
+        amountMicros: '100000000',
+        fundingAccountId: cashAed.id,
+        clientRequestId: voidableReq,
+      },
+      nov28,
+    );
+    expect(retryAfterVoid.idempotent).toBe(true);
+    expect(retryAfterVoid.journalId).toBe(created.journalId);
+
+    // H2: Non-admin blocked from PAYROLL_BONUS & lowercase direct_salary variants
+    const nonAdmin = setup({
+      isAdmin: false,
+      capabilities: ['finance.read', 'finance.manage'],
+    });
+    const naSnap = await nonAdmin.service.snapshot(
+      workspace,
+      staffMemberId,
+      userWorkspaceId,
+      {},
+      nov28,
+    );
+    const naCashAed = naSnap.accounts.find((a) => a.code === 'CASH:AED')!;
+    await expect(
+      nonAdmin.service.command(
+        workspace,
+        staffMemberId,
+        userWorkspaceId,
+        {
+          action: 'recordExpenseOrAsset',
+          entryKind: 'DIRECT_EXPENSE',
+          entryDate: '2026-11-20',
+          title: 'Sneaky Bonus',
+          category: 'PAYROLL_BONUS',
+          currency: 'AED',
+          amountMicros: '100000000',
+          fundingAccountId: naCashAed.id,
+        },
+        nov28,
+      ),
+    ).rejects.toThrow(ForbiddenException);
+    await expect(
+      nonAdmin.service.command(
+        workspace,
+        staffMemberId,
+        userWorkspaceId,
+        {
+          action: 'recordExpenseOrAsset',
+          entryKind: 'DIRECT_EXPENSE',
+          entryDate: '2026-11-20',
+          title: 'Sneaky Lowercase Salary',
+          category: 'direct_salary',
+          currency: 'AED',
+          amountMicros: '100000000',
+          fundingAccountId: naCashAed.id,
+        },
+        nov28,
+      ),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('M8: blocks archiving a person liability with non-zero balance or active recurring expense and succeeds when settled', async () => {
+    const { service } = setup();
+    const nov24 = new Date('2026-11-24T10:00:00Z');
+
+    await service.snapshot(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      { fromDate: '2026-11-01', toDate: '2026-11-30', asOfDate: '2026-11-30' },
+      nov24,
+    );
+
+    const personRes = await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'savePersonLiability',
+        personName: 'Zara',
+        personEmail: 'zara@otogrow.com',
+        currency: 'USD',
+      },
+      nov24,
+    );
+    const zaraId = String(personRes.accountId);
+
+    // Record $500 loan in from Zara
+    await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'recordLoanIn',
+        personAccountId: zaraId,
+        entryDate: '2026-11-10',
+        title: 'Seed advance from Zara',
+        currency: 'USD',
+        amountMicros: '500000000',
+        fxRateToAed: '3.6725',
+      },
+      nov24,
+    );
+
+    // Archiving while $500 is still owed must fail
+    await expect(
+      service.command(
+        workspace,
+        adminMemberId,
+        userWorkspaceId,
+        {
+          action: 'savePersonLiability',
+          id: zaraId,
+          personName: 'Zara',
+          personEmail: 'zara@otogrow.com',
+          currency: 'USD',
+          active: false,
+        },
+        nov24,
+      ),
+    ).rejects.toThrow(BadRequestException);
+
+    // Repay full $500 from Company Cash (USD)
+    await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'recordLoanRepayment',
+        personAccountId: zaraId,
+        entryDate: '2026-11-12',
+        title: 'Full repayment to Zara',
+        currency: 'USD',
+        amountMicros: '500000000',
+        fxRateToAed: '3.6725',
+      },
+      nov24,
+    );
+
+    // Add an active recurring expense funded by Zara -> archiving must still fail
+    const recRes = await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'saveRecurringExpense',
+        title: 'Zara card tool',
+        expenseType: 'DIRECT_EXPENSE',
+        category: 'DIRECT_SUBSCRIPTION',
+        currency: 'USD',
+        amountMicros: '25000000',
+        dayOfMonth: 28,
+        fundingAccountId: zaraId,
+        startMonth: '2026-11',
+      },
+      nov24,
+    );
+    await expect(
+      service.command(
+        workspace,
+        adminMemberId,
+        userWorkspaceId,
+        {
+          action: 'savePersonLiability',
+          id: zaraId,
+          personName: 'Zara',
+          personEmail: 'zara@otogrow.com',
+          currency: 'USD',
+          active: false,
+        },
+        nov24,
+      ),
+    ).rejects.toThrow(BadRequestException);
+
+    // M8 rework High #1: editing name/email without currency preserves stored currency
+    await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'savePersonLiability',
+        id: zaraId,
+        personName: 'Zara K',
+        personEmail: 'zara.k@otogrow.com',
+      },
+      nov24,
+    );
+    const afterRename = await service.snapshot(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      { fromDate: '2026-11-01', toDate: '2026-11-30', asOfDate: '2026-11-30' },
+      nov24,
+    );
+    expect(afterRename.accounts.find((a) => a.id === zaraId)?.currency).toBe(
+      'USD',
+    );
+
+    // M8 rework High #2: PAUSED recurring expense still blocks archiving
+    await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'setRecurringExpenseStatus',
+        id: String(recRes.recurringExpenseId),
+        status: 'PAUSED',
+      },
+      nov24,
+    );
+    await expect(
+      service.command(
+        workspace,
+        adminMemberId,
+        userWorkspaceId,
+        {
+          action: 'savePersonLiability',
+          id: zaraId,
+          personName: 'Zara K',
+          personEmail: 'zara.k@otogrow.com',
+          active: false,
+        },
+        nov24,
+      ),
+    ).rejects.toThrow(BadRequestException);
+
+    // Stop the recurring expense -> archiving succeeds
+    await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'setRecurringExpenseStatus',
+        id: String(recRes.recurringExpenseId),
+        status: 'STOPPED',
+      },
+      nov24,
+    );
+    await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'savePersonLiability',
+        id: zaraId,
+        personName: 'Zara K',
+        personEmail: 'zara.k@otogrow.com',
+        active: false,
+      },
+      nov24,
+    );
+
+    const afterArchive = await service.snapshot(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      { fromDate: '2026-11-01', toDate: '2026-11-30', asOfDate: '2026-11-30' },
+      nov24,
+    );
+    expect(afterArchive.accounts.find((a) => a.id === zaraId)?.active).toBe(
+      false,
+    );
+
+    // M8 rework High #2: archived person cannot receive new loans, opening liabilities, or resumed recurring expenses
+    await expect(
+      service.command(
+        workspace,
+        adminMemberId,
+        userWorkspaceId,
+        {
+          action: 'recordLoanIn',
+          personAccountId: zaraId,
+          entryDate: '2026-11-15',
+          currency: 'USD',
+          amountMicros: '100000000',
+        },
+        nov24,
+      ),
+    ).rejects.toThrow(BadRequestException);
+    await expect(
+      service.command(
+        workspace,
+        adminMemberId,
+        userWorkspaceId,
+        {
+          action: 'recordOpeningBalance',
+          kind: 'PERSON_LIABILITY',
+          title: 'Archived person opening',
+          entryDate: '2026-11-15',
+          currency: 'USD',
+          amountMicros: '100000000',
+          personAccountId: zaraId,
+        },
+        nov24,
+      ),
+    ).rejects.toThrow(BadRequestException);
+    await expect(
+      service.command(
+        workspace,
+        adminMemberId,
+        userWorkspaceId,
+        {
+          action: 'setRecurringExpenseStatus',
+          id: String(recRes.recurringExpenseId),
+          status: 'ACTIVE',
+        },
+        nov24,
+      ),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('M9: enforces payroll days 29-31 delta catch-up, base-salary-before-leave-reduction guard, explicit payTiming/startMonth, and duplicate/paidLeaves guards', async () => {
+    const { service } = setup();
+    const nov28 = new Date('2026-11-28T12:00:00Z');
+    const initial = await service.snapshot(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      { fromDate: '2026-11-01', toDate: '2026-11-30', asOfDate: '2026-11-30' },
+      nov28,
+    );
+    const cashAed = initial.accounts.find((a) => a.code === 'CASH:AED')!;
+
+    // 1. paidLeavesPerMonth > workingDaysPerMonth rejected
+    await expect(
+      service.command(
+        workspace,
+        adminMemberId,
+        userWorkspaceId,
+        {
+          action: 'savePayrollProfile',
+          employeeMemberId: staffMemberId,
+          employeeName: 'Arjun',
+          roleLabel: 'Editor',
+          currency: 'AED',
+          baseSalaryMicros: '10000000000',
+          workingDaysPerMonth: 20,
+          paidLeavesPerMonth: 21,
+          payDayOfMonth: 28,
+          fundingAccountId: cashAed.id,
+          startMonth: '2026-11',
+        },
+        nov28,
+      ),
+    ).rejects.toThrow(BadRequestException);
+
+    // 2. Create profile with explicit payTiming = SAME_MONTH even on day 5
+    const profRes = await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'savePayrollProfile',
+        employeeMemberId: staffMemberId,
+        employeeName: 'Arjun',
+        roleLabel: 'Editor',
+        currency: 'AED',
+        baseSalaryMicros: '26000000000', // 26,000 AED => 1,000 AED/day
+        workingDaysPerMonth: 26,
+        paidLeavesPerMonth: 0,
+        payDayOfMonth: 28,
+        payTiming: 'SAME_MONTH',
+        fundingAccountId: cashAed.id,
+        startMonth: '2026-11',
+      },
+      nov28,
+    );
+    const profileId = String(profRes.payrollProfileId);
+
+    // 3. Duplicate active profile for same employeeMemberId rejected
+    await expect(
+      service.command(
+        workspace,
+        adminMemberId,
+        userWorkspaceId,
+        {
+          action: 'savePayrollProfile',
+          employeeMemberId: staffMemberId,
+          employeeName: 'Arjun Duplicate',
+          roleLabel: 'Editor',
+          currency: 'AED',
+          baseSalaryMicros: '10000000000',
+          workingDaysPerMonth: 26,
+          paidLeavesPerMonth: 0,
+          payDayOfMonth: 28,
+          fundingAccountId: cashAed.id,
+          startMonth: '2026-11',
+        },
+        nov28,
+      ),
+    ).rejects.toThrow(BadRequestException);
+
+    // 4. Editing profile preserves startMonth when omitted and updates when provided
+    await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'savePayrollProfile',
+        id: profileId,
+        employeeMemberId: staffMemberId,
+        employeeName: 'Arjun',
+        roleLabel: 'Senior Editor',
+        currency: 'AED',
+        baseSalaryMicros: '26000000000',
+        workingDaysPerMonth: 26,
+        paidLeavesPerMonth: 0,
+        payDayOfMonth: 28,
+        fundingAccountId: cashAed.id,
+      },
+      nov28,
+    );
+    let snap = await service.snapshot(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      { fromDate: '2026-11-01', toDate: '2026-11-30', asOfDate: '2026-11-30' },
+      nov28,
+    );
+    expect(snap.payrollProfiles[0].startMonth).toBe('2026-11');
+    expect(snap.payrollProfiles[0].payTiming).toBe('SAME_MONTH');
+
+    // 5. Log 1 unpaid leave day BEFORE base salary is posted -> manual postPayrollAdjustments rejects
+    await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'addPayrollEntry',
+        profileId,
+        month: '2026-11',
+        entryKind: 'LEAVE',
+        days: '1',
+        eventDate: '2026-11-10',
+        note: 'Unpaid day 1',
+      },
+      nov28,
+    );
+    await expect(
+      service.command(
+        workspace,
+        adminMemberId,
+        userWorkspaceId,
+        {
+          action: 'postPayrollAdjustments',
+          profileId,
+          month: '2026-11',
+        },
+        nov28,
+      ),
+    ).rejects.toThrow(BadRequestException);
+
+    // 6. Run automation on payday (Nov 28): posts base salary (26,000) + leave reduction (1,000)
+    await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      { action: 'runDueAutomation', asOfDate: '2026-11-28' },
+      nov28,
+    );
+
+    // 7. Log late overtime on Nov 29 + additional leave on Nov 30 AFTER payday
+    await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'addPayrollEntry',
+        profileId,
+        month: '2026-11',
+        entryKind: 'LEAVE',
+        days: '1',
+        eventDate: '2026-11-30',
+        note: 'Late month leave',
+      },
+      new Date('2026-11-30T12:00:00Z'),
+    );
+    await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'addPayrollEntry',
+        profileId,
+        month: '2026-11',
+        entryKind: 'OVERTIME',
+        days: '1',
+        eventDate: '2026-11-29',
+        note: 'Late month overtime',
+      },
+      new Date('2026-11-30T12:00:00Z'),
+    );
+
+    // Automation run on Nov 30 posts ONLY the catch-up deltas (+1,000 leave reduction, +1,000 overtime)
+    const catchup = await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      { action: 'runDueAutomation', asOfDate: '2026-11-30' },
+      new Date('2026-11-30T12:00:00Z'),
+    );
+    expect(catchup.payrollAdjustmentsPosted).toBe(2);
+
+    // Re-running automation is idempotent (0 new postings)
+    const noop = await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      { action: 'runDueAutomation', asOfDate: '2026-11-30' },
+      new Date('2026-11-30T12:00:00Z'),
+    );
+    expect(noop.payrollAdjustmentsPosted).toBe(0);
+
+    snap = await service.snapshot(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      { fromDate: '2026-11-01', toDate: '2026-11-30', asOfDate: '2026-11-30' },
+      new Date('2026-11-30T12:00:00Z'),
+    );
+    // Net Direct Expense = 26,000 base - 1,000 leave - 1,000 delta leave + 1,000 overtime = 25,000 AED
+    expect(snap.profitAndLoss.directExpenseAedMicros).toBe('25000000000');
+    expect(snap.balanceSheet.isBalanced).toBe(true);
+  });
+
+  it('M9: supports multi-month automation catch-up, timezone today boundary, period lock + reverseJournal (with invoice reopen), and non-admin pagination', async () => {
+    const { service, stores } = setup();
+    // 2026-11-30T21:00:00Z is 2026-12-01 in Asia/Dubai (+04:00)
+    const lateNovUtc = new Date('2026-11-30T21:00:00Z');
+    const dubaiSnap = await service.snapshot(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {},
+      lateNovUtc,
+    );
+    expect(dubaiSnap.profile.timezone).toBe('Asia/Dubai');
+    expect(dubaiSnap.today).toBe('2026-12-01');
+
+    // Switch workspace timezone to UTC -> today becomes 2026-11-30
+    await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'saveCompanyProfile',
+        companyName: 'Otogrow Global',
+        timezone: 'UTC',
+      },
+      lateNovUtc,
+    );
+    const utcSnap = await service.snapshot(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {},
+      lateNovUtc,
+    );
+    expect(utcSnap.profile.timezone).toBe('UTC');
+    expect(utcSnap.today).toBe('2026-11-30');
+
+    const cashAed = utcSnap.accounts.find((a) => a.code === 'CASH:AED')!;
+
+    // 1. Multi-month catch-up (3 months: Aug, Sep, Oct, Nov)
+    await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'saveRecurringExpense',
+        title: 'Cloud Hosting',
+        expenseType: 'INDIRECT_EXPENSE',
+        category: 'INDIRECT_SOFTWARE',
+        currency: 'AED',
+        amountMicros: '100000000', // 100 AED
+        dayOfMonth: 10,
+        fundingAccountId: cashAed.id,
+        startMonth: '2026-08',
+      },
+      lateNovUtc,
+    );
+    const autoRes = await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      { action: 'runDueAutomation', asOfDate: '2026-11-30' },
+      lateNovUtc,
+    );
+    expect(autoRes.recurringExpensesPosted).toBe(4);
+
+    // 2. Invoice payment -> Period lock blocks void & backdated post -> reverseJournal reopens invoice & balances books
+    const invRes = await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'saveInvoice',
+        clientName: 'Acme Corp',
+        clientEmail: 'billing@acme.com',
+        currency: 'AED',
+        issueDate: '2026-11-01',
+        dueDate: '2026-11-15',
+        lineItems: [
+          {
+            label: 'Retainer',
+            quantity: '1',
+            unitPriceMicros: '5000000000',
+            discountPercent: '0',
+          },
+        ],
+      },
+      lateNovUtc,
+    );
+    const invoiceId = String(invRes.invoiceId);
+    const payRes = await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'recordInvoicePayment',
+        invoiceId,
+        paymentDate: '2026-11-10',
+        amountMicros: '5000000000',
+      },
+      lateNovUtc,
+    );
+    const payJournalId = String(payRes.journalId);
+
+    // Lock books through 2026-11-15
+    await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'setPeriodLock',
+        lockedThroughDate: '2026-11-15',
+      },
+      lateNovUtc,
+    );
+
+    // Backdated expense on 2026-11-15 rejected
+    await expect(
+      service.command(
+        workspace,
+        adminMemberId,
+        userWorkspaceId,
+        {
+          action: 'recordExpenseOrAsset',
+          entryKind: 'INDIRECT_EXPENSE',
+          category: 'INDIRECT_OFFICE',
+          title: 'Backdated expense',
+          entryDate: '2026-11-15',
+          currency: 'AED',
+          amountMicros: '50000000',
+          fundingAccountId: cashAed.id,
+        },
+        lateNovUtc,
+      ),
+    ).rejects.toThrow(BadRequestException);
+
+    // Voiding payment inside locked period rejected
+    await expect(
+      service.command(
+        workspace,
+        adminMemberId,
+        userWorkspaceId,
+        {
+          action: 'voidJournal',
+          journalId: payJournalId,
+          reason: 'Bounced',
+        },
+        lateNovUtc,
+      ),
+    ).rejects.toThrow(BadRequestException);
+
+    // Reversing in an open date (2026-11-20) succeeds, reopens invoice, and blocks double-reversal
+    const revRes = await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'reverseJournal',
+        journalId: payJournalId,
+        reversalDate: '2026-11-20',
+        reason: 'Payment recalled by bank',
+      },
+      lateNovUtc,
+    );
+    const revJournalId = String(revRes.journalId);
+    expect(revRes.reversalOfJournalId).toBe(payJournalId);
+
+    // Voiding a REVERSAL journal is permanently blocked
+    await expect(
+      service.command(
+        workspace,
+        adminMemberId,
+        userWorkspaceId,
+        {
+          action: 'voidJournal',
+          journalId: revJournalId,
+          reason: 'Try voiding reversal',
+        },
+        lateNovUtc,
+      ),
+    ).rejects.toThrow(BadRequestException);
+
+    // Double-reversal is blocked
+    await expect(
+      service.command(
+        workspace,
+        adminMemberId,
+        userWorkspaceId,
+        {
+          action: 'reverseJournal',
+          journalId: payJournalId,
+          reversalDate: '2026-11-21',
+          reason: 'Duplicate reversal attempt',
+        },
+        lateNovUtc,
+      ),
+    ).rejects.toThrow(BadRequestException);
+
+    const afterRev = await service.snapshot(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      { fromDate: '2026-11-01', toDate: '2026-11-30', asOfDate: '2026-11-30' },
+      lateNovUtc,
+    );
+    expect(afterRev.balanceSheet.isBalanced).toBe(true);
+    expect(afterRev.profitAndLoss.revenueAedMicros).toBe('0');
+    const reopenedInv = afterRev.invoices.find((i) => i.id === invoiceId)!;
+    expect(reopenedInv.paidMicros).toBe('0');
+    expect(reopenedInv.status).toBe('READY');
+    expect(reopenedInv.payments?.[0]?.reversed).toBe(true);
+    expect(
+      afterRev.journals.find((j) => j.id === payJournalId)?.isReversed,
+    ).toBe(true);
+
+    // Even after unlocking the period, voiding an already-reversed journal is blocked
+    await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      { action: 'setPeriodLock', lockedThroughDate: null },
+      lateNovUtc,
+    );
+    await expect(
+      service.command(
+        workspace,
+        adminMemberId,
+        userWorkspaceId,
+        {
+          action: 'voidJournal',
+          journalId: payJournalId,
+          reason: 'Try voiding already-reversed journal',
+        },
+        lateNovUtc,
+      ),
+    ).rejects.toThrow(BadRequestException);
+
+    // Locked-period payroll entry mutations and duplicate payroll reactivation via recurring status are blocked
+    const payProf1 = await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'savePayrollProfile',
+        employeeMemberId: staffMemberId,
+        employeeName: 'Arjun',
+        roleLabel: 'Editor',
+        currency: 'AED',
+        baseSalaryMicros: '5000000000',
+        workingDaysPerMonth: 26,
+        paidLeavesPerMonth: 2,
+        payDayOfMonth: 10,
+        payTiming: 'SAME_MONTH',
+        fundingAccountId: cashAed.id,
+        startMonth: '2026-10',
+      },
+      lateNovUtc,
+    );
+    const prof1Id = String(payProf1.payrollProfileId);
+    const rec1Id = String(payProf1.recurringExpenseId);
+
+    // Lock through 2026-11-15 -> 2026-11 SAME_MONTH payday (2026-11-10) is locked -> addPayrollEntry rejected
+    await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      { action: 'setPeriodLock', lockedThroughDate: '2026-11-15' },
+      lateNovUtc,
+    );
+    await expect(
+      service.command(
+        workspace,
+        adminMemberId,
+        userWorkspaceId,
+        {
+          action: 'addPayrollEntry',
+          profileId: prof1Id,
+          month: '2026-11',
+          entryKind: 'OVERTIME',
+          days: '1',
+          eventDate: '2026-11-05',
+          note: 'Late entry into closed payroll period',
+        },
+        lateNovUtc,
+      ),
+    ).rejects.toThrow(BadRequestException);
+
+    // Pause prof1 -> create prof2 for same member -> reactivating prof1 via setRecurringExpenseStatus must fail
+    await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'setRecurringExpenseStatus',
+        id: rec1Id,
+        status: 'PAUSED',
+      },
+      lateNovUtc,
+    );
+    await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'savePayrollProfile',
+        employeeMemberId: staffMemberId,
+        employeeName: 'Arjun V2',
+        roleLabel: 'Senior Editor',
+        currency: 'AED',
+        baseSalaryMicros: '6000000000',
+        workingDaysPerMonth: 26,
+        paidLeavesPerMonth: 2,
+        payDayOfMonth: 28,
+        payTiming: 'SAME_MONTH',
+        fundingAccountId: cashAed.id,
+        startMonth: '2026-11',
+      },
+      lateNovUtc,
+    );
+    await expect(
+      service.command(
+        workspace,
+        adminMemberId,
+        userWorkspaceId,
+        {
+          action: 'setRecurringExpenseStatus',
+          id: rec1Id,
+          status: 'ACTIVE',
+        },
+        lateNovUtc,
+      ),
+    ).rejects.toThrow(BadRequestException);
+
+    // 3. Non-admin SQL pagination: 510 payroll journals must not hide non-payroll journals
+    const journalList = stores.get(DeliveryFinanceV2JournalEntity)!;
+    for (let i = 0; i < 510; i++) {
+      journalList.push({
+        id: `payroll-pad-${i}`,
+        workspaceId: workspace.id,
+        entryDate: '2026-11-29',
+        entryType: 'PAYROLL_BONUS',
+        category: 'PAYROLL_BONUS',
+        title: `Bonus ${i}`,
+        notes: '',
+        currency: 'AED',
+        amountMicros: '1000000',
+        fxRateToAed: '1',
+        aedAmountMicros: '1000000',
+        fundingAccountId: cashAed.id,
+        targetAccountId: null,
+        projectId: null,
+        employeeMemberId: staffMemberId,
+        receiptUrl: null,
+        sourceRefType: null,
+        sourceRefId: null,
+        status: 'POSTED',
+        reversalOfJournalId: null,
+        createdBy: adminMemberId,
+        voidedBy: null,
+        voidedAt: null,
+        voidReason: null,
+        createdAt: new Date('2026-11-29T00:00:00Z'),
+        updatedAt: new Date('2026-11-29T00:00:00Z'),
+      });
+    }
+    const nonAdminSetup = setup({
+      isAdmin: false,
+      capabilities: ['finance.read', 'finance.manage'],
+    });
+    // Share the populated stores with the non-admin service instance
+    for (const [key, value] of stores.entries()) {
+      nonAdminSetup.stores.set(key, value);
+    }
+    const nonAdminSnap = await nonAdminSetup.service.snapshot(
+      workspace,
+      staffMemberId,
+      userWorkspaceId,
+      { fromDate: '2026-11-01', toDate: '2026-11-30', asOfDate: '2026-11-30' },
+      lateNovUtc,
+    );
+    expect(nonAdminSnap.canViewPayroll).toBe(false);
+    expect(
+      nonAdminSnap.journals.some((j) => j.title.includes('Cloud Hosting')),
+    ).toBe(true);
+    expect(
+      nonAdminSnap.journals.some((j) => j.entryType === 'PAYROLL_BONUS'),
+    ).toBe(false);
   });
 });

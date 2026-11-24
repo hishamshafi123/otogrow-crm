@@ -43,8 +43,8 @@ export const AdminCashForecastPanel = ({
   error,
 }: AdminCashForecastPanelProps) => {
   const { t } = useLingui();
-  const destination = `/delivery?view=finance&financeView=forecast&financeCurrency=${currency}`;
-  const reconciliationDestination = `/delivery?view=finance&financeView=reconciliation&financeCurrency=${currency}`;
+  const destination = `/delivery?view=finance&financeView=dashboard&financeCurrency=${currency}`;
+  const reconciliationDestination = `/delivery?view=finance&financeView=documents&financeCurrency=${currency}`;
 
   if (error) {
     return (

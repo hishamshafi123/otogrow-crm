@@ -6,7 +6,7 @@ const DECIMAL_AMOUNT = /^(?:\d+(?:\.\d{0,6})?|\.\d{1,6})$/;
 const UNSIGNED_MICROS = /^\d+$/;
 const SIGNED_MICROS = /^-?\d+$/;
 const CANONICAL_UNSIGNED_MICROS = /^(?:0|[1-9]\d*)$/;
-const MAX_FINANCE_ENTRY_MICROS = 9_223_372_036_854_775_807n;
+const MAX_FINANCE_ENTRY_MICROS = 9_000_000_000_000_000_000n;
 
 export const isFinanceAmountMicrosWithinLimit = (value: string): boolean =>
   isNonEmptyString(value) &&

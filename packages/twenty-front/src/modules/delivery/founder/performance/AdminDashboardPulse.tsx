@@ -83,16 +83,16 @@ export const AdminDashboardPulse = ({
   const totalAlerts = (attentionCount ?? 0) + degradedConnectionCount;
 
   const financeMonthHref = primarySummary
-    ? `/delivery?view=finance&financeView=monthly&financeMonth=${data.month}&financeCurrency=${primarySummary.currency}`
-    : `/delivery?view=finance&financeView=monthly&financeMonth=${data.month}`;
+    ? `/delivery?view=finance&financeView=dashboard&financeMonth=${data.month}&financeCurrency=${primarySummary.currency}`
+    : `/delivery?view=finance&financeView=dashboard&financeMonth=${data.month}`;
   const reconciliationHref = primarySummary
-    ? `/delivery?view=finance&financeView=reconciliation&financeCurrency=${primarySummary.currency}`
-    : `/delivery?view=finance&financeView=reconciliation`;
+    ? `/delivery?view=finance&financeView=documents&financeCurrency=${primarySummary.currency}`
+    : `/delivery?view=finance&financeView=documents`;
   const forecastHref = forecast
-    ? `/delivery?view=finance&financeView=forecast&financeCurrency=${forecast.currency}`
+    ? `/delivery?view=finance&financeView=dashboard&financeCurrency=${forecast.currency}`
     : activeCurrency
-      ? `/delivery?view=finance&financeView=forecast&financeCurrency=${activeCurrency}`
-      : `/delivery?view=finance&financeView=forecast`;
+      ? `/delivery?view=finance&financeView=dashboard&financeCurrency=${activeCurrency}`
+      : `/delivery?view=finance&financeView=dashboard`;
 
   return (
     <StyledPulseGrid aria-label={t`Executive summary`}>

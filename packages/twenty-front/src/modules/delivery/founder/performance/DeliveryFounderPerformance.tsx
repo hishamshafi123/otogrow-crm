@@ -276,7 +276,7 @@ const PerformanceWorkspace = ({
             </Link>
             {permission.canReadFinance && (
               <Link
-                to={`/delivery?view=finance&financeView=forecast${filters.currency ? `&financeCurrency=${filters.currency}` : ''}`}
+                to={`/delivery?view=finance&financeView=dashboard${filters.currency ? `&financeCurrency=${filters.currency}` : ''}`}
               >
                 <Trans>Cash forecast</Trans>
               </Link>
@@ -659,7 +659,7 @@ const PerformanceWorkspace = ({
               ))}
               {data.canReadFinance && (
                 <Link
-                  to={`/delivery?view=finance&financeView=monthly&financeMonth=${data.month}${data.currency ? `&financeCurrency=${data.currency}` : ''}`}
+                  to={`/delivery?view=finance&financeView=dashboard&financeMonth=${data.month}${data.currency ? `&financeCurrency=${data.currency}` : ''}`}
                 >
                   <Trans>Review monthly source records</Trans>
                 </Link>

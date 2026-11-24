@@ -68,7 +68,7 @@ export const PerformanceFinancialSummary = ({
             </Trans>
           </p>
           <Link
-            to={`/delivery?view=finance&financeView=monthly&financeMonth=${month}`}
+            to={`/delivery?view=finance&financeView=dashboard&financeMonth=${month}`}
           >
             <Trans>Open monthly finance</Trans>
           </Link>
@@ -78,7 +78,7 @@ export const PerformanceFinancialSummary = ({
   return (
     <StyledDeliveryStack>
       {currencies.map((summary) => {
-        const destination = `/delivery?view=finance&financeView=monthly&financeMonth=${month}&financeCurrency=${summary.currency}`;
+        const destination = `/delivery?view=finance&financeView=dashboard&financeMonth=${month}&financeCurrency=${summary.currency}`;
         const revenueDelta = calculateMonthDelta(
           summary.revenueMicros,
           summary.previousRevenueMicros,

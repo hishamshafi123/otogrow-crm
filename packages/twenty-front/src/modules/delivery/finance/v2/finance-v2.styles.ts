@@ -2,6 +2,7 @@ import { styled } from '@linaria/react';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
 
 export const StyledFinanceV2Stack = styled.div`
+  container-type: inline-size;
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -11,7 +12,7 @@ export const StyledFinanceV2Stack = styled.div`
 export const StyledFinanceV2HeroGrid = styled.div`
   display: grid;
   gap: 14px;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr));
 `;
 
 export const StyledFinanceV2StatCard = styled.article`
@@ -24,6 +25,11 @@ export const StyledFinanceV2StatCard = styled.article`
   gap: 6px;
   min-width: 0;
   padding: 16px 18px;
+
+  &[data-highlight='true'] {
+    background: ${themeCssVariables.color.transparent.iris2};
+    border-color: ${themeCssVariables.color.transparent.iris6};
+  }
 
   small {
     color: ${themeCssVariables.font.color.secondary};
@@ -38,11 +44,13 @@ export const StyledFinanceV2StatCard = styled.article`
     font-weight: 700;
     letter-spacing: -0.02em;
     line-height: 1.2;
+    overflow-wrap: anywhere;
   }
 
   p {
     color: ${themeCssVariables.font.color.secondary};
     font-size: 12px;
+    margin: 0;
   }
 `;
 
@@ -60,6 +68,7 @@ export const StyledFinanceV2Panel = styled.section`
   background: ${themeCssVariables.background.primary};
   border: 1px solid ${themeCssVariables.border.color.medium};
   border-radius: 14px;
+  container-type: inline-size;
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -105,6 +114,7 @@ export const StyledFinanceV2SubTabButton = styled.button`
   border: 1px solid ${themeCssVariables.border.color.medium};
   border-radius: 9px;
   color: ${themeCssVariables.font.color.secondary};
+  cursor: pointer;
   font-size: 13px;
   font-weight: 500;
   min-height: 36px;
@@ -121,7 +131,7 @@ export const StyledFinanceV2SubTabButton = styled.button`
 export const StyledFinanceV2FormGrid = styled.div`
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
 `;
 
 export const StyledFinanceV2TableWrap = styled.div`
@@ -140,6 +150,13 @@ export const StyledFinanceV2Table = styled.table`
     padding: 10px 8px;
     text-align: left;
     vertical-align: top;
+  }
+
+  tfoot td {
+    background: ${themeCssVariables.background.secondary};
+    border-bottom: none;
+    border-top: 2px solid ${themeCssVariables.border.color.medium};
+    font-weight: 700;
   }
 
   th {
@@ -194,12 +211,19 @@ export const StyledFinanceV2Notice = styled.p`
   border-radius: 10px;
   color: ${themeCssVariables.font.color.primary};
   font-size: 13px;
+  margin: 0;
   padding: 10px 14px;
 
   &[data-tone='danger'] {
     background: ${themeCssVariables.color.transparent.red2};
     border-color: ${themeCssVariables.color.transparent.red5};
     color: ${themeCssVariables.color.red11};
+  }
+
+  &[data-tone='warning'] {
+    background: ${themeCssVariables.color.transparent.amber2};
+    border-color: ${themeCssVariables.color.transparent.amber5};
+    color: ${themeCssVariables.color.amber11};
   }
 `;
 
@@ -220,4 +244,110 @@ export const StyledFinanceV2InlineEditor = styled.div`
   flex-direction: column;
   gap: 14px;
   padding: 16px 18px;
+`;
+
+export const StyledFinanceV2ActionGroup = styled.div`
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+`;
+
+export const StyledFinanceV2BarTrack = styled.span`
+  background: ${themeCssVariables.background.secondary};
+  border-radius: 999px;
+  display: block;
+  height: 8px;
+  overflow: hidden;
+  width: 100%;
+`;
+
+export const StyledFinanceV2BarFill = styled.span`
+  background: ${themeCssVariables.color.iris9};
+  border-radius: 999px;
+  display: block;
+  height: 100%;
+  transition: width 160ms ease;
+
+  &[data-tone='success'] {
+    background: ${themeCssVariables.color.green9};
+  }
+
+  &[data-tone='danger'] {
+    background: ${themeCssVariables.color.red9};
+  }
+
+  &[data-tone='warning'] {
+    background: ${themeCssVariables.color.amber9};
+  }
+`;
+
+export const StyledFinanceV2TrendGrid = styled.div`
+  align-items: end;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(min(96px, 100%), 1fr));
+  min-height: 140px;
+  padding-top: 8px;
+`;
+
+export const StyledFinanceV2TrendItem = styled.div`
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+
+  small {
+    color: ${themeCssVariables.font.color.secondary};
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+`;
+
+export const StyledFinanceV2BreakdownButton = styled.button`
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 6px 4px;
+  text-align: left;
+  width: 100%;
+
+  &:hover {
+    background: ${themeCssVariables.background.secondary};
+    border-radius: 8px;
+  }
+`;
+
+export const StyledFinanceV2BreakdownHeader = styled.span`
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  justify-content: space-between;
+  width: 100%;
+`;
+
+export const StyledFinanceV2ReadinessGrid = styled.div`
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+`;
+
+export const StyledFinanceV2ReadinessCard = styled.div`
+  background: ${themeCssVariables.background.secondary};
+  border: 1px solid ${themeCssVariables.border.color.light};
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
 `;

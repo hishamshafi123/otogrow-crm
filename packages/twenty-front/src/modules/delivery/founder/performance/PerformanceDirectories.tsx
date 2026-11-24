@@ -224,7 +224,7 @@ export const PerformanceClients = ({
                             <StyledDeliveryRow>
                               <strong>{finance.currency}</strong>
                               <Link
-                                to={`/delivery?view=finance&financeView=monthly&financeMonth=${month}&financeCurrency=${finance.currency}`}
+                                to={`/delivery?view=finance&financeView=dashboard&financeMonth=${month}&financeCurrency=${finance.currency}`}
                               >
                                 <Trans>Financial sources</Trans>
                               </Link>

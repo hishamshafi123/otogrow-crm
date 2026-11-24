@@ -18,10 +18,18 @@ import {
 @Index(['workspaceId', 'id'], { unique: true })
 @Index(['workspaceId', 'entryDate', 'id'])
 @Index(['workspaceId', 'entryType', 'entryDate'])
+@Index(['workspaceId', 'status', 'entryDate'])
+@Index(['workspaceId', 'sourceRefType', 'sourceRefId'], {
+  where: '"sourceRefType" IS NOT NULL AND "sourceRefId" IS NOT NULL',
+})
 @Index(['workspaceId', 'sourceRefType', 'sourceRefId'], {
   unique: true,
   where:
     '"sourceRefType" IS NOT NULL AND "sourceRefId" IS NOT NULL AND status = \'POSTED\'',
+})
+@Index(['workspaceId', 'reversalOfJournalId'], {
+  unique: true,
+  where: '"reversalOfJournalId" IS NOT NULL AND status = \'POSTED\'',
 })
 @Check("status IN ('POSTED','VOID')")
 @Check('"aedAmountMicros" >= 0')
