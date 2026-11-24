@@ -5,8 +5,13 @@ import { i18n } from '@lingui/core';
 import { I18nProvider } from '@lingui/react';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { createMemoryRouter, RouterProvider } from 'react-router-dom';
-import { DeliveryFinance } from '@/delivery/finance/DeliveryFinance';
+import {
+  createMemoryRouter,
+  Link,
+  RouterProvider,
+  useSearchParams,
+} from 'react-router-dom';
+import { DeliveryFinanceAiCosts } from '@/delivery/finance/DeliveryFinanceAiCosts';
 import { DeliveryDraftGuardProvider } from '@/delivery/drafts/DeliveryDraftGuard';
 import { type FinanceAiCostSnapshot } from '@/delivery/finance/finance-ai-cost.types';
 import {
@@ -112,19 +117,34 @@ jest.mock('@/delivery/workflows/useWorkflowAccess', () => ({
 const setup = (params = `&financeAiSpend=${AI_SPEND_ID}`) => {
   const Page = () => {
     const [, setVersion] = useState(0);
+    const [searchParams] = useSearchParams();
     mockRefreshPage = () => setVersion((value) => value + 1);
+    const financeView = searchParams.get('financeView') ?? 'ai-costs';
     return (
-      <DeliveryFinance
-        workspace={{
-          actor: { memberId: AI_MEMBER_ID, isAdmin: false, isManager: false },
-          projects: [],
-          tasks: [],
-          members: [],
-          companies: [],
-        }}
-        onChanged={mockChanged}
-        onOpenTask={jest.fn()}
-      />
+      <div>
+        <nav aria-label="Legacy finance views">
+          <Link
+            to="/delivery?view=finance&financeView=ai-costs"
+            aria-current={financeView === 'ai-costs' ? 'page' : undefined}
+          >
+            AI costs
+          </Link>
+          <Link
+            to="/delivery?view=finance&financeView=monthly"
+            aria-current={financeView === 'monthly' ? 'page' : undefined}
+          >
+            Monthly results
+          </Link>
+        </nav>
+        {financeView === 'monthly' ? (
+          <p>Monthly results workspace</p>
+        ) : (
+          <DeliveryFinanceAiCosts
+            key={searchParams.toString()}
+            onChanged={mockChanged}
+          />
+        )}
+      </div>
     );
   };
   const router = createMemoryRouter(

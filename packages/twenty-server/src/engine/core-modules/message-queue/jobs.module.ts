@@ -1,4 +1,5 @@
 import { DeliveryReminderJob } from 'src/modules/delivery/operations/delivery-reminder.job';
+import { DeliveryFinanceV2CronJob } from 'src/modules/delivery/finance-v2/finance-v2.cron.job';
 import { DeliveryInboxSendJob } from 'src/modules/delivery/inbox/delivery-inbox-send.job';
 import { DeliveryMediaJob } from 'src/modules/delivery/creative/delivery-media.job';
 import { DeliveryAtlasJob } from 'src/modules/delivery/creative/atlas/delivery-atlas.job';
@@ -122,6 +123,7 @@ import { WorkflowModule } from 'src/modules/workflow/workflow.module';
     DeliveryInboxSendJob,
     DeliveryAgentJob,
     DeliveryReminderJob,
+    DeliveryFinanceV2CronJob,
     DeliveryMediaJob,
     DeliveryAtlasJob,
     BillingReminderCronJob,

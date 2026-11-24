@@ -15,5 +15,9 @@ export const configureDeliveryFileAuthentication = (
         method: RequestMethod.ALL,
       },
       { path: 'portal/delivery-client-files/*path', method: RequestMethod.ALL },
+      {
+        path: 'portal/delivery-finance-v2-files/*path',
+        method: RequestMethod.ALL,
+      },
     );
 };

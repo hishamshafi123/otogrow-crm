@@ -54,6 +54,19 @@ import { DeliveryFinanceExportProfileEntity } from 'src/modules/delivery/finance
 import { DeliveryFinanceExportBatchEntity } from 'src/modules/delivery/finance/export/entities/delivery-finance-export-batch.entity';
 import { DeliveryFinanceExportService } from 'src/modules/delivery/finance/export/delivery-finance-export.service';
 import { DeliveryFinanceExportResolver } from 'src/modules/delivery/finance/export/delivery-finance-export.resolver';
+import { DeliveryFinanceV2AccountEntity } from 'src/modules/delivery/finance-v2/entities/delivery-finance-v2-account.entity';
+import { DeliveryFinanceV2InvoiceScheduleEntity } from 'src/modules/delivery/finance-v2/entities/delivery-finance-v2-invoice-schedule.entity';
+import { DeliveryFinanceV2InvoiceEntity } from 'src/modules/delivery/finance-v2/entities/delivery-finance-v2-invoice.entity';
+import { DeliveryFinanceV2JournalLineEntity } from 'src/modules/delivery/finance-v2/entities/delivery-finance-v2-journal-line.entity';
+import { DeliveryFinanceV2JournalEntity } from 'src/modules/delivery/finance-v2/entities/delivery-finance-v2-journal.entity';
+import { DeliveryFinanceV2PayrollEntryEntity } from 'src/modules/delivery/finance-v2/entities/delivery-finance-v2-payroll-entry.entity';
+import { DeliveryFinanceV2PayrollProfileEntity } from 'src/modules/delivery/finance-v2/entities/delivery-finance-v2-payroll-profile.entity';
+import { DeliveryFinanceV2ProfileEntity } from 'src/modules/delivery/finance-v2/entities/delivery-finance-v2-profile.entity';
+import { DeliveryFinanceV2QuoteEntity } from 'src/modules/delivery/finance-v2/entities/delivery-finance-v2-quote.entity';
+import { DeliveryFinanceV2RecurringExpenseEntity } from 'src/modules/delivery/finance-v2/entities/delivery-finance-v2-recurring-expense.entity';
+import { DeliveryFinanceV2FilesController } from 'src/modules/delivery/finance-v2/finance-v2-files.controller';
+import { DeliveryFinanceV2Resolver } from 'src/modules/delivery/finance-v2/finance-v2.resolver';
+import { DeliveryFinanceV2Service } from 'src/modules/delivery/finance-v2/finance-v2.service';
 import { DeliveryFinanceAiCostService } from 'src/modules/delivery/finance/delivery-finance-ai-cost.service';
 import { DeliveryFinanceAiCostResolver } from 'src/modules/delivery/finance/delivery-finance-ai-cost.resolver';
 import { DeliveryFinanceSettlementEntity } from 'src/modules/delivery/finance/entities/delivery-finance-settlement.entity';
@@ -223,6 +236,16 @@ import { DeliveryCreativeReadsResolver } from 'src/modules/delivery/creative/rea
       DeliveryFounderEscalationNoticeEntity,
       DeliveryFinanceExportProfileEntity,
       DeliveryFinanceExportBatchEntity,
+      DeliveryFinanceV2ProfileEntity,
+      DeliveryFinanceV2AccountEntity,
+      DeliveryFinanceV2JournalEntity,
+      DeliveryFinanceV2JournalLineEntity,
+      DeliveryFinanceV2RecurringExpenseEntity,
+      DeliveryFinanceV2PayrollProfileEntity,
+      DeliveryFinanceV2PayrollEntryEntity,
+      DeliveryFinanceV2QuoteEntity,
+      DeliveryFinanceV2InvoiceScheduleEntity,
+      DeliveryFinanceV2InvoiceEntity,
       DeliveryFinanceForecastAnchorEntity,
       DeliveryFinanceForecastItemEntity,
       DeliveryFinanceForecastRealizationEntity,
@@ -268,8 +291,11 @@ import { DeliveryCreativeReadsResolver } from 'src/modules/delivery/creative/rea
     DeliveryCreativeFilesController,
     DeliveryClientsController,
     DeliveryClientFilesController,
+    DeliveryFinanceV2FilesController,
   ],
   providers: [
+    DeliveryFinanceV2Service,
+    DeliveryFinanceV2Resolver,
     DeliveryNativeTaskAccessService,
     DeliveryInboxService,
     DeliveryInboxGmailService,
@@ -367,6 +393,7 @@ import { DeliveryCreativeReadsResolver } from 'src/modules/delivery/creative/rea
     DeliveryAssemblyAdapter,
   ],
   exports: [
+    DeliveryFinanceV2Service,
     DeliveryInboxReplyService,
     DeliveryAtlasService,
     DeliveryAgentService,

@@ -5,11 +5,15 @@ import { i18n } from '@lingui/core';
 import { I18nProvider } from '@lingui/react';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { createMemoryRouter, RouterProvider } from 'react-router-dom';
+import {
+  createMemoryRouter,
+  Link,
+  RouterProvider,
+  useSearchParams,
+} from 'react-router-dom';
 import { type DeliveryFinanceQuery } from '~/generated-metadata/graphql';
-import { type DeliveryWorkspace } from '@/delivery/delivery.types';
 import { DeliveryDraftGuardProvider } from '@/delivery/drafts/DeliveryDraftGuard';
-import { DeliveryFinance } from '@/delivery/finance/DeliveryFinance';
+import { DeliveryMonthlyFinance } from '@/delivery/finance/DeliveryMonthlyFinance';
 import { type FinanceAiCostSnapshot } from '@/delivery/finance/finance-ai-cost.types';
 import { type FinancePeriodSnapshot } from '@/delivery/finance/finance-period.types';
 import {
@@ -224,24 +228,30 @@ const snapshotFixture = (): FinanceSnapshot => ({
   projects: [{ id: PROJECT_ID, name: 'Client Alpha' }],
   members: [{ id: MEMBER_ID, name: 'Active editor' }],
 });
-const workspace: DeliveryWorkspace = {
-  actor: { memberId: MEMBER_ID, isAdmin: true, isManager: true },
-  projects: [],
-  members: [],
-  companies: [],
-  tasks: [],
-};
 const setup = (additionalParams = `&financeEntry=${ENTRY_ID}`) => {
   let refresh: () => void = () => undefined;
   const Page = () => {
     const [, setVersion] = useState(0);
+    const [searchParams] = useSearchParams();
     refresh = () => setVersion((value) => value + 1);
+    const financeView = searchParams.get('financeView') ?? 'monthly';
     return (
-      <DeliveryFinance
-        workspace={workspace}
-        onChanged={mockChanged}
-        onOpenTask={jest.fn()}
-      />
+      <div>
+        <nav aria-label="Legacy finance views">
+          <Link to="/delivery?view=finance&financeView=payments">
+            Payments and matching
+          </Link>
+        </nav>
+        {financeView === 'payments' ? (
+          <p>Payments workspace</p>
+        ) : (
+          <DeliveryMonthlyFinance
+            key={searchParams.toString()}
+            view={financeView === 'plans' ? 'plans' : 'monthly'}
+            onChanged={mockChanged}
+          />
+        )}
+      </div>
     );
   };
   const router = createMemoryRouter(
