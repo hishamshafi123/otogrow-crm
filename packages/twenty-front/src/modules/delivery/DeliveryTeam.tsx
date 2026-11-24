@@ -75,6 +75,7 @@ const DeliveryProjectForm = ({
   const { t } = useLingui();
   const [name, setName] = useState(project?.name ?? '');
   const nameHelpId = useId();
+  const clientHelpId = useId();
   const validName = isNonEmptyString(name.trim());
   const [companyId, setCompanyId] = useState(project?.companyId ?? '');
   const [memberIds, setMemberIds] = useState(project?.memberIds ?? []);
@@ -218,25 +219,28 @@ const DeliveryProjectForm = ({
                     onChange={(event) => setName(event.target.value)}
                   />
                 </label>
-                <label>
-                  <Trans>Client</Trans>
-                  <select
-                    value={companyId}
-                    onChange={(event) => setCompanyId(event.target.value)}
-                  >
-                    <option value="">{t`Internal work`}</option>
-                    {workspace.companies.map((company) => (
-                      <option key={company.id} value={company.id}>
-                        {company.name}
-                      </option>
-                    ))}
-                  </select>
-                  <small>
+                <div>
+                  <label>
+                    <Trans>Client</Trans>
+                    <select
+                      aria-describedby={clientHelpId}
+                      value={companyId}
+                      onChange={(event) => setCompanyId(event.target.value)}
+                    >
+                      <option value="">{t`Internal work`}</option>
+                      {workspace.companies.map((company) => (
+                        <option key={company.id} value={company.id}>
+                          {company.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <small id={clientHelpId}>
                     <Trans>
                       Only companies marked as clients in Clients appear here.
                     </Trans>
                   </small>
-                </label>
+                </div>
               </StyledDeliveryGrid>
               {!validName && (
                 <p id={nameHelpId} role="status">
