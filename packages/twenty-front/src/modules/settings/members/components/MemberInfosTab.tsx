@@ -15,6 +15,7 @@ type MemberInfosTabProps = {
   member: WorkspaceMember;
   onNameChange: (firstName: string, lastName: string) => void;
   onImpersonate?: () => void;
+  onResetPassword?: () => void;
   onDelete: () => void;
 };
 
@@ -26,6 +27,7 @@ const StyledNameRow = styled.div`
 
 const StyledActionRow = styled.div`
   display: flex;
+  flex-wrap: wrap;
   gap: ${themeCssVariables.spacing[2]};
 `;
 
@@ -33,6 +35,7 @@ export const MemberInfosTab = ({
   member,
   onNameChange,
   onImpersonate,
+  onResetPassword,
   onDelete,
 }: MemberInfosTabProps) => {
   const [firstName, setFirstName] = useState(member.name.firstName);
@@ -89,6 +92,14 @@ export const MemberInfosTab = ({
           description={t`Perform administrative actions or permanently delete this user`}
         />
         <StyledActionRow>
+          {onResetPassword && (
+            <Button
+              title={t`Set new password`}
+              variant="secondary"
+              size="small"
+              onClick={onResetPassword}
+            />
+          )}
           {onImpersonate && (
             <Button
               title={t`Impersonate`}

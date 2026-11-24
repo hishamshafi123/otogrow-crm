@@ -19,6 +19,10 @@ import {
   SAVE_OTOGROW_ROLE,
 } from '@/otogrow-access/otogrow-access.graphql';
 import {
+  EmployeeLoginModal,
+  type EmployeeLoginResetTarget,
+} from '@/otogrow-access/employee-login/EmployeeLoginModal';
+import {
   OTOGROW_CAPABILITIES,
   hasOtogrowCapability,
   type OtogrowRoleDirectory,
@@ -50,6 +54,13 @@ const StyledRow = styled.div`
   p {
     margin: ${themeCssVariables.spacing[1]} 0;
   }
+`;
+const StyledRowActions = styled.div`
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: ${themeCssVariables.spacing[2]};
+  justify-content: flex-end;
 `;
 const StyledChoices = styled.fieldset`
   border: 1px solid ${themeCssVariables.border.color.light};
@@ -123,6 +134,11 @@ export const OtogrowTeamRoles = ({ onChanged }: OtogrowTeamRolesProps) => {
     AssignOtogrowRolesMutationVariables
   >(ASSIGN_OTOGROW_ROLES);
   const [view, setView] = useState<'people' | 'roles'>('people');
+  const [loginModal, setLoginModal] = useState<
+    | { mode: 'create' }
+    | { mode: 'reset'; targetMember: EmployeeLoginResetTarget }
+    | null
+  >(null);
   const [draft, setEditor] = useState<Editor | null>(null);
   const [baseline, setBaseline] = useState(editorValues(null));
   const { requestAction } = useDeliveryDraftGuard();
@@ -405,6 +421,19 @@ export const OtogrowTeamRoles = ({ onChanged }: OtogrowTeamRolesProps) => {
           >
             <Trans>Roles</Trans>
           </StyledDeliveryButton>
+          {view === 'people' && !editor && (
+            <StyledDeliveryButton
+              type="button"
+              data-variant="primary"
+              onClick={() => {
+                setError('');
+                setNotice('');
+                setLoginModal({ mode: 'create' });
+              }}
+            >
+              <Trans>Create employee login</Trans>
+            </StyledDeliveryButton>
+          )}
           {view === 'roles' && !editor && (
             <StyledDeliveryButton
               onClick={() =>
@@ -671,28 +700,47 @@ export const OtogrowTeamRoles = ({ onChanged }: OtogrowTeamRolesProps) => {
                         </p>
                       )}
                     </div>
-                    <StyledDeliveryButton
-                      disabled={member.memberId === directory.actor.memberId}
-                      title={
-                        member.memberId === directory.actor.memberId
-                          ? t`Ask another administrator to change your roles.`
-                          : undefined
-                      }
-                      onClick={() =>
-                        openEditor({
-                          kind: 'member',
-                          member: { ...member, roleIds: [...member.roleIds] },
-                          roles: directory.roles,
-                        })
-                      }
-                    >{t`Edit roles for ${member.name}`}</StyledDeliveryButton>
+                    <StyledRowActions>
+                      {member.memberId !== directory.actor.memberId && (
+                        <StyledDeliveryButton
+                          type="button"
+                          onClick={() =>
+                            setLoginModal({
+                              mode: 'reset',
+                              targetMember: {
+                                workspaceMemberId: member.memberId,
+                                name: member.name,
+                              },
+                            })
+                          }
+                        >
+                          <Trans>Reset password</Trans>
+                        </StyledDeliveryButton>
+                      )}
+                      <StyledDeliveryButton
+                        disabled={member.memberId === directory.actor.memberId}
+                        title={
+                          member.memberId === directory.actor.memberId
+                            ? t`Ask another administrator to change your roles.`
+                            : undefined
+                        }
+                        onClick={() =>
+                          openEditor({
+                            kind: 'member',
+                            member: { ...member, roleIds: [...member.roleIds] },
+                            roles: directory.roles,
+                          })
+                        }
+                      >{t`Edit roles for ${member.name}`}</StyledDeliveryButton>
+                    </StyledRowActions>
                   </StyledRow>
                 ))
               ) : (
                 <p>
                   <Trans>
-                    No people yet. Invite teammates through workspace settings
-                    before assigning business roles.
+                    No people yet. Create an employee login above or invite
+                    teammates through workspace settings before assigning
+                    business roles.
                   </Trans>
                 </p>
               )
@@ -730,6 +778,22 @@ export const OtogrowTeamRoles = ({ onChanged }: OtogrowTeamRolesProps) => {
           </StyledList>
         )}
       </StyledDeliveryStack>
+      <EmployeeLoginModal
+        open={loginModal !== null}
+        mode={loginModal?.mode ?? 'create'}
+        targetMember={
+          loginModal?.mode === 'reset' ? loginModal.targetMember : null
+        }
+        otogrowRoles={directory.roles}
+        onClose={() => setLoginModal(null)}
+        onSuccess={async () => {
+          await Promise.all([
+            query.refetch(),
+            permission.refetch(),
+            onChanged(),
+          ]);
+        }}
+      />
     </StyledDeliveryCard>
   );
 };

@@ -1,6 +1,8 @@
 import { UseGuards } from '@nestjs/common';
 import { Args, Mutation, Query } from '@nestjs/graphql';
 
+import GraphQLJSON from 'graphql-type-json';
+
 import { MetadataResolver } from 'src/engine/api/graphql/graphql-config/decorators/metadata-resolver.decorator';
 import { WorkspaceEntity } from 'src/engine/core-modules/workspace/workspace.entity';
 import { AuthUserWorkspaceId } from 'src/engine/decorators/auth/auth-user-workspace-id.decorator';
@@ -16,11 +18,15 @@ import {
   OtogrowRoleInput,
 } from 'src/modules/otogrow-access/otogrow-access.dto';
 import { OtogrowAccessService } from 'src/modules/otogrow-access/otogrow-access.service';
+import { OtogrowEmployeeLoginService } from 'src/modules/otogrow-access/otogrow-employee-login.service';
 
 @UseGuards(WorkspaceAuthGuard, RequireAccessTokenGuard, CustomPermissionGuard)
 @MetadataResolver()
 export class OtogrowAccessResolver {
-  constructor(private readonly access: OtogrowAccessService) {}
+  constructor(
+    private readonly access: OtogrowAccessService,
+    private readonly employeeLogin: OtogrowEmployeeLoginService,
+  ) {}
 
   @Query(() => OtogrowAccessDTO)
   otogrowAccess(
@@ -58,6 +64,36 @@ export class OtogrowAccessResolver {
     @Args('input') input: OtogrowRoleAssignmentInput,
   ) {
     return this.access.assignRoles(
+      workspace.id,
+      memberId,
+      userWorkspaceId,
+      input,
+    );
+  }
+
+  @Mutation(() => GraphQLJSON)
+  createOtogrowEmployeeLogin(
+    @AuthWorkspace() workspace: WorkspaceEntity,
+    @AuthWorkspaceMemberId() memberId: string,
+    @AuthUserWorkspaceId() userWorkspaceId: string,
+    @Args('input', { type: () => GraphQLJSON }) input: unknown,
+  ) {
+    return this.employeeLogin.createEmployeeLogin(
+      workspace.id,
+      memberId,
+      userWorkspaceId,
+      input,
+    );
+  }
+
+  @Mutation(() => GraphQLJSON)
+  resetOtogrowEmployeePassword(
+    @AuthWorkspace() workspace: WorkspaceEntity,
+    @AuthWorkspaceMemberId() memberId: string,
+    @AuthUserWorkspaceId() userWorkspaceId: string,
+    @Args('input', { type: () => GraphQLJSON }) input: unknown,
+  ) {
+    return this.employeeLogin.resetEmployeePassword(
       workspace.id,
       memberId,
       userWorkspaceId,

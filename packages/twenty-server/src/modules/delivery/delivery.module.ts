@@ -124,6 +124,8 @@ import { DeliveryClientFilesController } from 'src/modules/delivery/clients/deli
 import { ThrottlerModule } from 'src/engine/core-modules/throttler/throttler.module';
 import { DeliveryClientsController } from 'src/modules/delivery/clients/delivery-clients.controller';
 import { DeliveryClientsService } from 'src/modules/delivery/clients/delivery-clients.service';
+import { DeliveryClientHubService } from 'src/modules/delivery/clients/delivery-client-hub.service';
+import { DeliveryClientHubResolver } from 'src/modules/delivery/clients/delivery-client-hub.resolver';
 import { DeliveryOperationsService } from 'src/modules/delivery/operations/delivery-operations.service';
 import { DeliveryOperationsEntity } from 'src/modules/delivery/entities/delivery-operations.entity';
 import { LeadAssignmentModule } from 'src/modules/lead-assignment/lead-assignment.module';
@@ -352,6 +354,8 @@ import { DeliveryCreativeReadsResolver } from 'src/modules/delivery/creative/rea
     DeliveryMetaAdapter,
     DeliveryBusinessService,
     DeliveryClientsService,
+    DeliveryClientHubService,
+    DeliveryClientHubResolver,
     DeliveryOperationsService,
     DeliveryReminderService,
     DeliveryService,

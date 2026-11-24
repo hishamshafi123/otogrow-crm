@@ -11,6 +11,7 @@ import {
   SETUP_PROJECT,
 } from '@/delivery/onboarding/__tests__/client-setup.fixtures';
 import { type ClientSetupContext } from '@/delivery/onboarding/client-setup.types';
+import { type ClientHubSnapshot } from '@/delivery/client-workspace/client-hub.types';
 import {
   clientWorkspaceDestination,
   clientWorkspaceSelection,
@@ -73,6 +74,27 @@ jest.mock('@/delivery/client-workspace/CompanyProfile', () => ({
     );
   },
 }));
+
+let mockHubData: ClientHubSnapshot | null = null;
+const mockUpdateRoster = jest.fn().mockResolvedValue(true);
+const mockClearUpdateError = jest.fn();
+
+jest.mock('@/delivery/client-workspace/useClientHub', () => ({
+  useClientHub: () => ({
+    data: mockHubData,
+    loading: false,
+    error: undefined,
+    updating: false,
+    updateError: null,
+    clearUpdateError: mockClearUpdateError,
+    refetch: mockRefetch,
+    updateRoster: mockUpdateRoster,
+  }),
+}));
+jest.mock('@/delivery/client-workspace/ClientRosterPickerModal', () => ({
+  ClientRosterPickerModal: ({ open }: { open: boolean }) =>
+    open ? <div role="dialog">CRM Client Picker Modal</div> : null,
+}));
 jest.mock('@/delivery/client-workspace/ClientContacts', () => ({
   ClientContacts: () => <p>Linked contacts</p>,
 }));
@@ -87,6 +109,30 @@ jest.mock('@/delivery/client-workspace/client-workspace.styles', () => ({
   StyledClientProject: 'article',
   StyledClientBoundary: 'fieldset',
   StyledClientActions: 'div',
+  StyledClientCommandBar: 'div',
+  StyledClientCommandMeta: 'div',
+  StyledClientSubtleButton: 'button',
+  StyledClientTag: 'span',
+  StyledClientTagRow: 'div',
+  StyledDirectoryBadge: 'span',
+  StyledDirectoryFooter: 'div',
+  StyledDirectoryOverviewLink: 'div',
+  StyledUndoBanner: 'div',
+  StyledClientAvatar: 'div',
+  StyledClientCard: 'article',
+  StyledClientCardFooter: 'div',
+  StyledClientCardHeader: 'div',
+  StyledClientFilterBar: 'div',
+  StyledClientFilterPill: 'button',
+  StyledClientFilterPills: 'div',
+  StyledClientIdentity: 'div',
+  StyledClientKpiCard: 'div',
+  StyledClientKpiGrid: 'div',
+  StyledClientMetricStrip: 'div',
+  StyledClientPortfolioGrid: 'div',
+  StyledClientTitleBlock: 'div',
+  StyledDueWorkItem: 'div',
+  StyledDueWorkList: 'div',
 }));
 jest.mock('@/delivery/deliveryStyles', () => ({
   StyledDeliveryButton: 'button',
@@ -108,6 +154,7 @@ const setup = (query = `clientCompany=${SETUP_COMPANY}`) => {
 beforeEach(() => {
   i18n.loadAndActivate({ locale: 'en', messages: {} });
   mockData = clientSetupFixture();
+  mockHubData = null;
   mockDenied = false;
   mockManager = true;
   mockError = null;
@@ -225,4 +272,107 @@ it('constructs clean links without previous client details', () => {
   expect(
     clientWorkspaceSelection(new URLSearchParams('clientProject=bad')).valid,
   ).toBe(false);
+});
+
+it('shows only designated clients, their due work, and opens the CRM client picker on Clients overview', async () => {
+  mockData = { ...clientSetupFixture(), selectedCompany: null };
+  mockHubData = {
+    workspaceId: 'workspace',
+    memberId: 'member',
+    userWorkspaceId: 'membership',
+    observedAt: '2026-11-24T12:00:00.000Z',
+    rosterConfigured: true,
+    includedCompanyIds: [SETUP_COMPANY],
+    excludedCompanyIds: [],
+    summary: {
+      totalClients: 1,
+      clientsNeedingAttention: 1,
+      totalActiveProjects: 1,
+      totalOpenTasks: 2,
+      totalOverdueTasks: 1,
+      totalDueSoonTasks: 1,
+      totalInReviewTasks: 0,
+      totalBlockedTasks: 0,
+      totalPendingOnboarding: 0,
+      canReadFinance: false,
+      totalOpenReceivablesByCurrency: [],
+    },
+    clients: [
+      {
+        id: SETUP_COMPANY,
+        name: 'Acme Client',
+        domainName: 'acme.io',
+        sourceToken: 'a'.repeat(64),
+        isExplicitClient: true,
+        hasDeliveryWork: true,
+        needsAttention: true,
+        projects: [
+          {
+            id: SETUP_PROJECT,
+            name: 'Acme Retainer',
+            memberIds: [],
+            memberNames: [],
+            openTasksCount: 2,
+            overdueTasksCount: 1,
+          },
+        ],
+        services: ['SEO', 'Meta Ads'],
+        billingModes: ['RETAINER'],
+        servicePlans: [],
+        tasksSummary: {
+          openCount: 2,
+          overdueCount: 1,
+          dueSoonCount: 1,
+          inReviewCount: 0,
+          blockedCount: 0,
+          changesRequestedCount: 0,
+          completedCount: 4,
+        },
+        dueTasks: [
+          {
+            id: 'task-1',
+            title: 'Deliver November SEO report',
+            projectId: SETUP_PROJECT,
+            projectName: 'Acme Retainer',
+            status: 'IN_PROGRESS',
+            priority: 'HIGH',
+            service: 'SEO',
+            dueAt: '2026-11-20T12:00:00.000Z',
+            scheduledDate: null,
+            assigneeId: null,
+            assigneeName: 'Maya',
+            isOverdue: true,
+            isDueSoon: false,
+          },
+        ],
+        portal: {
+          activeLinksCount: 1,
+          pendingSubmissionsCount: 0,
+          pendingClientReviewsCount: 0,
+        },
+        finance: null,
+      },
+    ],
+  };
+
+  const view = setup('');
+  expect(
+    screen.getByRole('link', { name: 'Deliver November SEO report' }),
+  ).toBeVisible();
+  expect(screen.getByText('SEO')).toBeVisible();
+  expect(screen.getByText('Retainer')).toBeVisible();
+
+  await view.user.click(
+    screen.getByRole('button', { name: 'Select clients from CRM' }),
+  );
+  expect(screen.getByRole('dialog')).toHaveTextContent(
+    'CRM Client Picker Modal',
+  );
+
+  await view.user.click(screen.getByRole('button', { name: 'Remove' }));
+  expect(mockUpdateRoster).toHaveBeenCalledWith({
+    action: 'remove',
+    companyIds: [SETUP_COMPANY],
+  });
+  expect(screen.getByRole('button', { name: 'Undo' })).toBeVisible();
 });

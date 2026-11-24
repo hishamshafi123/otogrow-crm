@@ -231,6 +231,11 @@ const DeliveryProjectForm = ({
                       </option>
                     ))}
                   </select>
+                  <small>
+                    <Trans>
+                      Only companies marked as clients in Clients appear here.
+                    </Trans>
+                  </small>
                 </label>
               </StyledDeliveryGrid>
               {!validName && (

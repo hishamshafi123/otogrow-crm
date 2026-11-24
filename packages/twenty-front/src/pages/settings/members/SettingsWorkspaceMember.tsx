@@ -1,8 +1,11 @@
+import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useDebouncedCallback } from 'use-debounce';
 
 import { useImpersonationSession } from '@/auth/hooks/useImpersonationSession';
 import { useFindOneRecord } from '@/object-record/hooks/useFindOneRecord';
+import { EmployeeLoginModal } from '@/otogrow-access/employee-login/EmployeeLoginModal';
+import { useOtogrowAccess } from '@/otogrow-access/useOtogrowAccess';
 import { SettingsPageContainer } from '@/settings/components/SettingsPageContainer';
 import { SettingsRolesQueryEffect } from '@/settings/roles/components/SettingsRolesQueryEffect';
 import { useHasPermissionFlag } from '@/settings/roles/hooks/useHasPermissionFlag';
@@ -50,6 +53,7 @@ export const SettingsWorkspaceMember = () => {
   const navigateSettings = useNavigateSettings();
   const { enqueueErrorSnackBar, enqueueSuccessSnackBar } = useSnackBar();
   const { openModal, closeModal } = useModal();
+  const [isResetPasswordOpen, setIsResetPasswordOpen] = useState(false);
   const currentUser = useAtomStateValue(currentUserState);
   const currentWorkspace = useAtomStateValue(currentWorkspaceState);
   const { startImpersonating } = useImpersonationSession();
@@ -57,6 +61,12 @@ export const SettingsWorkspaceMember = () => {
   const isImpersonating = useAtomStateValue(isImpersonatingState);
   const canImpersonate =
     useHasPermissionFlag(PermissionFlagType.IMPERSONATE) && !isImpersonating;
+  const hasWorkspaceMembersPermission = useHasPermissionFlag(
+    PermissionFlagType.WORKSPACE_MEMBERS,
+  );
+  const otogrowAccess = useOtogrowAccess();
+  const canResetEmployeePassword =
+    hasWorkspaceMembersPermission || otogrowAccess.canManageRoles;
 
   const {
     roles,
@@ -215,6 +225,14 @@ export const SettingsWorkspaceMember = () => {
             {activeTabId === SETTINGS_WORKSPACE_MEMBER_TABS.TABS_IDS.INFOS && (
               <MemberInfosTab
                 member={member}
+                onResetPassword={
+                  canResetEmployeePassword &&
+                  isDefined(member.userId) &&
+                  isDefined(currentUser?.id) &&
+                  member.userId !== currentUser.id
+                    ? () => setIsResetPasswordOpen(true)
+                    : undefined
+                }
                 onImpersonate={
                   canImpersonate &&
                   isDefined(member.userId) &&
@@ -245,6 +263,16 @@ export const SettingsWorkspaceMember = () => {
             onConfirmClick={handleDeleteMember}
             confirmButtonText={t`Remove member`}
             loading={isDeleting}
+          />
+          <EmployeeLoginModal
+            open={isResetPasswordOpen}
+            mode="reset"
+            targetMember={{
+              workspaceMemberId: member.id,
+              name: `${member.name.firstName} ${member.name.lastName}`.trim(),
+              email: member.userEmail,
+            }}
+            onClose={() => setIsResetPasswordOpen(false)}
           />
         </SettingsPageLayout>
       )}

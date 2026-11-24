@@ -32,9 +32,11 @@ import {
   StyledPerformanceRecordMetrics,
 } from '@/delivery/founder/performance/performanceStyles';
 import {
+  StyledDeliveryButton,
   StyledDeliveryRow,
   StyledDeliveryStack,
 } from '@/delivery/deliveryStyles';
+import { EmployeeLoginModal } from '@/otogrow-access/employee-login/EmployeeLoginModal';
 
 type PerformanceSnapshot =
   DeliveryFounderPerformanceQuery['deliveryFounderPerformance'];
@@ -338,14 +340,17 @@ export const PerformanceEmployees = ({
   month,
   timezone,
   canReadFinance,
+  onEmployeeCreated,
 }: {
   employees: PerformanceEmployee[];
   total: number;
   month: string;
   timezone: string;
   canReadFinance: boolean;
+  onEmployeeCreated?: () => void | Promise<unknown>;
 }) => {
   const { t } = useLingui();
+  const [isCreateLoginOpen, setIsCreateLoginOpen] = useState(false);
   return (
     <StyledAdminPanel
       aria-label={t`Employee performance`}
@@ -355,14 +360,23 @@ export const PerformanceEmployees = ({
     >
       <StyledDeliveryStack>
         <StyledAdminSectionHeader>
-          <h2>
-            <Trans>Employees</Trans>
-          </h2>
-          <StyledPerformanceMuted>
-            {total === 1
-              ? t`1 active team member`
-              : t`${total} active team members`}
-          </StyledPerformanceMuted>
+          <div>
+            <h2>
+              <Trans>Employees</Trans>
+            </h2>
+            <StyledPerformanceMuted>
+              {total === 1
+                ? t`1 active team member`
+                : t`${total} active team members`}
+            </StyledPerformanceMuted>
+          </div>
+          <StyledDeliveryButton
+            type="button"
+            data-variant="primary"
+            onClick={() => setIsCreateLoginOpen(true)}
+          >
+            <Trans>Create employee login</Trans>
+          </StyledDeliveryButton>
         </StyledAdminSectionHeader>
         <p>
           <Trans>
@@ -484,6 +498,12 @@ export const PerformanceEmployees = ({
           </StyledPerformanceList>
         )}
       </StyledDeliveryStack>
+      <EmployeeLoginModal
+        open={isCreateLoginOpen}
+        mode="create"
+        onClose={() => setIsCreateLoginOpen(false)}
+        onSuccess={onEmployeeCreated}
+      />
     </StyledAdminPanel>
   );
 };

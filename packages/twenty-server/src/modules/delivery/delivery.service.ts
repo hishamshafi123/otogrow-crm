@@ -36,6 +36,8 @@ import { OtogrowAccessService } from 'src/modules/otogrow-access/otogrow-access.
 import { DeliveryProjectEntity } from 'src/modules/delivery/entities/delivery-project.entity';
 import { DeliveryTaskEntity } from 'src/modules/delivery/entities/delivery-task.entity';
 import { DeliveryMemberEntity } from 'src/modules/delivery/entities/delivery-member.entity';
+import { DeliveryOperationsEntity } from 'src/modules/delivery/entities/delivery-operations.entity';
+import { resolveEffectiveClientCompanyIds } from 'src/modules/delivery/clients/delivery-client-hub.policy';
 import { deliveryCommandSchema } from 'src/modules/delivery/delivery-validation';
 import {
   assertDeliveryReview,
@@ -201,18 +203,36 @@ export class DeliveryService {
             task.details.reviewerId,
           ]),
         ]);
-        const companies: { id: string; name: string }[] = actor.isManager
-          ? await manager.query(
-              `SELECT id, name FROM ${this.schema(workspace)}."company" WHERE "deletedAt" IS NULL ORDER BY name LIMIT 1000`,
-            )
-          : projects.some((project) => project.companyId)
+        const projectCompanyIds = projects
+          .map((project) => project.companyId)
+          .filter(isDefined);
+        let managerClientCompanyIds: string[] = [];
+        if (actor.isManager) {
+          const operationsRecord = await manager
+            .getRepository(DeliveryOperationsEntity)
+            .findOneBy({ workspaceId: workspace.id });
+          const engagementCompanyIds = (
+            operationsRecord?.state.clients?.engagements ?? []
+          ).map((engagement) => engagement.companyId);
+          managerClientCompanyIds = [
+            ...new Set([
+              ...resolveEffectiveClientCompanyIds(
+                operationsRecord?.state.clientRoster,
+                projectCompanyIds,
+                engagementCompanyIds,
+              ),
+              ...projectCompanyIds,
+            ]),
+          ];
+        }
+        const companyIdsToLoad = actor.isManager
+          ? managerClientCompanyIds
+          : projectCompanyIds;
+        const companies: { id: string; name: string }[] =
+          companyIdsToLoad.length
             ? await manager.query(
-                `SELECT id, name FROM ${this.schema(workspace)}."company" WHERE id = ANY($1::uuid[]) AND "deletedAt" IS NULL`,
-                [
-                  projects
-                    .map((project) => project.companyId)
-                    .filter(isDefined),
-                ],
+                `SELECT id, name FROM ${this.schema(workspace)}."company" WHERE id = ANY($1::uuid[]) AND "deletedAt" IS NULL ORDER BY name LIMIT 1000`,
+                [companyIdsToLoad],
               )
             : [];
         const deliveryRows: { delivery: Fulfilment; timezone: string }[] =

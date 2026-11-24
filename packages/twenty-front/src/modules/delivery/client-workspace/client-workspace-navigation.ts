@@ -1,10 +1,12 @@
 import { isValidUuid } from 'twenty-shared/utils';
 
 export const CLIENT_SECTIONS = [
+  'overview',
   'profile',
   'contacts',
   'services',
   'projects',
+  'portal',
 ] as const;
 export type ClientSection = (typeof CLIENT_SECTIONS)[number];
 export const clientWorkspaceSelection = (params: URLSearchParams) => {

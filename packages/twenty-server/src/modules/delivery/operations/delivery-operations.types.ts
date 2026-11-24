@@ -87,6 +87,10 @@ export type DeliveryAlert = {
 };
 export type DeliveryOperations = {
   serviceCatalog?: string[];
+  clientRoster?: {
+    includedIds: string[];
+    excludedIds: string[];
+  };
   founderEscalationRouting?: {
     mode: 'RULES';
     revision: number;

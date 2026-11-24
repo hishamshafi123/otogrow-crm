@@ -22,6 +22,7 @@ import { OtogrowAccessService } from 'src/modules/otogrow-access/otogrow-access.
 import { readDeliverySnapshot } from 'src/modules/delivery/read-delivery-snapshot';
 import { recordOtogrowActivity } from 'src/modules/otogrow-activity/record-otogrow-activity';
 import { DeliveryClientSetupSourceService } from 'src/modules/delivery/onboarding/delivery-client-setup-source.service';
+import { resolveEffectiveClientCompanyIds } from 'src/modules/delivery/clients/delivery-client-hub.policy';
 import { DeliveryClientSetupEntity } from 'src/modules/delivery/onboarding/entities/delivery-client-setup.entity';
 import {
   clientSetupContextSchema,
@@ -250,10 +251,46 @@ export class DeliveryClientSetupService {
       auth.workspace.id,
       async (manager) => {
         const { identity, workspace } = await this.authorize(auth, manager);
-        const directory = await this.companies.list(
-          auth,
-          command.companySearch,
-        );
+        const operationsRepo = manager.getRepository(DeliveryOperationsEntity);
+        const operationsRecord =
+          operationsRepo && typeof operationsRepo.findOneBy === 'function'
+            ? await operationsRepo.findOneBy({ workspaceId: workspace.id })
+            : null;
+        let directory: {
+          companies: ClientSetupCompany[];
+          companiesHasMore: boolean;
+        };
+        if (
+          !command.companySearch &&
+          operationsRecord?.state?.clientRoster &&
+          typeof this.companies.listByIds === 'function'
+        ) {
+          const projectRepo = manager.getRepository(DeliveryProjectEntity);
+          const allProjects =
+            projectRepo && typeof projectRepo.find === 'function'
+              ? await projectRepo.find({
+                  where: { workspaceId: workspace.id },
+                  select: { id: true, companyId: true },
+                })
+              : [];
+          const engagementCompanyIds = (
+            operationsRecord.state.clients?.engagements ?? []
+          ).map((engagement) => engagement.companyId);
+          const effectiveClientIds = resolveEffectiveClientCompanyIds(
+            operationsRecord.state.clientRoster,
+            allProjects.map((project) => project.companyId),
+            engagementCompanyIds,
+          );
+          const designatedCompanies = effectiveClientIds.length
+            ? await this.companies.listByIds(auth, effectiveClientIds)
+            : [];
+          directory = {
+            companies: designatedCompanies,
+            companiesHasMore: false,
+          };
+        } else {
+          directory = await this.companies.list(auth, command.companySearch);
+        }
         const selectedCompany = command.companyId
           ? await this.company(auth, workspace, manager, command.companyId)
           : null;
@@ -556,6 +593,34 @@ export class DeliveryClientSetupService {
           engagementRevision: command.engagementRevision,
         },
       });
+      const operationsRepo = manager.getRepository(DeliveryOperationsEntity);
+      if (operationsRepo && typeof operationsRepo.save === 'function') {
+        const operationsRecord =
+          (await operationsRepo.findOneBy({ workspaceId: workspace.id })) ??
+          (typeof operationsRepo.create === 'function'
+            ? operationsRepo.create({
+                workspaceId: workspace.id,
+                state: newDeliveryOperations(),
+              })
+            : null);
+        if (operationsRecord?.state) {
+          const currentRoster = operationsRecord.state.clientRoster ?? {
+            includedIds: [],
+            excludedIds: [],
+          };
+          const included = new Set(currentRoster.includedIds);
+          const excluded = new Set(currentRoster.excludedIds);
+          if (!included.has(company.id) || excluded.has(company.id)) {
+            included.add(company.id);
+            excluded.delete(company.id);
+            operationsRecord.state.clientRoster = {
+              includedIds: [...included].sort(),
+              excludedIds: [...excluded].sort(),
+            };
+            await operationsRepo.save(operationsRecord);
+          }
+        }
+      }
       await recordOtogrowActivity(manager, {
         workspaceId: workspace.id,
         actorId: identity.memberId,

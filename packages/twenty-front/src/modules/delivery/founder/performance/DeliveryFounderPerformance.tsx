@@ -598,6 +598,7 @@ const PerformanceWorkspace = ({
             month={data.month}
             timezone={data.timezone}
             canReadFinance={data.canReadFinance}
+            onEmployeeCreated={() => query.refetch()}
           />
           <StyledDeliveryRow>
             {data.nextMemberId && (

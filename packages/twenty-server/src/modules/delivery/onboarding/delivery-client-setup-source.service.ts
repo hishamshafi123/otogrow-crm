@@ -1,5 +1,5 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
-import { ILike } from 'typeorm';
+import { ILike, In } from 'typeorm';
 import { escapeForIlike } from 'twenty-shared/utils';
 import { type WorkspaceAuthContext } from 'src/engine/core-modules/auth/types/workspace-auth-context.type';
 import { GlobalWorkspaceOrmManager } from 'src/engine/twenty-orm/global-workspace-datasource/global-workspace-orm.manager';
@@ -10,6 +10,10 @@ import {
   clientSetupHash,
   type ClientSetupCompany,
 } from 'src/modules/delivery/onboarding/delivery-client-setup.policy';
+
+export type ClientDirectoryCompany = ClientSetupCompany & {
+  domainName: string | null;
+};
 
 const companyView = (
   company: Pick<CompanyWorkspaceEntity, 'id' | 'name' | 'updatedAt'>,
@@ -26,6 +30,20 @@ const companyView = (
     }),
   };
 };
+
+const directoryCompanyView = (
+  company: Pick<
+    CompanyWorkspaceEntity,
+    'id' | 'name' | 'updatedAt' | 'domainName'
+  >,
+): ClientDirectoryCompany => ({
+  ...companyView(company),
+  domainName:
+    company.domainName?.primaryLinkUrl?.trim() ||
+    company.domainName?.primaryLinkLabel?.trim() ||
+    null,
+});
+
 @Injectable()
 export class DeliveryClientSetupSourceService {
   constructor(private readonly orm: GlobalWorkspaceOrmManager) {}
@@ -54,6 +72,51 @@ export class DeliveryClientSetupSourceService {
       return {
         companies: rows.slice(0, 50).map(companyView),
         companiesHasMore: rows.length > 50,
+      };
+    }, auth);
+  }
+  async listByIds(
+    auth: WorkspaceAuthContext,
+    ids: string[],
+  ): Promise<ClientDirectoryCompany[]> {
+    const uniqueIds = [...new Set(ids)];
+    if (!uniqueIds.length) return [];
+    return this.orm.executeInWorkspaceContext(async () => {
+      const repository = await this.orm.getRepository(
+        auth.workspace.id,
+        CompanyWorkspaceEntity,
+        this.permissions(),
+      );
+      const rows = await repository.find({
+        where: { id: In(uniqueIds) },
+        select: { id: true, name: true, domainName: true, updatedAt: true },
+        order: { name: 'ASC', id: 'ASC' },
+      });
+      return rows.map(directoryCompanyView);
+    }, auth);
+  }
+  async searchDirectory(
+    auth: WorkspaceAuthContext,
+    search: string,
+    limit = 100,
+  ): Promise<{ companies: ClientDirectoryCompany[]; hasMore: boolean }> {
+    const trimmed = search.trim();
+    const boundedLimit = Math.min(Math.max(limit, 1), 200);
+    return this.orm.executeInWorkspaceContext(async () => {
+      const repository = await this.orm.getRepository(
+        auth.workspace.id,
+        CompanyWorkspaceEntity,
+        this.permissions(),
+      );
+      const rows = await repository.find({
+        where: trimmed ? { name: ILike(`%${escapeForIlike(trimmed)}%`) } : {},
+        select: { id: true, name: true, domainName: true, updatedAt: true },
+        order: { name: 'ASC', id: 'ASC' },
+        take: boundedLimit + 1,
+      });
+      return {
+        companies: rows.slice(0, boundedLimit).map(directoryCompanyView),
+        hasMore: rows.length > boundedLimit,
       };
     }, auth);
   }

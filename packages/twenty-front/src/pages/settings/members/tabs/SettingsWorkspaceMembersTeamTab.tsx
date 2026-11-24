@@ -7,6 +7,11 @@ import { useDebounce } from 'use-debounce';
 
 import { currentWorkspaceMemberState } from '@/auth/states/currentWorkspaceMemberState';
 import { useFindManyRecords } from '@/object-record/hooks/useFindManyRecords';
+import { EmployeeLoginModal } from '@/otogrow-access/employee-login/EmployeeLoginModal';
+import { useOtogrowAccess } from '@/otogrow-access/useOtogrowAccess';
+import { SettingsRolesQueryEffect } from '@/settings/roles/components/SettingsRolesQueryEffect';
+import { useHasPermissionFlag } from '@/settings/roles/hooks/useHasPermissionFlag';
+import { useSettingsAllRoles } from '@/settings/roles/hooks/useSettingsAllRoles';
 import { Dropdown } from '@/ui/layout/dropdown/components/Dropdown';
 import { DropdownContent } from '@/ui/layout/dropdown/components/DropdownContent';
 import { DropdownMenuItemsContainer } from '@/ui/layout/dropdown/components/DropdownMenuItemsContainer';
@@ -26,6 +31,7 @@ import {
   IconChevronRight,
   IconHierarchy2,
   IconListDetails,
+  IconUserPlus,
 } from 'twenty-ui/icon';
 import { AppTooltip, TooltipDelay } from 'twenty-ui/surfaces';
 import { H2Title } from 'twenty-ui/typography';
@@ -36,6 +42,7 @@ import { MenuItem } from 'twenty-ui/navigation';
 import { TableCell } from '@/ui/layout/table/components/TableCell';
 import { TableRow } from '@/ui/layout/table/components/TableRow';
 import { ThemeContext, themeCssVariables } from 'twenty-ui/theme-constants';
+import { PermissionFlagType } from '~/generated-metadata/graphql';
 import { useNavigateApp } from '~/hooks/useNavigateApp';
 import { useNavigateSettings } from '~/hooks/useNavigateSettings';
 import { getAbsoluteImageUrl } from '~/utils/image/getAbsoluteImageUrl';
@@ -90,7 +97,24 @@ export const SettingsWorkspaceMembersTeamTab = () => {
   const { closeDropdown } = useCloseDropdown();
   const [isFetchingMore, setIsFetchingMore] = useState(false);
   const [searchFilter, setSearchFilter] = useState('');
+  const [isCreateLoginOpen, setIsCreateLoginOpen] = useState(false);
   const currentWorkspaceMember = useAtomStateValue(currentWorkspaceMemberState);
+  const hasWorkspaceMembersPermission = useHasPermissionFlag(
+    PermissionFlagType.WORKSPACE_MEMBERS,
+  );
+  const otogrowAccess = useOtogrowAccess();
+  const canCreateEmployeeLogin =
+    hasWorkspaceMembersPermission || otogrowAccess.canManageRoles;
+  const allRoles = useSettingsAllRoles();
+  const assignableCrmRoles = useMemo(
+    () =>
+      hasWorkspaceMembersPermission
+        ? allRoles
+            .filter((role) => role.canBeAssignedToUsers)
+            .map((role) => ({ id: role.id, label: role.label }))
+        : [],
+    [allRoles, hasWorkspaceMembersPermission],
+  );
 
   const [debouncedSearchFilter] = useDebounce(searchFilter, 300);
 
@@ -117,6 +141,7 @@ export const SettingsWorkspaceMembersTeamTab = () => {
     fetchMoreRecords,
     hasNextPage,
     loading,
+    refetch,
   } = useFindManyRecords<WorkspaceMember>({
     objectNameSingular: CoreObjectNameSingular.WorkspaceMember,
     filter: searchServerFilter,
@@ -165,6 +190,7 @@ export const SettingsWorkspaceMembersTeamTab = () => {
 
   return (
     <Section>
+      <SettingsRolesQueryEffect />
       <H2Title
         title={t`Manage Members`}
         description={t`Manage the members of your workspace here`}
@@ -175,6 +201,16 @@ export const SettingsWorkspaceMembersTeamTab = () => {
           onChange={handleSearchChange}
           placeholder={t`Search a team member...`}
         />
+        {canCreateEmployeeLogin && (
+          <Button
+            Icon={IconUserPlus}
+            title={t`Create login`}
+            accent="blue"
+            variant="primary"
+            size="medium"
+            onClick={() => setIsCreateLoginOpen(true)}
+          />
+        )}
         <Dropdown
           dropdownId="workspace-members-open-dropdown"
           clickableComponent={
@@ -310,6 +346,13 @@ export const SettingsWorkspaceMembersTeamTab = () => {
           )}
         </Table>
       </StyledTableContainer>
+      <EmployeeLoginModal
+        open={isCreateLoginOpen}
+        mode="create"
+        crmRoles={assignableCrmRoles}
+        onClose={() => setIsCreateLoginOpen(false)}
+        onSuccess={() => refetch()}
+      />
     </Section>
   );
 };

@@ -4,12 +4,13 @@ import { Trans, useLingui } from '@lingui/react/macro';
 import { useQuery } from '@apollo/client/react';
 import { isNonEmptyArray } from '@sniptt/guards';
 import { formatDistanceToNow } from 'date-fns';
-import { useContext, useMemo } from 'react';
+import { useContext, useMemo, useState } from 'react';
 
 import { SettingsRolesQueryEffect } from '@/settings/roles/components/SettingsRolesQueryEffect';
 
 import { useSnackBarOnQueryError } from '@/apollo/hooks/useSnackBarOnQueryError';
 import { currentWorkspaceState } from '@/auth/states/currentWorkspaceState';
+import { EmployeeLoginModal } from '@/otogrow-access/employee-login/EmployeeLoginModal';
 import { useSettingsAllRoles } from '@/settings/roles/hooks/useSettingsAllRoles';
 import { SettingsApprovedAccessDomainsListCard } from '@/settings/security/components/approvedAccessDomains/SettingsApprovedAccessDomainsListCard';
 import { useSnackBar } from '@/ui/feedback/snack-bar-manager/hooks/useSnackBar';
@@ -23,10 +24,10 @@ import { WorkspaceInviteLink } from '@/workspace/components/WorkspaceInviteLink'
 import { WorkspaceInviteTeam } from '@/workspace/components/WorkspaceInviteTeam';
 import { isDefined } from 'twenty-shared/utils';
 import { Status } from 'twenty-ui/data-display';
-import { IconMail, IconReload, IconTrash } from 'twenty-ui/icon';
+import { IconMail, IconReload, IconTrash, IconUserPlus } from 'twenty-ui/icon';
 import { AppTooltip, TooltipDelay } from 'twenty-ui/surfaces';
 import { H2Title } from 'twenty-ui/typography';
-import { IconButton } from 'twenty-ui/input';
+import { Button, IconButton } from 'twenty-ui/input';
 import { Section } from 'twenty-ui/layout';
 import { ThemeContext, themeCssVariables } from 'twenty-ui/theme-constants';
 import { GetWorkspaceInvitationsDocument } from '~/generated-metadata/graphql';
@@ -39,6 +40,25 @@ const StyledButtonContainer = styled.div`
   flex-shrink: 0;
   gap: ${themeCssVariables.spacing[1]};
   margin-left: ${themeCssVariables.spacing[2]};
+`;
+
+const StyledDirectLoginCard = styled.div`
+  align-items: center;
+  background: ${themeCssVariables.background.secondary};
+  border: 1px solid ${themeCssVariables.border.color.light};
+  border-radius: ${themeCssVariables.border.radius.md};
+  display: flex;
+  flex-wrap: wrap;
+  gap: ${themeCssVariables.spacing[3]};
+  justify-content: space-between;
+  padding: ${themeCssVariables.spacing[3]} ${themeCssVariables.spacing[4]};
+`;
+
+const StyledDirectLoginCopy = styled.div`
+  color: ${themeCssVariables.font.color.secondary};
+  flex: 1 1 240px;
+  font-size: ${themeCssVariables.font.size.sm};
+  line-height: 1.5;
 `;
 
 const StyledExpiresInHeader = styled.span`
@@ -74,9 +94,18 @@ export const SettingsWorkspaceMembersInviteTab = () => {
   const { enqueueErrorSnackBar } = useSnackBar();
   const roles = useSettingsAllRoles();
   const { localeCatalog } = useAtomStateValue(dateLocaleState);
+  const [isCreateLoginOpen, setIsCreateLoginOpen] = useState(false);
 
   const rolesById = useMemo(
     () => new Map(roles.map((role) => [role.id, role])),
+    [roles],
+  );
+
+  const assignableCrmRoles = useMemo(
+    () =>
+      roles
+        .filter((role) => role.canBeAssignedToUsers)
+        .map((role) => ({ id: role.id, label: role.label })),
     [roles],
   );
 
@@ -126,6 +155,35 @@ export const SettingsWorkspaceMembersInviteTab = () => {
   return (
     <>
       <SettingsRolesQueryEffect />
+      <Section>
+        <H2Title
+          title={t`Create employee login directly`}
+          description={t`Set an email and password so a teammate can sign in immediately without waiting for an invite email`}
+        />
+        <StyledDirectLoginCard>
+          <StyledDirectLoginCopy>
+            <Trans>
+              Skip the email invitation flow. Create a ready-to-use login,
+              generate a secure password, and copy the credentials to share
+              privately with your employee.
+            </Trans>
+          </StyledDirectLoginCopy>
+          <Button
+            Icon={IconUserPlus}
+            title={t`Create employee login`}
+            accent="blue"
+            variant="primary"
+            size="medium"
+            onClick={() => setIsCreateLoginOpen(true)}
+          />
+        </StyledDirectLoginCard>
+      </Section>
+      <EmployeeLoginModal
+        open={isCreateLoginOpen}
+        mode="create"
+        crmRoles={assignableCrmRoles}
+        onClose={() => setIsCreateLoginOpen(false)}
+      />
       {currentWorkspace?.inviteHash &&
         currentWorkspace?.isPublicInviteLinkEnabled && (
           <Section>
