@@ -10,16 +10,20 @@ import { RequireAccessTokenGuard } from 'src/engine/guards/require-access-token.
 import { WorkspaceAuthGuard } from 'src/engine/guards/workspace-auth.guard';
 import { DeliveryChatService } from 'src/modules/delivery/chat/delivery-chat.service';
 import {
+  DeliveryChatEditInput,
   DeliveryChatInput,
+  DeliveryChatMessageIdInput,
+  DeliveryChatReactionInput,
   DeliveryChatSendInput,
-  DeliveryChatViewedInput,
   DeliveryChatSnapshotDTO,
+  DeliveryChatViewedInput,
 } from 'src/modules/delivery/chat/delivery-chat.dto';
 
 @UseGuards(WorkspaceAuthGuard, RequireAccessTokenGuard, CustomPermissionGuard)
 @MetadataResolver()
 export class DeliveryChatResolver {
   constructor(private readonly chat: DeliveryChatService) {}
+
   @Query(() => DeliveryChatSnapshotDTO)
   deliveryChat(
     @AuthWorkspace() workspace: WorkspaceEntity,
@@ -29,6 +33,7 @@ export class DeliveryChatResolver {
   ) {
     return this.chat.snapshot(workspace.id, memberId, userWorkspaceId, input);
   }
+
   @Mutation(() => String)
   sendDeliveryChatMessage(
     @AuthWorkspace() workspace: WorkspaceEntity,
@@ -38,6 +43,7 @@ export class DeliveryChatResolver {
   ) {
     return this.chat.send(workspace.id, memberId, userWorkspaceId, input);
   }
+
   @Mutation(() => Boolean)
   viewDeliveryChatMessages(
     @AuthWorkspace() workspace: WorkspaceEntity,
@@ -46,5 +52,50 @@ export class DeliveryChatResolver {
     @Args('input') input: DeliveryChatViewedInput,
   ) {
     return this.chat.view(workspace.id, memberId, userWorkspaceId, input);
+  }
+
+  @Mutation(() => Boolean)
+  editDeliveryChatMessage(
+    @AuthWorkspace() workspace: WorkspaceEntity,
+    @AuthWorkspaceMemberId() memberId: string,
+    @AuthUserWorkspaceId() userWorkspaceId: string,
+    @Args('input') input: DeliveryChatEditInput,
+  ) {
+    return this.chat.edit(workspace.id, memberId, userWorkspaceId, input);
+  }
+
+  @Mutation(() => Boolean)
+  deleteDeliveryChatMessage(
+    @AuthWorkspace() workspace: WorkspaceEntity,
+    @AuthWorkspaceMemberId() memberId: string,
+    @AuthUserWorkspaceId() userWorkspaceId: string,
+    @Args('input') input: DeliveryChatMessageIdInput,
+  ) {
+    return this.chat.remove(workspace.id, memberId, userWorkspaceId, input);
+  }
+
+  @Mutation(() => Boolean)
+  toggleDeliveryChatReaction(
+    @AuthWorkspace() workspace: WorkspaceEntity,
+    @AuthWorkspaceMemberId() memberId: string,
+    @AuthUserWorkspaceId() userWorkspaceId: string,
+    @Args('input') input: DeliveryChatReactionInput,
+  ) {
+    return this.chat.toggleReaction(
+      workspace.id,
+      memberId,
+      userWorkspaceId,
+      input,
+    );
+  }
+
+  @Mutation(() => Boolean)
+  toggleDeliveryChatPin(
+    @AuthWorkspace() workspace: WorkspaceEntity,
+    @AuthWorkspaceMemberId() memberId: string,
+    @AuthUserWorkspaceId() userWorkspaceId: string,
+    @Args('input') input: DeliveryChatMessageIdInput,
+  ) {
+    return this.chat.togglePin(workspace.id, memberId, userWorkspaceId, input);
   }
 }

@@ -208,6 +208,7 @@ import { AddContentPostingWorkflowFastInstanceCommand } from 'src/database/comma
 import { AddKnowledgeBrandFilesFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1793845992011-add-knowledge-brand-files';
 import { AddDeliveryFinanceV2FastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1795508400000-add-delivery-finance-v2';
 import { AddDeliveryFinanceV2M9IndexesAndSettingsFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1795508500000-finance-v2-m9-indexes-and-settings';
+import { UpgradeDeliveryTeamChatFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1795508600000-upgrade-delivery-team-chat';
 
 export const INSTANCE_COMMANDS = [
   AddViewFieldGroupIdIndexOnViewFieldFastInstanceCommand,
@@ -418,4 +419,5 @@ export const INSTANCE_COMMANDS = [
   AddKnowledgeBrandFilesFastInstanceCommand,
   AddDeliveryFinanceV2FastInstanceCommand,
   AddDeliveryFinanceV2M9IndexesAndSettingsFastInstanceCommand,
+  UpgradeDeliveryTeamChatFastInstanceCommand,
 ];

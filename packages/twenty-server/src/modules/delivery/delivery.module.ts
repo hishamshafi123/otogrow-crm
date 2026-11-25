@@ -106,8 +106,10 @@ import { DeliveryKnowledgeVersionEntity } from 'src/modules/delivery/knowledge/e
 import { DeliveryKnowledgeService } from 'src/modules/delivery/knowledge/delivery-knowledge.service';
 import { DeliveryKnowledgeReadsService } from 'src/modules/delivery/knowledge/reads/delivery-knowledge-reads.service';
 import { DeliveryKnowledgeResolver } from 'src/modules/delivery/knowledge/delivery-knowledge.resolver';
+import { DeliveryChatFilesController } from 'src/modules/delivery/chat/delivery-chat-files.controller';
 import { DeliveryChatService } from 'src/modules/delivery/chat/delivery-chat.service';
 import { DeliveryChatResolver } from 'src/modules/delivery/chat/delivery-chat.resolver';
+import { DeliveryChatAttachmentEntity } from 'src/modules/delivery/chat/entities/delivery-chat-attachment.entity';
 import { DeliveryChatMessageEntity } from 'src/modules/delivery/chat/entities/delivery-chat-message.entity';
 import { DeliveryMetaReportEntity } from 'src/modules/delivery/advertising/entities/delivery-meta-report.entity';
 import { DeliveryBatchesResolver } from 'src/modules/delivery/batches/delivery-batches.resolver';
@@ -264,6 +266,7 @@ import { DeliveryCreativeReadsResolver } from 'src/modules/delivery/creative/rea
       DeliveryKnowledgeAssetEntity,
       DeliveryKnowledgeSourceEntity,
       DeliveryKnowledgeVersionEntity,
+      DeliveryChatAttachmentEntity,
       DeliveryChatMessageEntity,
       DeliveryMetaReportEntity,
       DeliveryBatchEntity,
@@ -292,6 +295,7 @@ import { DeliveryCreativeReadsResolver } from 'src/modules/delivery/creative/rea
     DeliveryClientsController,
     DeliveryClientFilesController,
     DeliveryFinanceV2FilesController,
+    DeliveryChatFilesController,
   ],
   providers: [
     DeliveryFinanceV2Service,
