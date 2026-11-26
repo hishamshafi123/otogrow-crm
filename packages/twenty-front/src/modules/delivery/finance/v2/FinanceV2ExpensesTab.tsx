@@ -7,12 +7,17 @@ import {
   parseFinanceAmountMicros,
 } from '@/delivery/finance/finance-money';
 import {
+  addDaysIso,
+  computeDefaultRecurringExpenseDate,
   computeDefaultReversalDate,
   createFinanceV2RequestId,
   isFinanceV2AmountMicrosWithinLimit,
   isValidHttpUrl,
+  isValidIsoDate,
   isValidPositiveFxRate,
+  isValidYearMonth,
   sanitizeExternalUrl,
+  shiftYearMonth,
 } from '@/delivery/finance/v2/finance-v2-currency';
 import {
   StyledFinanceV2ActionGroup,
@@ -117,8 +122,32 @@ export const FinanceV2ExpensesTab = ({
   const [confirmingStopRecId, setConfirmingStopRecId] = useState<string | null>(
     null,
   );
+  const [expensingRecId, setExpensingRecId] = useState<string | null>(null);
+  const [expenseRecDate, setExpenseRecDate] = useState(data.today);
+  const [expenseRecFxRate, setExpenseRecFxRate] = useState('');
+  const [recurringRequestId, setRecurringRequestId] = useState(
+    createFinanceV2RequestId,
+  );
   const [voidTarget, setVoidTarget] = useState<FinanceV2Journal | null>(null);
   const [voidReason, setVoidReason] = useState('');
+
+  const currentMonth = data.today.slice(0, 7);
+  const lockedThroughDate = data.profile.lockedThroughDate ?? null;
+  const isCurrentMonthFullyLocked = Boolean(
+    lockedThroughDate &&
+    isValidIsoDate(lockedThroughDate) &&
+    lockedThroughDate >= data.today,
+  );
+  const openMinDateInCurrentMonth =
+    lockedThroughDate &&
+    isValidIsoDate(lockedThroughDate) &&
+    lockedThroughDate.slice(0, 7) === currentMonth &&
+    lockedThroughDate < data.today
+      ? addDaysIso(lockedThroughDate, 1)
+      : `${currentMonth}-01`;
+  const isCurrentMonthPartiallyLocked =
+    !isCurrentMonthFullyLocked &&
+    openMinDateInCurrentMonth > `${currentMonth}-01`;
 
   // Day-to-day expense/asset form
   const [entryKind, setEntryKind] = useState<
@@ -145,9 +174,20 @@ export const FinanceV2ExpensesTab = ({
   const [recAmount, setRecAmount] = useState('');
   const [recDay, setRecDay] = useState('1');
   const [recFundingId, setRecFundingId] = useState('');
-  const [recStartMonth, setRecStartMonth] = useState(data.today.slice(0, 7));
+  const [recStartMonth, setRecStartMonth] = useState(currentMonth);
   const [recEndMonth, setRecEndMonth] = useState('');
   const [recNotes, setRecNotes] = useState('');
+  const [recExpenseNow, setRecExpenseNow] = useState(false);
+  const [recExpenseDateTouched, setRecExpenseDateTouched] = useState(false);
+  const [recExpenseDate, setRecExpenseDate] = useState(() =>
+    computeDefaultRecurringExpenseDate(
+      currentMonth,
+      1,
+      data.today,
+      lockedThroughDate,
+    ),
+  );
+  const [recExpenseFxRate, setRecExpenseFxRate] = useState('');
 
   // AI cost import
   const [selectedAiIds, setSelectedAiIds] = useState<string[]>([]);
@@ -182,15 +222,27 @@ export const FinanceV2ExpensesTab = ({
 
   const resetRecurringDraft = () => {
     setRecTitle('');
-    setRecType('INDIRECT_EXPENSE');
-    setRecCategory('INDIRECT_RENT');
+    setRecType('DIRECT_EXPENSE');
+    setRecCategory('DIRECT_SUBSCRIPTION');
     setRecCurrency('USD');
     setRecAmount('');
     setRecDay('1');
     setRecFundingId('');
-    setRecStartMonth(data.today.slice(0, 7));
+    setRecStartMonth(currentMonth);
     setRecEndMonth('');
     setRecNotes('');
+    setRecExpenseNow(false);
+    setRecExpenseDateTouched(false);
+    setRecExpenseDate(
+      computeDefaultRecurringExpenseDate(
+        currentMonth,
+        1,
+        data.today,
+        lockedThroughDate,
+      ),
+    );
+    setRecExpenseFxRate('');
+    setRecurringRequestId(createFinanceV2RequestId());
   };
 
   const closeAllPanels = () => {
@@ -199,6 +251,9 @@ export const FinanceV2ExpensesTab = ({
     setShowRecurringForm(false);
     setEditingRecId(null);
     setConfirmingStopRecId(null);
+    setExpensingRecId(null);
+    setExpenseRecDate(data.today);
+    setExpenseRecFxRate('');
     setVoidTarget(null);
     setVoidReason('');
     setReverseTarget(null);
@@ -315,12 +370,32 @@ export const FinanceV2ExpensesTab = ({
     return true;
   });
 
+  const canExpenseRecurringRule = (
+    rule: FinanceV2RecurringExpense,
+  ): boolean => {
+    const targetMonth = rule.currentMonthTargetMonth ?? currentMonth;
+    const startsLater = targetMonth < rule.startMonth;
+    const endedEarlier = Boolean(rule.endMonth && targetMonth > rule.endMonth);
+    const monthStatus = rule.currentMonthStatus ?? 'NOT_POSTED';
+    return (
+      data.canManage &&
+      (!rule.employeeName || data.canViewPayroll) &&
+      rule.status === 'ACTIVE' &&
+      !startsLater &&
+      !endedEarlier &&
+      monthStatus !== 'POSTED' &&
+      !isCurrentMonthFullyLocked
+    );
+  };
+
   const openEditRecurring = (rule: FinanceV2RecurringExpense) => {
     setFormError('');
     setConfirmingStopRecId(null);
+    setExpensingRecId(null);
     if (showRecurringForm && editingRecId === rule.id) {
       setShowRecurringForm(false);
       setEditingRecId(null);
+      resetRecurringDraft();
       return;
     }
     setEditingRecId(rule.id);
@@ -334,7 +409,86 @@ export const FinanceV2ExpensesTab = ({
     setRecStartMonth(rule.startMonth);
     setRecEndMonth(rule.endMonth ?? '');
     setRecNotes(rule.notes);
+    setRecExpenseNow(false);
+    setRecExpenseDateTouched(false);
+    setRecExpenseFxRate('');
     setShowRecurringForm(true);
+  };
+
+  const openExpenseRecurringForCurrentMonth = (
+    rule: FinanceV2RecurringExpense,
+  ) => {
+    setFormError('');
+    setShowRecurringForm(false);
+    setEditingRecId(null);
+    setConfirmingStopRecId(null);
+    if (expensingRecId === rule.id) {
+      setExpensingRecId(null);
+      return;
+    }
+    setExpensingRecId(rule.id);
+    setExpenseRecDate(
+      computeDefaultRecurringExpenseDate(
+        currentMonth,
+        rule.dayOfMonth,
+        data.today,
+        lockedThroughDate,
+      ),
+    );
+    setExpenseRecFxRate('');
+  };
+
+  const handleExpenseRecurringForCurrentMonth = async (
+    event: FormEvent,
+    rule: FinanceV2RecurringExpense,
+  ) => {
+    event.preventDefault();
+    setFormError('');
+    if (isCurrentMonthFullyLocked) {
+      setFormError(
+        t`Current month (${currentMonth}) is locked through ${lockedThroughDate ?? ''}. Unlock the period in Setup to expense now.`,
+      );
+      return;
+    }
+    const trimmedDate = expenseRecDate.trim();
+    if (
+      !trimmedDate ||
+      !isValidIsoDate(trimmedDate) ||
+      trimmedDate.slice(0, 7) !== currentMonth
+    ) {
+      setFormError(t`Choose a valid expense date within ${currentMonth}.`);
+      return;
+    }
+    if (trimmedDate > data.today) {
+      setFormError(
+        t`Expense date cannot be in the future (after ${data.today}).`,
+      );
+      return;
+    }
+    if (lockedThroughDate && trimmedDate <= lockedThroughDate) {
+      setFormError(
+        t`Expense date must be after the locked period (${lockedThroughDate}).`,
+      );
+      return;
+    }
+    const trimmedFx = rule.currency !== 'AED' ? expenseRecFxRate.trim() : '';
+    if (trimmedFx && !isValidPositiveFxRate(trimmedFx)) {
+      setFormError(t`Enter a valid positive AED exchange rate.`);
+      return;
+    }
+    const targetMonth = rule.currentMonthTargetMonth ?? currentMonth;
+    const res = await onRunCommand({
+      action: 'expenseRecurringForMonth',
+      id: rule.id,
+      month: targetMonth,
+      entryDate: trimmedDate,
+      ...(trimmedFx ? { fxRateToAed: trimmedFx } : {}),
+    });
+    if (res) {
+      setExpensingRecId(null);
+      setExpenseRecFxRate('');
+      setFormError('');
+    }
   };
 
   const duplicateManualEntry = (item: FinanceV2Journal) => {
@@ -431,6 +585,24 @@ export const FinanceV2ExpensesTab = ({
     }
   };
 
+  const doesMonthRangeCoverCurrentMonth = (
+    start: string,
+    end: string,
+  ): boolean => {
+    const trimmedStart = start.trim();
+    const trimmedEnd = end.trim();
+    return (
+      isValidYearMonth(trimmedStart) &&
+      trimmedStart <= currentMonth &&
+      (!trimmedEnd ||
+        (isValidYearMonth(trimmedEnd) && trimmedEnd >= currentMonth))
+    );
+  };
+
+  const draftRecurringCoversCurrentMonth =
+    !editingRecId &&
+    doesMonthRangeCoverCurrentMonth(recStartMonth, recEndMonth);
+
   const handleSaveRecurringExpense = async (event: FormEvent) => {
     event.preventDefault();
     setFormError('');
@@ -452,12 +624,12 @@ export const FinanceV2ExpensesTab = ({
       setFormError(t`Charge day must be between 1 and 31.`);
       return;
     }
-    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(recStartMonth.trim())) {
+    if (!isValidYearMonth(recStartMonth.trim())) {
       setFormError(t`Enter a valid start month (YYYY-MM).`);
       return;
     }
     const trimmedEnd = recEndMonth.trim();
-    if (trimmedEnd && !/^\d{4}-(0[1-9]|1[0-2])$/.test(trimmedEnd)) {
+    if (trimmedEnd && !isValidYearMonth(trimmedEnd)) {
       setFormError(t`Enter a valid end month (YYYY-MM).`);
       return;
     }
@@ -469,9 +641,45 @@ export const FinanceV2ExpensesTab = ({
       setFormError(t`Select a Charged From account.`);
       return;
     }
+    const shouldExpenseNow =
+      draftRecurringCoversCurrentMonth &&
+      recExpenseNow &&
+      !isCurrentMonthFullyLocked;
+    let trimmedExpenseDate = '';
+    let trimmedExpenseFx = '';
+    if (shouldExpenseNow) {
+      trimmedExpenseDate = recExpenseDate.trim();
+      if (
+        !trimmedExpenseDate ||
+        !isValidIsoDate(trimmedExpenseDate) ||
+        trimmedExpenseDate.slice(0, 7) !== currentMonth
+      ) {
+        setFormError(t`Choose a valid expense date within ${currentMonth}.`);
+        return;
+      }
+      if (trimmedExpenseDate > data.today) {
+        setFormError(
+          t`Expense date cannot be in the future (after ${data.today}).`,
+        );
+        return;
+      }
+      if (lockedThroughDate && trimmedExpenseDate <= lockedThroughDate) {
+        setFormError(
+          t`Expense date must be after the locked period (${lockedThroughDate}).`,
+        );
+        return;
+      }
+      trimmedExpenseFx = recCurrency !== 'AED' ? recExpenseFxRate.trim() : '';
+      if (trimmedExpenseFx && !isValidPositiveFxRate(trimmedExpenseFx)) {
+        setFormError(t`Enter a valid positive AED exchange rate.`);
+        return;
+      }
+    }
     const res = await onRunCommand({
       action: 'saveRecurringExpense',
-      ...(editingRecId ? { id: editingRecId } : {}),
+      ...(editingRecId
+        ? { id: editingRecId }
+        : { clientRequestId: recurringRequestId }),
       title: recTitle.trim(),
       expenseType: recType,
       category: recCategory,
@@ -482,19 +690,26 @@ export const FinanceV2ExpensesTab = ({
       startMonth: recStartMonth.trim(),
       endMonth: trimmedEnd || null,
       notes: recNotes,
+      ...(shouldExpenseNow
+        ? {
+            expenseCurrentMonth: true,
+            entryDate: trimmedExpenseDate,
+            ...(trimmedExpenseFx ? { fxRateToAed: trimmedExpenseFx } : {}),
+          }
+        : {}),
     });
     if (res) {
       setEditingRecId(null);
-      setRecTitle('');
-      setRecAmount('');
-      setRecEndMonth('');
-      setRecNotes('');
+      resetRecurringDraft();
       setShowRecurringForm(false);
     }
   };
 
   const renderRecurringFormBody = () => (
-    <form onSubmit={(event) => void handleSaveRecurringExpense(event)}>
+    <form
+      noValidate
+      onSubmit={(event) => void handleSaveRecurringExpense(event)}
+    >
       <StyledFinanceV2Stack>
         <h3>
           {editingRecId
@@ -565,9 +780,10 @@ export const FinanceV2ExpensesTab = ({
             <Trans>Currency</Trans>
             <select
               value={recCurrency}
-              onChange={(e) =>
-                setRecCurrency(e.target.value as FinanceV2Currency)
-              }
+              onChange={(e) => {
+                setRecCurrency(e.target.value as FinanceV2Currency);
+                setRecExpenseFxRate('');
+              }}
             >
               {FINANCE_V2_CURRENCIES.map((code) => (
                 <option key={code} value={code}>
@@ -591,7 +807,23 @@ export const FinanceV2ExpensesTab = ({
               min={1}
               max={31}
               value={recDay}
-              onChange={(e) => setRecDay(e.target.value)}
+              onChange={(e) => {
+                const nextDay = e.target.value;
+                setRecDay(nextDay);
+                if (!recExpenseDateTouched) {
+                  const parsed = Number.parseInt(nextDay, 10);
+                  if (Number.isInteger(parsed) && parsed >= 1 && parsed <= 31) {
+                    setRecExpenseDate(
+                      computeDefaultRecurringExpenseDate(
+                        currentMonth,
+                        parsed,
+                        data.today,
+                        lockedThroughDate,
+                      ),
+                    );
+                  }
+                }
+              }}
             />
           </label>
           <label>
@@ -611,7 +843,15 @@ export const FinanceV2ExpensesTab = ({
             <Trans>Start month (YYYY-MM)</Trans>
             <input
               value={recStartMonth}
-              onChange={(e) => setRecStartMonth(e.target.value)}
+              onChange={(e) => {
+                const nextStart = e.target.value;
+                setRecStartMonth(nextStart);
+                if (!doesMonthRangeCoverCurrentMonth(nextStart, recEndMonth)) {
+                  setRecExpenseNow(false);
+                  setRecExpenseDateTouched(false);
+                  setRecExpenseFxRate('');
+                }
+              }}
             />
           </label>
           <label>
@@ -619,7 +859,15 @@ export const FinanceV2ExpensesTab = ({
             <input
               value={recEndMonth}
               placeholder={t`Leave blank until stopped`}
-              onChange={(e) => setRecEndMonth(e.target.value)}
+              onChange={(e) => {
+                const nextEnd = e.target.value;
+                setRecEndMonth(nextEnd);
+                if (!doesMonthRangeCoverCurrentMonth(recStartMonth, nextEnd)) {
+                  setRecExpenseNow(false);
+                  setRecExpenseDateTouched(false);
+                  setRecExpenseFxRate('');
+                }
+              }}
             />
           </label>
         </StyledFinanceV2FormGrid>
@@ -630,6 +878,79 @@ export const FinanceV2ExpensesTab = ({
             onChange={(e) => setRecNotes(e.target.value)}
           />
         </label>
+        {draftRecurringCoversCurrentMonth && (
+          <StyledFinanceV2Stack>
+            <label>
+              <input
+                type="checkbox"
+                disabled={isCurrentMonthFullyLocked}
+                checked={!isCurrentMonthFullyLocked && recExpenseNow}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  setRecExpenseNow(checked);
+                  setRecExpenseDateTouched(false);
+                  if (checked) {
+                    const parsed = Number.parseInt(recDay, 10);
+                    setRecExpenseDate(
+                      computeDefaultRecurringExpenseDate(
+                        currentMonth,
+                        Number.isInteger(parsed) && parsed >= 1 && parsed <= 31
+                          ? parsed
+                          : 1,
+                        data.today,
+                        lockedThroughDate,
+                      ),
+                    );
+                  }
+                }}
+              />{' '}
+              {t`Also expense for current month (${currentMonth}) right now`}
+            </label>
+            {isCurrentMonthFullyLocked && (
+              <small>
+                {t`Current month (${currentMonth}) is locked through ${lockedThroughDate ?? ''}. Unlock the period in Setup to expense right now.`}
+              </small>
+            )}
+            {!isCurrentMonthFullyLocked && recExpenseNow && (
+              <>
+                {isCurrentMonthPartiallyLocked && (
+                  <small>
+                    {t`Accounting period is locked through ${lockedThroughDate ?? ''}. Open dates: ${openMinDateInCurrentMonth} to ${data.today}.`}
+                  </small>
+                )}
+                <StyledFinanceV2FormGrid>
+                  <label>
+                    <Trans>Expense date</Trans>
+                    <input
+                      type="date"
+                      aria-label={t`Current month expense date`}
+                      min={openMinDateInCurrentMonth}
+                      max={data.today}
+                      value={recExpenseDate}
+                      onChange={(e) => {
+                        setRecExpenseDateTouched(true);
+                        setRecExpenseDate(e.target.value);
+                      }}
+                    />
+                  </label>
+                  {recCurrency !== 'AED' && (
+                    <label>
+                      {t`FX Rate (${recCurrency} → AED)`}
+                      <input
+                        aria-label={t`Current month FX rate (${recCurrency} → AED)`}
+                        value={recExpenseFxRate}
+                        placeholder={
+                          data.profile.exchangeRates[recCurrency] ?? '1'
+                        }
+                        onChange={(e) => setRecExpenseFxRate(e.target.value)}
+                      />
+                    </label>
+                  )}
+                </StyledFinanceV2FormGrid>
+              </>
+            )}
+          </StyledFinanceV2Stack>
+        )}
         <StyledFinanceV2ActionGroup>
           <StyledDeliveryButton
             type="submit"
@@ -638,12 +959,17 @@ export const FinanceV2ExpensesTab = ({
           >
             {editingRecId
               ? t`Update Recurring Expense`
-              : t`Save Recurring Expense`}
+              : draftRecurringCoversCurrentMonth &&
+                  recExpenseNow &&
+                  !isCurrentMonthFullyLocked
+                ? t`Save & Expense (${currentMonth})`
+                : t`Save Recurring Expense`}
           </StyledDeliveryButton>
           <StyledDeliveryButton
             type="button"
             onClick={() => {
               setEditingRecId(null);
+              resetRecurringDraft();
               setShowRecurringForm(false);
               setFormError('');
             }}
@@ -674,6 +1000,20 @@ export const FinanceV2ExpensesTab = ({
       setConfirmingImportAllAi(false);
     }
   };
+
+  const hasOpenInlineEditRecPanel =
+    section === 'recurring' &&
+    showRecurringForm &&
+    editingRecId !== null &&
+    data.recurringExpenses.some(
+      (rule) => rule.id === editingRecId && !rule.employeeName,
+    );
+  const hasOpenInlineExpensePanel =
+    section === 'recurring' &&
+    expensingRecId !== null &&
+    data.recurringExpenses.some(
+      (rule) => rule.id === expensingRecId && canExpenseRecurringRule(rule),
+    );
 
   return (
     <StyledFinanceV2Stack>
@@ -723,10 +1063,6 @@ export const FinanceV2ExpensesTab = ({
               const wasEditing = Boolean(editingRecId);
               const nextOpen = wasEditing ? true : !showRecurringForm;
               closeAllPanels();
-              setRecTitle('');
-              setRecAmount('');
-              setRecEndMonth('');
-              setRecNotes('');
               setShowRecurringForm(nextOpen);
             }}
           >
@@ -735,11 +1071,15 @@ export const FinanceV2ExpensesTab = ({
         )}
       </StyledFinanceV2HeaderRow>
 
-      {formError && !voidTarget && !reverseTarget && !editingRecId && (
-        <StyledFinanceV2Notice data-tone="danger" role="alert">
-          {formError}
-        </StyledFinanceV2Notice>
-      )}
+      {formError &&
+        !voidTarget &&
+        !reverseTarget &&
+        !hasOpenInlineEditRecPanel &&
+        !hasOpenInlineExpensePanel && (
+          <StyledFinanceV2Notice data-tone="danger" role="alert">
+            {formError}
+          </StyledFinanceV2Notice>
+        )}
 
       {section === 'ledger' && (
         <StyledFinanceV2Stack>
@@ -1060,8 +1400,6 @@ export const FinanceV2ExpensesTab = ({
                   </thead>
                   <tbody>
                     {(() => {
-                      const lockedThroughDate =
-                        data.profile.lockedThroughDate ?? null;
                       const reversedIds = new Set(
                         data.journals
                           .filter(
@@ -1482,9 +1820,6 @@ export const FinanceV2ExpensesTab = ({
                         <Trans>Name</Trans>
                       </th>
                       <th>
-                        <Trans>Type</Trans>
-                      </th>
-                      <th>
                         <Trans>Charged From</Trans>
                       </th>
                       <th>
@@ -1496,6 +1831,7 @@ export const FinanceV2ExpensesTab = ({
                       <th>
                         <Trans>Status</Trans>
                       </th>
+                      <th>{t`This Month (${currentMonth})`}</th>
                       <th>
                         <Trans>Actions</Trans>
                       </th>
@@ -1503,14 +1839,50 @@ export const FinanceV2ExpensesTab = ({
                   </thead>
                   <tbody>
                     {data.recurringExpenses.map((rule) => {
+                      const targetMonth =
+                        rule.currentMonthTargetMonth ?? currentMonth;
+                      const startsLater = targetMonth < rule.startMonth;
+                      const endedEarlier = Boolean(
+                        rule.endMonth && targetMonth > rule.endMonth,
+                      );
+                      const monthStatus =
+                        rule.currentMonthStatus ?? 'NOT_POSTED';
+                      const canExpenseCurrentMonth =
+                        canExpenseRecurringRule(rule);
                       const isEditingThisRule =
                         showRecurringForm && editingRecId === rule.id;
                       const isConfirmingStop = confirmingStopRecId === rule.id;
+                      const isExpensingThisRule =
+                        expensingRecId === rule.id && canExpenseCurrentMonth;
+                      const isReExpense =
+                        monthStatus === 'VOID' || monthStatus === 'REVERSED';
+                      const isFollowingMonthPayroll =
+                        rule.payTiming === 'FOLLOWING_MONTH';
+                      const displayStartMonth = isFollowingMonthPayroll
+                        ? shiftYearMonth(rule.startMonth, 1)
+                        : rule.startMonth;
+                      const displayEndMonth =
+                        rule.endMonth && isFollowingMonthPayroll
+                          ? shiftYearMonth(rule.endMonth, 1)
+                          : (rule.endMonth ?? '');
+                      const categoryLabel =
+                        ALL_CATEGORY_LABELS.get(rule.category) ??
+                        rule.category.replaceAll('_', ' ');
+                      const expenseTypeLabel =
+                        rule.expenseType === 'DIRECT_EXPENSE'
+                          ? t`Direct`
+                          : t`Indirect`;
+
                       return (
                         <Fragment key={rule.id}>
                           <tr>
                             <td>
                               <strong>{rule.title}</strong>
+                              <div>
+                                <small>
+                                  {`${expenseTypeLabel} · ${categoryLabel}`}
+                                </small>
+                              </div>
                               {rule.employeeName && (
                                 <div>
                                   <StyledFinanceV2Pill data-tone="info">
@@ -1518,11 +1890,6 @@ export const FinanceV2ExpensesTab = ({
                                   </StyledFinanceV2Pill>
                                 </div>
                               )}
-                            </td>
-                            <td>
-                              {rule.expenseType === 'DIRECT_EXPENSE'
-                                ? t`Direct`
-                                : t`Indirect`}
                             </td>
                             <td>{rule.fundingAccountName}</td>
                             <td>{t`Day ${rule.dayOfMonth}`}</td>
@@ -1544,12 +1911,84 @@ export const FinanceV2ExpensesTab = ({
                               </StyledFinanceV2Pill>
                             </td>
                             <td>
+                              {monthStatus === 'POSTED' ? (
+                                <>
+                                  <StyledFinanceV2Pill data-tone="success">
+                                    <Trans>Expensed</Trans>
+                                  </StyledFinanceV2Pill>
+                                  {rule.currentMonthEntryDate && (
+                                    <div>
+                                      <small>
+                                        {rule.currentMonthEntryDate}
+                                      </small>
+                                    </div>
+                                  )}
+                                </>
+                              ) : startsLater ? (
+                                <StyledFinanceV2Pill data-tone="neutral">
+                                  {t`Starts ${displayStartMonth}`}
+                                </StyledFinanceV2Pill>
+                              ) : endedEarlier ? (
+                                <StyledFinanceV2Pill data-tone="neutral">
+                                  {t`Ended ${displayEndMonth}`}
+                                </StyledFinanceV2Pill>
+                              ) : rule.status !== 'ACTIVE' ? (
+                                <StyledFinanceV2Pill data-tone="neutral">
+                                  <Trans>Not active</Trans>
+                                </StyledFinanceV2Pill>
+                              ) : isCurrentMonthFullyLocked ? (
+                                <>
+                                  <StyledFinanceV2Pill data-tone="neutral">
+                                    <Trans>Locked</Trans>
+                                  </StyledFinanceV2Pill>
+                                  <div>
+                                    <small>
+                                      {t`Through ${lockedThroughDate ?? ''}`}
+                                    </small>
+                                  </div>
+                                </>
+                              ) : monthStatus === 'VOID' ? (
+                                <StyledFinanceV2Pill data-tone="warning">
+                                  <Trans>Voided</Trans>
+                                </StyledFinanceV2Pill>
+                              ) : monthStatus === 'REVERSED' ? (
+                                <StyledFinanceV2Pill data-tone="warning">
+                                  <Trans>Reversed</Trans>
+                                </StyledFinanceV2Pill>
+                              ) : (
+                                <StyledFinanceV2Pill data-tone="neutral">
+                                  <Trans>Not expensed</Trans>
+                                </StyledFinanceV2Pill>
+                              )}
+                            </td>
+                            <td>
                               {data.canManage &&
                                 (!rule.employeeName || data.canViewPayroll) && (
                                   <StyledFinanceV2ActionGroup>
+                                    {canExpenseCurrentMonth && (
+                                      <StyledDeliveryButton
+                                        type="button"
+                                        aria-expanded={isExpensingThisRule}
+                                        disabled={busy}
+                                        onClick={() =>
+                                          openExpenseRecurringForCurrentMonth(
+                                            rule,
+                                          )
+                                        }
+                                      >
+                                        {isExpensingThisRule ? (
+                                          <Trans>Close</Trans>
+                                        ) : isReExpense ? (
+                                          <Trans>Re-expense This Month</Trans>
+                                        ) : (
+                                          <Trans>Expense This Month</Trans>
+                                        )}
+                                      </StyledDeliveryButton>
+                                    )}
                                     {!rule.employeeName && (
                                       <StyledDeliveryButton
                                         type="button"
+                                        aria-expanded={isEditingThisRule}
                                         disabled={busy}
                                         onClick={() => openEditRecurring(rule)}
                                       >
@@ -1564,13 +2003,18 @@ export const FinanceV2ExpensesTab = ({
                                       <StyledDeliveryButton
                                         type="button"
                                         disabled={busy}
-                                        onClick={() =>
+                                        onClick={() => {
+                                          setFormError('');
+                                          setShowRecurringForm(false);
+                                          setEditingRecId(null);
+                                          setConfirmingStopRecId(null);
+                                          setExpensingRecId(null);
                                           void onRunCommand({
                                             action: 'setRecurringExpenseStatus',
                                             id: rule.id,
                                             status: 'PAUSED',
-                                          })
-                                        }
+                                          });
+                                        }}
                                       >
                                         <Trans>Pause</Trans>
                                       </StyledDeliveryButton>
@@ -1578,13 +2022,18 @@ export const FinanceV2ExpensesTab = ({
                                       <StyledDeliveryButton
                                         type="button"
                                         disabled={busy}
-                                        onClick={() =>
+                                        onClick={() => {
+                                          setFormError('');
+                                          setShowRecurringForm(false);
+                                          setEditingRecId(null);
+                                          setConfirmingStopRecId(null);
+                                          setExpensingRecId(null);
                                           void onRunCommand({
                                             action: 'setRecurringExpenseStatus',
                                             id: rule.id,
                                             status: 'ACTIVE',
-                                          })
-                                        }
+                                          });
+                                        }}
                                       >
                                         <Trans>Resume</Trans>
                                       </StyledDeliveryButton>
@@ -1597,6 +2046,7 @@ export const FinanceV2ExpensesTab = ({
                                           setFormError('');
                                           setShowRecurringForm(false);
                                           setEditingRecId(null);
+                                          setExpensingRecId(null);
                                           setConfirmingStopRecId((prev) =>
                                             prev === rule.id ? null : rule.id,
                                           );
@@ -1609,6 +2059,110 @@ export const FinanceV2ExpensesTab = ({
                                 )}
                             </td>
                           </tr>
+                          {isExpensingThisRule && (
+                            <tr>
+                              <td colSpan={7}>
+                                <StyledFinanceV2InlineEditor>
+                                  <form
+                                    noValidate
+                                    onSubmit={(event) =>
+                                      void handleExpenseRecurringForCurrentMonth(
+                                        event,
+                                        rule,
+                                      )
+                                    }
+                                  >
+                                    <StyledFinanceV2Stack>
+                                      <h4>
+                                        {targetMonth !== currentMonth
+                                          ? t`Expense "${rule.title}" for ${targetMonth} (settled in ${currentMonth})`
+                                          : t`Expense "${rule.title}" for ${currentMonth}`}
+                                      </h4>
+                                      {formError && (
+                                        <StyledFinanceV2Notice
+                                          data-tone="danger"
+                                          role="alert"
+                                        >
+                                          {formError}
+                                        </StyledFinanceV2Notice>
+                                      )}
+                                      <small>
+                                        {targetMonth !== currentMonth
+                                          ? t`Posts ${formatFinanceAmountMicros(rule.amountMicros, rule.currency)} from ${rule.fundingAccountName} into Day-to-Day Expenses for ${targetMonth} (paid in ${currentMonth}). Monthly automation will automatically skip ${targetMonth} so this salary is never double-counted; overtime, leave, and bonus adjustments post from Payroll on payday.`
+                                          : t`Posts ${formatFinanceAmountMicros(rule.amountMicros, rule.currency)} from ${rule.fundingAccountName} into Day-to-Day Expenses for ${currentMonth}. Monthly automation will automatically skip ${currentMonth} so this bill is never double-counted.`}
+                                      </small>
+                                      {isCurrentMonthPartiallyLocked && (
+                                        <small>
+                                          {t`Accounting period is locked through ${lockedThroughDate ?? ''}. Open dates: ${openMinDateInCurrentMonth} to ${data.today}.`}
+                                        </small>
+                                      )}
+                                      {isReExpense && (
+                                        <small>
+                                          {monthStatus === 'VOID'
+                                            ? t`An earlier ${targetMonth} entry was voided. Confirming posts a fresh entry for ${targetMonth}.`
+                                            : t`An earlier ${targetMonth} entry was reversed. Confirming posts a fresh entry for ${targetMonth}.`}
+                                        </small>
+                                      )}
+                                      <StyledFinanceV2FormGrid>
+                                        <label>
+                                          <Trans>Expense date</Trans>
+                                          <input
+                                            type="date"
+                                            autoFocus
+                                            aria-label={t`Recurring expense date`}
+                                            min={openMinDateInCurrentMonth}
+                                            max={data.today}
+                                            value={expenseRecDate}
+                                            onChange={(e) =>
+                                              setExpenseRecDate(e.target.value)
+                                            }
+                                          />
+                                        </label>
+                                        {rule.currency !== 'AED' && (
+                                          <label>
+                                            {t`FX Rate (${rule.currency} → AED)`}
+                                            <input
+                                              aria-label={t`Recurring expense FX rate (${rule.currency} → AED)`}
+                                              value={expenseRecFxRate}
+                                              placeholder={
+                                                data.profile.exchangeRates[
+                                                  rule.currency
+                                                ] ?? '1'
+                                              }
+                                              onChange={(e) =>
+                                                setExpenseRecFxRate(
+                                                  e.target.value,
+                                                )
+                                              }
+                                            />
+                                          </label>
+                                        )}
+                                      </StyledFinanceV2FormGrid>
+                                      <StyledFinanceV2ActionGroup>
+                                        <StyledDeliveryButton
+                                          type="submit"
+                                          data-primary="true"
+                                          disabled={busy}
+                                        >
+                                          <Trans>Confirm &amp; Expense</Trans>
+                                        </StyledDeliveryButton>
+                                        <StyledDeliveryButton
+                                          type="button"
+                                          onClick={() => {
+                                            setExpensingRecId(null);
+                                            setExpenseRecFxRate('');
+                                            setFormError('');
+                                          }}
+                                        >
+                                          <Trans>Cancel</Trans>
+                                        </StyledDeliveryButton>
+                                      </StyledFinanceV2ActionGroup>
+                                    </StyledFinanceV2Stack>
+                                  </form>
+                                </StyledFinanceV2InlineEditor>
+                              </td>
+                            </tr>
+                          )}
                           {isEditingThisRule && (
                             <tr>
                               <td colSpan={7}>

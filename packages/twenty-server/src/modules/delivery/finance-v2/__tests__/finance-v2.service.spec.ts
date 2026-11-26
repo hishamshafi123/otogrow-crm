@@ -33,6 +33,7 @@ import { DeliveryFinanceV2QuoteEntity } from 'src/modules/delivery/finance-v2/en
 import { DeliveryFinanceV2RecurringExpenseEntity } from 'src/modules/delivery/finance-v2/entities/delivery-finance-v2-recurring-expense.entity';
 import { DeliveryFinanceV2Service } from 'src/modules/delivery/finance-v2/finance-v2.service';
 import { type OtogrowAccessService } from 'src/modules/otogrow-access/otogrow-access.service';
+import { recordOtogrowActivity } from 'src/modules/otogrow-activity/record-otogrow-activity';
 import { OtogrowAiSpendEntity } from 'src/modules/otogrow-ai-budget/entities/otogrow-ai-spend.entity';
 
 type StoreMap = Map<unknown, Record<string, unknown>[]>;
@@ -3041,5 +3042,818 @@ describe('DeliveryFinanceV2Service End-to-End Accounting, Payroll, Quotes & Auto
     expect(
       nonAdminSnap.journals.some((j) => j.entryType === 'PAYROLL_BONUS'),
     ).toBe(false);
+  });
+
+  it('Recurring bills current-month expensing: manual post, create+expense, cron deduplication, void/reverse repost & privacy guards', async () => {
+    const { service, stores } = setup({ isAdmin: true });
+    const nov26Utc = new Date('2026-11-26T10:00:00Z');
+    const initialSnap = await service.snapshot(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      { fromDate: '2026-11-01', toDate: '2026-11-30', asOfDate: '2026-11-26' },
+      nov26Utc,
+    );
+    const cashUsd = initialSnap.accounts.find((a) => a.code === 'CASH:USD')!;
+    const cashAed = initialSnap.accounts.find((a) => a.code === 'CASH:AED')!;
+
+    // Seed opening cash balances so carrying AED outflow is deterministic
+    await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'recordOpeningBalance',
+        kind: 'CASH',
+        title: 'Opening USD Cash',
+        entryDate: '2026-11-01',
+        currency: 'USD',
+        amountMicros: '10000000000',
+        fxRateToAed: '3.6725',
+      },
+      nov26Utc,
+    );
+    await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'recordOpeningBalance',
+        kind: 'CASH',
+        title: 'Opening AED Cash',
+        entryDate: '2026-11-01',
+        currency: 'AED',
+        amountMicros: '20000000000',
+      },
+      nov26Utc,
+    );
+
+    // 1. Add recurring bill scheduled later this month (day 28 > Nov 26)
+    const createdBill = await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'saveRecurringExpense',
+        title: 'Adobe Creative Cloud',
+        expenseType: 'DIRECT_EXPENSE',
+        category: 'DIRECT_SUBSCRIPTION',
+        currency: 'USD',
+        amountMicros: '100000000',
+        dayOfMonth: 28,
+        fundingAccountId: cashUsd.id,
+        startMonth: '2026-11',
+        notes: 'Team design suite',
+      },
+      nov26Utc,
+    );
+    const adobeId = String(createdBill.recurringExpenseId);
+
+    const beforeExpenseSnap = await service.snapshot(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      { fromDate: '2026-11-01', toDate: '2026-11-30', asOfDate: '2026-11-26' },
+      nov26Utc,
+    );
+    const adobeBefore = beforeExpenseSnap.recurringExpenses.find(
+      (r) => r.id === adobeId,
+    )!;
+    expect(adobeBefore.currentMonthStatus).toBe('NOT_POSTED');
+    expect(adobeBefore.currentMonthEntryDate).toBeNull();
+    expect(
+      beforeExpenseSnap.analytics.upcomingCommitments30d.recurringExpenseCount,
+    ).toBe(1);
+
+    // 2. Expense it for the current month right now (default date clamps Nov 28 -> today Nov 26)
+    const expensed = await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'expenseRecurringForMonth',
+        id: adobeId,
+      },
+      nov26Utc,
+    );
+    expect(expensed.ok).toBe(true);
+    expect(expensed.month).toBe('2026-11');
+    expect(expensed.entryDate).toBe('2026-11-26');
+    const firstJournalId = String(expensed.journalId);
+
+    const afterExpenseSnap = await service.snapshot(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      { fromDate: '2026-11-01', toDate: '2026-11-30', asOfDate: '2026-11-26' },
+      nov26Utc,
+    );
+    const adobeAfter = afterExpenseSnap.recurringExpenses.find(
+      (r) => r.id === adobeId,
+    )!;
+    expect(adobeAfter.currentMonthStatus).toBe('POSTED');
+    expect(adobeAfter.currentMonthEntryDate).toBe('2026-11-26');
+    expect(adobeAfter.currentMonthJournalId).toBe(firstJournalId);
+    expect(afterExpenseSnap.balanceSheet.isBalanced).toBe(true);
+    expect(afterExpenseSnap.profitAndLoss.directExpenseAedMicros).toBe(
+      '367250000',
+    );
+    expect(
+      afterExpenseSnap.analytics.upcomingCommitments30d.recurringExpenseCount,
+    ).toBe(0);
+
+    // 3. Running due automation on Nov 30 must NOT double-post Adobe for 2026-11
+    const autoAfter = await service.runDueAutomationForWorkspace(
+      workspace.id,
+      adminMemberId,
+      '2026-11-30',
+    );
+    expect(autoAfter.recurringExpensesPosted).toBe(0);
+
+    // 4. Duplicate manual expenseRecurringForMonth must throw ConflictException
+    await expect(
+      service.command(
+        workspace,
+        adminMemberId,
+        userWorkspaceId,
+        { action: 'expenseRecurringForMonth', id: adobeId },
+        nov26Utc,
+      ),
+    ).rejects.toThrow(ConflictException);
+
+    // 5. Voiding the posted entry marks currentMonthStatus = VOID; cron skips it; manual re-expense works
+    await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'voidJournal',
+        journalId: firstJournalId,
+        reason: 'Adjusting amount',
+      },
+      nov26Utc,
+    );
+    const afterVoidSnap = await service.snapshot(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      { fromDate: '2026-11-01', toDate: '2026-11-30', asOfDate: '2026-11-26' },
+      nov26Utc,
+    );
+    expect(
+      afterVoidSnap.recurringExpenses.find((r) => r.id === adobeId)
+        ?.currentMonthStatus,
+    ).toBe('VOID');
+    const autoAfterVoid = await service.runDueAutomationForWorkspace(
+      workspace.id,
+      adminMemberId,
+      '2026-11-30',
+    );
+    expect(autoAfterVoid.recurringExpensesPosted).toBe(0);
+
+    const reExpensed = await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'expenseRecurringForMonth',
+        id: adobeId,
+        entryDate: '2026-11-25',
+      },
+      nov26Utc,
+    );
+    expect(reExpensed.entryDate).toBe('2026-11-25');
+
+    // 6. saveRecurringExpense with expenseCurrentMonth: true atomically creates & posts current month
+    const createAndExpense = await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'saveRecurringExpense',
+        title: 'Office Rent',
+        expenseType: 'INDIRECT_EXPENSE',
+        category: 'INDIRECT_OFFICE',
+        currency: 'AED',
+        amountMicros: '5000000000',
+        dayOfMonth: 5,
+        fundingAccountId: cashAed.id,
+        startMonth: '2026-11',
+        expenseCurrentMonth: true,
+        entryDate: '2026-11-05',
+      },
+      nov26Utc,
+    );
+    const rentId = String(createAndExpense.recurringExpenseId);
+    const rentJournalId = String(createAndExpense.journalId);
+    expect(createAndExpense.expensedMonth).toBe('2026-11');
+    expect(createAndExpense.entryDate).toBe('2026-11-05');
+
+    // Reject expenseCurrentMonth on edit
+    await expect(
+      service.command(
+        workspace,
+        adminMemberId,
+        userWorkspaceId,
+        {
+          action: 'saveRecurringExpense',
+          id: rentId,
+          title: 'Office Rent',
+          expenseType: 'INDIRECT_EXPENSE',
+          category: 'INDIRECT_OFFICE',
+          currency: 'AED',
+          amountMicros: '5000000000',
+          dayOfMonth: 5,
+          fundingAccountId: cashAed.id,
+          startMonth: '2026-11',
+          expenseCurrentMonth: true,
+        },
+        nov26Utc,
+      ),
+    ).rejects.toThrow(BadRequestException);
+
+    // 7. Period lock + reversal -> currentMonthStatus = REVERSED -> manual repost uses :REPOST: safely
+    await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      { action: 'setPeriodLock', lockedThroughDate: '2026-11-15' },
+      nov26Utc,
+    );
+    await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'reverseJournal',
+        journalId: rentJournalId,
+        reversalDate: '2026-11-20',
+        reason: 'Wrong amount in locked period',
+      },
+      nov26Utc,
+    );
+    const afterReverseSnap = await service.snapshot(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      { fromDate: '2026-11-01', toDate: '2026-11-30', asOfDate: '2026-11-26' },
+      nov26Utc,
+    );
+    expect(
+      afterReverseSnap.recurringExpenses.find((r) => r.id === rentId)
+        ?.currentMonthStatus,
+    ).toBe('REVERSED');
+
+    // Locked entryDate is rejected; default entryDate shifts safely to today (2026-11-26)
+    await expect(
+      service.command(
+        workspace,
+        adminMemberId,
+        userWorkspaceId,
+        {
+          action: 'expenseRecurringForMonth',
+          id: rentId,
+          entryDate: '2026-11-10',
+        },
+        nov26Utc,
+      ),
+    ).rejects.toThrow(BadRequestException);
+
+    const repostedRent = await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'expenseRecurringForMonth',
+        id: rentId,
+      },
+      nov26Utc,
+    );
+    expect(repostedRent.entryDate).toBe('2026-11-26');
+    const repostedJournal = stores
+      .get(DeliveryFinanceV2JournalEntity)!
+      .find((j) => j.id === repostedRent.journalId);
+    expect(String(repostedJournal?.sourceRefId)).toContain(
+      `${rentId}:2026-11:REPOST:`,
+    );
+
+    // 8. Guards: paused rule, future startMonth, future entryDate, and non-admin payroll privacy
+    await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      { action: 'setRecurringExpenseStatus', id: adobeId, status: 'PAUSED' },
+      nov26Utc,
+    );
+    await expect(
+      service.command(
+        workspace,
+        adminMemberId,
+        userWorkspaceId,
+        { action: 'expenseRecurringForMonth', id: adobeId },
+        nov26Utc,
+      ),
+    ).rejects.toThrow(BadRequestException);
+
+    const futureRule = await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'saveRecurringExpense',
+        title: 'Next Month Tool',
+        expenseType: 'DIRECT_EXPENSE',
+        category: 'DIRECT_SUBSCRIPTION',
+        currency: 'AED',
+        amountMicros: '100000000',
+        dayOfMonth: 1,
+        fundingAccountId: cashAed.id,
+        startMonth: '2026-12',
+      },
+      nov26Utc,
+    );
+    await expect(
+      service.command(
+        workspace,
+        adminMemberId,
+        userWorkspaceId,
+        {
+          action: 'expenseRecurringForMonth',
+          id: String(futureRule.recurringExpenseId),
+        },
+        nov26Utc,
+      ),
+    ).rejects.toThrow(BadRequestException);
+
+    // Payroll privacy: non-admin finance.manage cannot expense a payroll-linked salary rule
+    await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'savePayrollProfile',
+        employeeMemberId: staffMemberId,
+        employeeName: 'Arjun',
+        roleLabel: 'Editor',
+        currency: 'AED',
+        baseSalaryMicros: '5000000000',
+        workingDaysPerMonth: 26,
+        paidLeavesPerMonth: 2,
+        payDayOfMonth: 28,
+        payTiming: 'SAME_MONTH',
+        fundingAccountId: cashAed.id,
+        startMonth: '2026-11',
+      },
+      nov26Utc,
+    );
+    const salaryRule = stores
+      .get(DeliveryFinanceV2RecurringExpenseEntity)!
+      .find((r) => r.employeeMemberId === staffMemberId)!;
+    const nonAdminSetup = setup({
+      isAdmin: false,
+      capabilities: ['finance.read', 'finance.manage'],
+    });
+    for (const [key, value] of stores.entries()) {
+      nonAdminSetup.stores.set(key, value);
+    }
+    await expect(
+      nonAdminSetup.service.command(
+        workspace,
+        staffMemberId,
+        userWorkspaceId,
+        {
+          action: 'expenseRecurringForMonth',
+          id: String(salaryRule.id),
+        },
+        nov26Utc,
+      ),
+    ).rejects.toThrow(ForbiddenException);
+
+    const finalSnap = await service.snapshot(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      { fromDate: '2026-11-01', toDate: '2026-11-30', asOfDate: '2026-11-26' },
+      nov26Utc,
+    );
+    expect(finalSnap.balanceSheet.isBalanced).toBe(true);
+  });
+
+  it('Recurring bills hardening: FOLLOWING_MONTH payroll, clientRequestId idempotency, FX spread, activity privacy, fully-locked month & multi-repost cycle', async () => {
+    const activityMock = recordOtogrowActivity as jest.Mock;
+    activityMock.mockClear();
+
+    const { service, stores } = setup({ isAdmin: true });
+    const dec03Utc = new Date('2026-12-03T10:00:00Z');
+    const dec10Utc = new Date('2026-12-10T10:00:00Z');
+    const baseSnap = await service.snapshot(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      { fromDate: '2026-12-01', toDate: '2026-12-31', asOfDate: '2026-12-03' },
+      dec03Utc,
+    );
+    const cashUsd = baseSnap.accounts.find((a) => a.code === 'CASH:USD')!;
+    const cashAed = baseSnap.accounts.find((a) => a.code === 'CASH:AED')!;
+
+    // Seed USD cash at book carrying rate 3.6000 AED/USD
+    await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'recordOpeningBalance',
+        kind: 'CASH',
+        title: 'Opening USD',
+        entryDate: '2026-11-01',
+        currency: 'USD',
+        amountMicros: '10000000000',
+        fxRateToAed: '3.6000',
+      },
+      dec03Utc,
+    );
+    await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'recordOpeningBalance',
+        kind: 'CASH',
+        title: 'Opening AED',
+        entryDate: '2026-11-01',
+        currency: 'AED',
+        amountMicros: '50000000000',
+      },
+      dec03Utc,
+    );
+
+    // 1. FOLLOWING_MONTH payroll rule (startMonth 2026-10, payDay 5) on Dec 3 targets service month 2026-11
+    await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'savePayrollProfile',
+        employeeMemberId: staffMemberId,
+        employeeName: 'Arjun',
+        roleLabel: 'Editor',
+        currency: 'AED',
+        baseSalaryMicros: '5000000000',
+        workingDaysPerMonth: 26,
+        paidLeavesPerMonth: 2,
+        payDayOfMonth: 5,
+        payTiming: 'FOLLOWING_MONTH',
+        fundingAccountId: cashAed.id,
+        startMonth: '2026-10',
+      },
+      dec03Utc,
+    );
+    const arjunRule = stores
+      .get(DeliveryFinanceV2RecurringExpenseEntity)!
+      .find((r) => r.employeeMemberId === staffMemberId)!;
+    const arjunRuleId = String(arjunRule.id);
+
+    const dec03Snap = await service.snapshot(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      { fromDate: '2026-12-01', toDate: '2026-12-31', asOfDate: '2026-12-03' },
+      dec03Utc,
+    );
+    const arjunSnapBefore = dec03Snap.recurringExpenses.find(
+      (r) => r.id === arjunRuleId,
+    )!;
+    expect(arjunSnapBefore.payTiming).toBe('FOLLOWING_MONTH');
+    expect(arjunSnapBefore.currentMonthTargetMonth).toBe('2026-11');
+    expect(arjunSnapBefore.currentMonthStatus).toBe('NOT_POSTED');
+
+    // Explicitly passing month='2026-12' on Dec 3 (settles 2027-01) must fail to avoid cross-month split
+    await expect(
+      service.command(
+        workspace,
+        adminMemberId,
+        userWorkspaceId,
+        {
+          action: 'expenseRecurringForMonth',
+          id: arjunRuleId,
+          month: '2026-12',
+          entryDate: '2026-12-03',
+        },
+        dec03Utc,
+      ),
+    ).rejects.toThrow(BadRequestException);
+
+    // Default expenseRecurringForMonth on Dec 3 posts service month 2026-11 on 2026-12-03 and suppresses activity log
+    activityMock.mockClear();
+    const arjunPosted = await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'expenseRecurringForMonth',
+        id: arjunRuleId,
+      },
+      dec03Utc,
+    );
+    expect(arjunPosted.month).toBe('2026-11');
+    expect(arjunPosted.entryDate).toBe('2026-12-03');
+    expect(activityMock).not.toHaveBeenCalled();
+
+    // Seed Oct salary so cron on Dec 5 only checks Nov (already posted -> 0 new recurring expenses)
+    await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'expenseRecurringForMonth',
+        id: arjunRuleId,
+        month: '2026-10',
+        entryDate: '2026-11-05',
+      },
+      dec03Utc,
+    );
+    const dec05Cron = await service.runDueAutomationForWorkspace(
+      workspace.id,
+      adminMemberId,
+      '2026-12-05',
+    );
+    expect(dec05Cron.recurringExpensesPosted).toBe(0);
+
+    // On Dec 10, snapshot still shows Arjun as POSTED (2026-12-03), never false NOT_POSTED
+    const dec10Snap = await service.snapshot(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      { fromDate: '2026-12-01', toDate: '2026-12-31', asOfDate: '2026-12-10' },
+      dec10Utc,
+    );
+    const arjunSnapAfter = dec10Snap.recurringExpenses.find(
+      (r) => r.id === arjunRuleId,
+    )!;
+    expect(arjunSnapAfter.currentMonthTargetMonth).toBe('2026-11');
+    expect(arjunSnapAfter.currentMonthStatus).toBe('POSTED');
+    expect(arjunSnapAfter.currentMonthEntryDate).toBe('2026-12-03');
+
+    // New FOLLOWING_MONTH salary starting 2026-12 has targetMonth 2026-11 < startMonth -> rejected on Dec 3
+    await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'savePayrollProfile',
+        employeeName: 'Future Starter',
+        roleLabel: 'Designer',
+        currency: 'AED',
+        baseSalaryMicros: '3000000000',
+        workingDaysPerMonth: 26,
+        paidLeavesPerMonth: 2,
+        payDayOfMonth: 5,
+        payTiming: 'FOLLOWING_MONTH',
+        fundingAccountId: cashAed.id,
+        startMonth: '2026-12',
+      },
+      dec03Utc,
+    );
+    const starterRule = stores
+      .get(DeliveryFinanceV2RecurringExpenseEntity)!
+      .find((r) => r.employeeName === 'Future Starter')!;
+    await expect(
+      service.command(
+        workspace,
+        adminMemberId,
+        userWorkspaceId,
+        { action: 'expenseRecurringForMonth', id: String(starterRule.id) },
+        dec03Utc,
+      ),
+    ).rejects.toThrow(BadRequestException);
+
+    // 2. saveRecurringExpense clientRequestId idempotency + FX carrying-cost spread + activity log
+    activityMock.mockClear();
+    const createPayload = {
+      action: 'saveRecurringExpense' as const,
+      title: 'AWS Cloud',
+      expenseType: 'DIRECT_EXPENSE' as const,
+      category: 'DIRECT_SUBSCRIPTION',
+      currency: 'USD' as const,
+      amountMicros: '100000000', // $100
+      dayOfMonth: 1,
+      fundingAccountId: cashUsd.id,
+      startMonth: '2026-12',
+      expenseCurrentMonth: true,
+      entryDate: '2026-12-03',
+      fxRateToAed: '3.8000', // book carrying rate is 3.6000 -> 20 AED FX spread
+      clientRequestId: 'rec-req-aws-2026-12-001',
+    };
+    const awsFirst = await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      createPayload,
+      dec03Utc,
+    );
+    expect(awsFirst.expensedMonth).toBe('2026-12');
+    expect(activityMock).toHaveBeenCalledTimes(1);
+
+    // Retry with identical clientRequestId returns idempotent: true without duplicating rule or journal
+    const awsRetry = await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      createPayload,
+      dec03Utc,
+    );
+    expect(awsRetry.idempotent).toBe(true);
+    expect(awsRetry.recurringExpenseId).toBe(awsFirst.recurringExpenseId);
+    expect(awsRetry.journalId).toBe(awsFirst.journalId);
+    const awsRulesCount = stores
+      .get(DeliveryFinanceV2RecurringExpenseEntity)!
+      .filter((r) => r.title === 'AWS Cloud').length;
+    expect(awsRulesCount).toBe(1);
+
+    // Verify FX carrying-cost spread (380 AED expense, 360 AED cash outflow, 20 AED FX gain)
+    const awsLines = stores
+      .get(DeliveryFinanceV2JournalLineEntity)!
+      .filter((l) => l.journalId === awsFirst.journalId);
+    expect(awsLines.length).toBe(3);
+    const totalDebits = awsLines.reduce(
+      (sum, l) => sum + BigInt(String(l.debitAedMicros)),
+      BigInt('0'),
+    );
+    const totalCredits = awsLines.reduce(
+      (sum, l) => sum + BigInt(String(l.creditAedMicros)),
+      BigInt('0'),
+    );
+    expect(totalDebits).toBe(BigInt('380000000'));
+    expect(totalCredits).toBe(BigInt('380000000'));
+
+    // Voiding AWS journal then retrying original clientRequestId must NOT resurrect the voided journal
+    await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'voidJournal',
+        journalId: String(awsFirst.journalId),
+        reason: 'Void test',
+      },
+      dec03Utc,
+    );
+    const awsRetryAfterVoid = await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      createPayload,
+      dec03Utc,
+    );
+    expect(awsRetryAfterVoid.idempotent).toBe(true);
+    expect(awsRetryAfterVoid.journalId).toBeUndefined();
+
+    // 3. Non-linked DIRECT_SALARY rule: activity suppressed for admin, blocked for non-admin finance.manage
+    activityMock.mockClear();
+    const directSalRule = await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'saveRecurringExpense',
+        title: 'Contractor Retainer Salary',
+        expenseType: 'DIRECT_EXPENSE',
+        category: 'DIRECT_SALARY',
+        currency: 'AED',
+        amountMicros: '2000000000',
+        dayOfMonth: 2,
+        fundingAccountId: cashAed.id,
+        startMonth: '2026-12',
+        expenseCurrentMonth: true,
+        entryDate: '2026-12-02',
+      },
+      dec03Utc,
+    );
+    expect(activityMock).not.toHaveBeenCalled();
+
+    const nonAdminSetup = setup({
+      isAdmin: false,
+      capabilities: ['finance.read', 'finance.manage'],
+    });
+    for (const [key, value] of stores.entries()) {
+      nonAdminSetup.stores.set(key, value);
+    }
+    await expect(
+      nonAdminSetup.service.command(
+        workspace,
+        staffMemberId,
+        userWorkspaceId,
+        {
+          action: 'saveRecurringExpense',
+          title: 'Sneaky Salary',
+          expenseType: 'DIRECT_EXPENSE',
+          category: 'DIRECT_SALARY',
+          currency: 'AED',
+          amountMicros: '1000000000',
+          dayOfMonth: 1,
+          fundingAccountId: cashAed.id,
+          startMonth: '2026-12',
+          expenseCurrentMonth: true,
+        },
+        dec03Utc,
+      ),
+    ).rejects.toThrow(ForbiddenException);
+    await expect(
+      nonAdminSetup.service.command(
+        workspace,
+        staffMemberId,
+        userWorkspaceId,
+        {
+          action: 'expenseRecurringForMonth',
+          id: String(directSalRule.recurringExpenseId),
+        },
+        dec03Utc,
+      ),
+    ).rejects.toThrow(ForbiddenException);
+
+    // 4. Repeated reverse -> :REPOST:2 -> void -> :REPOST:3 cycle + fully locked month rejection
+    await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      { action: 'setPeriodLock', lockedThroughDate: '2026-12-02' },
+      dec03Utc,
+    );
+    await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'reverseJournal',
+        journalId: String(directSalRule.journalId),
+        reversalDate: '2026-12-03',
+        reason: 'Locked correction',
+      },
+      dec03Utc,
+    );
+    const repost1 = await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'expenseRecurringForMonth',
+        id: String(directSalRule.recurringExpenseId),
+        entryDate: '2026-12-03',
+      },
+      dec03Utc,
+    );
+    await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'voidJournal',
+        journalId: String(repost1.journalId),
+        reason: 'Void repost 1',
+      },
+      dec03Utc,
+    );
+    const repost2 = await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'expenseRecurringForMonth',
+        id: String(directSalRule.recurringExpenseId),
+        entryDate: '2026-12-03',
+      },
+      dec03Utc,
+    );
+    expect(repost2.journalId).not.toBe(repost1.journalId);
+
+    // Fully locked through today (2026-12-03): expensing AWS (currently VOID) must fail cleanly
+    await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      { action: 'setPeriodLock', lockedThroughDate: '2026-12-03' },
+      dec03Utc,
+    );
+    await expect(
+      service.command(
+        workspace,
+        adminMemberId,
+        userWorkspaceId,
+        {
+          action: 'expenseRecurringForMonth',
+          id: String(awsFirst.recurringExpenseId),
+        },
+        dec03Utc,
+      ),
+    ).rejects.toThrow(BadRequestException);
+
+    const balancedSnap = await service.snapshot(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      { fromDate: '2026-12-01', toDate: '2026-12-31', asOfDate: '2026-12-03' },
+      dec03Utc,
+    );
+    expect(balancedSnap.balanceSheet.isBalanced).toBe(true);
   });
 });

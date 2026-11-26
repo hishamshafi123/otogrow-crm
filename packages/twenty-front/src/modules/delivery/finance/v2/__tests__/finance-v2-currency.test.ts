@@ -2,6 +2,7 @@ import {
   addDaysIso,
   buildExchangeRateNote,
   calculateDraftDocumentTotals,
+  computeDefaultRecurringExpenseDate,
   computeDefaultReversalDate,
   convertAedMicrosToDisplay,
   convertCurrencyMicros,
@@ -243,5 +244,36 @@ describe('finance-v2-currency helpers', () => {
     );
     expect(isFinanceV2AmountMicrosWithinLimit('-1')).toBe(false);
     expect(isFinanceV2AmountMicrosWithinLimit('01')).toBe(false);
+  });
+
+  it('computes default current-month recurring expense dates with month clamping, today cap, and period-lock fallback', () => {
+    expect(
+      computeDefaultRecurringExpenseDate('2026-11', 5, '2026-11-26', null),
+    ).toBe('2026-11-05');
+    expect(
+      computeDefaultRecurringExpenseDate('2026-11', 28, '2026-11-26', null),
+    ).toBe('2026-11-26');
+    expect(
+      computeDefaultRecurringExpenseDate('2026-02', 31, '2026-02-28', null),
+    ).toBe('2026-02-28');
+    expect(
+      computeDefaultRecurringExpenseDate(
+        '2026-11',
+        5,
+        '2026-11-26',
+        '2026-11-15',
+      ),
+    ).toBe('2026-11-26');
+    expect(
+      computeDefaultRecurringExpenseDate(
+        '2026-11',
+        5,
+        '2026-11-26',
+        '2026-11-26',
+      ),
+    ).toBe('2026-11-05');
+    expect(
+      computeDefaultRecurringExpenseDate('bad-month', 5, '2026-11-26', null),
+    ).toBe('2026-11-26');
   });
 });

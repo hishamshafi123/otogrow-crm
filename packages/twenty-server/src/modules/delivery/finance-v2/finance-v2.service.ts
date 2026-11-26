@@ -147,6 +147,61 @@ const isPayrollSensitiveRecurring = (
   Boolean(rule.employeeMemberId) ||
   isPayrollSensitiveCategory(rule.category);
 
+const resolveRecurringPayTiming = (
+  rule: {
+    dayOfMonth: number;
+    employeeMemberId: string | null;
+    employeeName: string | null;
+  },
+  linkedPayrollProfile?: {
+    payDayOfMonth: number;
+    payTiming?: 'SAME_MONTH' | 'FOLLOWING_MONTH' | null;
+  } | null,
+): 'SAME_MONTH' | 'FOLLOWING_MONTH' | null => {
+  if (linkedPayrollProfile) {
+    return (
+      linkedPayrollProfile.payTiming ??
+      (linkedPayrollProfile.payDayOfMonth <= 10
+        ? 'FOLLOWING_MONTH'
+        : 'SAME_MONTH')
+    );
+  }
+  if (rule.employeeMemberId || rule.employeeName) {
+    return rule.dayOfMonth <= 10 ? 'FOLLOWING_MONTH' : 'SAME_MONTH';
+  }
+  return null;
+};
+
+const resolveCurrentMonthTargetForRecurringRule = (
+  rule: {
+    dayOfMonth: number;
+    employeeMemberId: string | null;
+    employeeName: string | null;
+  },
+  linkedPayrollProfile:
+    | {
+        payDayOfMonth: number;
+        payTiming?: 'SAME_MONTH' | 'FOLLOWING_MONTH' | null;
+      }
+    | null
+    | undefined,
+  currentMonth: string,
+): string => {
+  const payTiming = resolveRecurringPayTiming(rule, linkedPayrollProfile);
+  return payTiming === 'FOLLOWING_MONTH'
+    ? previousYearMonth(currentMonth)
+    : currentMonth;
+};
+
+// Derives a stable RFC 4122 UUID so create-level clientRequestId retries hit the primary key safely.
+const deterministicUuidFromSeed = (seed: string): string => {
+  const bytes = createHash('sha256').update(seed).digest();
+  bytes[6] = (bytes[6] & 0x0f) | 0x50;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = bytes.subarray(0, 16).toString('hex');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
+};
+
 const EMAIL_RATE_WINDOW_MS = 60_000;
 const EMAIL_RATE_LIMIT = 20;
 
@@ -1401,6 +1456,245 @@ export class DeliveryFinanceV2Service {
     return counts;
   }
 
+  private async postSingleRecurringExpenseInTransaction(
+    manager: EntityManager,
+    params: {
+      workspaceId: string;
+      profile: DeliveryFinanceV2ProfileEntity;
+      systemAccounts: Map<string, DeliveryFinanceV2AccountEntity>;
+      rule: DeliveryFinanceV2RecurringExpenseEntity;
+      linkedPayrollProfile?: DeliveryFinanceV2PayrollProfileEntity | null;
+      month: string;
+      today: string;
+      entryDateOverride?: string;
+      fxRateOverride?: string;
+      actorMemberId: string;
+    },
+  ): Promise<DeliveryFinanceV2JournalEntity> {
+    const {
+      workspaceId,
+      profile,
+      systemAccounts,
+      rule,
+      linkedPayrollProfile,
+      month,
+      today,
+      entryDateOverride,
+      fxRateOverride,
+      actorMemberId,
+    } = params;
+
+    if (rule.status !== 'ACTIVE') {
+      throw new BadRequestException(
+        'Resume this recurring bill before expensing it.',
+      );
+    }
+
+    const currentMonth = monthOfDate(today);
+    if (month > currentMonth) {
+      throw new BadRequestException(
+        'Cannot expense a recurring bill for a future month.',
+      );
+    }
+    if (month < rule.startMonth) {
+      throw new BadRequestException(
+        `This recurring bill starts in ${rule.startMonth} and cannot be expensed for ${month}.`,
+      );
+    }
+    if (rule.endMonth && month > rule.endMonth) {
+      throw new BadRequestException(
+        `This recurring bill ended in ${rule.endMonth} and cannot be expensed for ${month}.`,
+      );
+    }
+
+    const isPayrollBase = Boolean(
+      linkedPayrollProfile || rule.employeeMemberId || rule.employeeName,
+    );
+    const effectivePayTiming = resolveRecurringPayTiming(
+      rule,
+      linkedPayrollProfile,
+    );
+    const settlementMonth = isPayrollBase
+      ? resolvePayrollSettlementMonth(
+          month,
+          rule.dayOfMonth,
+          effectivePayTiming ?? undefined,
+        )
+      : month;
+    if (settlementMonth > currentMonth) {
+      throw new BadRequestException(
+        `This salary for ${month} settles in ${settlementMonth} and cannot be expensed before ${settlementMonth}.`,
+      );
+    }
+    const scheduledDate = resolveScheduledDateForMonth(
+      settlementMonth,
+      rule.dayOfMonth,
+    );
+
+    let entryDate = entryDateOverride;
+    if (entryDate) {
+      if (entryDate > today) {
+        throw new BadRequestException(
+          `Expense date cannot be in the future (after ${today}).`,
+        );
+      }
+      if (entryDate.slice(0, 7) !== settlementMonth) {
+        throw new BadRequestException(
+          `Expense date must fall within ${settlementMonth}.`,
+        );
+      }
+    } else {
+      entryDate = scheduledDate <= today ? scheduledDate : today;
+      if (
+        profile.lockedThroughDate &&
+        entryDate <= profile.lockedThroughDate &&
+        today > profile.lockedThroughDate &&
+        today.slice(0, 7) === settlementMonth
+      ) {
+        entryDate = today;
+      }
+    }
+
+    assertDateNotLocked(profile.lockedThroughDate, entryDate, 'post entries');
+
+    const fundingAccount = await this.assertFundingAccount(
+      manager,
+      workspaceId,
+      rule.fundingAccountId,
+    );
+    if (
+      fundingAccount.subType === 'CASH_CURRENCY' &&
+      fundingAccount.currency !== rule.currency
+    ) {
+      throw new BadRequestException(
+        `Choose Company Cash (${rule.currency}) or a Person Liability account.`,
+      );
+    }
+
+    const journalRepo = manager.getRepository(DeliveryFinanceV2JournalEntity);
+    const sourceRefType = 'RECURRING_EXPENSE';
+    const baseRefId = `${rule.id}:${month}`;
+    const allRecurringJournals = await journalRepo.findBy({
+      workspaceId,
+      sourceRefType,
+    });
+    const matching = allRecurringJournals.filter(
+      (item) =>
+        item.sourceRefId === baseRefId ||
+        Boolean(item.sourceRefId?.startsWith(`${baseRefId}:REPOST:`)),
+    );
+
+    const postedReversals = await journalRepo.findBy({
+      workspaceId,
+      entryType: 'REVERSAL',
+      status: 'POSTED',
+    });
+    const reversedJournalIds = new Set(
+      postedReversals
+        .map((rev) => rev.reversalOfJournalId)
+        .filter((id): id is string => Boolean(id)),
+    );
+
+    const activePosted = matching.find(
+      (item) => item.status === 'POSTED' && !reversedJournalIds.has(item.id),
+    );
+    if (activePosted) {
+      throw new ConflictException(
+        `"${rule.title}" has already been expensed for ${month} (${activePosted.entryDate}).`,
+      );
+    }
+
+    // Reuse the canonical `${rule.id}:${month}` key unless a locked-period reversed POSTED row still
+    // occupies the partial unique index (status = 'POSTED'), in which case allocate a `:REPOST:` key.
+    let sourceRefId = baseRefId;
+    const usedPostedRefs = new Set(
+      matching
+        .filter((item) => item.status === 'POSTED')
+        .map((item) => item.sourceRefId)
+        .filter((ref): ref is string => Boolean(ref)),
+    );
+    if (usedPostedRefs.has(baseRefId)) {
+      let repostIndex = matching.length + 1;
+      while (usedPostedRefs.has(`${baseRefId}:REPOST:${repostIndex}`)) {
+        repostIndex += 1;
+      }
+      sourceRefId = `${baseRefId}:REPOST:${repostIndex}`;
+    }
+
+    const fxRate = this.resolveFxRate(profile, rule.currency, fxRateOverride);
+    const amount = BigInt(rule.amountMicros);
+    const aedAmount = convertToAedMicros(amount, rule.currency, fxRate);
+    assertPositiveAed(aedAmount, 'Recurring expense amount');
+
+    const targetCode =
+      rule.expenseType === 'DIRECT_EXPENSE'
+        ? 'EXPENSE:DIRECT'
+        : 'EXPENSE:INDIRECT';
+    const targetAccount = systemAccounts.get(targetCode)!;
+    const fxAccount = systemAccounts.get('FX:GAIN_LOSS')!;
+    const fundingAed = await this.resolveCashOutflowCarryingAed(
+      manager,
+      workspaceId,
+      fundingAccount,
+      amount,
+      aedAmount,
+      entryDate,
+    );
+    const lines: FinanceV2JournalLineDraft[] = [
+      {
+        accountId: targetAccount.id,
+        debitAedMicros: aedAmount,
+        creditAedMicros: BigInt('0'),
+        currency: rule.currency,
+        originalSignedMicros: amount,
+      },
+      {
+        accountId: rule.fundingAccountId,
+        debitAedMicros: BigInt('0'),
+        creditAedMicros: fundingAed,
+        currency: rule.currency,
+        originalSignedMicros: -amount,
+      },
+    ];
+    this.appendFxSpreadLines(lines, fxAccount.id, aedAmount, fundingAed);
+
+    const journal = await this.postJournal(manager, {
+      workspaceId,
+      entryDate,
+      entryType: isPayrollBase ? 'PAYROLL_BASE' : 'RECURRING_EXPENSE',
+      category: rule.category,
+      title: `${rule.title} (${month})`,
+      notes: rule.notes,
+      currency: rule.currency,
+      amountMicros: amount,
+      fxRateToAed: fxRate,
+      aedAmountMicros: aedAmount,
+      fundingAccountId: rule.fundingAccountId,
+      targetAccountId: targetAccount.id,
+      employeeMemberId: rule.employeeMemberId,
+      sourceRefType,
+      sourceRefId,
+      createdBy: actorMemberId,
+      lines,
+    });
+
+    // Never leak employee salary details into the shared workspace activity feed.
+    if (!isPayrollBase && !isPayrollSensitiveCategory(rule.category)) {
+      await recordOtogrowActivity(manager, {
+        workspaceId,
+        actorId: actorMemberId,
+        category: 'BUSINESS',
+        action: rule.expenseType,
+        outcome: 'RECORDED',
+        summary: `${rule.title} (${month}, ${rule.currency})`.slice(0, 240),
+        sourceType: 'finance',
+        sourceId: journal.id,
+      });
+    }
+
+    return journal;
+  }
+
   private async postPayrollAdjustmentsInTransaction(
     manager: EntityManager,
     workspaceId: string,
@@ -1465,17 +1759,26 @@ export class DeliveryFinanceV2Service {
     );
 
     // Prevent posting PAYROLL_LEAVE_REDUCTION when no unreversed base salary was posted for this employee/month.
-    const baseSalaryJournals = payrollProfile.recurringExpenseId
+    const baseSalaryRefPrefix = payrollProfile.recurringExpenseId
+      ? `${payrollProfile.recurringExpenseId}:${month}`
+      : null;
+    const allRecurringBaseJournals = baseSalaryRefPrefix
       ? await journalRepo.findBy({
           workspaceId,
           sourceRefType: 'RECURRING_EXPENSE',
-          sourceRefId: `${payrollProfile.recurringExpenseId}:${month}`,
           status: 'POSTED',
         })
       : [];
-    const baseSalaryPosted = baseSalaryJournals.some(
-      (item) => !reversedJournalIds.has(item.id),
-    );
+    const baseSalaryPosted = baseSalaryRefPrefix
+      ? allRecurringBaseJournals.some(
+          (item) =>
+            (item.sourceRefId === baseSalaryRefPrefix ||
+              Boolean(
+                item.sourceRefId?.startsWith(`${baseSalaryRefPrefix}:REPOST:`),
+              )) &&
+            !reversedJournalIds.has(item.id),
+        )
+      : false;
 
     const allPayrollAdjJournals = await journalRepo.findBy({
       workspaceId,
@@ -2279,6 +2582,84 @@ export class DeliveryFinanceV2Service {
         projectProfitability,
       };
 
+      const payrollProfileByRecurringId = new Map<
+        string,
+        DeliveryFinanceV2PayrollProfileEntity
+      >();
+      for (const prof of allPayrollProfiles) {
+        if (prof.recurringExpenseId) {
+          payrollProfileByRecurringId.set(prof.recurringExpenseId, prof);
+        }
+      }
+      const recurringCurrentMonthStatusByRuleId = new Map<
+        string,
+        {
+          payTiming: 'SAME_MONTH' | 'FOLLOWING_MONTH' | null;
+          currentMonthTargetMonth: string;
+          currentMonthStatus: 'POSTED' | 'VOID' | 'REVERSED' | 'NOT_POSTED';
+          currentMonthEntryDate: string | null;
+          currentMonthJournalId: string | null;
+        }
+      >();
+      const timestampOf = (value: Date | string | undefined): number => {
+        if (!value) return 0;
+        const ms = value instanceof Date ? value.getTime() : Date.parse(value);
+        return Number.isFinite(ms) ? ms : 0;
+      };
+      for (const rule of recurringExpenses) {
+        const linkedPayroll = payrollProfileByRecurringId.get(rule.id);
+        const payTiming = resolveRecurringPayTiming(rule, linkedPayroll);
+        const targetMonth = resolveCurrentMonthTargetForRecurringRule(
+          rule,
+          linkedPayroll,
+          currentMonth,
+        );
+        const baseRefId = `${rule.id}:${targetMonth}`;
+        const matching = existingRecurringJournals
+          .filter(
+            (item) =>
+              item.sourceRefId === baseRefId ||
+              Boolean(item.sourceRefId?.startsWith(`${baseRefId}:REPOST:`)),
+          )
+          .sort(
+            (left, right) =>
+              timestampOf(right.createdAt) - timestampOf(left.createdAt) ||
+              right.id.localeCompare(left.id),
+          );
+        const activePosted = matching.find(
+          (item) =>
+            item.status === 'POSTED' && !reversedJournalIds.has(item.id),
+        );
+        if (activePosted) {
+          recurringCurrentMonthStatusByRuleId.set(rule.id, {
+            payTiming,
+            currentMonthTargetMonth: targetMonth,
+            currentMonthStatus: 'POSTED',
+            currentMonthEntryDate: activePosted.entryDate,
+            currentMonthJournalId: activePosted.id,
+          });
+        } else if (matching.length > 0) {
+          const latest = matching[0];
+          const latestIsReversed =
+            latest.status === 'POSTED' && reversedJournalIds.has(latest.id);
+          recurringCurrentMonthStatusByRuleId.set(rule.id, {
+            payTiming,
+            currentMonthTargetMonth: targetMonth,
+            currentMonthStatus: latestIsReversed ? 'REVERSED' : 'VOID',
+            currentMonthEntryDate: null,
+            currentMonthJournalId: null,
+          });
+        } else {
+          recurringCurrentMonthStatusByRuleId.set(rule.id, {
+            payTiming,
+            currentMonthTargetMonth: targetMonth,
+            currentMonthStatus: 'NOT_POSTED',
+            currentMonthEntryDate: null,
+            currentMonthJournalId: null,
+          });
+        }
+      }
+
       return {
         workspaceId: workspace.id,
         memberId,
@@ -2342,13 +2723,22 @@ export class DeliveryFinanceV2Service {
           createdAt: item.createdAt.toISOString(),
           updatedAt: item.updatedAt.toISOString(),
         })),
-        recurringExpenses: recurringExpenses.map((rule) => ({
-          ...rule,
-          fundingAccountName:
-            accountById.get(rule.fundingAccountId)?.name ?? 'Unknown account',
-          createdAt: rule.createdAt.toISOString(),
-          updatedAt: rule.updatedAt.toISOString(),
-        })),
+        recurringExpenses: recurringExpenses.map((rule) => {
+          const monthState = recurringCurrentMonthStatusByRuleId.get(rule.id);
+          return {
+            ...rule,
+            fundingAccountName:
+              accountById.get(rule.fundingAccountId)?.name ?? 'Unknown account',
+            payTiming: monthState?.payTiming ?? null,
+            currentMonthTargetMonth:
+              monthState?.currentMonthTargetMonth ?? currentMonth,
+            currentMonthStatus: monthState?.currentMonthStatus ?? 'NOT_POSTED',
+            currentMonthEntryDate: monthState?.currentMonthEntryDate ?? null,
+            currentMonthJournalId: monthState?.currentMonthJournalId ?? null,
+            createdAt: rule.createdAt.toISOString(),
+            updatedAt: rule.updatedAt.toISOString(),
+          };
+        }),
         payrollProfiles: payrollProfiles.map((prof) => {
           const linkedRule = prof.recurringExpenseId
             ? recurringById.get(prof.recurringExpenseId)
@@ -3587,6 +3977,19 @@ export class DeliveryFinanceV2Service {
                 'Only workspace administrators can manage salary schedules.',
               );
             }
+            if (input.id && input.expenseCurrentMonth) {
+              throw new BadRequestException(
+                'Use Expense This Month on an existing recurring bill.',
+              );
+            }
+            if (
+              !input.expenseCurrentMonth &&
+              (input.entryDate !== undefined || input.fxRateToAed !== undefined)
+            ) {
+              throw new BadRequestException(
+                'Expense date and FX rate apply only when expensing for the current month.',
+              );
+            }
             const funding = await this.assertFundingAccount(
               manager,
               workspace.id,
@@ -3656,8 +4059,49 @@ export class DeliveryFinanceV2Service {
               }
               rule = await repo.save(existing);
             } else {
+              const deterministicId = input.clientRequestId
+                ? deterministicUuidFromSeed(
+                    `finance-v2:saveRecurringExpense:${workspace.id}:${input.clientRequestId}`,
+                  )
+                : null;
+              if (deterministicId) {
+                const existingIdempotentRule = await repo.findOneBy({
+                  workspaceId: workspace.id,
+                  id: deterministicId,
+                });
+                if (existingIdempotentRule) {
+                  if (input.expenseCurrentMonth) {
+                    const currentMonth = monthOfDate(today);
+                    const existingJournal = await manager
+                      .getRepository(DeliveryFinanceV2JournalEntity)
+                      .findOneBy({
+                        workspaceId: workspace.id,
+                        sourceRefType: 'RECURRING_EXPENSE',
+                        sourceRefId: `${existingIdempotentRule.id}:${currentMonth}`,
+                        status: 'POSTED',
+                      });
+                    return {
+                      ok: true,
+                      recurringExpenseId: existingIdempotentRule.id,
+                      ...(existingJournal
+                        ? {
+                            journalId: existingJournal.id,
+                            expensedMonth: currentMonth,
+                            entryDate: existingJournal.entryDate,
+                          }
+                        : {}),
+                      idempotent: true,
+                    };
+                  }
+                  return {
+                    ok: true,
+                    recurringExpenseId: existingIdempotentRule.id,
+                    idempotent: true,
+                  };
+                }
+              }
               rule = repo.create({
-                id: randomUUID(),
+                id: deterministicId ?? randomUUID(),
                 workspaceId: workspace.id,
                 title: input.title,
                 expenseType: input.expenseType,
@@ -3676,7 +4120,87 @@ export class DeliveryFinanceV2Service {
               });
               await repo.save(rule);
             }
+            if (input.expenseCurrentMonth) {
+              const currentMonth = monthOfDate(today);
+              const posted = await this.postSingleRecurringExpenseInTransaction(
+                manager,
+                {
+                  workspaceId: workspace.id,
+                  profile,
+                  systemAccounts,
+                  rule,
+                  linkedPayrollProfile: null,
+                  month: currentMonth,
+                  today,
+                  entryDateOverride: input.entryDate,
+                  fxRateOverride: input.fxRateToAed,
+                  actorMemberId: memberId,
+                },
+              );
+              return {
+                ok: true,
+                recurringExpenseId: rule.id,
+                journalId: posted.id,
+                expensedMonth: currentMonth,
+                entryDate: posted.entryDate,
+              };
+            }
             return { ok: true, recurringExpenseId: rule.id };
+          }
+
+          case 'expenseRecurringForMonth': {
+            const rule = await manager
+              .getRepository(DeliveryFinanceV2RecurringExpenseEntity)
+              .findOneBy({
+                workspaceId: workspace.id,
+                id: input.id,
+              });
+            if (!rule) {
+              throw new NotFoundException('Recurring expense not found.');
+            }
+            const linkedProfile = await manager
+              .getRepository(DeliveryFinanceV2PayrollProfileEntity)
+              .findOneBy({
+                workspaceId: workspace.id,
+                recurringExpenseId: rule.id,
+              });
+            if (
+              (linkedProfile || isPayrollSensitiveRecurring(rule)) &&
+              !actor.isAdmin
+            ) {
+              throw new ForbiddenException(
+                'Only workspace administrators can expense salary schedules.',
+              );
+            }
+            const targetMonth =
+              input.month ??
+              resolveCurrentMonthTargetForRecurringRule(
+                rule,
+                linkedProfile,
+                monthOfDate(today),
+              );
+            const posted = await this.postSingleRecurringExpenseInTransaction(
+              manager,
+              {
+                workspaceId: workspace.id,
+                profile,
+                systemAccounts,
+                rule,
+                linkedPayrollProfile: linkedProfile,
+                month: targetMonth,
+                today,
+                entryDateOverride: input.entryDate,
+                fxRateOverride: input.fxRateToAed,
+                actorMemberId: memberId,
+              },
+            );
+            return {
+              ok: true,
+              recurringExpenseId: rule.id,
+              journalId: posted.id,
+              month: targetMonth,
+              entryDate: posted.entryDate,
+            };
           }
 
           case 'setRecurringExpenseStatus': {

@@ -135,6 +135,7 @@ export const StyledFinanceV2FormGrid = styled.div`
 `;
 
 export const StyledFinanceV2TableWrap = styled.div`
+  container-type: inline-size;
   max-width: 100%;
   overflow-x: auto;
 `;
@@ -240,10 +241,14 @@ export const StyledFinanceV2InlineEditor = styled.div`
   background: ${themeCssVariables.background.secondary};
   border: 1px solid ${themeCssVariables.border.color.medium};
   border-radius: 12px;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   gap: 14px;
+  left: 0;
+  max-width: calc(100cqi - 16px);
   padding: 16px 18px;
+  position: sticky;
 `;
 
 export const StyledFinanceV2ActionGroup = styled.div`

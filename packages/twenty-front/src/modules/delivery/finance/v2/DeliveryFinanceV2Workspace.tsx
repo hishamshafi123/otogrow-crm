@@ -212,6 +212,13 @@ export const DeliveryFinanceV2Workspace = ({
           : t`Accounting period lock cleared.`;
       case 'saveExchangeRates':
         return t`Default AED exchange rates updated.`;
+      case 'saveRecurringExpense':
+        if (payload?.expensedMonth) {
+          return t`Recurring bill saved and expensed for ${String(payload.expensedMonth)} — Day-to-Day Expenses, P&L, and Balance Sheet updated.`;
+        }
+        return isEdit ? t`Recurring bill updated.` : t`Recurring bill saved.`;
+      case 'expenseRecurringForMonth':
+        return t`Recurring bill expensed for ${String(payload?.month ?? '')} — Day-to-Day Expenses, P&L, and Balance Sheet updated.`;
       case 'savePayrollProfile':
         return t`Payroll salary saved and synced with Recurring Expenses.`;
       case 'addPayrollEntry':

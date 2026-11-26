@@ -47,6 +47,7 @@ Every milestone passes through this closed loop before advancing:
 | **M7** | Security, Financial Integrity & Edge-Case Hardening: FX Overdraft/Inflow Carrying AED, `bigint` Overflow Bounds, Logo Binary Validation + PDF Fallback, `receiptUrl` Sanitization, Non-Admin Payroll Privacy, `clientRequestId` Idempotency, Email TOCTOU & Rate Limiting | Implemented & Hardened (all 10 review findings fixed) | **PASS** (6/6; 28/28 server, 15/15 front) | **PASS** (Iter 5 review + rework) |
 | **M8** | UX & Workflow Polish Across All 5 Tabs: Inline Edit/Pay/Email/Void/Convert/Details Panels, Exact BigInt Draft Totals, Duplicate/Search/Filter, Archived Account Guards, Unsaved-Changes & Destructive Confirmations | Implemented & Hardened (all 11 review findings fixed) | **PASS** (6/6; 29/29 server, 17/17 front) | **PASS** (Iter 6 review + rework) |
 | **M9** | Accounting Controls, Production Reliability, Performance & CRM Unification: Period Lock & Reversal Journals, Workspace Timezone & Explicit Payroll Timing, Cached Logo Endpoint, DB Indexes (`1795508500000`), Cron Spec, and Founder Performance V2 Link Alignment | Implemented & Hardened (all 15 review findings fixed) | **PASS** (6/6; 38/38 server, 18/18 front, 124/124 founder) | **PASS** (Iter 7 review + rework) |
+| **M10** | Recurring Bills Current-Month Expensing: On-demand `expenseRecurringForMonth` action + inline row workflow, optional atomic `expenseCurrentMonth` on `saveRecurringExpense` (with `clientRequestId` idempotency), `This Month` status visibility (`Expensed` / `Not expensed` / `Voided` / `Reversed` / `Locked` / `Starts` / `Ended`), `FOLLOWING_MONTH` payroll settlement keying, and cron / 30d commitment deduplication | Implemented & Hardened (all 7 review findings fixed) | **PASS** (6/6; 40/40 server, 23/23 front) | **PASS** (Iter 8 sign-off) |
 
 ---
 
@@ -130,6 +131,29 @@ Every milestone passes through this closed loop before advancing:
     - `[PASS] G7-SERVER-TSGO` — Direct `tsgo -p tsconfig.json --noEmit` in `packages/twenty-server` PASS (0 errors, 6.0s).
     - `[PASS] G7-FRONT-TSGO` — Direct `tsgo -p tsconfig.json --noEmit` in `packages/twenty-front` PASS (0 errors, 7.0s).
   - Founder performance regression suite (`npx jest src/modules/delivery/founder/ --runInBand`) → **8/8 suites, 124/124 tests PASS**.
+
+### Iteration 8 — M10 Recurring Bills Current-Month Expensing, Adversarial Audit & Sign-Off (2026-11-26)
+- **Implemented:**
+  - **Backend (`finance-v2-schemas.ts`, `finance-v2.service.ts`):**
+    - Added `expenseRecurringForMonth` action and shared `postSingleRecurringExpenseInTransaction` helper posting balanced double-entry journals with weighted carrying AED outflow, FX spread lines, period-lock enforcement, canonical `sourceRefType: 'RECURRING_EXPENSE'` / `sourceRefId: '${rule.id}:${month}'` deduplication (shared with `runDueAutomation` and `upcomingCommitments30d`), void re-expensing, locked-period reversal `:REPOST:` allocation, strict admin-only payroll privacy (including suppressing `recordOtogrowActivity` for payroll/salary schedules), and `FOLLOWING_MONTH` payroll settlement keying (`resolveRecurringPayTiming` / `resolveCurrentMonthTargetForRecurringRule`).
+    - Extended `saveRecurringExpense` with atomic `expenseCurrentMonth`, `entryDate`, `fxRateToAed`, and deterministic `clientRequestId` UUID idempotency (`deterministicUuidFromSeed`).
+    - Enriched `snapshot().recurringExpenses` (using already-loaded `existingRecurringJournals` and `reversedJournalIds`) with `payTiming`, `currentMonthTargetMonth`, `currentMonthStatus`, `currentMonthEntryDate`, and `currentMonthJournalId`.
+    - Updated `postPayrollAdjustmentsInTransaction` to recognize `:REPOST:` base salary refs.
+  - **Frontend (`finance-v2.types.ts`, `finance-v2-currency.ts`, `finance-v2.styles.ts`, `DeliveryFinanceV2Workspace.tsx`, `FinanceV2ExpensesTab.tsx`):**
+    - Added `computeDefaultRecurringExpenseDate` helper with month clamping, `today` cap, and locked-period fallback.
+    - Added **`This Month (YYYY-MM)`** status column (`Expensed` + date, `Not expensed`, `Voided`, `Reversed`, `Locked`, `Starts`, `Ended`, `Not active`) and inline **`Expense This Month`** / **`Re-expense This Month`** row panel (editable open-period `Expense date`, optional FX rate for non-AED bills, clear cron deduplication & `FOLLOWING_MONTH` settlement copy).
+    - Added **`Also expense for current month (YYYY-MM) right now`** checkbox + date/FX inputs on the **`+ New Recurring Bill`** form (preserving custom date across charge-day edits, resetting when month window changes, disabled with clear notice when current month is fully locked), and fixed pre-existing `resetRecurringDraft()` default (`'INDIRECT_RENT'` → `'DIRECT_EXPENSE'` / `'DIRECT_SUBSCRIPTION'`).
+    - Kept Recurring Bills table compact at 7 columns (Type + Category subtitle under Name) and made `StyledFinanceV2InlineEditor` mobile-viewport-safe (`position: sticky; left: 0; max-width: calc(100cqi - 16px)` inside `container-type: inline-size` `StyledFinanceV2TableWrap`).
+- **Independent Review #8 (`ba1af267-cf7d-4893-a9e1-be0f8ffbdaab`):** Caught **1 Critical (`C1`)**, **2 High (`H1–H2`)**, **3 Medium (`M1–M3`)**, and **Low / test gaps**: `C1` `FOLLOWING_MONTH` payroll keying to `currentMonth` instead of settling service month; `H1` missing `clientRequestId` create idempotency on `saveRecurringExpense`; `H2` stale `expensingRecRule` object after 30s polls + `Pause`/`Resume` error teleportation; `M1` fully locked month dead-end + `isValidIsoDate`/`isValidYearMonth`/`noValidate`; `M2` `recDay` overwriting custom `recExpenseDate` + month-change/Cancel draft reset; `M3` primary CTA overload + 8-column mobile inline editor overflow; plus a11y labels, `aria-expanded`, focus, and 5 missing regression scenarios.
+- **Rework, Final Gate Run & Sign-Off:** Resolved every finding (`C1`, `H1–H2`, `M1–M3`, and all Low/test gaps), formatted all 10 files cleanly (`oxfmt --check` 0 issues), verified:
+  - `node packages/twenty-server/scripts/check-finance-v2-loop.cjs` → **6/6 PASS**:
+    - `[PASS] G5-MIGRATION-ORDER` — 59 instance commands verified unique & monotonic.
+    - `[PASS] G1-G6-SERVER-TESTS` — **3/3 suites, 40/40 tests PASS**.
+    - `[PASS] G3-REAL-PDF-SMOKE` — Real `@react-pdf/renderer` PDF generation PASS (`Invoice=25562 bytes`, `Quote=25277 bytes`).
+    - `[PASS] G7-G8-FRONT-TESTS` — **3/3 suites, 23/23 tests PASS**.
+    - `[PASS] G7-SERVER-TSGO` — Direct `tsgo -p tsconfig.json --noEmit` in `packages/twenty-server` PASS (0 errors, 15.2s).
+    - `[PASS] G7-FRONT-TSGO` — Direct `tsgo -p tsconfig.json --noEmit` in `packages/twenty-front` PASS (0 errors, 73.2s).
+  - **Independent Re-Verification (`ba1af267-cf7d-4893-a9e1-be0f8ffbdaab`):** **SIGN-OFF APPROVED (PASS)** — all 8/8 gates (`G1–G8`) PASS, 0 Critical/High/Medium findings remaining.
 
 ---
 

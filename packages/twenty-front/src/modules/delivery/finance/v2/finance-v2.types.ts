@@ -202,6 +202,11 @@ export type FinanceV2RecurringExpense = {
   startMonth: string;
   endMonth: string | null;
   status: 'ACTIVE' | 'PAUSED' | 'STOPPED';
+  payTiming?: 'SAME_MONTH' | 'FOLLOWING_MONTH' | null;
+  currentMonthTargetMonth?: string;
+  currentMonthStatus?: 'POSTED' | 'VOID' | 'REVERSED' | 'NOT_POSTED';
+  currentMonthEntryDate?: string | null;
+  currentMonthJournalId?: string | null;
 };
 
 export type FinanceV2PayrollProfile = {

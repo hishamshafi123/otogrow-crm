@@ -242,6 +242,32 @@ export const computeDefaultReversalDate = (
   return candidate;
 };
 
+export const computeDefaultRecurringExpenseDate = (
+  month: string,
+  dayOfMonth: number,
+  today: string,
+  lockedThroughDate?: string | null,
+): string => {
+  if (!isValidYearMonth(month)) {
+    return today;
+  }
+  const [year, monthNumber] = month.split('-').map(Number);
+  const lastDay = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
+  const clampedDay = Math.min(Math.max(Math.trunc(dayOfMonth), 1), lastDay);
+  const scheduledDate = `${month}-${String(clampedDay).padStart(2, '0')}`;
+  let candidate = scheduledDate <= today ? scheduledDate : today;
+  if (
+    lockedThroughDate &&
+    isValidIsoDate(lockedThroughDate) &&
+    candidate <= lockedThroughDate &&
+    today > lockedThroughDate &&
+    today.slice(0, 7) === month
+  ) {
+    candidate = today;
+  }
+  return candidate;
+};
+
 export const getQuarterRange = (
   today: string,
 ): { fromDate: string; toDate: string } => {

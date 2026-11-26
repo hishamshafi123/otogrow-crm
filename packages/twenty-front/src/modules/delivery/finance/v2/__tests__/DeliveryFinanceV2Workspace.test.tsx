@@ -1233,4 +1233,414 @@ describe('DeliveryFinanceV2Workspace (G6 & G8)', () => {
       globalThis.fetch = originalFetch;
     }
   });
+
+  it('Recurring bills: shows current-month status, expenses an active bill inline, and supports creating + expensing immediately', async () => {
+    const user = userEvent.setup();
+    const recurringSnap: FinanceV2Snapshot = {
+      ...sampleSnapshot,
+      today: '2026-11-26',
+      profile: {
+        ...sampleSnapshot.profile,
+        lockedThroughDate: '2026-11-15',
+      },
+      recurringExpenses: [
+        {
+          id: 'rec-adobe',
+          title: 'Adobe Creative Cloud',
+          expenseType: 'DIRECT_EXPENSE',
+          category: 'DIRECT_SUBSCRIPTION',
+          currency: 'USD',
+          amountMicros: '99000000',
+          dayOfMonth: 28,
+          fundingAccountId: 'cash-usd',
+          fundingAccountName: 'Company Cash (USD)',
+          employeeMemberId: null,
+          employeeName: null,
+          notes: 'Design apps',
+          startMonth: '2026-11',
+          endMonth: null,
+          status: 'ACTIVE',
+          currentMonthStatus: 'NOT_POSTED',
+          currentMonthEntryDate: null,
+          currentMonthJournalId: null,
+        },
+        {
+          id: 'rec-figma',
+          title: 'Figma Organization',
+          expenseType: 'DIRECT_EXPENSE',
+          category: 'DIRECT_SUBSCRIPTION',
+          currency: 'USD',
+          amountMicros: '45000000',
+          dayOfMonth: 5,
+          fundingAccountId: 'cash-usd',
+          fundingAccountName: 'Company Cash (USD)',
+          employeeMemberId: null,
+          employeeName: null,
+          notes: '',
+          startMonth: '2026-10',
+          endMonth: null,
+          status: 'ACTIVE',
+          currentMonthStatus: 'POSTED',
+          currentMonthEntryDate: '2026-11-05',
+          currentMonthJournalId: 'j-figma-nov',
+        },
+        {
+          id: 'rec-voided',
+          title: 'Notion Plus',
+          expenseType: 'INDIRECT_EXPENSE',
+          category: 'INDIRECT_OFFICE',
+          currency: 'USD',
+          amountMicros: '20000000',
+          dayOfMonth: 10,
+          fundingAccountId: 'cash-usd',
+          fundingAccountName: 'Company Cash (USD)',
+          employeeMemberId: null,
+          employeeName: null,
+          notes: '',
+          startMonth: '2026-11',
+          endMonth: null,
+          status: 'ACTIVE',
+          currentMonthStatus: 'VOID',
+          currentMonthEntryDate: null,
+          currentMonthJournalId: null,
+        },
+        {
+          id: 'rec-paused',
+          title: 'Paused Tool',
+          expenseType: 'DIRECT_EXPENSE',
+          category: 'DIRECT_SUBSCRIPTION',
+          currency: 'USD',
+          amountMicros: '15000000',
+          dayOfMonth: 12,
+          fundingAccountId: 'cash-usd',
+          fundingAccountName: 'Company Cash (USD)',
+          employeeMemberId: null,
+          employeeName: null,
+          notes: '',
+          startMonth: '2026-11',
+          endMonth: null,
+          status: 'PAUSED',
+          currentMonthStatus: 'NOT_POSTED',
+          currentMonthEntryDate: null,
+          currentMonthJournalId: null,
+        },
+      ],
+    };
+
+    mockUseQuery.mockReturnValue({
+      data: { deliveryFinanceV2: recurringSnap },
+      loading: false,
+      error: undefined,
+      refetch: jest.fn(async () => undefined),
+    });
+    mockMutate.mockResolvedValue({
+      data: {
+        changeDeliveryFinanceV2: {
+          ok: true,
+          month: '2026-11',
+          expensedMonth: '2026-11',
+        },
+      },
+    });
+
+    renderWorkspace('/delivery?view=finance&financeView=expenses');
+    await user.click(
+      screen.getByRole('button', { name: /Recurring Bills & Salaries/i }),
+    );
+
+    // Already-expensed row shows Expensed pill + date and hides Expense This Month button
+    const figmaRow = screen.getByText('Figma Organization').closest('tr')!;
+    expect(within(figmaRow).getByText('Expensed')).toBeInTheDocument();
+    expect(within(figmaRow).getByText('2026-11-05')).toBeInTheDocument();
+    expect(
+      within(figmaRow).queryByRole('button', { name: /Expense This Month/i }),
+    ).not.toBeInTheDocument();
+
+    // Paused row hides Expense This Month button
+    const pausedRow = screen.getByText('Paused Tool').closest('tr')!;
+    expect(
+      within(pausedRow).queryByRole('button', { name: /Expense This Month/i }),
+    ).not.toBeInTheDocument();
+
+    // Voided row offers Re-expense This Month
+    const voidedRow = screen.getByText('Notion Plus').closest('tr')!;
+    expect(within(voidedRow).getByText('Voided')).toBeInTheDocument();
+    expect(
+      within(voidedRow).getByRole('button', {
+        name: /Re-expense This Month/i,
+      }),
+    ).toBeInTheDocument();
+
+    // Active unexpensed row: open inline panel, reject locked date, then post valid date + FX
+    const adobeRow = screen.getByText('Adobe Creative Cloud').closest('tr')!;
+    expect(within(adobeRow).getByText('Not expensed')).toBeInTheDocument();
+    await user.click(
+      within(adobeRow).getByRole('button', { name: /^Expense This Month$/i }),
+    );
+
+    const dateInput = screen.getByLabelText(/Recurring expense date/i);
+    expect(dateInput).toHaveValue('2026-11-26');
+    await user.clear(dateInput);
+    await user.type(dateInput, '2026-11-10');
+    await user.click(
+      screen.getByRole('button', { name: /Confirm & Expense/i }),
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent(/locked period/i);
+    expect(mockMutate).not.toHaveBeenCalled();
+
+    await user.clear(dateInput);
+    await user.type(dateInput, '2026-11-25');
+    await user.type(
+      screen.getByLabelText(/Recurring expense FX rate \(USD → AED\)/i),
+      '3.68',
+    );
+    await user.click(
+      screen.getByRole('button', { name: /Confirm & Expense/i }),
+    );
+    expect(mockMutate).toHaveBeenCalledWith({
+      variables: {
+        input: {
+          action: 'expenseRecurringForMonth',
+          id: 'rec-adobe',
+          month: '2026-11',
+          entryDate: '2026-11-25',
+          fxRateToAed: '3.68',
+        },
+      },
+    });
+    mockMutate.mockClear();
+
+    // Create new recurring bill with "Also expense for current month (2026-11) right now" checked,
+    // verify customized Expense date is preserved when Charge day changes, and clientRequestId is sent
+    await user.click(
+      screen.getByRole('button', { name: /\+ New Recurring Bill/i }),
+    );
+    await user.type(
+      screen.getByPlaceholderText(/Adobe Creative Cloud/i),
+      'Slack Pro',
+    );
+    await user.type(screen.getByPlaceholderText('99'), '120');
+    await user.click(
+      screen.getByRole('checkbox', {
+        name: /Also expense for current month \(2026-11\) right now/i,
+      }),
+    );
+    const createDateInput = screen.getByLabelText(
+      /Current month expense date/i,
+    );
+    // Day 1 is inside locked period (<= 2026-11-15), so default expense date safely picks today 2026-11-26
+    expect(createDateInput).toHaveValue('2026-11-26');
+    await user.clear(createDateInput);
+    await user.type(createDateInput, '2026-11-20');
+    const dayInput = screen.getByLabelText(/Charge day of month/i);
+    await user.clear(dayInput);
+    await user.type(dayInput, '24');
+    // Customized date stays 2026-11-20 after changing charge day
+    expect(createDateInput).toHaveValue('2026-11-20');
+
+    await user.click(
+      screen.getByRole('button', { name: /Save & Expense \(2026-11\)/i }),
+    );
+    const saveCall = mockMutate.mock.calls[0]?.[0]?.variables?.input;
+    expect(saveCall).toEqual(
+      expect.objectContaining({
+        action: 'saveRecurringExpense',
+        title: 'Slack Pro',
+        amountMicros: '120000000',
+        startMonth: '2026-11',
+        expenseCurrentMonth: true,
+        entryDate: '2026-11-20',
+      }),
+    );
+    expect(typeof saveCall.clientRequestId).toBe('string');
+    expect(saveCall.clientRequestId.length).toBeGreaterThanOrEqual(8);
+  });
+
+  it('Recurring bills: handles FOLLOWING_MONTH payroll settlement, Pause error cleanup, and fully locked month UX', async () => {
+    const user = userEvent.setup();
+    const payrollSnap: FinanceV2Snapshot = {
+      ...sampleSnapshot,
+      today: '2026-12-03',
+      profile: {
+        ...sampleSnapshot.profile,
+        lockedThroughDate: '2026-12-01',
+      },
+      recurringExpenses: [
+        {
+          id: 'rec-sal-arjun',
+          title: 'Arjun — Base Salary',
+          expenseType: 'DIRECT_EXPENSE',
+          category: 'DIRECT_SALARY',
+          currency: 'USD',
+          amountMicros: '1500000000',
+          dayOfMonth: 5,
+          fundingAccountId: 'cash-usd',
+          fundingAccountName: 'Company Cash (USD)',
+          employeeMemberId: 'mem-arjun',
+          employeeName: 'Arjun',
+          notes: '',
+          startMonth: '2026-10',
+          endMonth: null,
+          status: 'ACTIVE',
+          payTiming: 'FOLLOWING_MONTH',
+          currentMonthTargetMonth: '2026-11',
+          currentMonthStatus: 'NOT_POSTED',
+          currentMonthEntryDate: null,
+          currentMonthJournalId: null,
+        },
+        {
+          id: 'rec-sal-new',
+          title: 'New Hire — Base Salary',
+          expenseType: 'DIRECT_EXPENSE',
+          category: 'DIRECT_SALARY',
+          currency: 'USD',
+          amountMicros: '1000000000',
+          dayOfMonth: 5,
+          fundingAccountId: 'cash-usd',
+          fundingAccountName: 'Company Cash (USD)',
+          employeeMemberId: 'mem-new',
+          employeeName: 'New Hire',
+          notes: '',
+          startMonth: '2026-12',
+          endMonth: null,
+          status: 'ACTIVE',
+          payTiming: 'FOLLOWING_MONTH',
+          currentMonthTargetMonth: '2026-11',
+          currentMonthStatus: 'NOT_POSTED',
+          currentMonthEntryDate: null,
+          currentMonthJournalId: null,
+        },
+      ],
+    };
+
+    mockUseQuery.mockReturnValue({
+      data: { deliveryFinanceV2: payrollSnap },
+      loading: false,
+      error: undefined,
+      refetch: jest.fn(async () => undefined),
+    });
+    mockMutate.mockResolvedValue({
+      data: { changeDeliveryFinanceV2: { ok: true, month: '2026-11' } },
+    });
+
+    renderWorkspace('/delivery?view=finance&financeView=expenses');
+    await user.click(
+      screen.getByRole('button', { name: /Recurring Bills & Salaries/i }),
+    );
+
+    // New FOLLOWING_MONTH salary starting 2026-12 settles first in 2027-01 and hides Expense This Month
+    const newHireRow = screen
+      .getByText('New Hire — Base Salary')
+      .closest('tr')!;
+    expect(within(newHireRow).getByText('Starts 2027-01')).toBeInTheDocument();
+    expect(
+      within(newHireRow).queryByRole('button', { name: /Expense This Month/i }),
+    ).not.toBeInTheDocument();
+
+    // Existing FOLLOWING_MONTH salary targets service month 2026-11 (settled in 2026-12)
+    const arjunRow = screen.getByText('Arjun — Base Salary').closest('tr')!;
+    await user.click(
+      within(arjunRow).getByRole('button', { name: /^Expense This Month$/i }),
+    );
+    expect(
+      screen.getByText(/for 2026-11 \(settled in 2026-12\)/i),
+    ).toBeInTheDocument();
+
+    // Trigger a locked-date validation error, then click Pause -> error clears instead of teleporting
+    const dateInput = screen.getByLabelText(/Recurring expense date/i);
+    await user.clear(dateInput);
+    await user.type(dateInput, '2026-12-01');
+    await user.click(
+      screen.getByRole('button', { name: /Confirm & Expense/i }),
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent(/locked period/i);
+    await user.click(
+      within(arjunRow).getByRole('button', { name: /^Pause$/i }),
+    );
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+
+    // Re-open and submit valid date -> sends target service month 2026-11
+    mockMutate.mockClear();
+    await user.click(
+      within(arjunRow).getByRole('button', { name: /^Expense This Month$/i }),
+    );
+    await user.click(
+      screen.getByRole('button', { name: /Confirm & Expense/i }),
+    );
+    expect(mockMutate).toHaveBeenCalledWith({
+      variables: {
+        input: {
+          action: 'expenseRecurringForMonth',
+          id: 'rec-sal-arjun',
+          month: '2026-11',
+          entryDate: '2026-12-03',
+        },
+      },
+    });
+  });
+
+  it('Recurring bills: shows Locked pill and disables immediate expensing when current month is fully locked', async () => {
+    const user = userEvent.setup();
+    const lockedSnap: FinanceV2Snapshot = {
+      ...sampleSnapshot,
+      today: '2026-12-03',
+      profile: {
+        ...sampleSnapshot.profile,
+        lockedThroughDate: '2026-12-03',
+      },
+      recurringExpenses: [
+        {
+          id: 'rec-sal-arjun',
+          title: 'Arjun — Base Salary',
+          expenseType: 'DIRECT_EXPENSE',
+          category: 'DIRECT_SALARY',
+          currency: 'USD',
+          amountMicros: '1500000000',
+          dayOfMonth: 5,
+          fundingAccountId: 'cash-usd',
+          fundingAccountName: 'Company Cash (USD)',
+          employeeMemberId: 'mem-arjun',
+          employeeName: 'Arjun',
+          notes: '',
+          startMonth: '2026-10',
+          endMonth: null,
+          status: 'ACTIVE',
+          payTiming: 'FOLLOWING_MONTH',
+          currentMonthTargetMonth: '2026-11',
+          currentMonthStatus: 'NOT_POSTED',
+          currentMonthEntryDate: null,
+          currentMonthJournalId: null,
+        },
+      ],
+    };
+    mockUseQuery.mockReturnValue({
+      data: { deliveryFinanceV2: lockedSnap },
+      loading: false,
+      error: undefined,
+      refetch: jest.fn(async () => undefined),
+    });
+
+    renderWorkspace('/delivery?view=finance&financeView=expenses');
+    await user.click(
+      screen.getByRole('button', { name: /Recurring Bills & Salaries/i }),
+    );
+    const lockedArjunRow = screen
+      .getByText('Arjun — Base Salary')
+      .closest('tr')!;
+    expect(within(lockedArjunRow).getByText('Locked')).toBeInTheDocument();
+    expect(
+      within(lockedArjunRow).queryByRole('button', {
+        name: /Expense This Month/i,
+      }),
+    ).not.toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole('button', { name: /\+ New Recurring Bill/i }),
+    );
+    expect(
+      screen.getByRole('checkbox', {
+        name: /Also expense for current month \(2026-12\) right now/i,
+      }),
+    ).toBeDisabled();
+  });
 });

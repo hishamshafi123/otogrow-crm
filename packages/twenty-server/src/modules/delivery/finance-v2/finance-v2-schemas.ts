@@ -283,6 +283,19 @@ export const financeV2CommandSchema = z.discriminatedUnion('action', [
       startMonth: financeV2MonthSchema,
       endMonth: patchableMonth,
       notes: patchableText,
+      expenseCurrentMonth: z.boolean().optional(),
+      entryDate: financeV2IsoDateSchema.optional(),
+      fxRateToAed: financeV2FxRateSchema.optional(),
+      clientRequestId: optionalClientRequestId,
+    })
+    .strict(),
+  z
+    .object({
+      action: z.literal('expenseRecurringForMonth'),
+      id: z.uuid(),
+      month: financeV2MonthSchema.optional(),
+      entryDate: financeV2IsoDateSchema.optional(),
+      fxRateToAed: financeV2FxRateSchema.optional(),
     })
     .strict(),
   z
