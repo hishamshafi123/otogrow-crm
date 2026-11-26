@@ -234,6 +234,8 @@ it('supports keyboard preparation and guarded keyboard navigation after opening 
   await user.tab();
   expect(screen.getByLabelText('Client')).toHaveFocus();
   await user.tab();
+  expect(screen.getByRole('button', { name: 'Select all' })).toHaveFocus();
+  await user.tab();
   expect(screen.getByRole('checkbox', { name: 'Editor' })).toHaveFocus();
   await user.keyboard(' ');
   expect(screen.getByRole('checkbox', { name: 'Editor' })).toBeChecked();

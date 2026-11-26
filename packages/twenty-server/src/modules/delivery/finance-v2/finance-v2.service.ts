@@ -46,7 +46,6 @@ import { DeliveryFinanceV2PayrollProfileEntity } from 'src/modules/delivery/fina
 import { DeliveryFinanceV2ProfileEntity } from 'src/modules/delivery/finance-v2/entities/delivery-finance-v2-profile.entity';
 import { DeliveryFinanceV2QuoteEntity } from 'src/modules/delivery/finance-v2/entities/delivery-finance-v2-quote.entity';
 import { DeliveryFinanceV2RecurringExpenseEntity } from 'src/modules/delivery/finance-v2/entities/delivery-finance-v2-recurring-expense.entity';
-import { renderFinanceV2PdfBuffer } from 'src/modules/delivery/finance-v2/finance-v2-pdf.util';
 import {
   financeV2CommandSchema,
   financeV2SnapshotQuerySchema,
@@ -924,6 +923,9 @@ export class DeliveryFinanceV2Service {
       BigInt(invoice.totalMicros),
       BigInt(invoice.paidMicros),
     );
+    const { renderFinanceV2PdfBuffer } = await import(
+      'src/modules/delivery/finance-v2/finance-v2-pdf.util'
+    );
     return renderFinanceV2PdfBuffer({
       kind: 'INVOICE',
       documentNumber: invoice.invoiceNumber,
@@ -1001,6 +1003,9 @@ export class DeliveryFinanceV2Service {
     profile: DeliveryFinanceV2ProfileEntity,
     quote: DeliveryFinanceV2QuoteEntity,
   ): Promise<Buffer> {
+    const { renderFinanceV2PdfBuffer } = await import(
+      'src/modules/delivery/finance-v2/finance-v2-pdf.util'
+    );
     return renderFinanceV2PdfBuffer({
       kind: 'QUOTE',
       documentNumber: quote.quoteNumber,
