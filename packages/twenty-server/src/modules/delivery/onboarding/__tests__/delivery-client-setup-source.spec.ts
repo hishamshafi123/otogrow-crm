@@ -24,8 +24,10 @@ const setup = () => {
     name: `Brand ${index}`,
     updatedAt: '2026-10-30T00:00:00.000Z',
   }));
-  const find = jest.fn(async () => rows),
-    findOne = jest.fn(async () => rows[0] ?? null);
+  const find = jest.fn(async (_options?: Record<string, unknown>) => rows),
+    findOne = jest.fn(
+      async (_options?: Record<string, unknown>) => rows[0] ?? null,
+    );
   const getRepository = jest.fn(async () => ({ find, findOne }));
   jest
     .mocked(getWorkspaceContext)
@@ -79,5 +81,86 @@ describe('Native company onboarding source', () => {
       'CRM permissions',
     );
     expect(test.getRepository).not.toHaveBeenCalled();
+  });
+  it('selects flattened composite domainName columns in listByIds and maps formatted domainName values', async () => {
+    const test = setup();
+    const companyId = randomUUID();
+    test.find.mockResolvedValue([
+      {
+        id: companyId,
+        name: 'Belfort Entity Hokuro',
+        updatedAt: '2026-10-30T00:00:00.000Z',
+        domainName: {
+          primaryLinkUrl: 'https://belfort.example',
+          primaryLinkLabel: 'belfort.example',
+        },
+      } as unknown as (typeof test.rows)[number],
+    ]);
+
+    const result = await test.service.listByIds(auth, [companyId, companyId]);
+
+    expect(test.find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: {
+          id: true,
+          name: true,
+          domainNamePrimaryLinkUrl: true,
+          domainNamePrimaryLinkLabel: true,
+          updatedAt: true,
+        },
+      }),
+    );
+    const selectArg = (
+      test.find.mock.calls[0]?.[0] as { select?: Record<string, unknown> }
+    )?.select;
+    expect(selectArg).not.toHaveProperty('domainName');
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      id: companyId,
+      name: 'Belfort Entity Hokuro',
+      domainName: 'https://belfort.example',
+    });
+  });
+  it('selects flattened composite domainName columns in searchDirectory', async () => {
+    const test = setup();
+    const companyId = randomUUID();
+    test.find.mockResolvedValue([
+      {
+        id: companyId,
+        name: 'Belfort Entity Hokuro',
+        updatedAt: '2026-10-30T00:00:00.000Z',
+        domainName: {
+          primaryLinkUrl: '',
+          primaryLinkLabel: 'belfort.example',
+        },
+      } as unknown as (typeof test.rows)[number],
+    ]);
+
+    const result = await test.service.searchDirectory(auth, 'Belfort', 50);
+
+    expect(test.find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        take: 51,
+        select: {
+          id: true,
+          name: true,
+          domainNamePrimaryLinkUrl: true,
+          domainNamePrimaryLinkLabel: true,
+          updatedAt: true,
+        },
+      }),
+    );
+    const selectArg = (
+      test.find.mock.calls[0]?.[0] as { select?: Record<string, unknown> }
+    )?.select;
+    expect(selectArg).not.toHaveProperty('domainName');
+    expect(result.hasMore).toBe(false);
+    expect(result.companies).toEqual([
+      expect.objectContaining({
+        id: companyId,
+        name: 'Belfort Entity Hokuro',
+        domainName: 'belfort.example',
+      }),
+    ]);
   });
 });

@@ -1,5 +1,5 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
-import { ILike, In } from 'typeorm';
+import { type FindOptionsSelect, ILike, In } from 'typeorm';
 import { escapeForIlike } from 'twenty-shared/utils';
 import { type WorkspaceAuthContext } from 'src/engine/core-modules/auth/types/workspace-auth-context.type';
 import { GlobalWorkspaceOrmManager } from 'src/engine/twenty-orm/global-workspace-datasource/global-workspace-orm.manager';
@@ -13,6 +13,26 @@ import {
 
 export type ClientDirectoryCompany = ClientSetupCompany & {
   domainName: string | null;
+};
+
+// CompanyWorkspaceEntity.domainName is a composite LINKS field whose persisted
+// columns are flattened via computeCompositeColumnName; selecting "domainName"
+// throws EntityPropertyNotFoundError / UNKNOWN_COLUMN in Twenty ORM v1 and v2.
+const DIRECTORY_COMPANY_SELECT = {
+  id: true,
+  name: true,
+  domainNamePrimaryLinkUrl: true,
+  domainNamePrimaryLinkLabel: true,
+  updatedAt: true,
+} as unknown as FindOptionsSelect<CompanyWorkspaceEntity>;
+
+type DirectoryCompanyRow = Pick<
+  CompanyWorkspaceEntity,
+  'id' | 'name' | 'updatedAt'
+> & {
+  domainName?: CompanyWorkspaceEntity['domainName'] | null;
+  domainNamePrimaryLinkUrl?: string | null;
+  domainNamePrimaryLinkLabel?: string | null;
 };
 
 const companyView = (
@@ -32,15 +52,14 @@ const companyView = (
 };
 
 const directoryCompanyView = (
-  company: Pick<
-    CompanyWorkspaceEntity,
-    'id' | 'name' | 'updatedAt' | 'domainName'
-  >,
+  company: DirectoryCompanyRow,
 ): ClientDirectoryCompany => ({
   ...companyView(company),
   domainName:
     company.domainName?.primaryLinkUrl?.trim() ||
     company.domainName?.primaryLinkLabel?.trim() ||
+    company.domainNamePrimaryLinkUrl?.trim() ||
+    company.domainNamePrimaryLinkLabel?.trim() ||
     null,
 });
 
@@ -89,7 +108,7 @@ export class DeliveryClientSetupSourceService {
       );
       const rows = await repository.find({
         where: { id: In(uniqueIds) },
-        select: { id: true, name: true, domainName: true, updatedAt: true },
+        select: DIRECTORY_COMPANY_SELECT,
         order: { name: 'ASC', id: 'ASC' },
       });
       return rows.map(directoryCompanyView);
@@ -110,7 +129,7 @@ export class DeliveryClientSetupSourceService {
       );
       const rows = await repository.find({
         where: trimmed ? { name: ILike(`%${escapeForIlike(trimmed)}%`) } : {},
-        select: { id: true, name: true, domainName: true, updatedAt: true },
+        select: DIRECTORY_COMPANY_SELECT,
         order: { name: 'ASC', id: 'ASC' },
         take: boundedLimit + 1,
       });

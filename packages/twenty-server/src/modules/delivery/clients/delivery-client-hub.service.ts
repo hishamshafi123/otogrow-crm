@@ -121,7 +121,7 @@ export class DeliveryClientHubService {
               memberId: identity.memberId,
               userWorkspaceId: identity.userWorkspaceId,
             },
-            ['id', 'title', 'assigneeId', 'dueAt'],
+            ['id', 'title', 'assigneeId', 'dueAt', 'createdAt'],
           );
           if (visibility) {
             const rows: {
