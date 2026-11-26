@@ -92,7 +92,11 @@ export class DeliveryClientHubService {
         const roster = normalizeClientRoster(operations?.state.clientRoster);
         const clientFees = operations?.state.clientFees ?? {};
 
-        const effectiveClientIds = resolveEffectiveClientCompanyIds(roster);
+        const effectiveClientIds = resolveEffectiveClientCompanyIds(
+          roster,
+          projects.map((project) => project.companyId),
+          engagements.map((engagement) => engagement.companyId),
+        );
 
         const designatedCompanies = effectiveClientIds.length
           ? await this.companies.listByIds(auth, effectiveClientIds)
@@ -224,17 +228,44 @@ export class DeliveryClientHubService {
           engagements.map((engagement) => engagement.companyId),
         );
 
-        const effectiveClientSet = new Set(
-          resolveEffectiveClientCompanyIds(roster),
+        const effectiveClientIds = resolveEffectiveClientCompanyIds(
+          roster,
+          projects.map((project) => project.companyId),
+          engagements.map((engagement) => engagement.companyId),
         );
+        const effectiveClientSet = new Set(effectiveClientIds);
 
+        const trimmedSearch = search.trim();
         const directory = await this.companies.searchDirectory(
           auth,
-          search.trim(),
+          trimmedSearch,
           100,
         );
 
-        const mapped = directory.companies.map((company) => {
+        const existingIds = new Set(
+          directory.companies.map((company) => company.id),
+        );
+        const priorityIds = [
+          ...new Set([
+            ...effectiveClientIds,
+            ...projectsCountByCompany.keys(),
+            ...engagementCompanySet,
+          ]),
+        ].filter((id) => !existingIds.has(id));
+        const normalizedSearch = trimmedSearch.toLocaleLowerCase();
+        const extraPriorityCompanies = priorityIds.length
+          ? (await this.companies.listByIds(auth, priorityIds)).filter(
+              (company) =>
+                !normalizedSearch ||
+                company.name.toLocaleLowerCase().includes(normalizedSearch),
+            )
+          : [];
+        const combinedCompanies = [
+          ...directory.companies,
+          ...extraPriorityCompanies,
+        ];
+
+        const mapped = combinedCompanies.map((company) => {
           const projectsCount = projectsCountByCompany.get(company.id) ?? 0;
           return {
             id: company.id,
@@ -258,7 +289,7 @@ export class DeliveryClientHubService {
 
         return {
           ...identity,
-          search: search.trim(),
+          search: trimmedSearch,
           hasMore: directory.hasMore,
           companies: mapped,
         };
@@ -336,7 +367,16 @@ export class DeliveryClientHubService {
 
       await repository.save(record);
 
-      const effectiveClientIds = resolveEffectiveClientCompanyIds(next);
+      const projects = await manager.getRepository(DeliveryProjectEntity).find({
+        where: { workspaceId: workspace.id },
+        select: { id: true, companyId: true },
+      });
+      const engagements = record.state.clients?.engagements ?? [];
+      const effectiveClientIds = resolveEffectiveClientCompanyIds(
+        next,
+        projects.map((project) => project.companyId),
+        engagements.map((engagement) => engagement.companyId),
+      );
 
       if (command.action === 'setFee' || command.action === 'clearFee') {
         await recordOtogrowActivity(manager, {

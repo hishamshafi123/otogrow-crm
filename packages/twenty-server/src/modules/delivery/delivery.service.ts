@@ -4,7 +4,10 @@ import { type DeliveryNativeTaskWriteOperation } from 'src/modules/delivery/nati
 import { freezeCreativeSubmissionLearning } from 'src/modules/delivery/creative/learning/freeze-creative-submission-learning';
 import { assertDeliveryCreativeReview } from 'src/modules/delivery/creative/assert-delivery-creative-review';
 import { recordDeliveryRevision } from 'src/modules/delivery/revisions/record-delivery-revision';
-import { type Fulfilment } from 'src/modules/delivery/operations/delivery-operations.types';
+import {
+  newDeliveryOperations,
+  type Fulfilment,
+} from 'src/modules/delivery/operations/delivery-operations.types';
 import {
   applyPublishedDeliveryWorkflow,
   getPublishedDeliveryWorkflow,
@@ -37,7 +40,10 @@ import { DeliveryProjectEntity } from 'src/modules/delivery/entities/delivery-pr
 import { DeliveryTaskEntity } from 'src/modules/delivery/entities/delivery-task.entity';
 import { DeliveryMemberEntity } from 'src/modules/delivery/entities/delivery-member.entity';
 import { DeliveryOperationsEntity } from 'src/modules/delivery/entities/delivery-operations.entity';
-import { resolveEffectiveClientCompanyIds } from 'src/modules/delivery/clients/delivery-client-hub.policy';
+import {
+  includeCompanyInClientRoster,
+  resolveEffectiveClientCompanyIds,
+} from 'src/modules/delivery/clients/delivery-client-hub.policy';
 import { deliveryCommandSchema } from 'src/modules/delivery/delivery-validation';
 import {
   assertDeliveryReview,
@@ -211,10 +217,15 @@ export class DeliveryService {
           const operationsRecord = await manager
             .getRepository(DeliveryOperationsEntity)
             .findOneBy({ workspaceId: workspace.id });
+          const engagementCompanyIds = (
+            operationsRecord?.state.clients?.engagements ?? []
+          ).map((engagement) => engagement.companyId);
           managerClientCompanyIds = [
             ...new Set([
               ...resolveEffectiveClientCompanyIds(
                 operationsRecord?.state.clientRoster,
+                projectCompanyIds,
+                engagementCompanyIds,
               ),
               ...projectCompanyIds,
             ]),
@@ -396,6 +407,39 @@ export class DeliveryService {
           memberIds: [...new Set(command.memberIds)],
           revision: (existing?.revision ?? 0) + 1,
         });
+        if (project.companyId) {
+          const operationsRepo = manager.getRepository(
+            DeliveryOperationsEntity,
+          );
+          if (
+            operationsRepo &&
+            typeof operationsRepo.findOneBy === 'function' &&
+            typeof operationsRepo.save === 'function'
+          ) {
+            const operationsRecord =
+              (await operationsRepo.findOneBy({ workspaceId: workspace.id })) ??
+              (typeof operationsRepo.create === 'function'
+                ? operationsRepo.create({
+                    workspaceId: workspace.id,
+                    state: newDeliveryOperations(),
+                  })
+                : null);
+            if (operationsRecord?.state) {
+              const rosterUpdate = includeCompanyInClientRoster(
+                operationsRecord.state.clientRoster,
+                project.companyId,
+                {
+                  forceReinclude:
+                    !existing || existing.companyId !== project.companyId,
+                },
+              );
+              if (rosterUpdate.changed) {
+                operationsRecord.state.clientRoster = rosterUpdate.roster;
+                await operationsRepo.save(operationsRecord);
+              }
+            }
+          }
+        }
         await recordOtogrowActivity(manager, {
           workspaceId: workspace.id,
           actorId: activityActor ? activityActor.actorId : memberId,

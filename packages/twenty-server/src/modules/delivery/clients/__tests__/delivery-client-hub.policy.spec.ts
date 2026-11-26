@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import {
   applyClientRosterUpdate,
   buildClientHubSnapshot,
+  includeCompanyInClientRoster,
   parseClientRosterUpdate,
   resolveEffectiveClientCompanyIds,
 } from 'src/modules/delivery/clients/delivery-client-hub.policy';
@@ -27,7 +28,7 @@ const makeDetails = (
 });
 
 describe('delivery-client-hub.policy', () => {
-  it('enforces a strict opt-in roster that never auto-pulls project or engagement companies', () => {
+  it('includes explicitly added, project-backed, and engagement-backed companies while honoring explicit exclusions', () => {
     const explicitId = randomUUID();
     const projectId = randomUUID();
     const engagementId = randomUUID();
@@ -42,10 +43,39 @@ describe('delivery-client-hub.policy', () => {
       [engagementId],
     );
 
-    expect(effective).toEqual([explicitId]);
+    expect(effective).toEqual([explicitId, projectId, engagementId].sort());
     expect(effective).not.toContain(excludedId);
-    expect(effective).not.toContain(projectId);
-    expect(effective).not.toContain(engagementId);
+  });
+
+  it('syncs a company into clientRoster while respecting forceReinclude for previously excluded companies', () => {
+    const companyA = randomUUID();
+    const excludedB = randomUUID();
+
+    const added = includeCompanyInClientRoster(undefined, companyA);
+    expect(added.changed).toBe(true);
+    expect(added.roster).toEqual({ includedIds: [companyA], excludedIds: [] });
+
+    const idempotent = includeCompanyInClientRoster(added.roster, companyA);
+    expect(idempotent.changed).toBe(false);
+
+    const preservedExclusion = includeCompanyInClientRoster(
+      { includedIds: [], excludedIds: [excludedB] },
+      excludedB,
+      { forceReinclude: false },
+    );
+    expect(preservedExclusion.changed).toBe(false);
+    expect(preservedExclusion.roster.excludedIds).toEqual([excludedB]);
+
+    const reincluded = includeCompanyInClientRoster(
+      { includedIds: [], excludedIds: [excludedB] },
+      excludedB,
+      { forceReinclude: true },
+    );
+    expect(reincluded.changed).toBe(true);
+    expect(reincluded.roster).toEqual({
+      includedIds: [excludedB],
+      excludedIds: [],
+    });
   });
 
   it('applies add, remove, batch set, and parses fee commands cleanly', () => {

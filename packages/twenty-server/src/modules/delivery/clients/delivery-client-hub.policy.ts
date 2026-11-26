@@ -82,11 +82,14 @@ export const normalizeClientRoster = (
   excludedIds: [...new Set(roster?.excludedIds ?? [])],
 });
 
-// Strict opt-in roster: only companies explicitly added or onboarded appear as clients.
+// Effective clients include explicitly added companies plus companies with
+// delivery projects or client engagements, while always honoring explicit
+// exclusions ("Not a client"). General CRM / Gmail-synced companies without
+// delivery work remain out automatically.
 export const resolveEffectiveClientCompanyIds = (
   roster: Partial<ClientRosterState> | null | undefined,
-  _projectCompanyIds?: (string | null | undefined)[],
-  _engagementCompanyIds?: (string | null | undefined)[],
+  projectCompanyIds: (string | null | undefined)[] = [],
+  engagementCompanyIds: (string | null | undefined)[] = [],
 ): string[] => {
   const normalized = normalizeClientRoster(roster);
   const excluded = new Set(normalized.excludedIds);
@@ -94,7 +97,48 @@ export const resolveEffectiveClientCompanyIds = (
   for (const id of normalized.includedIds) {
     if (!excluded.has(id)) effective.add(id);
   }
+  for (const id of projectCompanyIds) {
+    if (id && !excluded.has(id)) effective.add(id);
+  }
+  for (const id of engagementCompanyIds) {
+    if (id && !excluded.has(id)) effective.add(id);
+  }
   return [...effective].sort();
+};
+
+export const includeCompanyInClientRoster = (
+  current: Partial<ClientRosterState> | null | undefined,
+  companyId: string,
+  options?: { forceReinclude?: boolean },
+): { roster: ClientRosterState; changed: boolean } => {
+  const normalized = normalizeClientRoster(current);
+  const forceReinclude = options?.forceReinclude ?? true;
+  const included = new Set(normalized.includedIds);
+  const excluded = new Set(normalized.excludedIds);
+
+  if (excluded.has(companyId) && !forceReinclude) {
+    return { roster: normalized, changed: false };
+  }
+
+  const wasIncluded = included.has(companyId);
+  const wasExcluded = excluded.has(companyId);
+  if (wasIncluded && !wasExcluded) {
+    return { roster: normalized, changed: false };
+  }
+
+  if (!wasIncluded && included.size >= MAX_ROSTER_IDS) {
+    return { roster: normalized, changed: false };
+  }
+
+  included.add(companyId);
+  excluded.delete(companyId);
+  return {
+    roster: {
+      includedIds: [...included].sort(),
+      excludedIds: [...excluded].sort(),
+    },
+    changed: true,
+  };
 };
 
 export const applyClientRosterUpdate = (

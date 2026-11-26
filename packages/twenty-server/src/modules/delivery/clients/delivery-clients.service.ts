@@ -33,6 +33,7 @@ import {
   type ClientEngagement,
   type ClientBrandAsset,
 } from 'src/modules/delivery/clients/delivery-clients.types';
+import { includeCompanyInClientRoster } from 'src/modules/delivery/clients/delivery-client-hub.policy';
 import { recordOtogrowActivity } from 'src/modules/otogrow-activity/record-otogrow-activity';
 import { type OtogrowActivityInput } from 'src/modules/otogrow-activity/otogrow-activity.types';
 import { hasPerformanceMarketingService } from 'src/modules/delivery/advertising/delivery-meta-client-routing';
@@ -227,6 +228,7 @@ export class DeliveryClientsService {
   private async saveEngagement(
     manager: EntityManager,
     clients: DeliveryClients,
+    operations: DeliveryOperations,
     workspace: WorkspaceEntity,
     memberId: string,
     fields: z.infer<typeof engagementSchema>,
@@ -322,6 +324,14 @@ export class DeliveryClientsService {
     });
     if (existing) Object.assign(existing, engagement);
     else clients.engagements.push(engagement);
+    const rosterUpdate = includeCompanyInClientRoster(
+      operations.clientRoster,
+      project.companyId,
+      { forceReinclude: !existing },
+    );
+    if (rosterUpdate.changed) {
+      operations.clientRoster = rosterUpdate.roster;
+    }
     return engagement;
   }
 
@@ -337,11 +347,12 @@ export class DeliveryClientsService {
       throw new BadRequestException('Check the client form fields.');
     return this.transact(
       workspace.id,
-      async (clients, _operations, manager) => {
+      async (clients, operations, manager) => {
         await this.manager(workspace, memberId, userWorkspaceId, manager);
         const engagement = await this.saveEngagement(
           manager,
           clients,
+          operations,
           workspace,
           memberId,
           parsed.data,
@@ -372,7 +383,7 @@ export class DeliveryClientsService {
     const accessCode = randomBytes(8).toString('hex');
     const token = await this.transact(
       workspace.id,
-      async (clients, _operations, manager) => {
+      async (clients, operations, manager) => {
         await this.manager(workspace, memberId, userWorkspaceId, manager);
         const now = new Date().toISOString();
         let targetId = '';
@@ -381,6 +392,7 @@ export class DeliveryClientsService {
           const engagement = await this.saveEngagement(
             manager,
             clients,
+            operations,
             workspace,
             memberId,
             command.engagement,
@@ -763,9 +775,9 @@ export class DeliveryClientsService {
             throw new ForbiddenException();
           operations.business ??= newDeliveryBusiness();
           const previousRequest = operations.business.records.find(
-              (record) =>
-                record.clientEngagementId === engagement.id &&
-                record.clientRequestId === command.requestId,
+            (record) =>
+              record.clientEngagementId === engagement.id &&
+              record.clientRequestId === command.requestId,
           );
           if (previousRequest) {
             if (
