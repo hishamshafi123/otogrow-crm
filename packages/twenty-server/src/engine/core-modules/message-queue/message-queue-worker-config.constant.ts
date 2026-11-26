@@ -195,4 +195,24 @@ export const MESSAGE_QUEUE_WORKER_CONFIG: Record<
       boundedShutdownDrain: false,
     },
   },
+  [MessageQueue.mediaRenderQueue]: {
+    priority: 6,
+    workerOptions: {
+      concurrency: 1,
+      // 10 minutes: high-bitrate FFmpeg text-hook renders can take several minutes on VPS CPUs
+      lockDuration: 600_000,
+      maxStalledCount: 1,
+      boundedShutdownDrain: true,
+    },
+  },
+  [MessageQueue.driveSyncQueue]: {
+    priority: 4,
+    workerOptions: {
+      concurrency: 2,
+      // 10 minutes: resumable streaming uploads of large HD/4K video files to Google Drive
+      lockDuration: 600_000,
+      maxStalledCount: 2,
+      boundedShutdownDrain: true,
+    },
+  },
 };

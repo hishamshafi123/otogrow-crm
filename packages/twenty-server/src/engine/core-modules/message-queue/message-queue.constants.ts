@@ -22,4 +22,6 @@ export enum MessageQueue {
   aiStreamQueue = 'ai-stream-queue',
   leadScoringQueue = 'lead-scoring-queue',
   leadAssignmentQueue = 'lead-assignment-queue',
+  mediaRenderQueue = 'media-render-queue',
+  driveSyncQueue = 'drive-sync-queue',
 }

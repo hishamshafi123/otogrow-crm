@@ -13,6 +13,20 @@ export class ValidatedStorageDriver implements StorageDriver {
     return this.delegate.readFile(params);
   }
 
+  async readFileRange(params: {
+    filePath: string;
+    start: number;
+    end: number;
+  }): Promise<Readable> {
+    assertStoragePathIsSafe(params.filePath);
+
+    if (typeof this.delegate.readFileRange === 'function') {
+      return this.delegate.readFileRange(params);
+    }
+
+    throw new Error('Underlying storage driver does not support byte-range reads.');
+  }
+
   async writeFile(params: {
     filePath: string;
     sourceFile: Buffer | Uint8Array | string;

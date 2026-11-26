@@ -78,7 +78,15 @@ export const useApolloFactory = (options: Partial<Options> = {}) => {
         setCurrentWorkspaceMember(null);
         setCurrentWorkspace(null);
         setCurrentUserWorkspace(null);
+        const currentPathname = locationRef.current.pathname;
+        const isPublicPortalRoute =
+          currentPathname === '/client' ||
+          currentPathname.startsWith('/client/') ||
+          currentPathname.startsWith('/portal/') ||
+          currentPathname.startsWith('/delivery-client') ||
+          currentPathname.startsWith('/forms/');
         if (
+          !isPublicPortalRoute &&
           ![...ONGOING_USER_CREATION_PATHS, AppPath.ResetPassword].some(
             (path) => isMatchingLocation(locationRef.current, path),
           )

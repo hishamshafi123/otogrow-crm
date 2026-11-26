@@ -40,6 +40,14 @@ const ClientPortalPage = lazy(() =>
   })),
 );
 
+const ClientDashboardPortalPage = lazy(() =>
+  import('@/delivery/deliverables/ClientDashboardPortalPage').then(
+    (module) => ({
+      default: module.ClientDashboardPortalPage,
+    }),
+  ),
+);
+
 const createRootAppRouter = () =>
   createBrowserRouter(
     createRoutesFromElements(
@@ -76,6 +84,22 @@ const createRootAppRouter = () =>
             element={
               <LazyRoute fallback={null}>
                 <ClientPortalPage />
+              </LazyRoute>
+            }
+          />
+          <Route
+            path="/client"
+            element={
+              <LazyRoute fallback={null}>
+                <ClientDashboardPortalPage />
+              </LazyRoute>
+            }
+          />
+          <Route
+            path="/client/:slug"
+            element={
+              <LazyRoute fallback={null}>
+                <ClientDashboardPortalPage />
               </LazyRoute>
             }
           />

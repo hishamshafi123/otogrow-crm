@@ -95,7 +95,13 @@ RUN apk add --no-cache \
     'libcrypto3>=3.5.7-r0' \
     'libssl3>=3.5.7-r0' \
     'postgresql18-client>=18.4-r0' \
-    jq
+    jq \
+    ffmpeg \
+    fontconfig \
+    librsvg \
+    ttf-dejavu \
+    ttf-liberation \
+    font-noto
 
 COPY ./packages/twenty-docker/twenty/entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh

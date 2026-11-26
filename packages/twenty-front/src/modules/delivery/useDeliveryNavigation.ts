@@ -156,6 +156,12 @@ export const useDeliveryNavigation = (actor: DeliveryWorkspace['actor']) => {
           Icon: IconBriefcase,
         },
         {
+          view: 'deliverables',
+          label: t`Deliverables`,
+          description: t`Upload monthly videos & assets, manage Drive sync, and publish to clients.`,
+          Icon: IconVideo,
+        },
+        {
           view: 'knowledge',
           label: t`Brand knowledge`,
           description: t`Approved brand facts, creative rules, references and meeting decisions.`,

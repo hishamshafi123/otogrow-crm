@@ -93,6 +93,13 @@ export const usePageChangeEffectNavigateLocation = () => {
   );
 
   if (
+    location.pathname === '/client' ||
+    location.pathname.startsWith('/client/')
+  ) {
+    return;
+  }
+
+  if (
     (!isLogged || !isOnAWorkspace || !isDefined(currentWorkspace)) &&
     !someMatchingLocationOf([
       ...ONGOING_USER_CREATION_PATHS,

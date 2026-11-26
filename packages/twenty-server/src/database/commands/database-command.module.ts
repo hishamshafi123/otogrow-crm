@@ -8,6 +8,7 @@ import { SecretEncryptionRotationModule } from 'src/database/commands/secret-enc
 import { GenerateInstanceCommandCommand } from 'src/database/commands/generate-instance-command.command';
 import { InstallPreInstalledAppsCommand } from 'src/database/commands/install-pre-installed-apps.command';
 import { DeliveryFinanceV2CronCommand } from 'src/modules/delivery/finance-v2/finance-v2.cron.command';
+import { DeliveryVpsCleanupCronCommand } from 'src/modules/delivery/deliverables/delivery-vps-cleanup.cron.command';
 import { InstanceCommandGenerationService } from 'src/database/commands/instance-command-generation.service';
 import { ListOrphanedWorkspaceEntitiesCommand } from 'src/database/commands/list-and-delete-orphaned-workspace-entities.command';
 import { ConfirmationQuestion } from 'src/database/commands/questions/confirmation.question';
@@ -118,6 +119,7 @@ import { WorkflowCoreConsistencyModule } from 'src/modules/workflow/workflow-cor
     RebuildApplicationDefaultDepsCommand,
     InstallPreInstalledAppsCommand,
     DeliveryFinanceV2CronCommand,
+    DeliveryVpsCleanupCronCommand,
     provideWorkspaceScopedRepository(RoleEntity),
   ],
 })

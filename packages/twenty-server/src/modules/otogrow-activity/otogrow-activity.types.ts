@@ -84,7 +84,11 @@ export type OtogrowActivityInput = {
     | 'competitor'
     | 'release'
     | 'client-engagement'
-    | 'client-share';
+    | 'client-share'
+    | 'deliverable'
+    | 'video-hook-project'
+    | 'client-portal-access'
+    | 'drive-connection';
   sourceId: string;
   changes?: OtogrowActivityChange[];
   occurredAt?: Date;

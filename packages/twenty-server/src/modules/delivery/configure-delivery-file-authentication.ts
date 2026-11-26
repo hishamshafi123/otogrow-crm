@@ -21,5 +21,9 @@ export const configureDeliveryFileAuthentication = (
       path: 'portal/delivery-chat-files/*path',
       method: RequestMethod.ALL,
     },
+    {
+      path: 'portal/delivery-deliverables/*path',
+      method: RequestMethod.ALL,
+    },
   );
 };

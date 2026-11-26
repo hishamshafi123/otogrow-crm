@@ -6,6 +6,8 @@ import { DeliveryAdvertisingPage } from '@/delivery/advertising/workbench/Delive
 import { DeliveryCreativeProductionPage } from '@/delivery/creative/production/DeliveryCreativeProductionPage';
 import { DeliverySeoResultsPage } from '@/delivery/seo-results/DeliverySeoResultsPage';
 import { DeliveryDevelopmentPage } from '@/delivery/development/DeliveryDevelopmentPage';
+import { DeliveryDeliverablesPage } from '@/delivery/deliverables/DeliveryDeliverablesPage';
+import { DeliveryHookStudioPage } from '@/delivery/deliverables/DeliveryHookStudioPage';
 import { DeliveryCapacity } from '@/delivery/capacity/DeliveryCapacity';
 import { DeliveryTasksPage } from '@/delivery/tasks/DeliveryTasksPage';
 import { AtlasMediaPage } from '@/delivery/creative/atlas/AtlasMediaPage';
@@ -144,6 +146,8 @@ export const DeliveryWorkspacePage = () => {
         <DeliveryInboxPage />
       ) : view === 'onboarding' ? (
         <DeliveryClientSetupPage />
+      ) : view === 'deliverables' ? (
+        <DeliveryDeliverablesPage />
       ) : view === 'clients' &&
         (!params.get('clientView') ||
           params.get('clientView') === 'workspace') &&
@@ -154,6 +158,8 @@ export const DeliveryWorkspacePage = () => {
         !['agreements', 'legacy'].includes(params.get('clientView') ?? '') &&
         !params.has('task') ? (
         <DeliveryCommitmentsPage />
+      ) : view === 'creative' && params.get('creativeView') === 'hooks' ? (
+        <DeliveryHookStudioPage />
       ) : view === 'creative' && params.get('creativeView') === 'learning' ? (
         <DeliveryCreativeLearningPage />
       ) : view === 'creative' && params.get('creativeView') !== 'legacy' ? (

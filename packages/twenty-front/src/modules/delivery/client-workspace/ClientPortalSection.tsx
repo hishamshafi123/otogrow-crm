@@ -3,6 +3,7 @@ import { Trans, useLingui } from '@lingui/react/macro';
 import { type ClientHubItem } from '@/delivery/client-workspace/client-hub.types';
 import { formatBillingMode } from '@/delivery/client-workspace/client-hub-format';
 import { ClientSetupLink } from '@/delivery/onboarding/ClientSetupLink';
+import { ClientPortalAccessCard } from '@/delivery/deliverables/ClientPortalAccessCard';
 import {
   StyledClientProject,
   StyledClientTag,
@@ -28,6 +29,11 @@ export const ClientPortalSection = ({
 
   return (
     <StyledDeliveryStack>
+      <ClientPortalAccessCard
+        companyId={companyId}
+        companyName={hubClient?.name}
+      />
+
       <StyledDeliveryCard>
         <StyledDeliveryStack>
           <h3>
@@ -41,6 +47,9 @@ export const ClientPortalSection = ({
             </Trans>
           </p>
           <StyledDeliveryRow>
+            <Link to={`/delivery?view=deliverables&companyId=${companyId}`}>
+              <Trans>Open client deliverables</Trans>
+            </Link>
             <Link to="/delivery?view=clients&clientView=agreements">
               <Trans>Open all client portals &amp; links</Trans>
             </Link>

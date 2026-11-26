@@ -43,6 +43,8 @@ import { getPageTitleFromPath } from '~/utils/title-utils';
 export const WorkspaceAppProviders = () => {
   const { pathname } = useLocation();
   const pageTitle = getPageTitleFromPath(pathname);
+  const isPublicClientPortalRoute =
+    pathname === '/client' || pathname.startsWith('/client/');
 
   return (
     <SharedAppProviders>
@@ -76,19 +78,19 @@ export const WorkspaceAppProviders = () => {
                             <CommandMenuConfirmationModalManager />
                             <CommandRunner />
                             <OtogrowAccessLoaderEffect />
-                            <PhoneDialer />
+                            {!isPublicClientPortalRoute && <PhoneDialer />}
                           </StrictMode>
                         </DialogManager>
                       </DialogComponentInstanceContext.Provider>
                     </AgentChatProvider>
                   </SnackBarProvider>
                   <MainContextStoreProvider />
-                  <SupportChatEffect />
+                  {!isPublicClientPortalRoute && <SupportChatEffect />}
                   <InitializeQueryParamStateEffect />
                   <TrackPageViewEffect />
                   <RequestFreshCaptchaTokenEffect />
                   <PageChangeEffect />
-                  <WelcomeOverlay />
+                  {!isPublicClientPortalRoute && <WelcomeOverlay />}
                   <CompanyEnrichmentOnboardingEffect />
                   <SignOutOnOtherTabSignOutEffect />
                 </SSEProvider>

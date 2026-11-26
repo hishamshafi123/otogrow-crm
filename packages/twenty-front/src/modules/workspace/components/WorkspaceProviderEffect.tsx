@@ -64,6 +64,16 @@ export const WorkspaceProviderEffect = () => {
   ]);
 
   useEffect(() => {
+    const pathname = window.location.pathname;
+    const isPublicPortalRoute =
+      pathname === '/client' ||
+      pathname.startsWith('/client/') ||
+      pathname.startsWith('/portal/') ||
+      pathname.startsWith('/delivery-client') ||
+      pathname.startsWith('/forms/');
+    if (isPublicPortalRoute) {
+      return;
+    }
     if (
       isMultiWorkspaceEnabled &&
       isDefaultDomain &&

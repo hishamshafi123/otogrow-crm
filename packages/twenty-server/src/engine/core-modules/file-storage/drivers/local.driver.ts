@@ -70,6 +70,42 @@ export class LocalDriver implements StorageDriver {
     }
   }
 
+  async readFileRange(params: {
+    filePath: string;
+    start: number;
+    end: number;
+  }): Promise<Readable> {
+    const joinedPath = join(this.options.storagePath, params.filePath);
+    let filePath: string;
+
+    try {
+      filePath = realpathSync(path.resolve(joinedPath));
+    } catch {
+      throw new FileStorageException(
+        'File not found',
+        FileStorageExceptionCode.FILE_NOT_FOUND,
+      );
+    }
+
+    this.assertRealPathIsWithinStorage(filePath);
+
+    try {
+      return createReadStream(filePath, {
+        start: params.start,
+        end: params.end,
+      });
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        throw new FileStorageException(
+          'File not found',
+          FileStorageExceptionCode.FILE_NOT_FOUND,
+        );
+      }
+
+      throw error;
+    }
+  }
+
   // Resolves the on-disk path for a write, creating the parent folder and
   // enforcing storage containment + symlink rejection.
   private async resolveWritableRealPathOrThrow(

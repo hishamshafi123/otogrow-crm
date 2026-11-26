@@ -76,6 +76,14 @@ const ClientPortalPage = lazy(() =>
   })),
 );
 
+const ClientDashboardPortalPage = lazy(() =>
+  import('@/delivery/deliverables/ClientDashboardPortalPage').then(
+    (module) => ({
+      default: module.ClientDashboardPortalPage,
+    }),
+  ),
+);
+
 const Authorize = lazy(() =>
   import('~/pages/auth/Authorize').then((module) => ({
     default: module.Authorize,
@@ -359,6 +367,22 @@ const createWorkspaceAppRouter = ({
             element={
               <LazyRoute fallback={null}>
                 <ClientPortalPage />
+              </LazyRoute>
+            }
+          />
+          <Route
+            path="/client"
+            element={
+              <LazyRoute fallback={null}>
+                <ClientDashboardPortalPage />
+              </LazyRoute>
+            }
+          />
+          <Route
+            path="/client/:slug"
+            element={
+              <LazyRoute fallback={null}>
+                <ClientDashboardPortalPage />
               </LazyRoute>
             }
           />

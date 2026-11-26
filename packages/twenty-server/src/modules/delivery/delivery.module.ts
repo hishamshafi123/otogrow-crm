@@ -193,6 +193,30 @@ import { DeliveryCompetitorModule } from 'src/modules/delivery/competitors/deliv
 import { DeliverySeoResultsModule } from 'src/modules/delivery/seo-results/seo-results.module';
 import { DeliveryCreativeReadsService } from 'src/modules/delivery/creative/reads/delivery-creative-reads.service';
 import { DeliveryCreativeReadsResolver } from 'src/modules/delivery/creative/reads/delivery-creative-reads.resolver';
+import { DeliveryClientPortalAccessEntity } from 'src/modules/delivery/deliverables/entities/delivery-client-portal-access.entity';
+import { DeliveryDriveConnectionEntity } from 'src/modules/delivery/deliverables/entities/delivery-drive-connection.entity';
+import { DeliveryClientDriveMappingEntity } from 'src/modules/delivery/deliverables/entities/delivery-client-drive-mapping.entity';
+import { DeliveryDeliverableEntity } from 'src/modules/delivery/deliverables/entities/delivery-deliverable.entity';
+import { DeliveryVideoHookProjectEntity } from 'src/modules/delivery/deliverables/entities/delivery-video-hook-project.entity';
+import { DeliveryVideoHookVariationEntity } from 'src/modules/delivery/deliverables/entities/delivery-video-hook-variation.entity';
+import { DeliveryDeliverableReviewEntity } from 'src/modules/delivery/deliverables/entities/delivery-deliverable-review.entity';
+import { DeliveryContentMetricSnapshotEntity } from 'src/modules/delivery/deliverables/entities/delivery-content-metric-snapshot.entity';
+import { DeliveryMediaProbeService } from 'src/modules/delivery/deliverables/delivery-media-probe.service';
+import { DeliveryClientPortalAccessService } from 'src/modules/delivery/deliverables/delivery-client-portal-access.service';
+import { DeliveryClientPortalV2Controller } from 'src/modules/delivery/deliverables/delivery-client-portal-v2.controller';
+import { DeliveryClientPortalV2Service } from 'src/modules/delivery/deliverables/delivery-client-portal-v2.service';
+import { DeliveryDeliverablesService } from 'src/modules/delivery/deliverables/delivery-deliverables.service';
+import { DeliveryDriveService } from 'src/modules/delivery/deliverables/delivery-drive.service';
+import { DeliveryDriveOAuthController } from 'src/modules/delivery/deliverables/delivery-drive-oauth.controller';
+import { DeliveryHookAiService } from 'src/modules/delivery/deliverables/delivery-hook-ai.service';
+import { DeliveryHookRenderAdapter } from 'src/modules/delivery/deliverables/delivery-hook-render.adapter';
+import { DeliveryVideoHooksService } from 'src/modules/delivery/deliverables/delivery-video-hooks.service';
+import { DeliveryVpsCleanupService } from 'src/modules/delivery/deliverables/delivery-vps-cleanup.service';
+import {
+  DeliveryDeliverablesFilesController,
+  DeliveryDeliverablesMediaController,
+} from 'src/modules/delivery/deliverables/delivery-deliverables-files.controller';
+import { DeliveryDeliverablesResolver } from 'src/modules/delivery/deliverables/delivery-deliverables.resolver';
 
 @Module({
   imports: [
@@ -211,6 +235,14 @@ import { DeliveryCreativeReadsResolver } from 'src/modules/delivery/creative/rea
     LeadAssignmentModule,
     PermissionsModule,
     TypeOrmModule.forFeature([
+      DeliveryClientPortalAccessEntity,
+      DeliveryDriveConnectionEntity,
+      DeliveryClientDriveMappingEntity,
+      DeliveryDeliverableEntity,
+      DeliveryVideoHookProjectEntity,
+      DeliveryVideoHookVariationEntity,
+      DeliveryDeliverableReviewEntity,
+      DeliveryContentMetricSnapshotEntity,
       DeliveryInboxBindingEntity,
       DeliveryInboxConsentEntity,
       DeliveryInboxReplyEntity,
@@ -289,6 +321,10 @@ import { DeliveryCreativeReadsResolver } from 'src/modules/delivery/creative/rea
     ]),
   ],
   controllers: [
+    DeliveryDeliverablesFilesController,
+    DeliveryDeliverablesMediaController,
+    DeliveryDriveOAuthController,
+    DeliveryClientPortalV2Controller,
     DeliveryKnowledgeAssetsController,
     DeliveryVideoQaFilesController,
     DeliveryCreativeFilesController,
@@ -298,6 +334,16 @@ import { DeliveryCreativeReadsResolver } from 'src/modules/delivery/creative/rea
     DeliveryChatFilesController,
   ],
   providers: [
+    DeliveryMediaProbeService,
+    DeliveryClientPortalAccessService,
+    DeliveryClientPortalV2Service,
+    DeliveryDriveService,
+    DeliveryVpsCleanupService,
+    DeliveryHookRenderAdapter,
+    DeliveryHookAiService,
+    DeliveryVideoHooksService,
+    DeliveryDeliverablesService,
+    DeliveryDeliverablesResolver,
     DeliveryFinanceV2Service,
     DeliveryFinanceV2Resolver,
     DeliveryNativeTaskAccessService,
@@ -397,6 +443,12 @@ import { DeliveryCreativeReadsResolver } from 'src/modules/delivery/creative/rea
     DeliveryAssemblyAdapter,
   ],
   exports: [
+    DeliveryMediaProbeService,
+    DeliveryClientPortalAccessService,
+    DeliveryDriveService,
+    DeliveryVpsCleanupService,
+    DeliveryVideoHooksService,
+    DeliveryDeliverablesService,
     DeliveryFinanceV2Service,
     DeliveryInboxReplyService,
     DeliveryAtlasService,

@@ -212,6 +212,9 @@ const ClientWorkspaceDirectory = () => {
             >
               <Trans>Add from CRM</Trans>
             </StyledDeliveryButton>
+            <Link to="/delivery?view=deliverables">
+              <Trans>Deliverables</Trans>
+            </Link>
             <Link to="/delivery?view=clients&clientView=commitments">
               <Trans>Commitments</Trans>
             </Link>

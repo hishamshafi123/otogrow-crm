@@ -373,9 +373,12 @@ export class BullMQDriver
       );
     }
 
-    // This ensures only one waiting job can be queued for a specific option.id
+    // This ensures only one waiting/prioritized job can be queued for a specific option.id
     if (options?.id && !options?.allowDuplicatedPrefixes) {
-      const waitingJobs = await this.queueMap[queueName].getJobs(['waiting']);
+      const waitingJobs = await this.queueMap[queueName].getJobs([
+        'waiting',
+        'prioritized',
+      ]);
 
       const isJobAlreadyWaiting = waitingJobs.some(
         (job) => job.id?.slice(0, -(V4_LENGTH + 1)) === options.id,

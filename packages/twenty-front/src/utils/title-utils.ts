@@ -25,6 +25,9 @@ const getPathnameOrPrefix = (pathname: string) => {
 };
 
 export const getPageTitleFromPath = (pathname: string): string => {
+  if (pathname === '/client' || pathname.startsWith('/client/')) {
+    return 'Client Portal';
+  }
   const pathnameOrPrefix = getPathnameOrPrefix(pathname);
   switch (pathnameOrPrefix) {
     case AppPath.Verify:

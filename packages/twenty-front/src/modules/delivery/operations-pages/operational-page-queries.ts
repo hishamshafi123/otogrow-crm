@@ -3,6 +3,16 @@ export const OPERATIONAL_PAGE_QUERIES = {
     'DeliveryCommitmentEngagements',
     'DeliveryCommitments',
     'DeliveryClientSetup',
+    'DeliveryClientPortalAccess',
+  ],
+  deliverables: [
+    'DeliveryDeliverables',
+    'DeliveryDeliverable',
+    'DeliveryClientPortalAccess',
+    'DeliveryClientPortalAccessList',
+    'DeliveryDriveConfig',
+    'DeliveryHookProject',
+    'DeliveryContentMetricSnapshots',
   ],
   content: [
     'DeliveryContentProjects',

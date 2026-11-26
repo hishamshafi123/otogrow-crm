@@ -139,6 +139,20 @@ const STRUCTURAL_FIELDS = new Set([
   'fulfilmentStatus',
   'deliveryCycle',
   'nextCheckAt',
+  'sequenceNumber',
+  'monthKey',
+  'clientVisibility',
+  'purgedDeliverables',
+  'purgedVariations',
+  'reclaimedBytes',
+  'portalSlug',
+  'revokedAt',
+  'googleEmail',
+  'monthFolderPattern',
+  'autoPurgeVpsAfterHours',
+  'variationCount',
+  'hookProjectStatus',
+  'clientReview',
 ]);
 
 export const recordOtogrowActivity = async (

@@ -115,6 +115,37 @@ export class S3Driver implements StorageDriver {
     }
   }
 
+  async readFileRange(params: {
+    filePath: string;
+    start: number;
+    end: number;
+  }): Promise<Readable> {
+    const command = new GetObjectCommand({
+      Key: params.filePath,
+      Bucket: this.bucketName,
+      Range: `bytes=${params.start}-${params.end}`,
+    });
+
+    try {
+      const file = await this.s3Client.send(command);
+
+      if (!file || !file.Body || !(file.Body instanceof Readable)) {
+        throw new Error('Unable to get file stream');
+      }
+
+      return Readable.from(file.Body);
+    } catch (error) {
+      if ((error as { name?: string }).name === 'NoSuchKey') {
+        throw new FileStorageException(
+          'File not found',
+          FileStorageExceptionCode.FILE_NOT_FOUND,
+        );
+      }
+
+      throw error;
+    }
+  }
+
   async writeFile(params: {
     filePath: string;
     sourceFile: Buffer | Uint8Array | string;

@@ -30,6 +30,7 @@ import { MessagingOngoingStaleCronCommand } from 'src/modules/messaging/message-
 import { MessagingRelaunchFailedMessageChannelsCronCommand } from 'src/modules/messaging/message-import-manager/crons/commands/messaging-relaunch-failed-message-channels.cron.command';
 import { SequenceSchedulerCronCommand } from 'src/modules/sequences/crons/commands/sequence-scheduler.cron.command';
 import { DeliveryFinanceV2CronCommand } from 'src/modules/delivery/finance-v2/finance-v2.cron.command';
+import { DeliveryVpsCleanupCronCommand } from 'src/modules/delivery/deliverables/delivery-vps-cleanup.cron.command';
 import { WorkflowCoreConsistencyCronCommand } from 'src/modules/workflow/workflow-core-consistency/crons/commands/workflow-core-consistency-cron.command';
 import { WorkflowCleanWorkflowRunsCronCommand } from 'src/modules/workflow/workflow-runner/workflow-run-queue/cron/command/workflow-clean-workflow-runs.cron.command';
 import { WorkflowHandleStaledRunsCronCommand } from 'src/modules/workflow/workflow-runner/workflow-run-queue/cron/command/workflow-handle-staled-runs.cron.command';
@@ -50,6 +51,7 @@ export class CronRegisterAllCommand extends CommandRunner {
     private readonly messagingRelaunchFailedMessageChannelsCronCommand: MessagingRelaunchFailedMessageChannelsCronCommand,
     private readonly sequenceSchedulerCronCommand: SequenceSchedulerCronCommand,
     private readonly deliveryFinanceV2CronCommand: DeliveryFinanceV2CronCommand,
+    private readonly deliveryVpsCleanupCronCommand: DeliveryVpsCleanupCronCommand,
 
     private readonly calendarEventListFetchCronCommand: CalendarEventListFetchCronCommand,
     private readonly calendarEventsImportCronCommand: CalendarEventsImportCronCommand,
@@ -224,6 +226,10 @@ export class CronRegisterAllCommand extends CommandRunner {
       {
         name: 'DeliveryFinanceV2Automation',
         command: this.deliveryFinanceV2CronCommand,
+      },
+      {
+        name: 'DeliveryVpsVideoCleanup',
+        command: this.deliveryVpsCleanupCronCommand,
       },
     ];
 

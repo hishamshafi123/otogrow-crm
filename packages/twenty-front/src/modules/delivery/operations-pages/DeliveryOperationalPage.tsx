@@ -79,6 +79,10 @@ const OperationalWorkspace = ({
       title: t`Clients`,
       description: t`Manage client details, relationships and delivery.`,
     },
+    deliverables: {
+      title: t`Deliverables hub`,
+      description: t`Upload, number, review, sync to Google Drive, and publish client deliverables.`,
+    },
     chat: {
       title: t`Team chat`,
       description: t`Message teammates and follow up on unread messages.`,
