@@ -8,7 +8,29 @@ import { DeliveryMediaProbeService } from 'src/modules/delivery/deliverables/del
 const execFileAsync = promisify(execFile);
 
 describe('DeliveryMediaProbeService', () => {
+  let ffmpegAvailable = false;
+
+  beforeAll(async () => {
+    try {
+      await execFileAsync('ffmpeg', ['-version'], { timeout: 5_000 });
+      await execFileAsync('ffprobe', ['-version'], { timeout: 5_000 });
+      ffmpegAvailable = true;
+    } catch {
+      ffmpegAvailable = false;
+    }
+  });
+
+  it('returns empty metadata gracefully when probing a nonexistent file', async () => {
+    const service = new DeliveryMediaProbeService();
+    const meta = await service.probeMedia('/nonexistent/otogrow-missing.mp4');
+    expect(meta).toEqual({});
+  });
+
   it('probes resolution/fps/duration and extracts a JPEG thumbnail from a real MP4', async () => {
+    if (!ffmpegAvailable) {
+      return;
+    }
+
     const tmpDir = await fs.mkdtemp(
       path.join(os.tmpdir(), 'otogrow-probe-test-'),
     );
