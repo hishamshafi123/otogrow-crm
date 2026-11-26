@@ -18,12 +18,14 @@ type SetupCompanyCreationProps = {
   recoveryId: string | null;
   onSelected: (id: string) => void;
   onRecoveryChecked: () => void;
+  onCancel?: () => void;
 };
 export const SetupCompanyCreation = ({
   state,
   recoveryId,
   onSelected,
   onRecoveryChecked,
+  onCancel,
 }: SetupCompanyCreationProps) => {
   const { t } = useLingui();
   const native = useSetupCompanyCreation(state);
@@ -98,6 +100,7 @@ export const SetupCompanyCreation = ({
           <Trans>Company name</Trans>
           <input
             aria-label={t`Company name`}
+            placeholder={t`e.g. Acme Studio`}
             maxLength={200}
             value={name}
             disabled={locked || !native.allowed || native.busy}
@@ -105,17 +108,33 @@ export const SetupCompanyCreation = ({
           />
         </label>
         {!id && (
-          <StyledDeliveryButton
-            disabled={
-              !native.allowed || !name.trim() || native.busy || checking
-            }
-            onClick={async () => {
-              const prepared = { id: crypto.randomUUID(), name: name.trim() };
-              await submit(prepared);
-            }}
-          >
-            <Trans>Create company</Trans>
-          </StyledDeliveryButton>
+          <StyledDeliveryRow>
+            <StyledDeliveryButton
+              type="button"
+              data-primary="true"
+              disabled={
+                !native.allowed || !name.trim() || native.busy || checking
+              }
+              onClick={async () => {
+                const prepared = {
+                  id: crypto.randomUUID(),
+                  name: name.trim(),
+                };
+                await submit(prepared);
+              }}
+            >
+              <Trans>Create company</Trans>
+            </StyledDeliveryButton>
+            {onCancel && (
+              <StyledDeliveryButton
+                type="button"
+                disabled={native.busy || checking}
+                onClick={onCancel}
+              >
+                <Trans>Cancel</Trans>
+              </StyledDeliveryButton>
+            )}
+          </StyledDeliveryRow>
         )}
         {error && <p role="alert">{error}</p>}
         {id && (
@@ -133,6 +152,7 @@ export const SetupCompanyCreation = ({
                   </Trans>
                 </p>
                 <StyledDeliveryButton
+                  type="button"
                   disabled={
                     checking ||
                     native.busy ||
@@ -155,6 +175,8 @@ export const SetupCompanyCreation = ({
             )}
             {outcome?.kind === 'NOT_FOUND' && attempt && !editing && (
               <StyledDeliveryButton
+                type="button"
+                data-primary="true"
                 disabled={!native.allowed || checking || native.busy}
                 onClick={() => void submit(attempt)}
               >
@@ -182,6 +204,7 @@ export const SetupCompanyCreation = ({
             {editing && (
               <StyledDeliveryButton
                 type="button"
+                data-primary="true"
                 disabled={
                   !native.allowed || !name.trim() || checking || native.busy
                 }
@@ -206,6 +229,8 @@ export const SetupCompanyCreation = ({
                 </p>
                 <StyledDeliveryRow>
                   <StyledDeliveryButton
+                    type="button"
+                    data-primary="true"
                     onClick={() => onSelected(outcome.company.id)}
                   >
                     <Trans>Use this saved company</Trans>

@@ -153,6 +153,9 @@ const STRUCTURAL_FIELDS = new Set([
   'variationCount',
   'hookProjectStatus',
   'clientReview',
+  'clientFee',
+  'includedClientCount',
+  'excludedClientCount',
 ]);
 
 export const recordOtogrowActivity = async (

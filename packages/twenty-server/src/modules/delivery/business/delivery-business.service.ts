@@ -19,12 +19,14 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, type EntityManager } from 'typeorm';
 import { randomUUID } from 'node:crypto';
 import { WorkspaceEntity } from 'src/engine/core-modules/workspace/workspace.entity';
 import { DeliveryService } from 'src/modules/delivery/delivery.service';
+import { DeliveryFinanceV2Service } from 'src/modules/delivery/finance-v2/finance-v2.service';
 import { DeliveryOperationsEntity } from 'src/modules/delivery/entities/delivery-operations.entity';
 import { DeliveryProjectEntity } from 'src/modules/delivery/entities/delivery-project.entity';
 import {
@@ -79,7 +81,27 @@ export class DeliveryBusinessService {
     private readonly models: AiModelRegistryService,
     private readonly budget: OtogrowAiBudgetService,
     private readonly roleAccess: OtogrowAccessService,
+    @Optional() private readonly financeV2?: DeliveryFinanceV2Service,
   ) {}
+
+  private async resolveClientName(
+    manager: EntityManager,
+    workspace: WorkspaceEntity,
+    companyId: string | null | undefined,
+    fallback: string,
+  ): Promise<string> {
+    if (!companyId) return fallback;
+    try {
+      const rows: { name: string }[] = await manager.query(
+        `SELECT name FROM ${this.delivery.schema(workspace)}."company" WHERE id = $1 AND "deletedAt" IS NULL LIMIT 1`,
+        [companyId],
+      );
+      const name = rows[0]?.name?.trim();
+      return name || fallback;
+    } catch {
+      return fallback;
+    }
+  }
 
   private recordActivity(
     manager: EntityManager,
@@ -1041,6 +1063,40 @@ export class DeliveryBusinessService {
         if (existing)
           business.records[business.records.indexOf(existing)] = record;
         else business.records.push(record);
+        if (
+          this.financeV2 &&
+          record.kind === 'FINANCE' &&
+          (record.category === 'INCOME' || record.category === 'RECEIVABLE')
+        ) {
+          const linkedProject = record.projectId
+            ? projects.find((project) => project.id === record.projectId)
+            : undefined;
+          const clientName = await this.resolveClientName(
+            manager,
+            workspace,
+            record.companyId ?? linkedProject?.companyId,
+            linkedProject?.name ?? record.title,
+          );
+          await this.financeV2.syncClientBusinessFinanceEntryInTransaction(
+            manager,
+            {
+              workspaceId: workspace.id,
+              memberId,
+              recordId: record.id,
+              category: record.category,
+              title: record.title,
+              clientName,
+              currency: record.currency,
+              amountMinor: record.amount,
+              date: record.date,
+              dueDate: record.dueDate,
+              projectId: record.projectId,
+              externalReference: record.externalReference,
+              evidenceUrl: record.evidenceUrl,
+              notes: record.notes,
+            },
+          );
+        }
         const owner = (item: BusinessRecord | undefined) =>
           item && 'ownerId' in item
             ? item.ownerId
@@ -1362,6 +1418,34 @@ export class DeliveryBusinessService {
             ],
           };
           business.records.push(receipt);
+          if (this.financeV2) {
+            const linkedProject = record.projectId
+              ? projects.find((project) => project.id === record.projectId)
+              : undefined;
+            const clientName = await this.resolveClientName(
+              manager,
+              workspace,
+              record.companyId ?? linkedProject?.companyId,
+              linkedProject?.name ?? record.title,
+            );
+            await this.financeV2.settleClientBusinessReceivableInTransaction(
+              manager,
+              {
+                workspaceId: workspace.id,
+                memberId,
+                receivableId: record.id,
+                receiptId: receipt.id,
+                title: receipt.title,
+                clientName,
+                currency: receipt.currency,
+                amountMinor: receipt.amount,
+                paymentDate: receipt.date,
+                projectId: receipt.projectId,
+                evidenceUrl: receipt.evidenceUrl,
+                notes: command.note || record.notes,
+              },
+            );
+          }
           await this.recordActivity(manager, workspace.id, memberId, receipt, {
             action: 'FINANCE_RECEIPT_CREATED',
             summary: 'Recorded a payment receipt for a receivable.',
@@ -1370,6 +1454,24 @@ export class DeliveryBusinessService {
               { field: 'state', before: null, after: 'POSTED' },
             ],
           });
+        }
+        if (
+          this.financeV2 &&
+          record.kind === 'FINANCE' &&
+          command.status === 'VOID' &&
+          (record.category === 'INCOME' || record.category === 'RECEIVABLE')
+        ) {
+          await this.financeV2.voidClientBusinessFinanceEntryInTransaction(
+            manager,
+            {
+              workspaceId: workspace.id,
+              memberId,
+              recordId: record.id,
+              category: record.category,
+              externalReference: record.externalReference,
+              reason: command.note.trim(),
+            },
+          );
         }
         if (
           record.kind === 'FINANCE' &&

@@ -88,6 +88,7 @@ jest.mock('@/delivery/client-workspace/CompanyProfile', () => ({
 }));
 
 let mockHubData: ClientHubSnapshot | null = null;
+let mockUpdateError: string | null = null;
 const mockUpdateRoster = jest.fn().mockResolvedValue(true);
 const mockClearUpdateError = jest.fn();
 
@@ -97,7 +98,7 @@ jest.mock('@/delivery/client-workspace/useClientHub', () => ({
     loading: false,
     error: undefined,
     updating: false,
-    updateError: null,
+    updateError: mockUpdateError,
     clearUpdateError: mockClearUpdateError,
     refetch: mockRefetch,
     updateRoster: mockUpdateRoster,
@@ -153,6 +154,11 @@ jest.mock('@/delivery/client-workspace/client-workspace.styles', () => ({
   StyledBillingFormGrid: 'div',
   StyledLedgerList: 'div',
   StyledLedgerRow: 'div',
+  StyledMrrProgressTrack: 'div',
+  StyledMrrProgressFill: 'div',
+  StyledMrrSummaryCard: 'div',
+  StyledMrrSummaryTop: 'div',
+  StyledMrrMetricRow: 'div',
 }));
 jest.mock('@/delivery/deliveryStyles', () => ({
   StyledDeliveryButton: 'button',
@@ -186,6 +192,59 @@ const buildHubFixture = (): ClientHubSnapshot => ({
     totalOpenReceivablesByCurrency: [
       { currency: 'USD', amount: 150000, count: 1 },
     ],
+    projectedMrr: {
+      month: '2026-11',
+      baseCurrency: 'AED',
+      exchangeRates: { AED: '1', USD: '3.6725' },
+      projectedMrrAedMicros: '9181250000',
+      collectedTowardMrrAedMicros: '9181250000',
+      totalCollectedThisMonthAedMicros: '9181250000',
+      remainingAedMicros: '0',
+      collectionPercent: 100,
+      mrrClientCount: 1,
+      paidClientCount: 1,
+      partialClientCount: 0,
+      unpaidClientCount: 0,
+      byCurrency: [
+        {
+          currency: 'USD',
+          projectedMrrMinor: 250000,
+          projectedMrrMicros: '2500000000',
+          projectedMrrAedMicros: '9181250000',
+          clientCount: 1,
+          paidCount: 1,
+          partialCount: 0,
+          unpaidCount: 0,
+        },
+      ],
+      oneTime: {
+        clientCount: 0,
+        totalAedMicros: '0',
+        byCurrency: [],
+        clients: [],
+      },
+      clients: [
+        {
+          companyId: SETUP_COMPANY,
+          companyName: 'Acme Client',
+          cadence: 'MONTHLY',
+          currency: 'USD',
+          agreedFeeMinor: 250000,
+          agreedFeeMicros: '2500000000',
+          monthlyEquivalentMinor: 250000,
+          monthlyEquivalentMicros: '2500000000',
+          monthlyEquivalentAedMicros: '9181250000',
+          collectedThisMonthAedMicros: '9181250000',
+          collectedInFeeCurrencyMinor: 250000,
+          collectedInFeeCurrencyMicros: '2500000000',
+          collectedTowardMrrAedMicros: '9181250000',
+          remainingAedMicros: '0',
+          collectionPercent: 100,
+          status: 'PAID',
+          notes: 'Billed on the 1st',
+        },
+      ],
+    },
   },
   clients: [
     {
@@ -248,6 +307,25 @@ const buildHubFixture = (): ClientHubSnapshot => ({
           cadence: 'MONTHLY',
           notes: 'Billed on the 1st',
           updatedAt: '2026-11-01T00:00:00.000Z',
+        },
+        currentMonthMrr: {
+          companyId: SETUP_COMPANY,
+          companyName: 'Acme Client',
+          cadence: 'MONTHLY',
+          currency: 'USD',
+          agreedFeeMinor: 250000,
+          agreedFeeMicros: '2500000000',
+          monthlyEquivalentMinor: 250000,
+          monthlyEquivalentMicros: '2500000000',
+          monthlyEquivalentAedMicros: '9181250000',
+          collectedThisMonthAedMicros: '9181250000',
+          collectedInFeeCurrencyMinor: 250000,
+          collectedInFeeCurrencyMicros: '2500000000',
+          collectedTowardMrrAedMicros: '9181250000',
+          remainingAedMicros: '0',
+          collectionPercent: 100,
+          status: 'PAID',
+          notes: 'Billed on the 1st',
         },
         openReceivablesByCurrency: [
           { currency: 'USD', amount: 150000, count: 1 },
@@ -320,6 +398,7 @@ beforeEach(() => {
   i18n.loadAndActivate({ locale: 'en', messages: {} });
   mockData = clientSetupFixture();
   mockHubData = null;
+  mockUpdateError = null;
   mockDenied = false;
   mockManager = true;
   mockError = null;
@@ -549,3 +628,31 @@ it('lets managers update agreed client fee and record payments directly inside O
     }),
   );
 });
+
+it('displays Projected MRR summary on Clients overview and surfaces inline fee save errors inside Billing card', () => {
+  mockData = { ...clientSetupFixture(), selectedCompany: null };
+  mockHubData = buildHubFixture();
+
+  const overview = setup('');
+  expect(screen.getByText(/Projected MRR \((Nov|November) 2026\)/i)).toBeVisible();
+  expect(
+    screen.getByRole('heading', { name: /Projected MRR · (Nov|November) 2026/i }),
+  ).toBeVisible();
+  expect(screen.getByText(/100% of projected MRR/i)).toBeVisible();
+  expect(screen.getByText('MRR paid')).toBeVisible();
+  overview.unmount();
+
+  mockData = clientSetupFixture();
+  mockUpdateError = 'Agreed fee amount must be greater than zero.';
+  setup(`clientCompany=${SETUP_COMPANY}&clientSection=overview`);
+  expect(screen.getByText('Paid this month')).toBeVisible();
+  const alerts = screen.getAllByRole('alert');
+  expect(
+    alerts.some((node) =>
+      node.textContent?.includes(
+        'Agreed fee amount must be greater than zero.',
+      ),
+    ),
+  ).toBe(true);
+});
+

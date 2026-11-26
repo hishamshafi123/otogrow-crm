@@ -12,6 +12,17 @@ import {
 } from 'src/modules/delivery/business/delivery-business.types';
 import { type ClientFeeSetting } from 'src/modules/delivery/operations/delivery-operations.types';
 import { type DeliveryDetails } from 'src/modules/delivery/delivery.types';
+import {
+  CLIENT_BUSINESS_INVOICE_PAYMENT_PREFIX,
+  CLIENT_BUSINESS_PAYMENT_REF_TYPE,
+  deterministicClientReceivableInvoiceId,
+  microsToMinorUnits,
+} from 'src/modules/delivery/finance-v2/finance-v2-client-sync.util';
+import {
+  computeProjectedMrrSnapshot,
+  type ProjectedMrrClientRow,
+  type ProjectedMrrSnapshot,
+} from 'src/modules/delivery/finance-v2/finance-v2-mrr.util';
 
 const identifier = z.uuid();
 const MAX_ROSTER_IDS = 2000;
@@ -46,7 +57,9 @@ export const clientRosterUpdateSchema = z.discriminatedUnion('action', [
     .object({
       action: z.literal('setFee'),
       companyId: identifier,
-      amount: deliveryMoneySchema,
+      amount: deliveryMoneySchema.refine((value) => value > 0, {
+        message: 'Fee amount must be greater than zero.',
+      }),
       currency: deliveryCurrencySchema,
       cadence: z.enum(['MONTHLY', 'QUARTERLY', 'ONE_TIME']),
       notes: z.string().trim().max(500).optional(),
@@ -68,10 +81,20 @@ export const parseClientRosterUpdate = (
   input: unknown,
 ): ClientRosterUpdateCommand => {
   const parsed = clientRosterUpdateSchema.safeParse(input);
-  if (!parsed.success)
+  if (!parsed.success) {
+    const action =
+      typeof input === 'object' && input !== null && 'action' in input
+        ? (input as { action?: unknown }).action
+        : null;
+    if (action === 'setFee' || action === 'clearFee') {
+      throw new BadRequestException(
+        'Enter a valid positive agreed fee amount, currency, and billing cadence.',
+      );
+    }
     throw new BadRequestException(
       'Choose valid client companies before updating your client list.',
     );
+  }
   return parsed.data;
 };
 
@@ -249,6 +272,7 @@ export type ClientHubFinanceEntry = {
 export type ClientHubFinanceSnapshot = {
   canManage: boolean;
   fee: ClientFeeSetting | null;
+  currentMonthMrr: ProjectedMrrClientRow | null;
   openReceivablesByCurrency: ClientHubCurrencyTotal[];
   overdueReceivablesCount: number;
   collectedByCurrency: ClientHubCurrencyTotal[];
@@ -316,6 +340,7 @@ export type ClientHubSummary = {
   canReadFinance: boolean;
   canManageFinance: boolean;
   totalOpenReceivablesByCurrency: ClientHubCurrencyTotal[];
+  projectedMrr: ProjectedMrrSnapshot | null;
 };
 
 const toIsoOrNull = (
@@ -337,7 +362,37 @@ const toCurrencyList = (
     }))
     .sort((left, right) => left.currency.localeCompare(right.currency));
 
+export type ClientHubFinanceV2InvoiceSource = {
+  id: string;
+  invoiceNumber: string;
+  clientName: string;
+  projectId: string | null;
+  currency: string;
+  issueDate: string;
+  dueDate: string;
+  totalMicros: string;
+  paidMicros: string;
+  status: string;
+  notes: string;
+};
+
+export type ClientHubFinanceV2PaymentJournalSource = {
+  id: string;
+  entryDate: string;
+  title: string;
+  notes: string;
+  currency: string;
+  amountMicros: string;
+  aedAmountMicros?: string | null;
+  projectId: string | null;
+  sourceRefType: string | null;
+  sourceRefId: string | null;
+  status: string;
+  reversed?: boolean;
+};
+
 export const buildClientHubSnapshot = ({
+  workspaceId,
   companies,
   roster,
   clientFees,
@@ -347,11 +402,16 @@ export const buildClientHubSnapshot = ({
   links,
   shares,
   businessRecords,
+  financeV2Invoices = [],
+  financeV2PaymentJournals = [],
+  exchangeRates,
+  timeZone,
   memberNamesById,
   canReadFinance,
   canManageFinance = false,
   now = new Date(),
 }: {
+  workspaceId?: string;
   companies: ClientDirectoryCompany[];
   roster?: Partial<ClientRosterState> | null;
   clientFees?: Record<string, ClientFeeSetting> | null;
@@ -361,6 +421,10 @@ export const buildClientHubSnapshot = ({
   links: ClientHubLinkSource[];
   shares: ClientShare[];
   businessRecords: BusinessRecord[];
+  financeV2Invoices?: ClientHubFinanceV2InvoiceSource[];
+  financeV2PaymentJournals?: ClientHubFinanceV2PaymentJournalSource[];
+  exchangeRates?: Record<string, string> | null;
+  timeZone?: string | null;
   memberNamesById: Map<string, string>;
   canReadFinance: boolean;
   canManageFinance?: boolean;
@@ -430,9 +494,71 @@ export const buildClientHubSnapshot = ({
     { amount: number; count: number }
   >();
 
+  const getOrCreateFinanceBucket = (companyId: string) => {
+    let bucket = financeByCompany.get(companyId);
+    if (!bucket) {
+      bucket = {
+        openReceivables: new Map(),
+        collected: new Map(),
+        overdueReceivablesCount: 0,
+        entries: [],
+      };
+      financeByCompany.set(companyId, bucket);
+    }
+    return bucket;
+  };
+
+  const addCurrencyTotal = (
+    map: Map<string, { amount: number; count: number }>,
+    currency: string,
+    amount: number,
+  ) => {
+    const existing = map.get(currency) ?? { amount: 0, count: 0 };
+    existing.amount += amount;
+    existing.count += 1;
+    map.set(currency, existing);
+  };
+
   if (canReadFinance) {
+    const companyNameCounts = new Map<string, number>();
+    for (const company of companies) {
+      const normalized = company.name.trim().toLocaleLowerCase();
+      if (!normalized) continue;
+      companyNameCounts.set(
+        normalized,
+        (companyNameCounts.get(normalized) ?? 0) + 1,
+      );
+    }
+    const companyIdByUniqueName = new Map<string, string>();
+    for (const company of companies) {
+      const normalized = company.name.trim().toLocaleLowerCase();
+      if (normalized && companyNameCounts.get(normalized) === 1) {
+        companyIdByUniqueName.set(normalized, company.id);
+      }
+    }
+
+    const financeV2InvoiceById = new Map(
+      financeV2Invoices.map((invoice) => [invoice.id, invoice]),
+    );
+    const inactiveSyncedJournalRefs = new Set<string>();
+    const activeSyncedJournalRefs = new Set<string>();
+    for (const journal of financeV2PaymentJournals) {
+      if (!journal.sourceRefType || !journal.sourceRefId) continue;
+      const key = `${journal.sourceRefType}::${journal.sourceRefId}`;
+      if (journal.status === 'POSTED' && !journal.reversed) {
+        activeSyncedJournalRefs.add(key);
+      } else {
+        inactiveSyncedJournalRefs.add(key);
+      }
+    }
+
     const activeFinanceRecords = businessRecords.filter(
       (record) => record.kind === 'FINANCE' && record.status !== 'VOID',
+    );
+    const businessRecordIds = new Set(
+      businessRecords
+        .filter((record) => record.kind === 'FINANCE')
+        .map((record) => record.id),
     );
     const linkedReceiptReceivableIds = new Set<string>();
     const receivableIds = new Set<string>();
@@ -451,6 +577,8 @@ export const buildClientHubSnapshot = ({
       }
     }
 
+    const syncedBusinessInvoiceIds = new Set<string>();
+
     for (const record of activeFinanceRecords) {
       if (record.kind !== 'FINANCE') continue;
       if (record.category !== 'RECEIVABLE' && record.category !== 'INCOME')
@@ -461,21 +589,97 @@ export const buildClientHubSnapshot = ({
       const targetCompanyId = project?.companyId ?? record.companyId ?? null;
       if (!targetCompanyId) continue;
 
-      let bucket = financeByCompany.get(targetCompanyId);
-      if (!bucket) {
-        bucket = {
-          openReceivables: new Map(),
-          collected: new Map(),
-          overdueReceivablesCount: 0,
-          entries: [],
-        };
-        financeByCompany.set(targetCompanyId, bucket);
+      if (record.category === 'INCOME') {
+        let syncKey: string | null = null;
+        if (record.externalReference.startsWith('receivable:') && workspaceId) {
+          const recId = record.externalReference.slice('receivable:'.length);
+          const linkedInvId = deterministicClientReceivableInvoiceId(
+            workspaceId,
+            recId,
+          );
+          syncKey = `INVOICE_PAYMENT::${linkedInvId}:${CLIENT_BUSINESS_INVOICE_PAYMENT_PREFIX}${record.id}`;
+        } else {
+          syncKey = `${CLIENT_BUSINESS_PAYMENT_REF_TYPE}::${record.id}`;
+        }
+        if (
+          syncKey &&
+          inactiveSyncedJournalRefs.has(syncKey) &&
+          !activeSyncedJournalRefs.has(syncKey)
+        ) {
+          continue;
+        }
       }
+
+      const linkedV2Invoice =
+        record.category === 'RECEIVABLE' && workspaceId
+          ? financeV2InvoiceById.get(
+              deterministicClientReceivableInvoiceId(workspaceId, record.id),
+            )
+          : undefined;
+      if (linkedV2Invoice) {
+        syncedBusinessInvoiceIds.add(linkedV2Invoice.id);
+        if (linkedV2Invoice.status === 'VOID') {
+          continue;
+        }
+      }
+
+      const bucket = getOrCreateFinanceBucket(targetCompanyId);
 
       const isAutoReceiptForVisibleReceivable =
         record.category === 'INCOME' &&
         record.externalReference.startsWith('receivable:') &&
         receivableIds.has(record.externalReference.slice('receivable:'.length));
+
+      if (
+        record.category === 'RECEIVABLE' &&
+        record.status !== 'PAID' &&
+        linkedV2Invoice
+      ) {
+        const totalMinor = microsToMinorUnits(linkedV2Invoice.totalMicros);
+        const paidMinor = microsToMinorUnits(linkedV2Invoice.paidMicros);
+        const remainingMinor = Math.max(0, totalMinor - paidMinor);
+
+        if (paidMinor > 0) {
+          addCurrencyTotal(bucket.collected, record.currency, paidMinor);
+        }
+        if (remainingMinor > 0) {
+          addCurrencyTotal(
+            bucket.openReceivables,
+            record.currency,
+            remainingMinor,
+          );
+          addCurrencyTotal(
+            totalOpenReceivables,
+            record.currency,
+            remainingMinor,
+          );
+          if (record.dueDate && record.dueDate < todayDate) {
+            bucket.overdueReceivablesCount += 1;
+          }
+        }
+        bucket.entries.push({
+          id: record.id,
+          revision: record.revision,
+          title: record.title,
+          category: record.category,
+          status:
+            remainingMinor === 0
+              ? 'PAID'
+              : paidMinor > 0
+                ? 'PARTIALLY_PAID'
+                : record.status,
+          currency: record.currency,
+          amount: remainingMinor > 0 ? remainingMinor : totalMinor,
+          date: record.date,
+          dueDate: record.dueDate ?? null,
+          projectId: record.projectId ?? null,
+          projectName: project?.name ?? null,
+          externalReference:
+            record.externalReference || linkedV2Invoice.invoiceNumber,
+          notes: record.notes,
+        });
+        continue;
+      }
 
       if (!isAutoReceiptForVisibleReceivable) {
         bucket.entries.push({
@@ -496,22 +700,8 @@ export const buildClientHubSnapshot = ({
       }
 
       if (record.category === 'RECEIVABLE' && record.status !== 'PAID') {
-        const entry = bucket.openReceivables.get(record.currency) ?? {
-          amount: 0,
-          count: 0,
-        };
-        entry.amount += record.amount;
-        entry.count += 1;
-        bucket.openReceivables.set(record.currency, entry);
-
-        const totalEntry = totalOpenReceivables.get(record.currency) ?? {
-          amount: 0,
-          count: 0,
-        };
-        totalEntry.amount += record.amount;
-        totalEntry.count += 1;
-        totalOpenReceivables.set(record.currency, totalEntry);
-
+        addCurrencyTotal(bucket.openReceivables, record.currency, record.amount);
+        addCurrencyTotal(totalOpenReceivables, record.currency, record.amount);
         if (record.dueDate && record.dueDate < todayDate) {
           bucket.overdueReceivablesCount += 1;
         }
@@ -521,14 +711,115 @@ export const buildClientHubSnapshot = ({
           record.status === 'PAID' &&
           !linkedReceiptReceivableIds.has(record.id))
       ) {
-        const entry = bucket.collected.get(record.currency) ?? {
-          amount: 0,
-          count: 0,
-        };
-        entry.amount += record.amount;
-        entry.count += 1;
-        bucket.collected.set(record.currency, entry);
+        addCurrencyTotal(bucket.collected, record.currency, record.amount);
       }
+    }
+
+    // Merge native Finance V2 invoices created in Business → Finance that belong to a client.
+    const matchedFinanceV2InvoiceIds = new Set<string>();
+    for (const invoice of financeV2Invoices) {
+      if (invoice.status === 'VOID') continue;
+      if (syncedBusinessInvoiceIds.has(invoice.id)) continue;
+
+      const project = invoice.projectId
+        ? projectById.get(invoice.projectId)
+        : undefined;
+      const targetCompanyId =
+        project?.companyId ??
+        companyIdByUniqueName.get(invoice.clientName.trim().toLocaleLowerCase()) ??
+        null;
+      if (!targetCompanyId) continue;
+
+      matchedFinanceV2InvoiceIds.add(invoice.id);
+      const bucket = getOrCreateFinanceBucket(targetCompanyId);
+      const totalMinor = microsToMinorUnits(invoice.totalMicros);
+      const paidMinor = microsToMinorUnits(invoice.paidMicros);
+      const remainingMinor = Math.max(0, totalMinor - paidMinor);
+
+      if (paidMinor > 0) {
+        addCurrencyTotal(bucket.collected, invoice.currency, paidMinor);
+      }
+      if (remainingMinor > 0) {
+        addCurrencyTotal(
+          bucket.openReceivables,
+          invoice.currency,
+          remainingMinor,
+        );
+        addCurrencyTotal(totalOpenReceivables, invoice.currency, remainingMinor);
+        if (invoice.dueDate && invoice.dueDate < todayDate) {
+          bucket.overdueReceivablesCount += 1;
+        }
+      }
+
+      bucket.entries.push({
+        id: invoice.id,
+        revision: 0,
+        title: invoice.clientName
+          ? `${invoice.invoiceNumber} · ${invoice.clientName}`
+          : invoice.invoiceNumber,
+        category: 'RECEIVABLE',
+        status:
+          remainingMinor === 0
+            ? 'PAID'
+            : paidMinor > 0
+              ? 'PARTIALLY_PAID'
+              : 'OPEN',
+        currency: invoice.currency,
+        amount: remainingMinor > 0 ? remainingMinor : totalMinor,
+        date: invoice.issueDate,
+        dueDate: invoice.dueDate ?? null,
+        projectId: invoice.projectId ?? null,
+        projectName: project?.name ?? null,
+        externalReference: invoice.invoiceNumber,
+        notes: invoice.notes,
+      });
+    }
+
+    // Merge any standalone project-linked Finance V2 payment journals not already covered above.
+    for (const journal of financeV2PaymentJournals) {
+      if (journal.status !== 'POSTED' || journal.reversed) continue;
+      if (
+        journal.sourceRefType === CLIENT_BUSINESS_PAYMENT_REF_TYPE &&
+        journal.sourceRefId &&
+        businessRecordIds.has(journal.sourceRefId)
+      ) {
+        continue;
+      }
+      if (journal.sourceRefType === 'INVOICE_PAYMENT' && journal.sourceRefId) {
+        const [invoiceId, suffix] = journal.sourceRefId.split(':');
+        if (
+          syncedBusinessInvoiceIds.has(invoiceId) ||
+          matchedFinanceV2InvoiceIds.has(invoiceId) ||
+          suffix?.startsWith(CLIENT_BUSINESS_INVOICE_PAYMENT_PREFIX)
+        ) {
+          continue;
+        }
+      }
+      const project = journal.projectId
+        ? projectById.get(journal.projectId)
+        : undefined;
+      const targetCompanyId = project?.companyId ?? null;
+      if (!targetCompanyId) continue;
+
+      const amountMinor = microsToMinorUnits(journal.amountMicros);
+      if (amountMinor <= 0) continue;
+      const bucket = getOrCreateFinanceBucket(targetCompanyId);
+      addCurrencyTotal(bucket.collected, journal.currency, amountMinor);
+      bucket.entries.push({
+        id: journal.id,
+        revision: 0,
+        title: journal.title,
+        category: 'INCOME',
+        status: 'POSTED',
+        currency: journal.currency,
+        amount: amountMinor,
+        date: journal.entryDate,
+        dueDate: null,
+        projectId: journal.projectId ?? null,
+        projectName: project?.name ?? null,
+        externalReference: '',
+        notes: journal.notes,
+      });
     }
 
     for (const bucket of financeByCompany.values()) {
@@ -542,6 +833,54 @@ export const buildClientHubSnapshot = ({
         if (dateDiff !== 0) return dateDiff;
         return left.title.localeCompare(right.title);
       });
+    }
+  }
+
+  const projectedMrr = canReadFinance
+    ? computeProjectedMrrSnapshot({
+        workspaceId,
+        activeClients: companies.map((company) => ({
+          id: company.id,
+          name: company.name,
+        })),
+        clientFees,
+        projects: projects.map((project) => ({
+          id: project.id,
+          companyId: project.companyId,
+        })),
+        businessRecords,
+        financeV2Invoices: financeV2Invoices.map((invoice) => ({
+          id: invoice.id,
+          clientName: invoice.clientName,
+          projectId: invoice.projectId,
+          currency: invoice.currency,
+          status: invoice.status,
+        })),
+        financeV2PaymentJournals: financeV2PaymentJournals.map((journal) => ({
+          id: journal.id,
+          entryDate: journal.entryDate,
+          currency: journal.currency,
+          amountMicros: journal.amountMicros,
+          aedAmountMicros: journal.aedAmountMicros ?? null,
+          projectId: journal.projectId,
+          sourceRefType: journal.sourceRefType,
+          sourceRefId: journal.sourceRefId,
+          status: journal.status,
+          reversed: journal.reversed,
+        })),
+        exchangeRates,
+        timeZone,
+        now,
+      })
+    : null;
+
+  const mrrRowByCompanyId = new Map<string, ProjectedMrrClientRow>();
+  if (projectedMrr) {
+    for (const row of projectedMrr.clients) {
+      mrrRowByCompanyId.set(row.companyId, row);
+    }
+    for (const row of projectedMrr.oneTime.clients) {
+      mrrRowByCompanyId.set(row.companyId, row);
     }
   }
 
@@ -691,6 +1030,7 @@ export const buildClientHubSnapshot = ({
       ? {
           canManage: canManageFinance,
           fee: clientFee,
+          currentMonthMrr: mrrRowByCompanyId.get(company.id) ?? null,
           openReceivablesByCurrency: financeBucket
             ? toCurrencyList(financeBucket.openReceivables)
             : [],
@@ -780,6 +1120,7 @@ export const buildClientHubSnapshot = ({
       totalOpenReceivablesByCurrency: canReadFinance
         ? toCurrencyList(totalOpenReceivables)
         : [],
+      projectedMrr,
     },
   };
 };

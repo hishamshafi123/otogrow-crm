@@ -4,8 +4,12 @@ import { type WorkspaceAuthContext } from 'src/engine/core-modules/auth/types/wo
 import { WorkspaceEntity } from 'src/engine/core-modules/workspace/workspace.entity';
 import { DeliveryOperationsEntity } from 'src/modules/delivery/entities/delivery-operations.entity';
 import { DeliveryProjectEntity } from 'src/modules/delivery/entities/delivery-project.entity';
+import { DeliveryFinanceV2InvoiceEntity } from 'src/modules/delivery/finance-v2/entities/delivery-finance-v2-invoice.entity';
+import { DeliveryFinanceV2JournalEntity } from 'src/modules/delivery/finance-v2/entities/delivery-finance-v2-journal.entity';
+import { DeliveryFinanceV2ProfileEntity } from 'src/modules/delivery/finance-v2/entities/delivery-finance-v2-profile.entity';
 import { DeliveryClientHubService } from 'src/modules/delivery/clients/delivery-client-hub.service';
 import { newDeliveryOperations } from 'src/modules/delivery/operations/delivery-operations.types';
+import { OtogrowActivityEventEntity } from 'src/modules/otogrow-activity/entities/otogrow-activity-event.entity';
 
 const makeAuth = (workspaceId: string): WorkspaceAuthContext =>
   ({
@@ -21,6 +25,9 @@ describe('DeliveryClientHubService', () => {
     operationsState = newDeliveryOperations(),
     companiesById = {},
     searchDirectoryResult = { companies: [], hasMore: false },
+    financeV2Invoices = [],
+    financeV2Journals = [],
+    financeV2Profile = null,
   }: {
     projects?: {
       id: string;
@@ -49,14 +56,23 @@ describe('DeliveryClientHubService', () => {
       }[];
       hasMore: boolean;
     };
+    financeV2Invoices?: Partial<DeliveryFinanceV2InvoiceEntity>[];
+    financeV2Journals?: Partial<DeliveryFinanceV2JournalEntity>[];
+    financeV2Profile?: Partial<DeliveryFinanceV2ProfileEntity> | null;
   }) => {
     const workspaceId = randomUUID();
     const workspace = {
       id: workspaceId,
       databaseSchema: 'workspace_test',
     };
+    const operationsRecord = {
+      workspaceId,
+      state: operationsState,
+    };
+    const activityInserts: Record<string, unknown>[] = [];
 
     const manager = {
+      queryRunner: { isTransactionActive: true },
       query: jest.fn().mockResolvedValue([]),
       getRepository: jest.fn((entity: unknown) => {
         if (entity === WorkspaceEntity) {
@@ -64,15 +80,40 @@ describe('DeliveryClientHubService', () => {
         }
         if (entity === DeliveryOperationsEntity) {
           return {
-            findOneBy: jest.fn().mockResolvedValue({
-              workspaceId,
-              state: operationsState,
+            findOneBy: jest.fn().mockResolvedValue(operationsRecord),
+            create: jest.fn((value: unknown) => value),
+            save: jest.fn(async (value: typeof operationsRecord) => {
+              operationsRecord.state = value.state;
+              return operationsRecord;
             }),
           };
         }
         if (entity === DeliveryProjectEntity) {
           return {
             find: jest.fn().mockResolvedValue(projects),
+          };
+        }
+        if (entity === DeliveryFinanceV2InvoiceEntity) {
+          return {
+            find: jest.fn().mockResolvedValue(financeV2Invoices),
+          };
+        }
+        if (entity === DeliveryFinanceV2JournalEntity) {
+          return {
+            find: jest.fn().mockResolvedValue(financeV2Journals),
+          };
+        }
+        if (entity === DeliveryFinanceV2ProfileEntity) {
+          return {
+            findOneBy: jest.fn().mockResolvedValue(financeV2Profile),
+          };
+        }
+        if (entity === OtogrowActivityEventEntity) {
+          return {
+            insert: jest.fn(async (event: Record<string, unknown>) => {
+              activityInserts.push(event);
+              return undefined;
+            }),
           };
         }
         throw new Error(`Unexpected repository: ${String(entity)}`);
@@ -125,7 +166,12 @@ describe('DeliveryClientHubService', () => {
       companies as never,
     );
 
-    return { service, auth: makeAuth(workspaceId), companies };
+    return {
+      service,
+      auth: makeAuth(workspaceId),
+      companies,
+      activityInserts,
+    };
   };
 
   it('surfaces a manually created client with 2 projects even when clientRoster is empty', async () => {
@@ -268,4 +314,160 @@ describe('DeliveryClientHubService', () => {
       projectsCount: 0,
     });
   });
+
+  it('saves and clears agreed fees with structural activity logging and computes current-month Projected MRR', async () => {
+    const monthlyClientId = randomUUID();
+    const monthlyProjectId = randomUUID();
+    const quarterlyClientId = randomUUID();
+    const oneTimeClientId = randomUUID();
+    const currentMonthDate = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Dubai',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
+
+    const { service, auth, activityInserts } = buildService({
+      projects: [
+        {
+          id: monthlyProjectId,
+          name: 'Apex Retainer',
+          companyId: monthlyClientId,
+          memberIds: [],
+        },
+        {
+          id: randomUUID(),
+          name: 'Beta Quarterly',
+          companyId: quarterlyClientId,
+          memberIds: [],
+        },
+        {
+          id: randomUUID(),
+          name: 'Gamma Launch',
+          companyId: oneTimeClientId,
+          memberIds: [],
+        },
+      ],
+      companiesById: {
+        [monthlyClientId]: {
+          id: monthlyClientId,
+          name: 'Apex Studio',
+          domainName: 'apex.ae',
+          updatedAt: '2026-11-26T00:00:00.000Z',
+          sourceToken: 'e'.repeat(64),
+        },
+        [quarterlyClientId]: {
+          id: quarterlyClientId,
+          name: 'Beta Global',
+          domainName: 'beta.com',
+          updatedAt: '2026-11-26T00:00:00.000Z',
+          sourceToken: 'f'.repeat(64),
+        },
+        [oneTimeClientId]: {
+          id: oneTimeClientId,
+          name: 'Gamma OneTime',
+          domainName: 'gamma.io',
+          updatedAt: '2026-11-26T00:00:00.000Z',
+          sourceToken: '1'.repeat(64),
+        },
+      },
+      financeV2Profile: {
+        timezone: 'Asia/Dubai',
+        exchangeRates: { AED: '1', USD: '3.6725' },
+      },
+      financeV2Journals: [
+        {
+          id: randomUUID(),
+          entryType: 'INVOICE_PAYMENT',
+          status: 'POSTED',
+          entryDate: currentMonthDate,
+          currency: 'AED',
+          amountMicros: '5000000000',
+          aedAmountMicros: '5000000000',
+          projectId: monthlyProjectId,
+          sourceRefType: 'CLIENT_BUSINESS_PAYMENT',
+          sourceRefId: 'pay-1',
+        },
+      ],
+    });
+
+    await service.updateRoster(auth, {
+      action: 'setFee',
+      companyId: monthlyClientId,
+      amount: 1000000, // 10,000.00 AED (minor units)
+      currency: 'AED',
+      cadence: 'MONTHLY',
+    });
+    await service.updateRoster(auth, {
+      action: 'setFee',
+      companyId: quarterlyClientId,
+      amount: 300000, // 3,000.00 USD / 3 = 1,000 USD/mo
+      currency: 'USD',
+      cadence: 'QUARTERLY',
+    });
+    await service.updateRoster(auth, {
+      action: 'setFee',
+      companyId: oneTimeClientId,
+      amount: 400000, // 4,000.00 AED one-time
+      currency: 'AED',
+      cadence: 'ONE_TIME',
+    });
+
+    expect(activityInserts).toHaveLength(3);
+    expect(activityInserts[0]).toMatchObject({
+      category: 'CLIENT',
+      action: 'CLIENT_FEE_UPDATED',
+    });
+
+    const hub = await service.hub(auth);
+    const projectedMrr = hub.summary.projectedMrr;
+    expect(projectedMrr).not.toBeNull();
+
+    // 10,000 AED + (3,000 USD / 3 = 1,000 USD * 3.6725 = 3,672.5 AED) = 13,672.5 AED
+    expect(projectedMrr?.projectedMrrAedMicros).toBe('13672500000');
+    expect(projectedMrr?.collectedTowardMrrAedMicros).toBe('5000000000');
+    expect(projectedMrr?.remainingAedMicros).toBe('8672500000');
+    expect(projectedMrr?.mrrClientCount).toBe(2);
+    expect(projectedMrr?.oneTime.clientCount).toBe(1);
+    expect(projectedMrr?.oneTime.totalAedMicros).toBe('4000000000');
+    expect(projectedMrr?.paidClientCount).toBe(0);
+    expect(projectedMrr?.partialClientCount).toBe(1);
+    expect(projectedMrr?.unpaidClientCount).toBe(1);
+
+    const apex = hub.clients.find((client) => client.id === monthlyClientId);
+    expect(apex?.finance?.fee).toMatchObject({
+      amount: 1000000,
+      currency: 'AED',
+      cadence: 'MONTHLY',
+    });
+    expect(apex?.finance?.currentMonthMrr).toMatchObject({
+      status: 'PARTIAL',
+      collectedTowardMrrAedMicros: '5000000000',
+      remainingAedMicros: '5000000000',
+      collectionPercent: 50,
+    });
+
+    const gamma = hub.clients.find((client) => client.id === oneTimeClientId);
+    expect(gamma?.finance?.currentMonthMrr).toMatchObject({
+      status: 'ONE_TIME',
+      monthlyEquivalentAedMicros: '0',
+    });
+
+    // Clearing the monthly fee should succeed and drop MRR to Beta only
+    await service.updateRoster(auth, {
+      action: 'clearFee',
+      companyId: monthlyClientId,
+    });
+
+    const afterClear = await service.hub(auth);
+    expect(afterClear.summary.projectedMrr?.projectedMrrAedMicros).toBe(
+      '3672500000',
+    );
+    expect(afterClear.summary.projectedMrr?.mrrClientCount).toBe(1);
+    expect(
+      afterClear.clients.find((client) => client.id === monthlyClientId)
+        ?.finance?.fee,
+    ).toBeNull();
+  });
 });
+

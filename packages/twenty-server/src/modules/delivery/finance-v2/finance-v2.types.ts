@@ -231,6 +231,7 @@ export type FinanceV2Analytics = {
   };
   payrollMonthRevenueAedMicros: string | null;
   projectProfitability: FinanceV2ProjectProfitabilityRow[];
+  projectedMrr?: import('src/modules/delivery/finance-v2/finance-v2-mrr.util').ProjectedMrrSnapshot;
 };
 
 export type FinanceV2CashCurrencyBalance = {

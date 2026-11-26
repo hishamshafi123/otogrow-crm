@@ -53,7 +53,19 @@ jest.mock('@/delivery/deliveryStyles', () => ({
 }));
 jest.mock('@/delivery/onboarding/onboardingStyles', () => ({
   StyledSetupBoundary: 'fieldset',
+  StyledSetupShell: 'div',
   StyledSetupSteps: 'ol',
+  StyledSetupContextBar: 'div',
+  StyledSetupStageCard: 'section',
+  StyledSetupStepHeader: 'div',
+  StyledSetupSubCard: 'div',
+  StyledSetupChoiceGrid: 'div',
+  StyledSetupChoiceCard: 'button',
+  StyledSetupToggleCard: 'label',
+  StyledSetupNotice: 'div',
+  StyledSetupDivider: 'div',
+  StyledSetupFooter: 'div',
+  StyledSetupSummaryHeader: 'div',
   StyledSetupSummary: 'dl',
 }));
 jest.mock('@/ui/layout/page/components/PageContainer', () => ({

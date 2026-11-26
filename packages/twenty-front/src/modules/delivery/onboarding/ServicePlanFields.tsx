@@ -102,6 +102,7 @@ export const ServicePlanFields = ({
         <textarea
           name="scope"
           required
+          placeholder={t`Describe the agreed deliverables, channels, and monthly focus…`}
           maxLength={6000}
           value={values.scope}
           onChange={(event) =>
@@ -114,6 +115,7 @@ export const ServicePlanFields = ({
           <Trans>Deliverable allowance</Trans>
           <input
             name="allowance"
+            placeholder={t`e.g. 12 short-form videos & 8 statics / month`}
             maxLength={2000}
             value={values.allowance}
             onChange={(event) =>
@@ -125,6 +127,7 @@ export const ServicePlanFields = ({
           <Trans>Client contact and account owner</Trans>
           <input
             name="contact"
+            placeholder={t`e.g. Sarah (CEO) · sarah@client.com`}
             maxLength={500}
             value={values.contact}
             onChange={(event) =>

@@ -97,6 +97,70 @@ export type FinanceV2ProjectProfitabilityRow = {
   grossMarginPercent: string | null;
 };
 
+export type FinanceV2ProjectedMrrStatus =
+  | 'PAID'
+  | 'PARTIAL'
+  | 'UNPAID'
+  | 'ONE_TIME';
+
+export type FinanceV2ProjectedMrrClientRow = {
+  companyId: string;
+  companyName: string;
+  cadence: 'MONTHLY' | 'QUARTERLY' | 'ONE_TIME';
+  currency: FinanceV2Currency;
+  agreedFeeMinor: number;
+  agreedFeeMicros: string;
+  monthlyEquivalentMinor: number;
+  monthlyEquivalentMicros: string;
+  monthlyEquivalentAedMicros: string;
+  collectedThisMonthAedMicros: string;
+  collectedInFeeCurrencyMinor: number;
+  collectedInFeeCurrencyMicros: string;
+  collectedTowardMrrAedMicros: string;
+  remainingAedMicros: string;
+  collectionPercent: number;
+  status: FinanceV2ProjectedMrrStatus;
+  notes: string;
+};
+
+export type FinanceV2ProjectedMrrSnapshot = {
+  month: string;
+  baseCurrency: FinanceV2Currency;
+  exchangeRates: Record<string, string>;
+  projectedMrrAedMicros: string;
+  collectedTowardMrrAedMicros: string;
+  totalCollectedThisMonthAedMicros: string;
+  remainingAedMicros: string;
+  collectionPercent: number;
+  mrrClientCount: number;
+  paidClientCount: number;
+  partialClientCount: number;
+  unpaidClientCount: number;
+  byCurrency: {
+    currency: FinanceV2Currency;
+    projectedMrrMinor: number;
+    projectedMrrMicros: string;
+    projectedMrrAedMicros: string;
+    clientCount: number;
+    paidCount: number;
+    partialCount: number;
+    unpaidCount: number;
+  }[];
+  oneTime: {
+    clientCount: number;
+    totalAedMicros: string;
+    byCurrency: {
+      currency: FinanceV2Currency;
+      amountMinor: number;
+      amountMicros: string;
+      aedMicros: string;
+      clientCount: number;
+    }[];
+    clients: FinanceV2ProjectedMrrClientRow[];
+  };
+  clients: FinanceV2ProjectedMrrClientRow[];
+};
+
 export type FinanceV2Analytics = {
   previousPeriod: {
     fromDate: string;
@@ -126,6 +190,7 @@ export type FinanceV2Analytics = {
   };
   payrollMonthRevenueAedMicros: string | null;
   projectProfitability: FinanceV2ProjectProfitabilityRow[];
+  projectedMrr?: FinanceV2ProjectedMrrSnapshot;
 };
 
 export type FinanceV2PersonLiabilityBalance = {

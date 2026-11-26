@@ -143,6 +143,7 @@ export const SetupFirstTaskFields = ({
   const reviewers = members.filter((member) =>
     ['ADMIN', 'MANAGER'].includes(member.access),
   );
+  const issues = setupTaskIssues(values, members, memberIds);
   return (
     <StyledDeliveryStack>
       <StyledDeliveryGrid>
@@ -150,6 +151,7 @@ export const SetupFirstTaskFields = ({
           <Trans>First task title</Trans>
           <input
             aria-label={t`First task title`}
+            placeholder={t`e.g. Kickoff creative brief & onboarding audit`}
             value={values.title}
             maxLength={200}
             onChange={(event) =>
@@ -161,6 +163,7 @@ export const SetupFirstTaskFields = ({
           <Trans>Task service</Trans>
           <input
             aria-label={t`Task service`}
+            placeholder={t`e.g. Performance marketing, SEO, Design`}
             value={values.service}
             maxLength={100}
             onChange={(event) =>
@@ -173,6 +176,7 @@ export const SetupFirstTaskFields = ({
         <Trans>Task instructions</Trans>
         <textarea
           aria-label={t`Task instructions`}
+          placeholder={t`Outline deliverables, links, or expectations for this first task…`}
           value={values.brief}
           maxLength={20000}
           onChange={(event) =>
@@ -292,11 +296,13 @@ export const SetupFirstTaskFields = ({
           </label>
         </StyledDeliveryGrid>
       </details>
-      <ul aria-label={t`First task requirements`}>
-        {setupTaskIssues(values, members, memberIds).map((code) => (
-          <li key={code}>{messages[code]}</li>
-        ))}
-      </ul>
+      {issues.length > 0 && (
+        <ul aria-label={t`First task requirements`}>
+          {issues.map((code) => (
+            <li key={code}>{messages[code]}</li>
+          ))}
+        </ul>
+      )}
     </StyledDeliveryStack>
   );
 };

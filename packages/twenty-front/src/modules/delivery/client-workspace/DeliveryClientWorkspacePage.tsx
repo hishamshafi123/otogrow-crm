@@ -445,6 +445,7 @@ const ClientWorkspaceDirectory = () => {
                   companyName={company.name}
                   hubClient={selectedHubClient}
                   updatingRoster={hub.updating}
+                  rosterError={hub.updateError}
                   onUpdateRoster={hub.updateRoster}
                   onRefreshHub={hub.refetch}
                 />

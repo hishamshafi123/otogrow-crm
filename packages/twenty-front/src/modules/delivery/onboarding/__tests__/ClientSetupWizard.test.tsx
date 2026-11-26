@@ -41,7 +41,19 @@ jest.mock('@/delivery/deliveryStyles', () => ({
   StyledDeliveryButton: 'button',
 }));
 jest.mock('@/delivery/onboarding/onboardingStyles', () => ({
+  StyledSetupShell: 'div',
   StyledSetupSteps: 'ol',
+  StyledSetupContextBar: 'div',
+  StyledSetupStageCard: 'section',
+  StyledSetupStepHeader: 'div',
+  StyledSetupSubCard: 'div',
+  StyledSetupChoiceGrid: 'div',
+  StyledSetupChoiceCard: 'button',
+  StyledSetupToggleCard: 'label',
+  StyledSetupNotice: 'div',
+  StyledSetupDivider: 'div',
+  StyledSetupFooter: 'div',
+  StyledSetupSummaryHeader: 'div',
   StyledSetupSummary: 'dl',
 }));
 jest.mock('@/delivery/onboarding/SetupCompanyCreation', () => ({
@@ -235,13 +247,15 @@ beforeEach(() => {
 
 it('reviews a new project, explicit team and advertising service plan with a retained independently reviewed first task', async () => {
   const { router, user } = setup();
-  await user.selectOptions(screen.getByLabelText('Project choice'), 'NEW');
+  await user.click(
+    screen.getByRole('button', { name: /Prepare a new project/i }),
+  );
   await user.type(screen.getByLabelText('New project name'), 'Product launch');
-  await user.selectOptions(screen.getByLabelText('Project teammates'), [
-    SETUP_EDITOR,
-  ]);
+  await user.click(screen.getByRole('checkbox', { name: 'Project editor' }));
   await continueStep(user);
-  await user.selectOptions(screen.getByLabelText('Service plan choice'), 'NEW');
+  expect(
+    screen.queryByLabelText('Service plan choice'),
+  ).not.toBeInTheDocument();
   await user.type(
     screen.getByLabelText('Service plan name'),
     'Launch retainer',
@@ -551,4 +565,67 @@ it('opens a requested additional plan directly without a redundant mode choice',
     screen.getByRole('list', { name: 'Selected services' }),
   ).toHaveTextContent('SEO');
   expect(mockCreate).not.toHaveBeenCalled();
+});
+
+it('auto-opens new project form when client has no projects and allows effortless multi-teammate selection', async () => {
+  mockContext.projects = [];
+  const { user } = setup();
+
+  // Directly shows new project inputs without redundant choice cards
+  expect(screen.getByLabelText('New project name')).toBeVisible();
+  await user.type(
+    screen.getByLabelText('New project name'),
+    'Full-Funnel Retainer',
+  );
+
+  // Select multiple teammates with single clicks (no Cmd/Ctrl required)
+  await user.click(
+    screen.getByRole('checkbox', { name: 'Independent manager' }),
+  );
+  await user.click(screen.getByRole('checkbox', { name: 'Project editor' }));
+  expect(
+    screen.getByRole('list', { name: 'Selected teammates' }),
+  ).toHaveTextContent(/Independent manager.*Project editor/);
+
+  await continueStep(user);
+  await user.type(
+    screen.getByLabelText('Service plan name'),
+    'Growth Retainer',
+  );
+  await user.click(screen.getByRole('checkbox', { name: 'SEO' }));
+  await user.selectOptions(
+    screen.getByLabelText('Billing arrangement'),
+    'RETAINER',
+  );
+  await user.type(
+    screen.getByLabelText('Client-visible scope'),
+    'SEO and paid social execution',
+  );
+  await continueStep(user);
+  // Skip optional first task
+  await continueStep(user);
+
+  // Review step shows both teammates and lets user jump back to edit
+  expect(
+    screen.getByText('Independent manager, Project editor'),
+  ).toBeVisible();
+  await user.click(
+    screen.getByRole('button', { name: 'Edit project & team' }),
+  );
+  expect(screen.getByLabelText('New project name')).toHaveValue(
+    'Full-Funnel Retainer',
+  );
+  await continueStep(user);
+  await continueStep(user);
+  await continueStep(user);
+  await user.click(
+    screen.getByRole('button', { name: 'Save reviewed client setup' }),
+  );
+  await screen.findByRole('heading', { name: 'Client work setup saved' });
+  expect(mockCreate).toHaveBeenCalledWith(
+    expect.objectContaining({
+      projectName: 'Full-Funnel Retainer',
+      memberIds: [SETUP_MANAGER, SETUP_EDITOR],
+    }),
+  );
 });

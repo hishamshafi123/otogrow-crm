@@ -16,7 +16,19 @@ import { FileStorageDriverFactory } from 'src/engine/core-modules/file-storage/f
 import { TwentyConfigService } from 'src/engine/core-modules/twenty-config/twenty-config.service';
 import { WorkspaceEntity } from 'src/engine/core-modules/workspace/workspace.entity';
 import { DeliveryService } from 'src/modules/delivery/delivery.service';
+import { DeliveryOperationsEntity } from 'src/modules/delivery/entities/delivery-operations.entity';
 import { DeliveryProjectEntity } from 'src/modules/delivery/entities/delivery-project.entity';
+import {
+  CLIENT_BUSINESS_INVOICE_PAYMENT_PREFIX,
+  CLIENT_BUSINESS_PAYMENT_REF_TYPE,
+  deterministicClientReceivableInvoiceId,
+  minorUnitsToMicros,
+} from 'src/modules/delivery/finance-v2/finance-v2-client-sync.util';
+import { computeProjectedMrrSnapshot } from 'src/modules/delivery/finance-v2/finance-v2-mrr.util';
+import {
+  normalizeClientRoster,
+  resolveEffectiveClientCompanyIds,
+} from 'src/modules/delivery/clients/delivery-client-hub.policy';
 import {
   canManageFinance,
   canReadFinance,
@@ -2009,22 +2021,34 @@ export class DeliveryFinanceV2Service {
       rawInput ?? {},
     );
 
-    return this.dataSource.transaction(async (manager) => {
-      const actor = await this.authorize(
-        manager,
-        workspace,
-        memberId,
-        userWorkspaceId,
-        false,
-      );
-      const canViewPayroll = actor.isAdmin;
-      const profile = await this.ensureProfile(manager, workspace.id);
-      await this.ensureSystemAccounts(manager, workspace.id);
+    const readOnce = (allowBackfillCheck: boolean) =>
+      this.dataSource.transaction(async (manager) => {
+        const actor = await this.authorize(
+          manager,
+          workspace,
+          memberId,
+          userWorkspaceId,
+          false,
+        );
+        const canViewPayroll = actor.isAdmin;
+        const profile = await this.ensureProfile(manager, workspace.id);
+        await this.ensureSystemAccounts(manager, workspace.id);
 
-      const today = todayIsoDate(now, profile.timezone);
-      const currentMonth = monthOfDate(today);
-      const fromDate = query.fromDate ?? firstDayOfMonth(currentMonth);
-      const toDate = query.toDate ?? today;
+        if (
+          allowBackfillCheck &&
+          (await this.hasUnsyncedClientBusinessBilling(
+            manager,
+            workspace.id,
+            profile.lockedThroughDate,
+          ))
+        ) {
+          return { __needsClientBillingBackfill: true as const };
+        }
+
+        const today = todayIsoDate(now, profile.timezone);
+        const currentMonth = monthOfDate(today);
+        const fromDate = query.fromDate ?? firstDayOfMonth(currentMonth);
+        const toDate = query.toDate ?? today;
       if (fromDate > toDate) {
         throw new BadRequestException(
           'P&L "From" date cannot be later than "To" date.',
@@ -2192,7 +2216,6 @@ export class DeliveryFinanceV2Service {
           where: {
             workspaceId: workspace.id,
             entryType: 'INVOICE_PAYMENT',
-            sourceRefType: 'INVOICE_PAYMENT',
           },
           order: { entryDate: 'DESC', createdAt: 'DESC' },
         });
@@ -2209,7 +2232,10 @@ export class DeliveryFinanceV2Service {
         }[]
       >();
       for (const journal of invoicePaymentJournals) {
-        if (journal.sourceRefId) {
+        if (
+          journal.sourceRefType === 'INVOICE_PAYMENT' &&
+          journal.sourceRefId
+        ) {
           const [invoiceId] = journal.sourceRefId.split(':');
           const list = paymentsByInvoiceId.get(invoiceId) ?? [];
           list.push({
@@ -2555,6 +2581,91 @@ export class DeliveryFinanceV2Service {
         canViewPayroll,
       );
 
+      const operations = await manager
+        .getRepository(DeliveryOperationsEntity)
+        .findOneBy({ workspaceId: workspace.id });
+      const clientRoster = normalizeClientRoster(operations?.state.clientRoster);
+      const clientFees = operations?.state.clientFees ?? {};
+      const engagements = operations?.state.clients?.engagements ?? [];
+      const effectiveClientIds = resolveEffectiveClientCompanyIds(
+        clientRoster,
+        projects.map((project) => project.companyId),
+        engagements.map((engagement) => engagement.companyId),
+      );
+      let activeClientsForMrr: { id: string; name: string }[] = [];
+      if (effectiveClientIds.length > 0) {
+        let companyRows:
+          | { id: string; name: string; deletedAt?: Date | string | null }[]
+          | null = null;
+        try {
+          const queried = await manager.query(
+            `SELECT id, name, "deletedAt" FROM ${this.delivery.schema(workspace)}."company" WHERE id = ANY($1::uuid[])`,
+            [effectiveClientIds],
+          );
+          if (Array.isArray(queried)) {
+            companyRows = queried as {
+              id: string;
+              name: string;
+              deletedAt?: Date | string | null;
+            }[];
+          }
+        } catch {
+          companyRows = null;
+        }
+        if (companyRows && companyRows.length > 0) {
+          activeClientsForMrr = companyRows
+            .filter((row) => !row.deletedAt)
+            .map((row) => ({
+              id: row.id,
+              name: row.name?.trim() || 'Client',
+            }));
+        } else {
+          const projectNameByCompanyId = new Map<string, string>();
+          for (const project of projects) {
+            if (project.companyId && !projectNameByCompanyId.has(project.companyId)) {
+              projectNameByCompanyId.set(project.companyId, project.name);
+            }
+          }
+          activeClientsForMrr = effectiveClientIds.map((companyId) => ({
+            id: companyId,
+            name: projectNameByCompanyId.get(companyId) ?? 'Client',
+          }));
+        }
+      }
+
+      const projectedMrr = computeProjectedMrrSnapshot({
+        workspaceId: workspace.id,
+        activeClients: activeClientsForMrr,
+        clientFees,
+        projects: projects.map((project) => ({
+          id: project.id,
+          companyId: project.companyId,
+        })),
+        businessRecords: operations?.state.business?.records ?? [],
+        financeV2Invoices: allInvoices.map((invoice) => ({
+          id: invoice.id,
+          clientName: invoice.clientName,
+          projectId: invoice.projectId,
+          currency: invoice.currency,
+          status: invoice.status,
+        })),
+        financeV2PaymentJournals: invoicePaymentJournals.map((journal) => ({
+          id: journal.id,
+          entryDate: journal.entryDate,
+          currency: journal.currency,
+          amountMicros: journal.amountMicros,
+          aedAmountMicros: journal.aedAmountMicros,
+          projectId: journal.projectId,
+          sourceRefType: journal.sourceRefType,
+          sourceRefId: journal.sourceRefId,
+          status: journal.status,
+          reversed: reversedJournalIds.has(journal.id),
+        })),
+        exchangeRates: profile.exchangeRates,
+        timeZone: profile.timezone,
+        month: currentMonth,
+      });
+
       const analytics: FinanceV2Analytics = {
         previousPeriod: {
           fromDate: previousRange.fromDate,
@@ -2580,6 +2691,7 @@ export class DeliveryFinanceV2Service {
         },
         payrollMonthRevenueAedMicros,
         projectProfitability,
+        projectedMrr,
       };
 
       const payrollProfileByRecurringId = new Map<
@@ -2783,7 +2895,18 @@ export class DeliveryFinanceV2Service {
           name: member.name,
         })),
       };
-    });
+      });
+
+    const firstPass = await readOnce(true);
+    if ('__needsClientBillingBackfill' in firstPass) {
+      await this.backfillUnsyncedClientBusinessBilling(workspace, memberId);
+      const secondPass = await readOnce(false);
+      if ('__needsClientBillingBackfill' in secondPass) {
+        throw new Error('Unexpected Finance V2 backfill state.');
+      }
+      return secondPass;
+    }
+    return firstPass;
   }
 
   async command(
@@ -5871,6 +5994,691 @@ export class DeliveryFinanceV2Service {
         filename: `otogrow-ledger-${fromDate}-to-${toDate}.csv`,
         csv: rows.map((row) => row.map(csvCell).join(',')).join('\r\n'),
       };
+    });
+  }
+
+  private async postClientCashPaymentInTransaction(
+    manager: EntityManager,
+    params: {
+      workspaceId: string;
+      profile: DeliveryFinanceV2ProfileEntity;
+      systemAccounts: Map<string, DeliveryFinanceV2AccountEntity>;
+      currency: FinanceV2Currency;
+      amountMicros: bigint;
+      entryDate: string;
+      title: string;
+      notes: string;
+      projectId: string | null;
+      receiptUrl: string | null;
+      sourceRefType: string;
+      sourceRefId: string;
+      memberId: string;
+    },
+  ): Promise<DeliveryFinanceV2JournalEntity> {
+    const cashAccount = await this.ensureCashAccount(
+      manager,
+      params.workspaceId,
+      params.currency,
+    );
+    const revenueAccount = params.systemAccounts.get('REVENUE:SERVICE')!;
+    const fxAccount = params.systemAccounts.get('FX:GAIN_LOSS')!;
+    const fxRate = this.resolveFxRate(params.profile, params.currency);
+    const aedAmount = convertToAedMicros(
+      params.amountMicros,
+      params.currency,
+      fxRate,
+    );
+    assertPositiveAed(aedAmount, 'Client payment');
+
+    const cashAed = await this.resolveCashInflowCarryingAed(
+      manager,
+      params.workspaceId,
+      cashAccount,
+      params.amountMicros,
+      aedAmount,
+      params.entryDate,
+    );
+    assertPositiveAed(cashAed, 'Client payment cash carrying amount');
+
+    const lines: FinanceV2JournalLineDraft[] = [
+      {
+        accountId: cashAccount.id,
+        debitAedMicros: cashAed,
+        creditAedMicros: BigInt('0'),
+        currency: params.currency,
+        originalSignedMicros: params.amountMicros,
+      },
+      {
+        accountId: revenueAccount.id,
+        debitAedMicros: BigInt('0'),
+        creditAedMicros: aedAmount,
+        currency: params.currency,
+        originalSignedMicros: -params.amountMicros,
+      },
+    ];
+    this.appendFxSpreadLines(lines, fxAccount.id, cashAed, aedAmount);
+
+    return this.postJournal(manager, {
+      workspaceId: params.workspaceId,
+      entryDate: params.entryDate,
+      entryType: 'INVOICE_PAYMENT',
+      category: 'SERVICE_REVENUE',
+      title: params.title,
+      notes: params.notes,
+      currency: params.currency,
+      amountMicros: params.amountMicros,
+      fxRateToAed: fxRate,
+      aedAmountMicros: aedAmount,
+      fundingAccountId: cashAccount.id,
+      targetAccountId: revenueAccount.id,
+      projectId: params.projectId,
+      receiptUrl: params.receiptUrl,
+      sourceRefType: params.sourceRefType,
+      sourceRefId: params.sourceRefId,
+      createdBy: params.memberId,
+      lines,
+    });
+  }
+
+  async syncClientBusinessFinanceEntryInTransaction(
+    manager: EntityManager,
+    params: {
+      workspaceId: string;
+      memberId: string;
+      recordId: string;
+      category: 'INCOME' | 'RECEIVABLE';
+      title: string;
+      clientName: string;
+      currency: FinanceV2Currency;
+      amountMinor: number;
+      date: string;
+      dueDate: string | null;
+      projectId: string | null;
+      externalReference: string;
+      evidenceUrl: string | null;
+      notes: string;
+    },
+  ): Promise<void> {
+    if (params.amountMinor <= 0) return;
+    await this.lockWorkspace(manager, params.workspaceId, true);
+    const profile = await this.ensureProfile(manager, params.workspaceId);
+    const systemAccounts = await this.ensureSystemAccounts(
+      manager,
+      params.workspaceId,
+    );
+    const amountMicros = minorUnitsToMicros(params.amountMinor);
+
+    if (params.category === 'INCOME') {
+      const noteParts = [
+        params.externalReference ? `Ref: ${params.externalReference}` : '',
+        params.notes.trim(),
+      ].filter(Boolean);
+      await this.postClientCashPaymentInTransaction(manager, {
+        workspaceId: params.workspaceId,
+        profile,
+        systemAccounts,
+        currency: params.currency,
+        amountMicros,
+        entryDate: params.date,
+        title: params.title,
+        notes: noteParts.join(' · '),
+        projectId: params.projectId,
+        receiptUrl: params.evidenceUrl,
+        sourceRefType: CLIENT_BUSINESS_PAYMENT_REF_TYPE,
+        sourceRefId: params.recordId,
+        memberId: params.memberId,
+      });
+      return;
+    }
+
+    const invoiceRepo = manager.getRepository(DeliveryFinanceV2InvoiceEntity);
+    const invoiceId = deterministicClientReceivableInvoiceId(
+      params.workspaceId,
+      params.recordId,
+    );
+    const existing = await invoiceRepo.findOneBy({
+      workspaceId: params.workspaceId,
+      id: invoiceId,
+    });
+    if (existing) return;
+
+    const trimmedRef = params.externalReference.trim();
+    let invoiceNumber: string;
+    if (
+      trimmedRef &&
+      !(await invoiceRepo.findOneBy({
+        workspaceId: params.workspaceId,
+        invoiceNumber: trimmedRef,
+      }))
+    ) {
+      invoiceNumber = trimmedRef;
+    } else {
+      invoiceNumber = await this.nextDocumentNumber(
+        manager,
+        profile,
+        'INVOICE',
+        params.date,
+      );
+    }
+
+    const dueDate =
+      params.dueDate && params.dueDate >= params.date
+        ? params.dueDate
+        : params.date;
+    const invoice = invoiceRepo.create({
+      id: invoiceId,
+      workspaceId: params.workspaceId,
+      invoiceNumber,
+      scheduleId: null,
+      scheduleMonth: null,
+      sourceQuoteId: null,
+      clientName: params.clientName.trim() || params.title,
+      clientEmail: '',
+      clientAddress: '',
+      projectId: params.projectId,
+      currency: params.currency,
+      issueDate: params.date,
+      dueDate,
+      lineItems: [
+        {
+          id: randomUUID(),
+          label: params.title,
+          description: params.notes.trim(),
+          quantity: '1',
+          unitPriceMicros: amountMicros.toString(),
+          discountPercent: '0',
+          lineTotalMicros: amountMicros.toString(),
+        },
+      ],
+      subtotalMicros: amountMicros.toString(),
+      discountTotalMicros: '0',
+      totalMicros: amountMicros.toString(),
+      paidMicros: '0',
+      status: 'SENT',
+      pdfStoragePath: null,
+      sentAt: new Date(),
+      sentBy: params.memberId,
+      sentVia: 'MANUAL',
+      notes: params.notes.trim() || profile.defaultInvoiceNotes,
+      voidReason: null,
+      voidedAt: null,
+      createdBy: params.memberId,
+    });
+    await invoiceRepo.save(invoice);
+  }
+
+  async settleClientBusinessReceivableInTransaction(
+    manager: EntityManager,
+    params: {
+      workspaceId: string;
+      memberId: string;
+      receivableId: string;
+      receiptId: string;
+      title: string;
+      clientName: string;
+      currency: FinanceV2Currency;
+      amountMinor: number;
+      paymentDate: string;
+      projectId: string | null;
+      evidenceUrl: string | null;
+      notes: string;
+    },
+  ): Promise<void> {
+    if (params.amountMinor <= 0) return;
+    await this.lockWorkspace(manager, params.workspaceId, true);
+    const profile = await this.ensureProfile(manager, params.workspaceId);
+    const systemAccounts = await this.ensureSystemAccounts(
+      manager,
+      params.workspaceId,
+    );
+    const invoiceRepo = manager.getRepository(DeliveryFinanceV2InvoiceEntity);
+    const invoiceId = deterministicClientReceivableInvoiceId(
+      params.workspaceId,
+      params.receivableId,
+    );
+    const invoice = await invoiceRepo.findOneBy({
+      workspaceId: params.workspaceId,
+      id: invoiceId,
+    });
+
+    if (invoice) {
+      if (invoice.status === 'VOID' || invoice.status === 'PAID') return;
+      const total = BigInt(invoice.totalMicros);
+      const alreadyPaid = BigInt(invoice.paidMicros);
+      const remaining = total > alreadyPaid ? total - alreadyPaid : BigInt('0');
+      if (remaining <= BigInt('0')) return;
+
+      const requestedMicros = minorUnitsToMicros(params.amountMinor);
+      const paymentMicros =
+        requestedMicros > remaining ? remaining : requestedMicros;
+      await this.postClientCashPaymentInTransaction(manager, {
+        workspaceId: params.workspaceId,
+        profile,
+        systemAccounts,
+        currency: invoice.currency,
+        amountMicros: paymentMicros,
+        entryDate: params.paymentDate,
+        title: `Payment — ${invoice.invoiceNumber} (${invoice.clientName})`,
+        notes: params.notes,
+        projectId: invoice.projectId ?? params.projectId,
+        receiptUrl: params.evidenceUrl,
+        sourceRefType: 'INVOICE_PAYMENT',
+        sourceRefId: `${invoice.id}:${CLIENT_BUSINESS_INVOICE_PAYMENT_PREFIX}${params.receiptId}`,
+        memberId: params.memberId,
+      });
+
+      const nextPaid = alreadyPaid + paymentMicros;
+      invoice.paidMicros = nextPaid.toString();
+      invoice.status = nextPaid >= total ? 'PAID' : 'PARTIALLY_PAID';
+      await invoiceRepo.save(invoice);
+      return;
+    }
+
+    await this.postClientCashPaymentInTransaction(manager, {
+      workspaceId: params.workspaceId,
+      profile,
+      systemAccounts,
+      currency: params.currency,
+      amountMicros: minorUnitsToMicros(params.amountMinor),
+      entryDate: params.paymentDate,
+      title: params.title,
+      notes: params.notes,
+      projectId: params.projectId,
+      receiptUrl: params.evidenceUrl,
+      sourceRefType: CLIENT_BUSINESS_PAYMENT_REF_TYPE,
+      sourceRefId: params.receiptId,
+      memberId: params.memberId,
+    });
+  }
+
+  async voidClientBusinessFinanceEntryInTransaction(
+    manager: EntityManager,
+    params: {
+      workspaceId: string;
+      memberId: string;
+      recordId: string;
+      category: 'INCOME' | 'RECEIVABLE';
+      externalReference: string;
+      reason: string;
+    },
+  ): Promise<void> {
+    await this.lockWorkspace(manager, params.workspaceId, true);
+    const profile = await this.ensureProfile(manager, params.workspaceId);
+    const journalRepo = manager.getRepository(DeliveryFinanceV2JournalEntity);
+    const invoiceRepo = manager.getRepository(DeliveryFinanceV2InvoiceEntity);
+
+    if (params.category === 'RECEIVABLE') {
+      const invoiceId = deterministicClientReceivableInvoiceId(
+        params.workspaceId,
+        params.recordId,
+      );
+      const invoice = await invoiceRepo.findOneBy({
+        workspaceId: params.workspaceId,
+        id: invoiceId,
+      });
+      if (
+        invoice &&
+        invoice.status !== 'VOID' &&
+        BigInt(invoice.paidMicros) === BigInt('0')
+      ) {
+        invoice.status = 'VOID';
+        invoice.voidReason = params.reason;
+        invoice.voidedAt = new Date();
+        await invoiceRepo.save(invoice);
+      }
+      return;
+    }
+
+    let journal = await journalRepo.findOneBy({
+      workspaceId: params.workspaceId,
+      sourceRefType: CLIENT_BUSINESS_PAYMENT_REF_TYPE,
+      sourceRefId: params.recordId,
+      status: 'POSTED',
+    });
+    let linkedInvoiceId: string | null = null;
+    if (!journal && params.externalReference.startsWith('receivable:')) {
+      const receivableId = params.externalReference.slice('receivable:'.length);
+      linkedInvoiceId = deterministicClientReceivableInvoiceId(
+        params.workspaceId,
+        receivableId,
+      );
+      journal = await journalRepo.findOneBy({
+        workspaceId: params.workspaceId,
+        sourceRefType: 'INVOICE_PAYMENT',
+        sourceRefId: `${linkedInvoiceId}:${CLIENT_BUSINESS_INVOICE_PAYMENT_PREFIX}${params.recordId}`,
+        status: 'POSTED',
+      });
+    }
+    if (!journal) return;
+
+    assertDateNotLocked(
+      profile.lockedThroughDate,
+      journal.entryDate,
+      'void entries',
+    );
+    journal.status = 'VOID';
+    journal.voidedBy = params.memberId;
+    journal.voidedAt = new Date();
+    journal.voidReason = params.reason;
+    await journalRepo.save(journal);
+
+    if (linkedInvoiceId) {
+      const invoice = await invoiceRepo.findOneBy({
+        workspaceId: params.workspaceId,
+        id: linkedInvoiceId,
+      });
+      if (invoice && invoice.status !== 'VOID') {
+        const currentPaid = BigInt(invoice.paidMicros);
+        const paymentAmt = BigInt(journal.amountMicros);
+        const nextPaid =
+          currentPaid > paymentAmt ? currentPaid - paymentAmt : BigInt('0');
+        invoice.paidMicros = nextPaid.toString();
+        invoice.status =
+          nextPaid === BigInt('0')
+            ? invoice.sentAt
+              ? 'SENT'
+              : 'READY'
+            : 'PARTIALLY_PAID';
+        await invoiceRepo.save(invoice);
+      }
+    }
+  }
+
+  private async hasUnsyncedClientBusinessBilling(
+    manager: EntityManager,
+    workspaceId: string,
+    lockedThroughDate: string | null,
+  ): Promise<boolean> {
+    const operations = await manager
+      .getRepository(DeliveryOperationsEntity)
+      .findOneBy({ workspaceId });
+    const records = operations?.state.business?.records ?? [];
+    const clientFinanceRecords = records.filter(
+      (
+        record,
+      ): record is Extract<
+        (typeof records)[number],
+        { kind: 'FINANCE' }
+      > =>
+        record.kind === 'FINANCE' &&
+        Boolean(record.companyId) &&
+        record.status !== 'VOID' &&
+        record.amount > 0 &&
+        (record.category === 'INCOME' || record.category === 'RECEIVABLE'),
+    );
+    if (clientFinanceRecords.length === 0) return false;
+
+    const existingInvoices = await manager
+      .getRepository(DeliveryFinanceV2InvoiceEntity)
+      .findBy({ workspaceId });
+    const invoiceById = new Map(
+      existingInvoices.map((invoice) => [invoice.id, invoice]),
+    );
+    const existingJournals = await manager
+      .getRepository(DeliveryFinanceV2JournalEntity)
+      .findBy({ workspaceId });
+    const journalKeys = new Set(
+      existingJournals
+        .filter((journal) => journal.sourceRefType && journal.sourceRefId)
+        .map((journal) => `${journal.sourceRefType}::${journal.sourceRefId}`),
+    );
+    const receiptReceivableIds = new Set(
+      clientFinanceRecords
+        .filter(
+          (record) =>
+            record.category === 'INCOME' &&
+            record.externalReference.startsWith('receivable:'),
+        )
+        .map((record) =>
+          record.externalReference.slice('receivable:'.length),
+        ),
+    );
+
+    for (const record of clientFinanceRecords) {
+      if (record.category === 'RECEIVABLE') {
+        const invoiceId = deterministicClientReceivableInvoiceId(
+          workspaceId,
+          record.id,
+        );
+        const invoice = invoiceById.get(invoiceId);
+        if (!invoice) return true;
+        if (
+          record.status === 'PAID' &&
+          !receiptReceivableIds.has(record.id) &&
+          invoice.status !== 'PAID' &&
+          invoice.status !== 'VOID' &&
+          (!lockedThroughDate || record.date > lockedThroughDate) &&
+          !journalKeys.has(
+            `INVOICE_PAYMENT::${invoiceId}:${CLIENT_BUSINESS_INVOICE_PAYMENT_PREFIX}${record.id}`,
+          )
+        ) {
+          return true;
+        }
+        continue;
+      }
+
+      if (lockedThroughDate && record.date <= lockedThroughDate) continue;
+
+      if (record.externalReference.startsWith('receivable:')) {
+        const receivableId = record.externalReference.slice(
+          'receivable:'.length,
+        );
+        const invoiceId = deterministicClientReceivableInvoiceId(
+          workspaceId,
+          receivableId,
+        );
+        const invoice = invoiceById.get(invoiceId);
+        if (invoice && (invoice.status === 'PAID' || invoice.status === 'VOID')) {
+          continue;
+        }
+        const alreadyRecorded =
+          journalKeys.has(
+            `INVOICE_PAYMENT::${invoiceId}:${CLIENT_BUSINESS_INVOICE_PAYMENT_PREFIX}${record.id}`,
+          ) ||
+          journalKeys.has(`${CLIENT_BUSINESS_PAYMENT_REF_TYPE}::${record.id}`);
+        if (!alreadyRecorded) return true;
+      } else if (
+        !journalKeys.has(`${CLIENT_BUSINESS_PAYMENT_REF_TYPE}::${record.id}`)
+      ) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  private async backfillUnsyncedClientBusinessBilling(
+    workspace: WorkspaceEntity,
+    memberId: string,
+  ): Promise<void> {
+    await this.dataSource.transaction(async (manager) => {
+      await this.lockWorkspace(manager, workspace.id, true);
+      const profile = await this.ensureProfile(manager, workspace.id);
+      await this.ensureSystemAccounts(manager, workspace.id);
+
+      const operations = await manager
+        .getRepository(DeliveryOperationsEntity)
+        .findOneBy({ workspaceId: workspace.id });
+      const records = operations?.state.business?.records ?? [];
+      const clientFinanceRecords = records.filter(
+        (
+          record,
+        ): record is Extract<
+          (typeof records)[number],
+          { kind: 'FINANCE' }
+        > =>
+          record.kind === 'FINANCE' &&
+          Boolean(record.companyId) &&
+          record.status !== 'VOID' &&
+          record.amount > 0 &&
+          (record.category === 'INCOME' || record.category === 'RECEIVABLE'),
+      );
+      if (clientFinanceRecords.length === 0) return;
+
+      const companyNamesById = new Map<string, string>();
+      const companyIds = [
+        ...new Set(
+          clientFinanceRecords
+            .map((record) => record.companyId)
+            .filter((id): id is string => Boolean(id)),
+        ),
+      ];
+      if (companyIds.length > 0) {
+        try {
+          const rows: { id: string; name: string }[] = await manager.query(
+            `SELECT id, name FROM ${this.delivery.schema(workspace)}."company" WHERE id = ANY($1::uuid[]) AND "deletedAt" IS NULL`,
+            [companyIds],
+          );
+          for (const row of rows) {
+            if (row.id && row.name) companyNamesById.set(row.id, row.name);
+          }
+        } catch {
+          // Non-fatal fallback when workspace company schema is unavailable in isolated tests.
+        }
+      }
+
+      const existingJournals = await manager
+        .getRepository(DeliveryFinanceV2JournalEntity)
+        .findBy({ workspaceId: workspace.id });
+      const journalKeys = new Set(
+        existingJournals
+          .filter((journal) => journal.sourceRefType && journal.sourceRefId)
+          .map((journal) => `${journal.sourceRefType}::${journal.sourceRefId}`),
+      );
+      const receiptReceivableIds = new Set(
+        clientFinanceRecords
+          .filter(
+            (record) =>
+              record.category === 'INCOME' &&
+              record.externalReference.startsWith('receivable:'),
+          )
+          .map((record) =>
+            record.externalReference.slice('receivable:'.length),
+          ),
+      );
+
+      // 1. Sync receivables first so linked payment receipts can settle their invoices.
+      for (const record of clientFinanceRecords) {
+        if (record.category !== 'RECEIVABLE') continue;
+        const clientName =
+          (record.companyId ? companyNamesById.get(record.companyId) : null) ??
+          record.title;
+        await this.syncClientBusinessFinanceEntryInTransaction(manager, {
+          workspaceId: workspace.id,
+          memberId: record.createdBy || memberId,
+          recordId: record.id,
+          category: 'RECEIVABLE',
+          title: record.title,
+          clientName,
+          currency: record.currency,
+          amountMinor: record.amount,
+          date: record.date,
+          dueDate: record.dueDate,
+          projectId: record.projectId,
+          externalReference: record.externalReference,
+          evidenceUrl: record.evidenceUrl,
+          notes: record.notes,
+        });
+
+        if (
+          record.status === 'PAID' &&
+          !receiptReceivableIds.has(record.id) &&
+          (!profile.lockedThroughDate ||
+            record.date > profile.lockedThroughDate)
+        ) {
+          const invoiceId = deterministicClientReceivableInvoiceId(
+            workspace.id,
+            record.id,
+          );
+          if (
+            !journalKeys.has(
+              `INVOICE_PAYMENT::${invoiceId}:${CLIENT_BUSINESS_INVOICE_PAYMENT_PREFIX}${record.id}`,
+            )
+          ) {
+            await this.settleClientBusinessReceivableInTransaction(manager, {
+              workspaceId: workspace.id,
+              memberId: record.decisionBy || record.createdBy || memberId,
+              receivableId: record.id,
+              receiptId: record.id,
+              title: `Payment: ${record.title}`,
+              clientName,
+              currency: record.currency,
+              amountMinor: record.amount,
+              paymentDate: record.date,
+              projectId: record.projectId,
+              evidenceUrl: record.evidence ?? record.evidenceUrl,
+              notes: record.notes,
+            });
+          }
+        }
+      }
+
+      // 2. Sync payment receipts & direct cash collected.
+      for (const record of clientFinanceRecords) {
+        if (record.category !== 'INCOME') continue;
+        if (
+          profile.lockedThroughDate &&
+          record.date <= profile.lockedThroughDate
+        ) {
+          continue;
+        }
+        const clientName =
+          (record.companyId ? companyNamesById.get(record.companyId) : null) ??
+          record.title;
+        if (record.externalReference.startsWith('receivable:')) {
+          const receivableId = record.externalReference.slice(
+            'receivable:'.length,
+          );
+          const invoiceId = deterministicClientReceivableInvoiceId(
+            workspace.id,
+            receivableId,
+          );
+          if (
+            journalKeys.has(
+              `INVOICE_PAYMENT::${invoiceId}:${CLIENT_BUSINESS_INVOICE_PAYMENT_PREFIX}${record.id}`,
+            ) ||
+            journalKeys.has(`${CLIENT_BUSINESS_PAYMENT_REF_TYPE}::${record.id}`)
+          ) {
+            continue;
+          }
+          await this.settleClientBusinessReceivableInTransaction(manager, {
+            workspaceId: workspace.id,
+            memberId: record.createdBy || memberId,
+            receivableId,
+            receiptId: record.id,
+            title: record.title,
+            clientName,
+            currency: record.currency,
+            amountMinor: record.amount,
+            paymentDate: record.date,
+            projectId: record.projectId,
+            evidenceUrl: record.evidenceUrl,
+            notes: record.notes,
+          });
+        } else {
+          if (
+            journalKeys.has(`${CLIENT_BUSINESS_PAYMENT_REF_TYPE}::${record.id}`)
+          ) {
+            continue;
+          }
+          await this.syncClientBusinessFinanceEntryInTransaction(manager, {
+            workspaceId: workspace.id,
+            memberId: record.createdBy || memberId,
+            recordId: record.id,
+            category: 'INCOME',
+            title: record.title,
+            clientName,
+            currency: record.currency,
+            amountMinor: record.amount,
+            date: record.date,
+            dueDate: null,
+            projectId: record.projectId,
+            externalReference: record.externalReference,
+            evidenceUrl: record.evidenceUrl,
+            notes: record.notes,
+          });
+        }
+      }
     });
   }
 }

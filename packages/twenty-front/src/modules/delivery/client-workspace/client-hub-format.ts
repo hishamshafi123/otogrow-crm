@@ -107,3 +107,17 @@ export const formatBillingMode = (mode: string): string => {
   if (mode === 'ONE_TIME') return 'One-time';
   return mode;
 };
+
+export const formatYearMonthLabel = (yearMonth: string): string => {
+  const match = /^(\d{4})-(\d{2})$/.exec(yearMonth);
+  if (!match) return yearMonth;
+  const year = Number(match[1]);
+  const monthIndex = Number(match[2]) - 1;
+  const parsed = new Date(Date.UTC(year, monthIndex, 1));
+  if (Number.isNaN(parsed.getTime())) return yearMonth;
+  return parsed.toLocaleDateString(undefined, {
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+};

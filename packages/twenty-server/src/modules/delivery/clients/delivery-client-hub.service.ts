@@ -15,6 +15,9 @@ import {
 } from 'src/modules/delivery/business/delivery-business.policy';
 import { DeliveryOperationsEntity } from 'src/modules/delivery/entities/delivery-operations.entity';
 import { DeliveryProjectEntity } from 'src/modules/delivery/entities/delivery-project.entity';
+import { DeliveryFinanceV2InvoiceEntity } from 'src/modules/delivery/finance-v2/entities/delivery-finance-v2-invoice.entity';
+import { DeliveryFinanceV2JournalEntity } from 'src/modules/delivery/finance-v2/entities/delivery-finance-v2-journal.entity';
+import { DeliveryFinanceV2ProfileEntity } from 'src/modules/delivery/finance-v2/entities/delivery-finance-v2-profile.entity';
 import { newDeliveryOperations } from 'src/modules/delivery/operations/delivery-operations.types';
 import { DeliveryClientSetupSourceService } from 'src/modules/delivery/onboarding/delivery-client-setup-source.service';
 import { OtogrowAccessService } from 'src/modules/otogrow-access/otogrow-access.service';
@@ -27,6 +30,8 @@ import {
   normalizeClientRoster,
   parseClientRosterUpdate,
   resolveEffectiveClientCompanyIds,
+  type ClientHubFinanceV2InvoiceSource,
+  type ClientHubFinanceV2PaymentJournalSource,
   type ClientHubTaskSource,
 } from 'src/modules/delivery/clients/delivery-client-hub.policy';
 
@@ -151,7 +156,74 @@ export class DeliveryClientHubService {
 
         const financeReadable = canReadFinance(actor);
         const financeManageable = canManageFinance(actor);
+        let financeV2Invoices: ClientHubFinanceV2InvoiceSource[] = [];
+        let financeV2PaymentJournals: ClientHubFinanceV2PaymentJournalSource[] =
+          [];
+        let exchangeRates: Record<string, string> | null = null;
+        let timeZone: string | null = null;
+        if (financeReadable) {
+          const [v2Invoices, v2PaymentJournals, v2Reversals, v2Profile] =
+            await Promise.all([
+              manager.getRepository(DeliveryFinanceV2InvoiceEntity).find({
+                where: { workspaceId: workspace.id },
+                order: { dueDate: 'DESC', createdAt: 'DESC' },
+              }),
+              manager.getRepository(DeliveryFinanceV2JournalEntity).find({
+                where: {
+                  workspaceId: workspace.id,
+                  entryType: 'INVOICE_PAYMENT',
+                },
+                order: { entryDate: 'DESC', createdAt: 'DESC' },
+              }),
+              manager.getRepository(DeliveryFinanceV2JournalEntity).find({
+                where: {
+                  workspaceId: workspace.id,
+                  entryType: 'REVERSAL',
+                  status: 'POSTED',
+                },
+              }),
+              manager
+                .getRepository(DeliveryFinanceV2ProfileEntity)
+                .findOneBy({ workspaceId: workspace.id }),
+            ]);
+          exchangeRates = v2Profile?.exchangeRates ?? null;
+          timeZone = v2Profile?.timezone ?? null;
+          const reversedIds = new Set(
+            v2Reversals
+              .map((rev) => rev.reversalOfJournalId)
+              .filter((id): id is string => Boolean(id)),
+          );
+          financeV2Invoices = v2Invoices.map((invoice) => ({
+            id: invoice.id,
+            invoiceNumber: invoice.invoiceNumber,
+            clientName: invoice.clientName,
+            projectId: invoice.projectId,
+            currency: invoice.currency,
+            issueDate: invoice.issueDate,
+            dueDate: invoice.dueDate,
+            totalMicros: invoice.totalMicros,
+            paidMicros: invoice.paidMicros,
+            status: invoice.status,
+            notes: invoice.notes,
+          }));
+          financeV2PaymentJournals = v2PaymentJournals.map((journal) => ({
+            id: journal.id,
+            entryDate: journal.entryDate,
+            title: journal.title,
+            notes: journal.notes,
+            currency: journal.currency,
+            amountMicros: journal.amountMicros,
+            aedAmountMicros: journal.aedAmountMicros,
+            projectId: journal.projectId,
+            sourceRefType: journal.sourceRefType,
+            sourceRefId: journal.sourceRefId,
+            status: journal.status,
+            reversed: reversedIds.has(journal.id),
+          }));
+        }
+
         const snapshot = buildClientHubSnapshot({
+          workspaceId: workspace.id,
           companies: designatedCompanies,
           roster,
           clientFees,
@@ -171,6 +243,10 @@ export class DeliveryClientHubService {
           })),
           shares,
           businessRecords,
+          financeV2Invoices,
+          financeV2PaymentJournals,
+          exchangeRates,
+          timeZone,
           memberNamesById,
           canReadFinance: financeReadable,
           canManageFinance: financeManageable,
@@ -335,6 +411,13 @@ export class DeliveryClientHubService {
 
       const before = normalizeClientRoster(record.state.clientRoster);
       let next = before;
+      const previousFee =
+        command.action === 'setFee' || command.action === 'clearFee'
+          ? (record.state.clientFees?.[command.companyId] ?? null)
+          : null;
+      const previousFeeLabel = previousFee
+        ? `${previousFee.currency} ${previousFee.amount / 100} (${previousFee.cadence})`
+        : null;
 
       if (command.action === 'setFee' || command.action === 'clearFee') {
         if (!canManageFinance(actor)) {
@@ -396,11 +479,17 @@ export class DeliveryClientHubService {
               ? [
                   {
                     field: 'clientFee',
-                    before: null,
+                    before: previousFeeLabel,
                     after: `${command.currency} ${command.amount / 100} (${command.cadence})`,
                   },
                 ]
-              : [{ field: 'clientFee', before: 'configured', after: null }],
+              : [
+                  {
+                    field: 'clientFee',
+                    before: previousFeeLabel ?? 'configured',
+                    after: null,
+                  },
+                ],
         });
       } else {
         await recordOtogrowActivity(manager, {

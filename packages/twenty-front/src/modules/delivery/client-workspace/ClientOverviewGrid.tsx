@@ -13,6 +13,7 @@ import {
   formatFeeCadenceShort,
   formatMoneyMinor,
   formatTaskStatus,
+  formatYearMonthLabel,
 } from '@/delivery/client-workspace/client-hub-format';
 import { clientWorkspaceDestination } from '@/delivery/client-workspace/client-workspace-navigation';
 import {
@@ -34,6 +35,11 @@ import {
   StyledClientTagRow,
   StyledClientTitleBlock,
   StyledEmptyStateCard,
+  StyledMrrMetricRow,
+  StyledMrrProgressFill,
+  StyledMrrProgressTrack,
+  StyledMrrSummaryCard,
+  StyledMrrSummaryTop,
   StyledNextDeliverable,
 } from '@/delivery/client-workspace/client-workspace.styles';
 import {
@@ -42,6 +48,7 @@ import {
   StyledDeliveryRow,
   StyledDeliveryStack,
 } from '@/delivery/deliveryStyles';
+import { formatFinanceAmountMicros } from '@/delivery/finance/finance-money';
 
 type PortfolioFilter =
   | 'all'
@@ -213,6 +220,31 @@ export const ClientOverviewGrid = ({
           </small>
         </StyledClientKpiCard>
 
+        {summary.canReadFinance &&
+          summary.projectedMrr &&
+          summary.projectedMrr.mrrClientCount > 0 && (
+            <StyledClientKpiCard
+              data-tone={
+                summary.projectedMrr.collectionPercent >= 100
+                  ? 'success'
+                  : undefined
+              }
+            >
+              <span>
+                {t`Projected MRR (${formatYearMonthLabel(summary.projectedMrr.month)})`}
+              </span>
+              <strong>
+                {formatFinanceAmountMicros(
+                  summary.projectedMrr.projectedMrrAedMicros,
+                  summary.projectedMrr.baseCurrency,
+                )}
+              </strong>
+              <small>
+                {t`${summary.projectedMrr.collectionPercent}% collected · ${formatFinanceAmountMicros(summary.projectedMrr.remainingAedMicros, summary.projectedMrr.baseCurrency)} remaining`}
+              </small>
+            </StyledClientKpiCard>
+          )}
+
         {summary.canReadFinance && openReceivablesText && (
           <StyledClientKpiCard>
             <span>
@@ -225,6 +257,139 @@ export const ClientOverviewGrid = ({
           </StyledClientKpiCard>
         )}
       </StyledClientKpiGrid>
+
+      {summary.canReadFinance &&
+        summary.projectedMrr &&
+        (summary.projectedMrr.mrrClientCount > 0 ||
+          summary.projectedMrr.oneTime.clientCount > 0) && (
+          <StyledMrrSummaryCard
+            aria-label={t`Current month projected MRR summary`}
+          >
+            <StyledMrrSummaryTop>
+              <div>
+                <h3>
+                  {t`Projected MRR · ${formatYearMonthLabel(summary.projectedMrr.month)}`}
+                </h3>
+                <small>
+                  {summary.projectedMrr.mrrClientCount > 0
+                    ? t`${summary.projectedMrr.mrrClientCount} recurring clients (${summary.projectedMrr.paidClientCount} paid · ${summary.projectedMrr.partialClientCount} partial · ${summary.projectedMrr.unpaidClientCount} unpaid)`
+                    : t`No recurring retainers yet — one-time engagements tracked below`}
+                </small>
+              </div>
+              <Link to="/delivery?view=finance">
+                <Trans>Finance overview →</Trans>
+              </Link>
+            </StyledMrrSummaryTop>
+
+            {summary.projectedMrr.mrrClientCount > 0 && (
+              <>
+                <StyledMrrMetricRow>
+                  <div>
+                    <span>
+                      <Trans>Projected MRR</Trans>
+                    </span>
+                    <strong>
+                      {formatFinanceAmountMicros(
+                        summary.projectedMrr.projectedMrrAedMicros,
+                        summary.projectedMrr.baseCurrency,
+                      )}
+                    </strong>
+                    <small>
+                      {summary.projectedMrr.byCurrency
+                        .map(
+                          (item) =>
+                            `${formatMoneyMinor(item.projectedMrrMinor, item.currency)}/mo`,
+                        )
+                        .join(' · ')}
+                    </small>
+                  </div>
+                  <div>
+                    <span>
+                      <Trans>Collected this month</Trans>
+                    </span>
+                    <strong>
+                      {formatFinanceAmountMicros(
+                        summary.projectedMrr.collectedTowardMrrAedMicros,
+                        summary.projectedMrr.baseCurrency,
+                      )}
+                    </strong>
+                    <small>
+                      {t`${summary.projectedMrr.collectionPercent}% of projected MRR`}
+                    </small>
+                  </div>
+                  <div>
+                    <span>
+                      <Trans>Remaining to collect</Trans>
+                    </span>
+                    <strong>
+                      {formatFinanceAmountMicros(
+                        summary.projectedMrr.remainingAedMicros,
+                        summary.projectedMrr.baseCurrency,
+                      )}
+                    </strong>
+                    <small>
+                      {summary.projectedMrr.unpaidClientCount +
+                        summary.projectedMrr.partialClientCount ===
+                      0
+                        ? t`All retainers collected`
+                        : t`${summary.projectedMrr.unpaidClientCount + summary.projectedMrr.partialClientCount} clients with balance due`}
+                    </small>
+                  </div>
+                  {summary.projectedMrr.oneTime.clientCount > 0 && (
+                    <div>
+                      <span>
+                        <Trans>One-time fees (excl. MRR)</Trans>
+                      </span>
+                      <strong>
+                        {formatFinanceAmountMicros(
+                          summary.projectedMrr.oneTime.totalAedMicros,
+                          summary.projectedMrr.baseCurrency,
+                        )}
+                      </strong>
+                      <small>
+                        {summary.projectedMrr.oneTime.byCurrency
+                          .map((item) =>
+                            formatMoneyMinor(item.amountMinor, item.currency),
+                          )
+                          .join(' · ')}
+                      </small>
+                    </div>
+                  )}
+                </StyledMrrMetricRow>
+
+                <StyledMrrProgressTrack
+                  role="progressbar"
+                  aria-label={t`Monthly MRR collection progress`}
+                  aria-valuenow={summary.projectedMrr.collectionPercent}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                >
+                  <StyledMrrProgressFill
+                    data-tone={
+                      summary.projectedMrr.collectionPercent >= 100
+                        ? undefined
+                        : summary.projectedMrr.collectionPercent > 0
+                          ? 'warning'
+                          : 'iris'
+                    }
+                    style={{
+                      width: `${summary.projectedMrr.collectionPercent}%`,
+                    }}
+                  />
+                </StyledMrrProgressTrack>
+              </>
+            )}
+
+            {summary.projectedMrr.mrrClientCount === 0 &&
+              summary.projectedMrr.oneTime.clientCount > 0 && (
+                <StyledClientTagRow>
+                  <StyledClientTag>
+                    {t`One-time engagements (excluded from MRR): ${formatFinanceAmountMicros(summary.projectedMrr.oneTime.totalAedMicros, summary.projectedMrr.baseCurrency)} (${summary.projectedMrr.oneTime.byCurrency.map((item) => formatMoneyMinor(item.amountMinor, item.currency)).join(' · ')})`}
+                  </StyledClientTag>
+                </StyledClientTagRow>
+              )}
+          </StyledMrrSummaryCard>
+        )}
 
       <StyledClientFilterBar>
         <StyledClientFilterPills role="group" aria-label={t`Filter clients`}>
@@ -510,7 +675,8 @@ export const ClientOverviewGrid = ({
                 {(client.services.length > 0 ||
                   client.tasksSummary.blockedCount > 0 ||
                   client.portal.pendingSubmissionsCount > 0 ||
-                  (client.finance?.overdueReceivablesCount ?? 0) > 0) && (
+                  (client.finance?.overdueReceivablesCount ?? 0) > 0 ||
+                  Boolean(client.finance?.currentMonthMrr)) && (
                   <StyledClientTagRow>
                     {client.services.slice(0, 3).map((service) => (
                       <StyledClientTag key={service}>{service}</StyledClientTag>
@@ -535,6 +701,30 @@ export const ClientOverviewGrid = ({
                         {t`Overdue invoice`}
                       </StyledClientTag>
                     )}
+                    {client.finance?.currentMonthMrr &&
+                      (client.finance.currentMonthMrr.status === 'ONE_TIME' ? (
+                        <StyledClientTag>
+                          <Trans>One-time fee</Trans>
+                        </StyledClientTag>
+                      ) : (
+                        <StyledClientTag
+                          data-tone={
+                            client.finance.currentMonthMrr.status === 'PAID'
+                              ? 'success'
+                              : client.finance.currentMonthMrr.status ===
+                                  'PARTIAL'
+                                ? 'warning'
+                                : 'iris'
+                          }
+                        >
+                          {client.finance.currentMonthMrr.status === 'PAID'
+                            ? t`MRR paid`
+                            : client.finance.currentMonthMrr.status ===
+                                'PARTIAL'
+                              ? t`MRR ${client.finance.currentMonthMrr.collectionPercent}% paid`
+                              : t`MRR unpaid`}
+                        </StyledClientTag>
+                      ))}
                   </StyledClientTagRow>
                 )}
 

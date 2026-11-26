@@ -1,5 +1,12 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Trans, useLingui } from '@lingui/react/macro';
+import {
+  formatFeeCadenceLabel,
+  formatMoneyMinor,
+  formatYearMonthLabel,
+} from '@/delivery/client-workspace/client-hub-format';
+import { clientWorkspaceDestination } from '@/delivery/client-workspace/client-workspace-navigation';
 import {
   StyledDeliveryButton,
   StyledDeliveryRow,
@@ -522,6 +529,24 @@ export const FinanceV2DashboardTab = ({
           </p>
         </StyledFinanceV2StatCard>
 
+        {analytics?.projectedMrr && (
+          <StyledFinanceV2StatCard data-highlight="true">
+            <small>
+              {t`Projected MRR (${formatYearMonthLabel(analytics.projectedMrr.month)})`}
+            </small>
+            <strong>
+              {formatDisplay(analytics.projectedMrr.projectedMrrAedMicros)}
+            </strong>
+            <p>
+              {analytics.projectedMrr.mrrClientCount > 0
+                ? t`${analytics.projectedMrr.collectionPercent}% collected (${formatDisplay(analytics.projectedMrr.collectedTowardMrrAedMicros)}) · ${formatDisplay(analytics.projectedMrr.remainingAedMicros)} remaining`
+                : analytics.projectedMrr.oneTime.clientCount > 0
+                  ? t`${analytics.projectedMrr.oneTime.clientCount} one-time agreed fees (excluded from MRR)`
+                  : t`Set agreed client fees in Clients to project monthly MRR`}
+            </p>
+          </StyledFinanceV2StatCard>
+        )}
+
         <StyledFinanceV2StatCard>
           <small>
             <Trans>Owed to People (Liabilities)</Trans>
@@ -530,6 +555,222 @@ export const FinanceV2DashboardTab = ({
           <p>{t`${bs.liabilitiesByPerson.length} people tracked`}</p>
         </StyledFinanceV2StatCard>
       </StyledFinanceV2HeroGrid>
+
+      {analytics?.projectedMrr && (
+        <StyledFinanceV2Panel
+          aria-label={t`Current month projected MRR breakdown`}
+        >
+          <StyledFinanceV2HeaderRow>
+            <div>
+              <h3>
+                {t`Projected MRR · ${formatYearMonthLabel(analytics.projectedMrr.month)} (${displayCurrency})`}
+              </h3>
+              <small>
+                <Trans>
+                  Monthly retainers count at 100%, quarterly retainers at 1/3
+                  per month, and one-time fees are tracked separately below.
+                </Trans>
+              </small>
+            </div>
+            <StyledFinanceV2ActionGroup>
+              {analytics.projectedMrr.mrrClientCount > 0 && (
+                <>
+                  <StyledFinanceV2Pill data-tone="success">
+                    {t`${analytics.projectedMrr.paidClientCount} paid`}
+                  </StyledFinanceV2Pill>
+                  <StyledFinanceV2Pill data-tone="warning">
+                    {t`${analytics.projectedMrr.partialClientCount} partial`}
+                  </StyledFinanceV2Pill>
+                  <StyledFinanceV2Pill data-tone="danger">
+                    {t`${analytics.projectedMrr.unpaidClientCount} unpaid`}
+                  </StyledFinanceV2Pill>
+                </>
+              )}
+              <Link to="/delivery?view=clients">
+                <Trans>Manage client fees →</Trans>
+              </Link>
+            </StyledFinanceV2ActionGroup>
+          </StyledFinanceV2HeaderRow>
+
+          {analytics.projectedMrr.mrrClientCount > 0 ? (
+            <>
+              <StyledFinanceV2HeroGrid>
+                <StyledFinanceV2StatCard>
+                  <small>
+                    <Trans>Projected MRR</Trans>
+                  </small>
+                  <strong>
+                    {formatDisplay(
+                      analytics.projectedMrr.projectedMrrAedMicros,
+                    )}
+                  </strong>
+                  <p>
+                    {analytics.projectedMrr.byCurrency
+                      .map(
+                        (item) =>
+                          `${formatMoneyMinor(item.projectedMrrMinor, item.currency)}/mo`,
+                      )
+                      .join(' · ')}
+                  </p>
+                </StyledFinanceV2StatCard>
+                <StyledFinanceV2StatCard>
+                  <small>
+                    <Trans>Collected This Month (toward MRR)</Trans>
+                  </small>
+                  <strong>
+                    {formatDisplay(
+                      analytics.projectedMrr.collectedTowardMrrAedMicros,
+                    )}
+                  </strong>
+                  <p>
+                    {t`${analytics.projectedMrr.collectionPercent}% of ${formatYearMonthLabel(analytics.projectedMrr.month)} MRR`}
+                  </p>
+                </StyledFinanceV2StatCard>
+                <StyledFinanceV2StatCard>
+                  <small>
+                    <Trans>Remaining to Collect</Trans>
+                  </small>
+                  <strong>
+                    {formatDisplay(analytics.projectedMrr.remainingAedMicros)}
+                  </strong>
+                  <p>
+                    {analytics.projectedMrr.unpaidClientCount +
+                      analytics.projectedMrr.partialClientCount ===
+                    0
+                      ? t`All recurring clients paid this month`
+                      : t`${analytics.projectedMrr.unpaidClientCount + analytics.projectedMrr.partialClientCount} clients with balance due`}
+                  </p>
+                </StyledFinanceV2StatCard>
+                {analytics.projectedMrr.oneTime.clientCount > 0 && (
+                  <StyledFinanceV2StatCard>
+                    <small>
+                      <Trans>One-Time Agreed Fees (Excl. MRR)</Trans>
+                    </small>
+                    <strong>
+                      {formatDisplay(
+                        analytics.projectedMrr.oneTime.totalAedMicros,
+                      )}
+                    </strong>
+                    <p>
+                      {analytics.projectedMrr.oneTime.byCurrency
+                        .map((item) =>
+                          formatMoneyMinor(item.amountMinor, item.currency),
+                        )
+                        .join(' · ')}
+                    </p>
+                  </StyledFinanceV2StatCard>
+                )}
+              </StyledFinanceV2HeroGrid>
+
+              <StyledFinanceV2BarTrack
+                role="progressbar"
+                aria-label={t`Current month projected MRR collection progress`}
+                aria-valuenow={analytics.projectedMrr.collectionPercent}
+                aria-valuemin={0}
+                aria-valuemax={100}
+              >
+                <StyledFinanceV2BarFill
+                  data-tone={
+                    analytics.projectedMrr.collectionPercent >= 100
+                      ? 'success'
+                      : analytics.projectedMrr.collectionPercent > 0
+                        ? 'warning'
+                        : undefined
+                  }
+                  style={{
+                    width: `${analytics.projectedMrr.collectionPercent}%`,
+                  }}
+                />
+              </StyledFinanceV2BarTrack>
+
+              <StyledFinanceV2TableWrap>
+                <StyledFinanceV2Table>
+                  <thead>
+                    <tr>
+                      <th>
+                        <Trans>Client</Trans>
+                      </th>
+                      <th>
+                        <Trans>Cadence</Trans>
+                      </th>
+                      <th data-numeric="true">
+                        <Trans>Agreed Fee</Trans>
+                      </th>
+                      <th data-numeric="true">
+                        {t`Monthly MRR (${displayCurrency})`}
+                      </th>
+                      <th data-numeric="true">
+                        {t`Collected (${displayCurrency})`}
+                      </th>
+                      <th data-numeric="true">
+                        {t`Remaining (${displayCurrency})`}
+                      </th>
+                      <th>
+                        <Trans>Status</Trans>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {analytics.projectedMrr.clients.map((row) => (
+                      <tr key={row.companyId}>
+                        <td>
+                          <Link
+                            to={clientWorkspaceDestination({
+                              companyId: row.companyId,
+                              section: 'overview',
+                            })}
+                          >
+                            {row.companyName}
+                          </Link>
+                        </td>
+                        <td>{formatFeeCadenceLabel(row.cadence)}</td>
+                        <td data-numeric="true">
+                          {formatMoneyMinor(row.agreedFeeMinor, row.currency)}
+                          {row.cadence === 'QUARTERLY'
+                            ? ` (${formatMoneyMinor(row.monthlyEquivalentMinor, row.currency)}/mo)`
+                            : ''}
+                        </td>
+                        <td data-numeric="true">
+                          {formatDisplay(row.monthlyEquivalentAedMicros)}
+                        </td>
+                        <td data-numeric="true">
+                          {formatDisplay(row.collectedThisMonthAedMicros)}
+                        </td>
+                        <td data-numeric="true">
+                          {formatDisplay(row.remainingAedMicros)}
+                        </td>
+                        <td>
+                          <StyledFinanceV2Pill
+                            data-tone={
+                              row.status === 'PAID'
+                                ? 'success'
+                                : row.status === 'PARTIAL'
+                                  ? 'warning'
+                                  : 'danger'
+                            }
+                          >
+                            {row.status === 'PAID'
+                              ? t`Paid`
+                              : row.status === 'PARTIAL'
+                                ? t`Partial (${row.collectionPercent}%)`
+                                : t`Unpaid`}
+                          </StyledFinanceV2Pill>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </StyledFinanceV2Table>
+              </StyledFinanceV2TableWrap>
+            </>
+          ) : (
+            <StyledFinanceV2Notice>
+              {analytics.projectedMrr.oneTime.clientCount > 0
+                ? t`No monthly or quarterly retainers configured yet. ${analytics.projectedMrr.oneTime.clientCount} one-time agreed fees totaling ${formatDisplay(analytics.projectedMrr.oneTime.totalAedMicros)} (${analytics.projectedMrr.oneTime.byCurrency.map((item) => formatMoneyMinor(item.amountMinor, item.currency)).join(' · ')}) are tracked outside MRR.`
+                : t`No agreed client fees set yet. Save a Monthly or Quarterly agreed fee on any client to track Projected MRR and collection progress for ${formatYearMonthLabel(analytics.projectedMrr.month)}.`}
+            </StyledFinanceV2Notice>
+          )}
+        </StyledFinanceV2Panel>
+      )}
 
       {analytics && (
         <StyledFinanceV2SplitGrid>

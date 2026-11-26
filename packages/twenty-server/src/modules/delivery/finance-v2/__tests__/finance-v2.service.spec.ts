@@ -20,6 +20,7 @@ import { type FileStorageDriverFactory } from 'src/engine/core-modules/file-stor
 import { type TwentyConfigService } from 'src/engine/core-modules/twenty-config/twenty-config.service';
 import { type WorkspaceEntity } from 'src/engine/core-modules/workspace/workspace.entity';
 import { type DeliveryService } from 'src/modules/delivery/delivery.service';
+import { DeliveryOperationsEntity } from 'src/modules/delivery/entities/delivery-operations.entity';
 import { DeliveryProjectEntity } from 'src/modules/delivery/entities/delivery-project.entity';
 import { DeliveryFinanceV2AccountEntity } from 'src/modules/delivery/finance-v2/entities/delivery-finance-v2-account.entity';
 import { DeliveryFinanceV2InvoiceScheduleEntity } from 'src/modules/delivery/finance-v2/entities/delivery-finance-v2-invoice-schedule.entity';
@@ -314,7 +315,7 @@ describe('DeliveryFinanceV2Service End-to-End Accounting, Payroll, Quotes & Auto
       configService,
     );
 
-    return { service, stores, writeFile, sendEmail };
+    return { service, stores, manager, writeFile, sendEmail };
   };
 
   it('G6-ACCESS-PRIVACY: blocks non-finance employees from reading, mutating, or downloading PDFs', async () => {
@@ -3856,4 +3857,322 @@ describe('DeliveryFinanceV2Service End-to-End Accounting, Payroll, Quotes & Auto
     );
     expect(balancedSnap.balanceSheet.isBalanced).toBe(true);
   });
+
+  it('CLIENT-BILLING-BRIDGE: syncs client cash collected, receivables, settlements, voids, and backfills pre-existing client billing idempotently', async () => {
+    const { service, stores, manager } = setup();
+    const nowUtc = new Date('2026-11-26T10:00:00.000Z');
+    const companyId = '44444444-4444-4444-8444-444444444441';
+    const paymentId = '44444444-4444-4444-8444-444444444442';
+    const receivableId = '44444444-4444-4444-8444-444444444443';
+    const receiptId = '44444444-4444-4444-8444-444444444444';
+    const legacyIncomeId = '44444444-4444-4444-8444-444444444445';
+
+    // 1. Pre-existing client cash collected stored only in DeliveryOperationsEntity before bridge existed
+    stores.set(DeliveryOperationsEntity, [
+      {
+        workspaceId: workspace.id,
+        state: {
+          business: {
+            records: [
+              {
+                id: legacyIncomeId,
+                revision: 1,
+                kind: 'FINANCE',
+                projectId: null,
+                companyId,
+                title: 'Legacy Client Retainer',
+                currency: 'AED',
+                amount: 100000, // 1,000.00 AED
+                date: '2026-11-05',
+                category: 'INCOME',
+                dueDate: null,
+                externalReference: 'LEG-001',
+                evidenceUrl: null,
+                notes: 'Bank transfer',
+                status: 'POSTED',
+                createdBy: adminMemberId,
+                createdAt: nowUtc.toISOString(),
+                updatedAt: nowUtc.toISOString(),
+                history: [],
+              },
+            ],
+          },
+        },
+      },
+    ]);
+
+    // First snapshot automatically backfills the pre-existing client cash collected record
+    const afterBackfill = await service.snapshot(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      { fromDate: '2026-11-01', toDate: '2026-11-30', asOfDate: '2026-11-26' },
+      nowUtc,
+    );
+    expect(afterBackfill.balanceSheet.isBalanced).toBe(true);
+    expect(afterBackfill.profitAndLoss.revenueAedMicros).toBe('1000000000');
+
+    // Second snapshot must be 100% idempotent (no double-counting!)
+    const afterSecondSnapshot = await service.snapshot(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      { fromDate: '2026-11-01', toDate: '2026-11-30', asOfDate: '2026-11-26' },
+      nowUtc,
+    );
+    expect(afterSecondSnapshot.profitAndLoss.revenueAedMicros).toBe(
+      '1000000000',
+    );
+
+    // 2. Direct client cash collected syncs into Finance V2 cash & revenue
+    await service.syncClientBusinessFinanceEntryInTransaction(
+      manager as never,
+      {
+        workspaceId: workspace.id,
+        memberId: adminMemberId,
+        recordId: paymentId,
+        category: 'INCOME',
+        title: 'Acme Retainer Payment',
+        clientName: 'Acme Studio',
+        currency: 'AED',
+        amountMinor: 250000, // 2,500.00 AED
+        date: '2026-11-12',
+        dueDate: null,
+        projectId: null,
+        externalReference: 'PAY-101',
+        evidenceUrl: null,
+        notes: 'Stripe payout',
+      },
+    );
+
+    // 3. Client receivable creates linked Finance V2 invoice, then marking paid settles it
+    await service.syncClientBusinessFinanceEntryInTransaction(
+      manager as never,
+      {
+        workspaceId: workspace.id,
+        memberId: adminMemberId,
+        recordId: receivableId,
+        category: 'RECEIVABLE',
+        title: 'Acme November Invoice',
+        clientName: 'Acme Studio',
+        currency: 'AED',
+        amountMinor: 150000, // 1,500.00 AED
+        date: '2026-11-15',
+        dueDate: '2026-11-29',
+        projectId: null,
+        externalReference: 'INV-ACME-11',
+        evidenceUrl: null,
+        notes: 'Monthly retainer',
+      },
+    );
+
+    const beforeSettle = await service.snapshot(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      { fromDate: '2026-11-01', toDate: '2026-11-30', asOfDate: '2026-11-26' },
+      nowUtc,
+    );
+    // Revenue so far: 1,000 + 2,500 = 3,500 AED; invoice is SENT with 0 paid
+    expect(beforeSettle.profitAndLoss.revenueAedMicros).toBe('3500000000');
+    const syncedInv = beforeSettle.invoices.find(
+      (i) => i.invoiceNumber === 'INV-ACME-11',
+    );
+    expect(syncedInv).toBeDefined();
+    expect(syncedInv?.status).toBe('SENT');
+    expect(syncedInv?.paidMicros).toBe('0');
+
+    // Settle receivable -> marks invoice PAID and posts 1,500 AED cash/revenue
+    await service.settleClientBusinessReceivableInTransaction(
+      manager as never,
+      {
+        workspaceId: workspace.id,
+        memberId: adminMemberId,
+        receivableId,
+        receiptId,
+        title: 'Payment receipt: Acme November Invoice',
+        clientName: 'Acme Studio',
+        currency: 'AED',
+        amountMinor: 150000,
+        paymentDate: '2026-11-20',
+        projectId: null,
+        evidenceUrl: 'https://receipts.example/acme-nov',
+        notes: 'Paid in full',
+      },
+    );
+
+    const afterSettle = await service.snapshot(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      { fromDate: '2026-11-01', toDate: '2026-11-30', asOfDate: '2026-11-26' },
+      nowUtc,
+    );
+    // Revenue now: 1,000 + 2,500 + 1,500 = 5,000 AED
+    expect(afterSettle.profitAndLoss.revenueAedMicros).toBe('5000000000');
+    expect(afterSettle.balanceSheet.isBalanced).toBe(true);
+    const paidInv = afterSettle.invoices.find(
+      (i) => i.invoiceNumber === 'INV-ACME-11',
+    );
+    expect(paidInv?.status).toBe('PAID');
+    expect(paidInv?.paidMicros).toBe('1500000000');
+
+    // 4. Voiding direct client cash payment removes its 2,500 AED revenue impact cleanly
+    await service.voidClientBusinessFinanceEntryInTransaction(
+      manager as never,
+      {
+        workspaceId: workspace.id,
+        memberId: adminMemberId,
+        recordId: paymentId,
+        category: 'INCOME',
+        externalReference: 'PAY-101',
+        reason: 'Entered in error',
+      },
+    );
+
+    const afterVoid = await service.snapshot(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      { fromDate: '2026-11-01', toDate: '2026-11-30', asOfDate: '2026-11-26' },
+      nowUtc,
+    );
+    expect(afterVoid.profitAndLoss.revenueAedMicros).toBe('2500000000');
+    expect(afterVoid.balanceSheet.isBalanced).toBe(true);
+  });
+
+  it('computes current-month Projected MRR in snapshot analytics from clientFees and Finance V2 collections', async () => {
+    const { service, stores, manager } = setup();
+    const nowUtc = new Date('2026-11-26T09:00:00Z');
+    const alphaCompanyId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const betaCompanyId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+    const gammaCompanyId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+    const paymentRecordId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+
+    // Bootstrap accounts and profile
+    await service.snapshot(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      { fromDate: '2026-11-01', toDate: '2026-11-30', asOfDate: '2026-11-26' },
+      nowUtc,
+    );
+
+    // Seed active roster, agreed fees (minor units), and matching client payment business record
+    stores.set(DeliveryOperationsEntity, [
+      {
+        workspaceId: workspace.id,
+        state: {
+          clientRoster: {
+            includedIds: [alphaCompanyId, betaCompanyId, gammaCompanyId],
+            excludedIds: [],
+          },
+          clientFees: {
+            [alphaCompanyId]: {
+              amount: 1000000, // 10,000.00 AED
+              currency: 'AED',
+              cadence: 'MONTHLY',
+              notes: '',
+              updatedAt: '2026-11-01T00:00:00Z',
+              updatedBy: adminMemberId,
+            },
+            [betaCompanyId]: {
+              amount: 300000, // 3,000.00 USD / 3 = 1,000 USD/mo
+              currency: 'USD',
+              cadence: 'QUARTERLY',
+              notes: '',
+              updatedAt: '2026-11-01T00:00:00Z',
+              updatedBy: adminMemberId,
+            },
+            [gammaCompanyId]: {
+              amount: 500000, // 5,000.00 AED one-time
+              currency: 'AED',
+              cadence: 'ONE_TIME',
+              notes: '',
+              updatedAt: '2026-11-01T00:00:00Z',
+              updatedBy: adminMemberId,
+            },
+          },
+          business: {
+            records: [
+              {
+                id: paymentRecordId,
+                revision: 1,
+                kind: 'FINANCE',
+                category: 'INCOME',
+                companyId: alphaCompanyId,
+                projectId: null,
+                title: 'Alpha Retainer Part 1',
+                currency: 'AED',
+                amount: 600000,
+                date: '2026-11-12',
+                dueDate: null,
+                externalReference: 'PAY-ALPHA-1',
+                evidenceUrl: null,
+                notes: 'Partial monthly retainer',
+                status: 'POSTED',
+                createdBy: adminMemberId,
+                createdAt: '2026-11-12T00:00:00Z',
+                updatedAt: '2026-11-12T00:00:00Z',
+              },
+            ],
+          },
+        },
+      },
+    ]);
+
+    // Sync the direct client payment of 6,000 AED into Finance V2 ledger
+    await service.syncClientBusinessFinanceEntryInTransaction(
+      manager as never,
+      {
+        workspaceId: workspace.id,
+        memberId: adminMemberId,
+        recordId: paymentRecordId,
+        category: 'INCOME',
+        title: 'Alpha Retainer Part 1',
+        clientName: 'Alpha Studio',
+        currency: 'AED',
+        amountMinor: 600000, // 6,000 AED
+        date: '2026-11-12',
+        dueDate: null,
+        projectId: null,
+        externalReference: 'PAY-ALPHA-1',
+        evidenceUrl: null,
+        notes: 'Partial monthly retainer',
+      },
+    );
+
+    const snap = await service.snapshot(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      { fromDate: '2026-11-01', toDate: '2026-11-30', asOfDate: '2026-11-26' },
+      nowUtc,
+    );
+
+    const projectedMrr = snap.analytics.projectedMrr;
+    expect(projectedMrr).toBeDefined();
+
+    // 10,000 AED + (3,000 USD / 3 = 1,000 USD * 3.6725 = 3,672.5 AED) = 13,672.5 AED
+    expect(projectedMrr?.month).toBe('2026-11');
+    expect(projectedMrr?.projectedMrrAedMicros).toBe('13672500000');
+    expect(projectedMrr?.collectedTowardMrrAedMicros).toBe('6000000000');
+    expect(projectedMrr?.remainingAedMicros).toBe('7672500000');
+    expect(projectedMrr?.mrrClientCount).toBe(2);
+    expect(projectedMrr?.oneTime.clientCount).toBe(1);
+    expect(projectedMrr?.oneTime.totalAedMicros).toBe('5000000000');
+    expect(projectedMrr?.paidClientCount).toBe(0);
+    expect(projectedMrr?.partialClientCount).toBe(1);
+    expect(projectedMrr?.unpaidClientCount).toBe(1);
+    const alphaRow = projectedMrr?.clients.find(
+      (c) => c.companyId === alphaCompanyId,
+    );
+    expect(alphaRow).toMatchObject({
+      status: 'PARTIAL',
+      collectedTowardMrrAedMicros: '6000000000',
+      remainingAedMicros: '4000000000',
+      collectionPercent: 60,
+    });
+  });
 });
+

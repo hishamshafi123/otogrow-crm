@@ -32,6 +32,7 @@ type ClientSelectedOverviewProps = {
   companyName: string;
   hubClient: ClientHubItem | null;
   updatingRoster: boolean;
+  rosterError?: string | null;
   onUpdateRoster: (input: ClientRosterUpdateInput) => Promise<boolean>;
   onRefreshHub: () => Promise<unknown>;
 };
@@ -41,6 +42,7 @@ export const ClientSelectedOverview = ({
   companyName,
   hubClient,
   updatingRoster,
+  rosterError,
   onUpdateRoster,
   onRefreshHub,
 }: ClientSelectedOverviewProps) => {
@@ -247,6 +249,7 @@ export const ClientSelectedOverview = ({
           companyName={companyName}
           hubClient={hubClient}
           updatingRoster={updatingRoster}
+          rosterError={rosterError}
           onUpdateRoster={onUpdateRoster}
           onRefreshHub={onRefreshHub}
         />

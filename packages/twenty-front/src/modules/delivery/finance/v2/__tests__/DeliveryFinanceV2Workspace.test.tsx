@@ -1643,4 +1643,144 @@ describe('DeliveryFinanceV2Workspace (G6 & G8)', () => {
       }),
     ).toBeDisabled();
   });
+
+  it('Overview tab: renders Projected MRR KPI card, collection progress, per-client breakdown, and separate one-time fees', () => {
+    const mrrSnap: FinanceV2Snapshot = {
+      ...sampleSnapshot,
+      analytics: {
+        ...sampleSnapshot.analytics!,
+        projectedMrr: {
+          month: '2026-11',
+          baseCurrency: 'AED',
+          exchangeRates: { AED: '1', USD: '3.6725' },
+          projectedMrrAedMicros: '13672500000',
+          collectedTowardMrrAedMicros: '6000000000',
+          totalCollectedThisMonthAedMicros: '6000000000',
+          remainingAedMicros: '7672500000',
+          collectionPercent: 44,
+          mrrClientCount: 2,
+          paidClientCount: 0,
+          partialClientCount: 1,
+          unpaidClientCount: 1,
+          byCurrency: [
+            {
+              currency: 'AED',
+              projectedMrrMinor: 1000000,
+              projectedMrrMicros: '10000000000',
+              projectedMrrAedMicros: '10000000000',
+              clientCount: 1,
+              paidCount: 0,
+              partialCount: 1,
+              unpaidCount: 0,
+            },
+            {
+              currency: 'USD',
+              projectedMrrMinor: 100000,
+              projectedMrrMicros: '1000000000',
+              projectedMrrAedMicros: '3672500000',
+              clientCount: 1,
+              paidCount: 0,
+              partialCount: 0,
+              unpaidCount: 1,
+            },
+          ],
+          oneTime: {
+            clientCount: 1,
+            totalAedMicros: '5000000000',
+            byCurrency: [
+              {
+                currency: 'AED',
+                amountMinor: 500000,
+                amountMicros: '5000000000',
+                aedMicros: '5000000000',
+                clientCount: 1,
+              },
+            ],
+            clients: [
+              {
+                companyId: 'co-gamma',
+                companyName: 'Gamma Launch',
+                cadence: 'ONE_TIME',
+                currency: 'AED',
+                agreedFeeMinor: 500000,
+                agreedFeeMicros: '5000000000',
+                monthlyEquivalentMinor: 0,
+                monthlyEquivalentMicros: '0',
+                monthlyEquivalentAedMicros: '0',
+                collectedThisMonthAedMicros: '0',
+                collectedInFeeCurrencyMinor: 0,
+                collectedInFeeCurrencyMicros: '0',
+                collectedTowardMrrAedMicros: '0',
+                remainingAedMicros: '0',
+                collectionPercent: 0,
+                status: 'ONE_TIME',
+                notes: '',
+              },
+            ],
+          },
+          clients: [
+            {
+              companyId: 'co-beta',
+              companyName: 'Beta Global',
+              cadence: 'QUARTERLY',
+              currency: 'USD',
+              agreedFeeMinor: 300000,
+              agreedFeeMicros: '3000000000',
+              monthlyEquivalentMinor: 100000,
+              monthlyEquivalentMicros: '1000000000',
+              monthlyEquivalentAedMicros: '3672500000',
+              collectedThisMonthAedMicros: '0',
+              collectedInFeeCurrencyMinor: 0,
+              collectedInFeeCurrencyMicros: '0',
+              collectedTowardMrrAedMicros: '0',
+              remainingAedMicros: '3672500000',
+              collectionPercent: 0,
+              status: 'UNPAID',
+              notes: '',
+            },
+            {
+              companyId: 'co-alpha',
+              companyName: 'Alpha Studio',
+              cadence: 'MONTHLY',
+              currency: 'AED',
+              agreedFeeMinor: 1000000,
+              agreedFeeMicros: '10000000000',
+              monthlyEquivalentMinor: 1000000,
+              monthlyEquivalentMicros: '10000000000',
+              monthlyEquivalentAedMicros: '10000000000',
+              collectedThisMonthAedMicros: '6000000000',
+              collectedInFeeCurrencyMinor: 600000,
+              collectedInFeeCurrencyMicros: '6000000000',
+              collectedTowardMrrAedMicros: '6000000000',
+              remainingAedMicros: '4000000000',
+              collectionPercent: 60,
+              status: 'PARTIAL',
+              notes: '',
+            },
+          ],
+        },
+      },
+    };
+    mockUseQuery.mockReturnValue({
+      data: { deliveryFinanceV2: mrrSnap },
+      loading: false,
+      error: undefined,
+      refetch: jest.fn(async () => undefined),
+    });
+
+    renderWorkspace('/delivery?view=finance');
+
+    expect(
+      screen.getByRole('heading', {
+        name: /Projected MRR · (Nov|November) 2026 \(AED\)/i,
+      }),
+    ).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Alpha Studio' })).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Beta Global' })).toBeVisible();
+    expect(screen.getByText(/44% collected/i)).toBeVisible();
+    expect(
+      screen.getByText('One-Time Agreed Fees (Excl. MRR)'),
+    ).toBeVisible();
+  });
 });
+

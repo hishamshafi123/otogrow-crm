@@ -2,6 +2,7 @@ import { useDeliveryDraftGuard } from '@/delivery/drafts/DeliveryDraftGuard';
 import { ClientSetupLink } from '@/delivery/onboarding/ClientSetupLink';
 import { useDeliveryNativeDraft } from '@/delivery/drafts/useDeliveryNativeDraft';
 import { DeliveryDraftConflict } from '@/delivery/drafts/DeliveryDraftConflict';
+import { TeamMemberMultiPicker } from '@/delivery/components/TeamMemberMultiPicker';
 import { OtogrowTeamRoles } from '@/otogrow-access/OtogrowTeamRoles';
 import { useId, useState } from 'react';
 import { isNonEmptyString } from '@sniptt/guards';
@@ -247,27 +248,14 @@ const DeliveryProjectForm = ({
                   <Trans>Add a project name before saving.</Trans>
                 </p>
               )}
-              <strong>
-                <Trans>Project members</Trans>
-              </strong>
-              <StyledDeliveryGrid>
-                {workspace.members.map((member) => (
-                  <label key={member.id} style={{ flexDirection: 'row' }}>
-                    <input
-                      type="checkbox"
-                      checked={memberIds.includes(member.id)}
-                      onChange={(event) =>
-                        setMemberIds(
-                          event.target.checked
-                            ? [...memberIds, member.id]
-                            : memberIds.filter((id) => id !== member.id),
-                        )
-                      }
-                    />
-                    {member.name}
-                  </label>
-                ))}
-              </StyledDeliveryGrid>
+              <TeamMemberMultiPicker
+                members={workspace.members}
+                selectedIds={memberIds}
+                onChange={setMemberIds}
+                label={t`Project members`}
+                helperText={t`Click teammates to add or remove them from this project.`}
+                disabled={busy || saving}
+              />
               <StyledDeliveryButton
                 disabled={busy || saving || stale || !draft.dirty || !validName}
                 type="submit"

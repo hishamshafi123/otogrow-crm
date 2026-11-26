@@ -219,3 +219,53 @@ it('keeps the draft and explains recovery when both save and refresh fail', asyn
     'Original project draft',
   );
 });
+
+it('lets managers add and remove multiple teammates cleanly when creating a project', async () => {
+  i18n.loadAndActivate({ locale: 'en', messages: {} });
+  const workspace: DeliveryWorkspace = {
+    actor: { memberId: 'admin', isAdmin: true, isManager: true },
+    members: [
+      { id: 'm1', name: 'Amna', access: 'MANAGER', roleLabel: 'PM' },
+      { id: 'm2', name: 'Arjun', access: 'MEMBER', roleLabel: 'Editor' },
+      { id: 'm3', name: 'Maya', access: 'MEMBER', roleLabel: 'Designer' },
+      { id: 'm4', name: 'Zaid', access: 'MEMBER', roleLabel: 'Strategist' },
+      { id: 'm5', name: 'Lina', access: 'MEMBER', roleLabel: 'Copywriter' },
+    ],
+    projects: [],
+    tasks: [],
+    companies: [],
+  };
+  const run = jest.fn().mockResolvedValue(true);
+  const user = userEvent.setup();
+  render(
+    <I18nProvider i18n={i18n}>
+      <DeliveryTeam workspace={workspace} run={run} busy={false} />
+    </I18nProvider>,
+  );
+
+  await user.click(screen.getByText('Create project', { selector: 'summary' }));
+  await user.type(screen.getByLabelText('Project name'), 'Q4 Growth Sprint');
+
+  // Single-click multi-selection without modifier keys
+  await user.click(screen.getByRole('checkbox', { name: 'Amna' }));
+  await user.click(screen.getByRole('checkbox', { name: 'Arjun' }));
+  await user.click(screen.getByRole('checkbox', { name: 'Maya' }));
+
+  // Filter teammates and add another match
+  await user.type(screen.getByLabelText('Filter teammates'), 'Lina');
+  await user.click(screen.getByRole('checkbox', { name: 'Lina' }));
+  await user.click(screen.getByRole('button', { name: 'Reset' }));
+
+  // Remove one via chip button
+  await user.click(screen.getByRole('button', { name: 'Remove Arjun' }));
+
+  await user.click(screen.getByRole('button', { name: 'Create project' }));
+  await waitFor(() =>
+    expect(run).toHaveBeenCalledWith({
+      action: 'project',
+      name: 'Q4 Growth Sprint',
+      companyId: null,
+      memberIds: ['m1', 'm3', 'm5'],
+    }),
+  );
+});

@@ -26,6 +26,8 @@ import {
   StyledFeeBanner,
   StyledLedgerList,
   StyledLedgerRow,
+  StyledMrrProgressFill,
+  StyledMrrProgressTrack,
 } from '@/delivery/client-workspace/client-workspace.styles';
 import {
   StyledDeliveryButton,
@@ -33,6 +35,7 @@ import {
   StyledDeliveryRow,
   StyledDeliveryStack,
 } from '@/delivery/deliveryStyles';
+import { formatFinanceAmountMicros } from '@/delivery/finance/finance-money';
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
 
@@ -55,6 +58,7 @@ type ClientBillingSectionProps = {
   companyName: string;
   hubClient: ClientHubItem;
   updatingRoster: boolean;
+  rosterError?: string | null;
   onUpdateRoster: (input: ClientRosterUpdateInput) => Promise<boolean>;
   onRefreshHub: () => Promise<unknown>;
 };
@@ -64,6 +68,7 @@ export const ClientBillingSection = ({
   companyName,
   hubClient,
   updatingRoster,
+  rosterError,
   onUpdateRoster,
   onRefreshHub,
 }: ClientBillingSectionProps) => {
@@ -118,6 +123,8 @@ export const ClientBillingSection = ({
     finance.openReceivablesByCurrency,
   );
   const collectedText = formatCurrencyTotals(finance.collectedByCurrency);
+  const currentMonthMrr = finance.currentMonthMrr ?? null;
+  const activeFeeError = feeError ?? rosterError ?? null;
 
   const openFeeEditor = () => {
     setFeeCurrency(finance.fee?.currency ?? 'USD');
@@ -226,8 +233,8 @@ export const ClientBillingSection = ({
       setRecordingEntry(false);
       setStatusMessage(
         entryCategory === 'INCOME'
-          ? t`Recorded payment for ${companyName}.`
-          : t`Created invoice for ${companyName}.`,
+          ? t`Recorded payment for ${companyName} and synced to Business → Finance.`
+          : t`Created invoice for ${companyName} and synced to Business → Finance.`,
       );
     } catch (error) {
       setEntryError(
@@ -270,7 +277,9 @@ export const ClientBillingSection = ({
       await onRefreshHub();
       setSettlingEntryId(null);
       setSettleEvidenceUrl('');
-      setStatusMessage(t`Marked "${entry.title}" as paid.`);
+      setStatusMessage(
+        t`Marked "${entry.title}" as paid and posted to Business → Finance.`,
+      );
     } catch (error) {
       setSettleError(
         error instanceof Error
@@ -336,7 +345,7 @@ export const ClientBillingSection = ({
         {/* Agreed fee block */}
         {!editingFee ? (
           <StyledFeeBanner>
-            <div>
+            <div style={{ flex: 1, minWidth: '220px' }}>
               {finance.fee ? (
                 <>
                   <div className="fee-amount">
@@ -350,8 +359,81 @@ export const ClientBillingSection = ({
                     <StyledClientTag data-tone="iris">
                       {formatFeeCadenceLabel(finance.fee.cadence)}
                     </StyledClientTag>
+                    {currentMonthMrr &&
+                      (currentMonthMrr.status === 'ONE_TIME' ? (
+                        <StyledClientTag>
+                          <Trans>Excluded from MRR</Trans>
+                        </StyledClientTag>
+                      ) : (
+                        <StyledClientTag
+                          data-tone={
+                            currentMonthMrr.status === 'PAID'
+                              ? 'success'
+                              : currentMonthMrr.status === 'PARTIAL'
+                                ? 'warning'
+                                : 'danger'
+                          }
+                        >
+                          {currentMonthMrr.status === 'PAID'
+                            ? t`Paid this month`
+                            : currentMonthMrr.status === 'PARTIAL'
+                              ? t`Partial (${currentMonthMrr.collectionPercent}%)`
+                              : t`Unpaid this month`}
+                        </StyledClientTag>
+                      ))}
                   </div>
+                  {currentMonthMrr && currentMonthMrr.status !== 'ONE_TIME' && (
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '6px',
+                        marginTop: '8px',
+                      }}
+                    >
+                      <small>
+                        {currentMonthMrr.cadence === 'QUARTERLY'
+                          ? t`Projected MRR: ${formatMoneyMinor(currentMonthMrr.monthlyEquivalentMinor, currentMonthMrr.currency)}/mo (${formatFinanceAmountMicros(currentMonthMrr.monthlyEquivalentAedMicros, 'AED')})`
+                          : currentMonthMrr.currency !== 'AED'
+                            ? t`Projected MRR: ${formatFinanceAmountMicros(currentMonthMrr.monthlyEquivalentAedMicros, 'AED')} base`
+                            : t`Projected MRR: ${formatFinanceAmountMicros(currentMonthMrr.monthlyEquivalentAedMicros, 'AED')}`}
+                        {' · '}
+                        {t`Collected this month: ${formatFinanceAmountMicros(currentMonthMrr.collectedThisMonthAedMicros, 'AED')}`}
+                        {BigInt(currentMonthMrr.remainingAedMicros) > 0n
+                          ? t` · Remaining: ${formatFinanceAmountMicros(currentMonthMrr.remainingAedMicros, 'AED')}`
+                          : ''}
+                      </small>
+                      <StyledMrrProgressTrack
+                        role="progressbar"
+                        aria-label={t`Current month MRR collection progress`}
+                        aria-valuenow={currentMonthMrr.collectionPercent}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                      >
+                        <StyledMrrProgressFill
+                          data-tone={
+                            currentMonthMrr.status === 'PAID'
+                              ? undefined
+                              : currentMonthMrr.status === 'PARTIAL'
+                                ? 'warning'
+                                : 'iris'
+                          }
+                          style={{
+                            width: `${currentMonthMrr.collectionPercent}%`,
+                          }}
+                        />
+                      </StyledMrrProgressTrack>
+                    </div>
+                  )}
+                  {currentMonthMrr &&
+                    currentMonthMrr.status === 'ONE_TIME' &&
+                    BigInt(currentMonthMrr.collectedThisMonthAedMicros) > 0n && (
+                      <small>
+                        {t`Collected this month: ${formatFinanceAmountMicros(currentMonthMrr.collectedThisMonthAedMicros, 'AED')} · One-time fee (tracked outside MRR)`}
+                      </small>
+                    )}
                   {finance.fee.notes && <p>{finance.fee.notes}</p>}
+                  {activeFeeError && <p role="alert">{activeFeeError}</p>}
                 </>
               ) : (
                 <>
@@ -360,10 +442,11 @@ export const ClientBillingSection = ({
                   </strong>
                   <p>
                     <Trans>
-                      Set this client’s retainer or project fee to pre-fill
-                      invoices and payments.
+                      Set this client’s retainer or project fee to feed
+                      Projected MRR and pre-fill invoices and payments.
                     </Trans>
                   </p>
+                  {activeFeeError && <p role="alert">{activeFeeError}</p>}
                 </>
               )}
             </div>
@@ -448,7 +531,14 @@ export const ClientBillingSection = ({
                   />
                 </label>
               </StyledBillingFormGrid>
-              {feeError && <p role="alert">{feeError}</p>}
+              <small>
+                {feeCadence === 'MONTHLY'
+                  ? t`Counts 100% toward current-month Projected MRR.`
+                  : feeCadence === 'QUARTERLY'
+                    ? t`Counts as 1/3 per month toward current-month Projected MRR.`
+                    : t`Tracked separately as a one-time engagement (excluded from MRR).`}
+              </small>
+              {activeFeeError && <p role="alert">{activeFeeError}</p>}
               <StyledDeliveryRow>
                 <StyledDeliveryButton
                   type="submit"
@@ -607,6 +697,20 @@ export const ClientBillingSection = ({
                   </label>
                 </StyledBillingFormGrid>
 
+                <small>
+                  {entryCategory === 'INCOME' ? (
+                    <Trans>
+                      Automatically posts to Business → Finance cash balance,
+                      revenue P&amp;L, and general ledger.
+                    </Trans>
+                  ) : (
+                    <Trans>
+                      Automatically creates a linked invoice in Business →
+                      Finance Receivables.
+                    </Trans>
+                  )}
+                </small>
+
                 {entryError && <p role="alert">{entryError}</p>}
 
                 <StyledDeliveryRow>
@@ -639,7 +743,10 @@ export const ClientBillingSection = ({
           <StyledLedgerList aria-label={t`Recent client billing entries`}>
             {finance.entries.slice(0, 8).map((entry) => {
               const isOpenReceivable =
-                entry.category === 'RECEIVABLE' && entry.status === 'OPEN';
+                entry.category === 'RECEIVABLE' &&
+                (entry.status === 'OPEN' || entry.status === 'PARTIALLY_PAID');
+              const isPartiallyPaid = entry.status === 'PARTIALLY_PAID';
+              const isNativeFinanceV2Entry = entry.revision === 0;
               const isOverdue =
                 isOpenReceivable &&
                 Boolean(entry.dueDate) &&
@@ -655,9 +762,11 @@ export const ClientBillingSection = ({
                   ? t`Collected`
                   : entry.status === 'PAID'
                     ? t`Paid`
-                    : isOverdue
-                      ? t`Overdue`
-                      : t`Open invoice`;
+                    : isPartiallyPaid
+                      ? t`Partially paid`
+                      : isOverdue
+                        ? t`Overdue`
+                        : t`Open invoice`;
 
               return (
                 <StyledLedgerRow key={entry.id}>
@@ -678,7 +787,7 @@ export const ClientBillingSection = ({
                         ? ` · ${entry.externalReference}`
                         : ''}
                     </small>
-                    {settlingEntryId === entry.id && (
+                    {settlingEntryId === entry.id && !isNativeFinanceV2Entry && (
                       <form
                         onSubmit={(event) =>
                           void handleConfirmPaid(entry, event)
@@ -726,6 +835,7 @@ export const ClientBillingSection = ({
                     </span>
                     {isOpenReceivable &&
                       finance.canManage &&
+                      !isNativeFinanceV2Entry &&
                       settlingEntryId !== entry.id && (
                         <StyledDeliveryButton
                           type="button"
@@ -737,6 +847,13 @@ export const ClientBillingSection = ({
                         >
                           <Trans>Mark paid</Trans>
                         </StyledDeliveryButton>
+                      )}
+                    {isOpenReceivable &&
+                      finance.canManage &&
+                      isNativeFinanceV2Entry && (
+                        <Link to="/delivery?view=finance&financeView=documents">
+                          <Trans>Record in Finance →</Trans>
+                        </Link>
                       )}
                   </div>
                 </StyledLedgerRow>

@@ -1150,3 +1150,98 @@ export const StyledUndoBanner = styled.div`
     margin: 0;
   }
 `;
+
+export const StyledMrrProgressTrack = styled.div`
+  background: ${themeCssVariables.background.tertiary};
+  border-radius: 999px;
+  height: 7px;
+  overflow: hidden;
+  width: 100%;
+`;
+
+export const StyledMrrProgressFill = styled.div`
+  background: ${themeCssVariables.color.green9};
+  border-radius: 999px;
+  height: 100%;
+  transition: width 220ms ease;
+
+  &[data-tone='warning'] {
+    background: ${themeCssVariables.color.amber9};
+  }
+
+  &[data-tone='iris'] {
+    background: ${themeCssVariables.color.iris9};
+  }
+`;
+
+export const StyledMrrSummaryCard = styled.div`
+  background-color: ${themeCssVariables.background.primary};
+  background-image: radial-gradient(
+    420px circle at 0% 0%,
+    ${themeCssVariables.color.transparent.iris2},
+    transparent 62%
+  );
+  border: 1px solid ${themeCssVariables.border.color.medium};
+  border-radius: 16px;
+  box-shadow: 0 10px 24px -18px ${themeCssVariables.boxShadow.color};
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px;
+`;
+
+export const StyledMrrSummaryTop = styled.div`
+  align-items: flex-start;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  justify-content: space-between;
+
+  h3 {
+    color: ${themeCssVariables.font.color.primary};
+    font-size: 14px;
+    font-weight: 700;
+    margin: 0;
+  }
+
+  small {
+    color: ${themeCssVariables.font.color.secondary};
+    font-size: 12px;
+  }
+`;
+
+export const StyledMrrMetricRow = styled.div`
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+
+  > div {
+    background: ${themeCssVariables.background.secondary};
+    border: 1px solid ${themeCssVariables.border.color.light};
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 10px 12px;
+  }
+
+  span {
+    color: ${themeCssVariables.font.color.tertiary};
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+
+  strong {
+    color: ${themeCssVariables.font.color.primary};
+    font-size: 16px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+  }
+
+  small {
+    color: ${themeCssVariables.font.color.secondary};
+    font-size: 11px;
+  }
+`;

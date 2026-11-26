@@ -66,9 +66,74 @@ export type ClientHubFinanceEntry = {
   notes: string;
 };
 
+export type ProjectedMrrStatus = 'PAID' | 'PARTIAL' | 'UNPAID' | 'ONE_TIME';
+
+export type ProjectedMrrCurrencyBreakdown = {
+  currency: DeliveryCurrency;
+  projectedMrrMinor: number;
+  projectedMrrMicros: string;
+  projectedMrrAedMicros: string;
+  clientCount: number;
+  paidCount: number;
+  partialCount: number;
+  unpaidCount: number;
+};
+
+export type ProjectedMrrOneTimeCurrencyBreakdown = {
+  currency: DeliveryCurrency;
+  amountMinor: number;
+  amountMicros: string;
+  aedMicros: string;
+  clientCount: number;
+};
+
+export type ProjectedMrrClientRow = {
+  companyId: string;
+  companyName: string;
+  cadence: ClientFeeCadence;
+  currency: DeliveryCurrency;
+  agreedFeeMinor: number;
+  agreedFeeMicros: string;
+  monthlyEquivalentMinor: number;
+  monthlyEquivalentMicros: string;
+  monthlyEquivalentAedMicros: string;
+  collectedThisMonthAedMicros: string;
+  collectedInFeeCurrencyMinor: number;
+  collectedInFeeCurrencyMicros: string;
+  collectedTowardMrrAedMicros: string;
+  remainingAedMicros: string;
+  collectionPercent: number;
+  status: ProjectedMrrStatus;
+  notes: string;
+};
+
+export type ProjectedMrrSnapshot = {
+  month: string;
+  baseCurrency: DeliveryCurrency;
+  exchangeRates: Record<string, string>;
+  projectedMrrAedMicros: string;
+  collectedTowardMrrAedMicros: string;
+  totalCollectedThisMonthAedMicros: string;
+  remainingAedMicros: string;
+  collectionPercent: number;
+  mrrClientCount: number;
+  paidClientCount: number;
+  partialClientCount: number;
+  unpaidClientCount: number;
+  byCurrency: ProjectedMrrCurrencyBreakdown[];
+  oneTime: {
+    clientCount: number;
+    totalAedMicros: string;
+    byCurrency: ProjectedMrrOneTimeCurrencyBreakdown[];
+    clients: ProjectedMrrClientRow[];
+  };
+  clients: ProjectedMrrClientRow[];
+};
+
 export type ClientHubFinanceSnapshot = {
   canManage: boolean;
   fee: ClientHubFee | null;
+  currentMonthMrr?: ProjectedMrrClientRow | null;
   openReceivablesByCurrency: ClientHubCurrencyTotal[];
   overdueReceivablesCount: number;
   collectedByCurrency: ClientHubCurrencyTotal[];
@@ -140,6 +205,7 @@ export type ClientHubSummary = {
   canReadFinance: boolean;
   canManageFinance: boolean;
   totalOpenReceivablesByCurrency: ClientHubCurrencyTotal[];
+  projectedMrr?: ProjectedMrrSnapshot | null;
 };
 
 export type ClientHubSnapshot = {
