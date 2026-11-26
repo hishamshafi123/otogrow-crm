@@ -27,7 +27,13 @@ const mockCancel = jest.fn();
 const mockMutateBusiness = jest.fn().mockResolvedValue({ data: {} });
 
 jest.mock('@apollo/client/react', () => ({
-  useMutation: () => [mockMutateBusiness],
+  useMutation: () => [mockMutateBusiness, { loading: false }],
+  useQuery: () => ({
+    data: undefined,
+    loading: false,
+    error: undefined,
+    refetch: mockRefetch,
+  }),
 }));
 
 jest.mock('@/delivery/workflows/useWorkflowAccess', () => ({
