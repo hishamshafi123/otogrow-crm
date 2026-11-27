@@ -6,6 +6,7 @@ import { DeliveryVpsCleanupCronJob } from 'src/modules/delivery/deliverables/del
 import { DeliveryInboxSendJob } from 'src/modules/delivery/inbox/delivery-inbox-send.job';
 import { DeliveryMediaJob } from 'src/modules/delivery/creative/delivery-media.job';
 import { DeliveryAtlasJob } from 'src/modules/delivery/creative/atlas/delivery-atlas.job';
+import { DeliveryStudioJob } from 'src/modules/delivery/studio/delivery-studio.job';
 import { Module } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { DeliveryModule } from 'src/modules/delivery/delivery.module';
@@ -132,6 +133,7 @@ import { WorkflowModule } from 'src/modules/workflow/workflow.module';
     DeliveryVpsCleanupCronJob,
     DeliveryMediaJob,
     DeliveryAtlasJob,
+    DeliveryStudioJob,
     BillingReminderCronJob,
     CleanSuspendedWorkspacesJob,
     CleanOnboardingWorkspacesJob,

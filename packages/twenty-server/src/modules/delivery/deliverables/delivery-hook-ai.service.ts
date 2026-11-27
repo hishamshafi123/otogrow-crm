@@ -65,6 +65,8 @@ export type CreativeHookDirectionInput = {
   offerAngle?: string;
   toneOverride?: string;
   customDirection?: string;
+  masterPrompt?: string;
+  exampleHooks?: string[];
   variationCount?: number;
 };
 
@@ -387,6 +389,26 @@ export class DeliveryHookAiService {
           )
         : 'Video analysis not yet run.';
 
+      const exampleHooks = (params.creativeInput.exampleHooks ?? [])
+        .map((item) => item.trim())
+        .filter(Boolean)
+        .slice(0, 20);
+      const examplesBlock =
+        exampleHooks.length > 0
+          ? [
+              '',
+              '--- EXAMPLE REFERENCE HOOKS (MATCH THIS STYLE, RHYTHM & ENERGY) ---',
+              ...exampleHooks.map((ex, i) => `${i + 1}. "${ex}"`),
+            ]
+          : [];
+      const masterPromptBlock = params.creativeInput.masterPrompt?.trim()
+        ? [
+            '',
+            '--- SAVED HOOK MASTER PROMPT (HIGH PRIORITY INSTRUCTIONS) ---',
+            params.creativeInput.masterPrompt.trim(),
+          ]
+        : [];
+
       const prompt = [
         `Client / Brand: ${params.websiteProfile?.brandName || params.companyName}`,
         `Deliverable Title: ${params.deliverableTitle}`,
@@ -408,6 +430,8 @@ export class DeliveryHookAiService {
         `Offer / Angle: ${params.creativeInput.offerAngle || 'Use the strongest offer from the brand profile'}`,
         `Tone Override: ${params.creativeInput.toneOverride || params.websiteProfile?.toneOfVoice || 'Authentic, punchy, scroll-stopping'}`,
         `Custom Notes: ${params.creativeInput.customDirection || 'None'}`,
+        ...masterPromptBlock,
+        ...examplesBlock,
         '',
         `Generate exactly ${targetCount} distinct, high-performing on-screen opening text hooks (5 to 12 words each, readable in 2-4 seconds on mobile).`,
         'Vary the angle across hooks (e.g., Curiosity Gap, Pain Point, Contrarian, Specific Proof, Direct Offer, Pattern Interrupt, POV/Relatable, Mistake Callout).',

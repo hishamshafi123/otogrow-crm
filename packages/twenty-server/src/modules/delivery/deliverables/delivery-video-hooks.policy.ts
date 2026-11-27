@@ -143,7 +143,9 @@ export const creativeHookInputSchema = z
     offerAngle: z.string().trim().max(400).optional(),
     toneOverride: z.string().trim().max(200).optional(),
     customDirection: z.string().trim().max(1200).optional(),
-    variationCount: z.number().int().min(3).max(12).optional(),
+    masterPrompt: z.string().trim().max(4000).optional(),
+    exampleHooks: z.array(z.string().trim().min(1).max(300)).max(25).optional(),
+    variationCount: z.number().int().min(1).max(12).optional(),
   })
   .strict();
 

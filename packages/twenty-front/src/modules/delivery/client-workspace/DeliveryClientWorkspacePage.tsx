@@ -408,6 +408,21 @@ const ClientWorkspaceDirectory = () => {
                       <Trans>Add to clients</Trans>
                     </StyledDeliveryButton>
                   )}
+                  <Link
+                    to={`/delivery?view=studio&companyId=${company.id}${serviceProjectId ? `&projectId=${serviceProjectId}` : ''}`}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      fontSize: 13,
+                      fontWeight: 600,
+                      padding: '6px 12px',
+                      borderRadius: 6,
+                      border: '1px solid currentColor',
+                      textDecoration: 'none',
+                    }}
+                  >
+                    <Trans>✦ AI Studio</Trans>
+                  </Link>
                   <ClientSetupLink companyId={company.id}>
                     <Trans>+ Add project or service</Trans>
                   </ClientSetupLink>
@@ -511,6 +526,11 @@ const ClientWorkspaceDirectory = () => {
                             to={`/delivery?view=knowledge&project=${item.id}&clientCompany=${company.id}&clientProject=${item.id}`}
                           >
                             <Trans>Brand knowledge &amp; meetings</Trans>
+                          </Link>
+                          <Link
+                            to={`/delivery?view=studio&companyId=${company.id}&projectId=${item.id}`}
+                          >
+                            <Trans>✦ Open in AI Studio</Trans>
                           </Link>
                         </StyledDeliveryRow>
                       </StyledClientProject>

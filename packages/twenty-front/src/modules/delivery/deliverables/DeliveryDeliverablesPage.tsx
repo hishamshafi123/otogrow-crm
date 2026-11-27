@@ -724,6 +724,21 @@ const DeliverablesHubBody = () => {
         </StyledFilterGroup>
 
         <StyledDeliveryRow>
+          <Link
+            to={`/delivery?view=studio${selectedCompanyId ? `&companyId=${selectedCompanyId}` : ''}`}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              fontSize: 13,
+              fontWeight: 600,
+              padding: '6px 12px',
+              borderRadius: 6,
+              border: '1px solid currentColor',
+              textDecoration: 'none',
+            }}
+          >
+            <Trans>✦ AI Studio</Trans>
+          </Link>
           <StyledDeliveryButton
             type="button"
             onClick={() =>

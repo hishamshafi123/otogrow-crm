@@ -83,6 +83,10 @@ const OperationalWorkspace = ({
       title: t`Deliverables hub`,
       description: t`Upload, number, review, sync to Google Drive, and publish client deliverables.`,
     },
+    studio: {
+      title: t`AI Studio`,
+      description: t`Multi-client character sheets, AI video generation with WaveSpeed → Kie.ai failover, dynamic text hooks, and Drive sync.`,
+    },
     chat: {
       title: t`Team chat`,
       description: t`Message teammates and follow up on unread messages.`,

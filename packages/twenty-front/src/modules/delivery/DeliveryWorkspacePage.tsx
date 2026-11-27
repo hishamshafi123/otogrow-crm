@@ -8,6 +8,7 @@ import { DeliverySeoResultsPage } from '@/delivery/seo-results/DeliverySeoResult
 import { DeliveryDevelopmentPage } from '@/delivery/development/DeliveryDevelopmentPage';
 import { DeliveryDeliverablesPage } from '@/delivery/deliverables/DeliveryDeliverablesPage';
 import { DeliveryHookStudioPage } from '@/delivery/deliverables/DeliveryHookStudioPage';
+import { DeliveryAiStudioPage } from '@/delivery/studio/DeliveryAiStudioPage';
 import { DeliveryCapacity } from '@/delivery/capacity/DeliveryCapacity';
 import { DeliveryTasksPage } from '@/delivery/tasks/DeliveryTasksPage';
 import { AtlasMediaPage } from '@/delivery/creative/atlas/AtlasMediaPage';
@@ -148,6 +149,8 @@ export const DeliveryWorkspacePage = () => {
         <DeliveryClientSetupPage />
       ) : view === 'deliverables' ? (
         <DeliveryDeliverablesPage />
+      ) : view === 'studio' ? (
+        <DeliveryAiStudioPage />
       ) : view === 'clients' &&
         (!params.get('clientView') ||
           params.get('clientView') === 'workspace') &&

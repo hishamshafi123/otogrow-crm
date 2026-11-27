@@ -14,6 +14,11 @@ export const OPERATIONAL_PAGE_QUERIES = {
     'DeliveryHookProject',
     'DeliveryContentMetricSnapshots',
   ],
+  studio: [
+    'DeliveryStudioWorkspace',
+    'DeliveryStudioHookProject',
+    'DeliveryStudioAgentCapabilities',
+  ],
   content: [
     'DeliveryContentProjects',
     'DeliveryContentProjectChoices',

@@ -170,6 +170,19 @@ export const useDeliveryNavigation = (actor: DeliveryWorkspace['actor']) => {
       ],
     },
     {
+      id: 'ai-studio',
+      label: t`AI Studio`,
+      Icon: IconVideo,
+      items: [
+        {
+          view: 'studio',
+          label: t`AI Studio`,
+          description: t`Multi-client character sheets, AI videos (WaveSpeed → Kie.ai), dynamic text hooks & Drive sync.`,
+          Icon: IconVideo,
+        },
+      ],
+    },
+    {
       id: 'inbox',
       label: t`Inbox`,
       Icon: IconInbox,

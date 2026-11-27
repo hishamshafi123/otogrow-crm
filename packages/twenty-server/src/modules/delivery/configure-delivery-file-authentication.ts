@@ -25,5 +25,9 @@ export const configureDeliveryFileAuthentication = (
       path: 'portal/delivery-deliverables/*path',
       method: RequestMethod.ALL,
     },
+    {
+      path: 'portal/delivery-studio/*path',
+      method: RequestMethod.ALL,
+    },
   );
 };

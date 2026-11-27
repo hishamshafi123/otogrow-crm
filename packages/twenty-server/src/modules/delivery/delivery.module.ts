@@ -217,6 +217,20 @@ import {
   DeliveryDeliverablesMediaController,
 } from 'src/modules/delivery/deliverables/delivery-deliverables-files.controller';
 import { DeliveryDeliverablesResolver } from 'src/modules/delivery/deliverables/delivery-deliverables.resolver';
+import { DeliveryStudioAssetEntity } from 'src/modules/delivery/studio/entities/delivery-studio-asset.entity';
+import { DeliveryStudioJobEntity } from 'src/modules/delivery/studio/entities/delivery-studio-job.entity';
+import { DeliveryStudioPresetEntity } from 'src/modules/delivery/studio/entities/delivery-studio-preset.entity';
+import { DeliveryStudioProductKitEntity } from 'src/modules/delivery/studio/entities/delivery-studio-product-kit.entity';
+import { DeliveryStudioProviderConfigEntity } from 'src/modules/delivery/studio/entities/delivery-studio-provider-config.entity';
+import { DeliveryStudioReferenceVideoEntity } from 'src/modules/delivery/studio/entities/delivery-studio-reference-video.entity';
+import { DeliveryStudioProviderRouterService } from 'src/modules/delivery/studio/delivery-studio-provider-router.service';
+import { DeliveryStudioService } from 'src/modules/delivery/studio/delivery-studio.service';
+import { DeliveryStudioResolver } from 'src/modules/delivery/studio/delivery-studio.resolver';
+import {
+  DeliveryStudioFilesController,
+  DeliveryStudioMediaController,
+} from 'src/modules/delivery/studio/delivery-studio-files.controller';
+import { DeliveryStudioAgentController } from 'src/modules/delivery/studio/delivery-studio-agent.controller';
 
 @Module({
   imports: [
@@ -318,11 +332,20 @@ import { DeliveryDeliverablesResolver } from 'src/modules/delivery/deliverables/
       DeliveryTaskEntity,
       DeliveryAgentEntity,
       DeliveryAgentRunEntity,
+      DeliveryStudioProviderConfigEntity,
+      DeliveryStudioPresetEntity,
+      DeliveryStudioReferenceVideoEntity,
+      DeliveryStudioProductKitEntity,
+      DeliveryStudioAssetEntity,
+      DeliveryStudioJobEntity,
     ]),
   ],
   controllers: [
     DeliveryDeliverablesFilesController,
     DeliveryDeliverablesMediaController,
+    DeliveryStudioFilesController,
+    DeliveryStudioMediaController,
+    DeliveryStudioAgentController,
     DeliveryDriveOAuthController,
     DeliveryClientPortalV2Controller,
     DeliveryKnowledgeAssetsController,
@@ -334,6 +357,9 @@ import { DeliveryDeliverablesResolver } from 'src/modules/delivery/deliverables/
     DeliveryChatFilesController,
   ],
   providers: [
+    DeliveryStudioProviderRouterService,
+    DeliveryStudioService,
+    DeliveryStudioResolver,
     DeliveryMediaProbeService,
     DeliveryClientPortalAccessService,
     DeliveryClientPortalV2Service,
@@ -443,6 +469,7 @@ import { DeliveryDeliverablesResolver } from 'src/modules/delivery/deliverables/
     DeliveryAssemblyAdapter,
   ],
   exports: [
+    DeliveryStudioService,
     DeliveryMediaProbeService,
     DeliveryClientPortalAccessService,
     DeliveryDriveService,
