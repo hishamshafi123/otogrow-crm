@@ -37,12 +37,28 @@ export type StudioModelSpecDTO = {
     defaultResolution: string;
     minDurationSec?: number;
     maxDurationSec?: number;
+    maxInputVideoSec?: number;
+    usesAtMentionTokens?: boolean;
   };
   pricing: {
     unit: 'PER_IMAGE' | 'PER_SECOND';
     baseRateUsd?: number;
     baseUsd?: number;
     resolutionMultipliers?: Record<string, number>;
+    billsInputVideoDuration?: boolean;
+    minRefVideoRatioOfOutput?: number;
+    providerRates?: {
+      wavespeed?: {
+        perImage?: Record<string, number>;
+        perSecWithoutRefVideo?: Record<string, number>;
+        perSecWithRefVideo?: Record<string, number>;
+      };
+      kie?: {
+        perImage?: Record<string, number>;
+        perSecWithoutRefVideo?: Record<string, number>;
+        perSecWithRefVideo?: Record<string, number>;
+      };
+    };
   };
   wavespeed?: { endpoint: string };
   kie?: { model: string };
@@ -383,20 +399,71 @@ export const studioMediaUrl = (relativePath: string | null | undefined): string 
 
 export const estimateModelCostUsd = (
   model: StudioModelSpecDTO | undefined,
-  opts: { resolution?: string; durationSec?: number; count?: number },
+  opts: {
+    resolution?: string;
+    durationSec?: number;
+    referenceVideoDurationSec?: number | null;
+    count?: number;
+    provider?: StudioProviderId;
+  },
 ): number => {
   if (!model) return 0;
+  const res = opts.resolution || model.capabilities.defaultResolution;
+  const count = Math.max(1, opts.count ?? 1);
+  const providerKey = opts.provider ?? 'wavespeed';
+  const providerTable =
+    model.pricing.providerRates?.[providerKey] ??
+    model.pricing.providerRates?.wavespeed ??
+    model.pricing.providerRates?.kie;
   const baseRate = model.pricing.baseRateUsd ?? model.pricing.baseUsd ?? 0;
   const mult =
-    opts.resolution && model.pricing.resolutionMultipliers?.[opts.resolution]
-      ? model.pricing.resolutionMultipliers[opts.resolution]
+    res && model.pricing.resolutionMultipliers?.[res]
+      ? model.pricing.resolutionMultipliers[res]
       : 1;
-  const count = Math.max(1, opts.count ?? 1);
+
   if (model.pricing.unit === 'PER_IMAGE') {
-    return Number((baseRate * mult * count).toFixed(4));
+    const exactRate =
+      providerTable?.perImage?.[res] ??
+      providerTable?.perImage?.[res.toUpperCase()] ??
+      baseRate * mult;
+    return Number((exactRate * count).toFixed(4));
   }
-  const dur = Math.max(1, opts.durationSec ?? 8);
-  return Number((baseRate * dur * mult * count).toFixed(4));
+
+  const outputSec = Math.max(
+    model.capabilities.minDurationSec ?? 4,
+    Math.min(
+      model.capabilities.maxDurationSec ?? 30,
+      Math.round(opts.durationSec ?? 8),
+    ),
+  );
+  const rawRefSec =
+    typeof opts.referenceVideoDurationSec === 'number' &&
+    Number.isFinite(opts.referenceVideoDurationSec) &&
+    opts.referenceVideoDurationSec > 0
+      ? opts.referenceVideoDurationSec
+      : 0;
+  const hasRefVideo = rawRefSec > 0;
+
+  let totalBilledSec = outputSec;
+  if (hasRefVideo && model.pricing.billsInputVideoDuration) {
+    const maxIn = model.capabilities.maxInputVideoSec ?? 30;
+    const normalizedRef = Math.ceil(Math.max(2, Math.min(maxIn, rawRefSec)));
+    const minFloor = model.pricing.minRefVideoRatioOfOutput
+      ? Math.ceil(outputSec * model.pricing.minRefVideoRatioOfOutput)
+      : 0;
+    totalBilledSec = outputSec + Math.max(normalizedRef, minFloor);
+  }
+
+  const rateMap = hasRefVideo
+    ? (providerTable?.perSecWithRefVideo ??
+      providerTable?.perSecWithoutRefVideo)
+    : (providerTable?.perSecWithoutRefVideo ??
+      providerTable?.perSecWithRefVideo);
+
+  const perSecRate =
+    rateMap?.[res] ?? rateMap?.[res.toLowerCase()] ?? baseRate * mult;
+
+  return Number((perSecRate * totalBilledSec * count).toFixed(4));
 };
 
 export const formatUsdEstimate = (usd: number): string => {

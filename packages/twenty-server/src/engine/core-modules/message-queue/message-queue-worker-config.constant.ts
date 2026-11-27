@@ -160,8 +160,9 @@ export const MESSAGE_QUEUE_WORKER_CONFIG: Record<
   [MessageQueue.aiQueue]: {
     priority: 5,
     workerOptions: {
-      concurrency: 1,
-      lockDuration: 30_000,
+      concurrency: 4,
+      // AI video generation jobs poll remote providers for several minutes
+      lockDuration: 600_000,
       maxStalledCount: 1,
       boundedShutdownDrain: false,
     },

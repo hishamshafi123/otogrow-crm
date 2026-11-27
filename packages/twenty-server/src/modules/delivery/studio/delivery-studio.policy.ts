@@ -167,6 +167,24 @@ export const generateVideoSchema = z
     resolution: z.string().trim().max(16).optional(),
     durationSec: z.number().int().min(4).max(30).optional(),
     generateAudio: z.boolean().optional(),
+    autoPromptWithGemini: z.boolean().optional(),
+  })
+  .strict();
+
+export const analyzeVideoPromptSchema = z
+  .object({
+    companyId: z.string().uuid(),
+    referenceVideoId: z.string().uuid(),
+    characterAssetId: z.string().uuid().nullable().optional(),
+    productKitId: z.string().uuid().nullable().optional(),
+    productAssetIds: z.array(z.string().uuid()).max(16).optional(),
+    environmentPresetId: z.string().uuid().nullable().optional(),
+    modelKey: z
+      .string()
+      .refine((v) => MODEL_KEYS.includes(v), 'Unsupported video model')
+      .optional(),
+    environmentOverride: z.string().trim().max(2000).optional(),
+    customNotes: z.string().trim().max(2000).optional(),
   })
   .strict();
 

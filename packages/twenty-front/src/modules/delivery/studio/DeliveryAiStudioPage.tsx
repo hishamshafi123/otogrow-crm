@@ -6,6 +6,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
 import { DeliveryOperationalPage } from '@/delivery/operations-pages/DeliveryOperationalPage';
 import {
+  ANALYZE_DELIVERY_STUDIO_VIDEO_PROMPT,
   BATCH_GENERATE_DELIVERY_STUDIO_VIDEOS,
   GENERATE_DELIVERY_STUDIO_CHARACTER_SHEET,
   GENERATE_DELIVERY_STUDIO_VIDEO,
@@ -24,6 +25,7 @@ import {
   type StudioApiRequestSnapshotDTO,
   type StudioAssetDTO,
   type StudioProductKitDTO,
+  type StudioProviderId,
   type StudioStageKey,
   type StudioWorkspacePayload,
   studioMediaUrl,
@@ -864,6 +866,86 @@ const StyledClientPickerTag = styled.span`
   }
 `;
 
+const StyledTogglePill = styled.button`
+  align-items: center;
+  background: ${themeCssVariables.background.tertiary};
+  border: 1px solid ${themeCssVariables.border.color.medium};
+  border-radius: 999px;
+  color: ${themeCssVariables.font.color.secondary};
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 600;
+  gap: 6px;
+  padding: 4px 10px;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+
+  &[data-on='true'] {
+    background: ${themeCssVariables.color.transparent.blue2};
+    border-color: ${themeCssVariables.color.blue5};
+    color: ${themeCssVariables.color.blue};
+  }
+`;
+
+const StyledToggleDot = styled.span`
+  background: ${themeCssVariables.font.color.tertiary};
+  border-radius: 999px;
+  display: inline-block;
+  height: 7px;
+  width: 7px;
+
+  &[data-on='true'] {
+    background: ${themeCssVariables.color.blue};
+  }
+`;
+
+const StyledPromptActionsRow = styled.div`
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
+`;
+
+const StyledPromptHint = styled.div`
+  color: ${themeCssVariables.font.color.secondary};
+  font-size: 11px;
+  line-height: 1.4;
+`;
+
+const StyledPromptTextarea = styled.textarea`
+  background: ${themeCssVariables.background.primary};
+  border: 1px solid ${themeCssVariables.border.color.medium};
+  border-radius: 8px;
+  color: ${themeCssVariables.font.color.primary};
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.45;
+  min-height: 132px;
+  padding: 9px 10px;
+  resize: vertical;
+  width: 100%;
+`;
+
+const StyledCostCaption = styled.div`
+  color: ${themeCssVariables.font.color.tertiary};
+  font-size: 11px;
+  text-align: center;
+`;
+
+const StyledDismissBtn = styled.button`
+  background: transparent;
+  border: none;
+  color: ${themeCssVariables.font.color.tertiary};
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0 4px;
+
+  &:hover {
+    color: ${themeCssVariables.font.color.primary};
+  }
+`;
+
 const isClothingTagLabel = (tag: string): boolean => {
   const normalized = tag.trim().toLowerCase();
   return (
@@ -902,6 +984,16 @@ export const DeliveryAiStudioPage = () => {
   const [productUrlInput, setProductUrlInput] = useState('');
   const [importingUrl, setImportingUrl] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
+  // Reference video duration detection, Gemini prompt analysis & dismissed failure cards
+  const [detectedRefDurations, setDetectedRefDurations] = useState<
+    Record<string, number>
+  >({});
+  const [analyzingPrompt, setAnalyzingPrompt] = useState(false);
+  const [promptExpanded, setPromptExpanded] = useState(false);
+  const [dismissedFailedJobIds, setDismissedFailedJobIds] = useState<
+    Set<string>
+  >(() => new Set());
 
   const [busyGenerate, setBusyGenerate] = useState(false);
   const [banner, setBanner] = useState<{
@@ -1063,6 +1155,16 @@ export const DeliveryAiStudioPage = () => {
   const [approveAssetMutation] = useMutation(
     SET_DELIVERY_STUDIO_ASSET_APPROVED,
   );
+  const [analyzeVideoPromptMutation] = useMutation<{
+    analyzeDeliveryStudioVideoPrompt: {
+      prompt: string;
+      source: string;
+      modelId: string | null;
+      summary: string;
+      analyzedImageCount: number;
+      referenceVideoDurationSec: number | null;
+    };
+  }>(ANALYZE_DELIVERY_STUDIO_VIDEO_PROMPT);
 
   // Derived data
   const clients = useMemo(
@@ -1133,6 +1235,28 @@ export const DeliveryAiStudioPage = () => {
     [workspace?.catalog],
   );
 
+  const currentImageModel = useMemo(
+    () => imageModels.find((m) => m.key === activeTab.imageModelKey),
+    [imageModels, activeTab.imageModelKey],
+  );
+  const currentVideoModel = useMemo(
+    () => videoModels.find((m) => m.key === activeTab.videoModelKey),
+    [videoModels, activeTab.videoModelKey],
+  );
+  const compareVideoModel = useMemo(
+    () =>
+      activeTab.compareMode &&
+      activeTab.compareModelKey !== activeTab.videoModelKey
+        ? videoModels.find((m) => m.key === activeTab.compareModelKey)
+        : undefined,
+    [
+      videoModels,
+      activeTab.compareMode,
+      activeTab.compareModelKey,
+      activeTab.videoModelKey,
+    ],
+  );
+
   const garments = useMemo(
     () => workspace?.productKits ?? [],
     [workspace?.productKits],
@@ -1183,6 +1307,104 @@ export const DeliveryAiStudioPage = () => {
       null,
     [referenceVideos, activeTab.selectedReferenceVideoId],
   );
+
+  const effectiveRefDurationSec = useMemo(() => {
+    const metaDur = selectedRefVideo?.mediaMeta?.durationSec;
+    if (
+      typeof metaDur === 'number' &&
+      Number.isFinite(metaDur) &&
+      metaDur > 0
+    ) {
+      return metaDur;
+    }
+    if (selectedRefVideo && detectedRefDurations[selectedRefVideo.id]) {
+      return detectedRefDurations[selectedRefVideo.id];
+    }
+    return null;
+  }, [selectedRefVideo, detectedRefDurations]);
+
+  // Probe reference video duration client-side if server metadata didn't have it (e.g. older uploads before MP4 parser)
+  useEffect(() => {
+    if (!selectedRefVideo) return;
+    const metaDur = selectedRefVideo.mediaMeta?.durationSec;
+    if (
+      typeof metaDur === 'number' &&
+      Number.isFinite(metaDur) &&
+      metaDur > 0
+    ) {
+      return;
+    }
+    if (detectedRefDurations[selectedRefVideo.id]) return;
+
+    const url = studioMediaUrl(selectedRefVideo.streamPath);
+    if (!url) return;
+
+    let cancelled = false;
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+    video.muted = true;
+    const cleanup = () => {
+      video.removeAttribute('src');
+      try {
+        video.load();
+      } catch {
+        // ignore
+      }
+    };
+    const onLoaded = () => {
+      if (
+        !cancelled &&
+        Number.isFinite(video.duration) &&
+        video.duration > 0
+      ) {
+        const dur = Number(video.duration.toFixed(2));
+        setDetectedRefDurations((prev) =>
+          prev[selectedRefVideo.id] === dur
+            ? prev
+            : { ...prev, [selectedRefVideo.id]: dur },
+        );
+      }
+      cleanup();
+    };
+    const onError = () => cleanup();
+    video.addEventListener('loadedmetadata', onLoaded, { once: true });
+    video.addEventListener('error', onError, { once: true });
+    video.src = url;
+    return () => {
+      cancelled = true;
+      video.removeEventListener('loadedmetadata', onLoaded);
+      video.removeEventListener('error', onError);
+      cleanup();
+    };
+  }, [selectedRefVideo, detectedRefDurations]);
+
+  // Auto-match output video duration to the selected reference video's real duration (clamped to model min/max)
+  useEffect(() => {
+    if (!activeTab.videoDurationAutoMatched) return;
+    if (
+      typeof effectiveRefDurationSec !== 'number' ||
+      !Number.isFinite(effectiveRefDurationSec) ||
+      effectiveRefDurationSec <= 0
+    ) {
+      return;
+    }
+    const minSec = currentVideoModel?.capabilities.minDurationSec ?? 4;
+    const maxSec = currentVideoModel?.capabilities.maxDurationSec ?? 15;
+    const matched = Math.max(
+      minSec,
+      Math.min(maxSec, Math.round(effectiveRefDurationSec)),
+    );
+    if (activeTab.videoDurationSec !== matched) {
+      patchActiveTab({ videoDurationSec: matched });
+    }
+  }, [
+    effectiveRefDurationSec,
+    activeTab.videoDurationAutoMatched,
+    activeTab.videoDurationSec,
+    currentVideoModel?.capabilities.minDurationSec,
+    currentVideoModel?.capabilities.maxDurationSec,
+    patchActiveTab,
+  ]);
 
   const characterSheets = useMemo(
     () => workspace?.characterSheets ?? [],
@@ -1483,6 +1705,77 @@ export const DeliveryAiStudioPage = () => {
     includedAssetIdSet,
   ]);
 
+  const videoPromptInputKey = useMemo(
+    () =>
+      [
+        selectedCharSheet?.id ?? '',
+        selectedVideoProductAssets.map((a) => a.id).join(','),
+        selectedRefVideo?.id ?? '',
+        activeTab.videoModelKey,
+      ].join('|'),
+    [
+      selectedCharSheet?.id,
+      selectedVideoProductAssets,
+      selectedRefVideo?.id,
+      activeTab.videoModelKey,
+    ],
+  );
+
+  const handleAnalyzeVideoPrompt = async () => {
+    if (!activeTab.companyId || !selectedRefVideo) return;
+    setBanner(null);
+    setAnalyzingPrompt(true);
+    try {
+      const videoProductAssetIds = selectedVideoProductAssets.map((a) => a.id);
+      const res = await analyzeVideoPromptMutation({
+        variables: {
+          input: {
+            companyId: activeTab.companyId,
+            referenceVideoId: selectedRefVideo.id,
+            characterAssetId: selectedCharSheet?.id ?? null,
+            productKitId: selectedVideoGarment?.id ?? null,
+            productAssetIds:
+              videoProductAssetIds.length > 0 ? videoProductAssetIds : undefined,
+            modelKey: activeTab.videoModelKey,
+            environmentOverride:
+              activeTab.videoEnvironmentOverride.trim() || undefined,
+            customNotes: activeTab.videoCustomNotes.trim() || undefined,
+          },
+        },
+      });
+      const analyzed = res.data?.analyzeDeliveryStudioVideoPrompt;
+      if (analyzed?.prompt) {
+        patchActiveTab({
+          videoMasterPrompt: analyzed.prompt,
+          geminiPromptMeta: {
+            source: analyzed.source,
+            modelId: analyzed.modelId,
+            summary: analyzed.summary,
+            key: videoPromptInputKey,
+          },
+        });
+        setPromptExpanded(true);
+        setBanner({
+          tone: 'info',
+          text:
+            analyzed.source === 'GEMINI'
+              ? `Gemini (${analyzed.modelId ?? 'multimodal'}) wrote a tailored prompt from ${analyzed.analyzedImageCount} image${analyzed.analyzedImageCount === 1 ? '' : 's'} + reference video. Review or edit below before generating.`
+              : analyzed.summary,
+        });
+      }
+    } catch (err) {
+      setBanner({
+        tone: 'error',
+        text:
+          err instanceof Error
+            ? err.message
+            : 'Could not analyze media with Gemini.',
+      });
+    } finally {
+      setAnalyzingPrompt(false);
+    }
+  };
+
   const handleGenerateVideo = async () => {
     if (!activeTab.companyId || !selectedRefVideo) return;
     setBanner(null);
@@ -1507,6 +1800,7 @@ export const DeliveryAiStudioPage = () => {
             modelKeys,
             routingMode: activeTab.routingMode,
             masterPrompt: activeTab.videoMasterPrompt.trim() || undefined,
+            autoPromptWithGemini: activeTab.autoPromptWithGemini,
             environmentOverride:
               activeTab.videoEnvironmentOverride.trim() || undefined,
             customNotes: activeTab.videoCustomNotes.trim() || undefined,
@@ -1519,7 +1813,10 @@ export const DeliveryAiStudioPage = () => {
       });
       setBanner({
         tone: 'info',
-        text: 'Generating AI Video in the locked environment…',
+        text:
+          activeTab.autoPromptWithGemini && !activeTab.videoMasterPrompt.trim()
+            ? 'Gemini analyzed your inputs & queued AI Video generation…'
+            : 'Generating AI Video in the locked environment…',
       });
       await workspaceQuery.refetch();
     } catch (err) {
@@ -1601,24 +1898,86 @@ export const DeliveryAiStudioPage = () => {
     }
   };
 
-  const currentImageModel = imageModels.find(
-    (m) => m.key === activeTab.imageModelKey,
-  );
-  const currentVideoModel = videoModels.find(
-    (m) => m.key === activeTab.videoModelKey,
-  );
+  // Resolve primary provider for accurate pricing preview
+  const effectiveProvider = useMemo<StudioProviderId>(() => {
+    if (activeTab.routingMode === 'WAVESPEED_ONLY') return 'wavespeed';
+    if (activeTab.routingMode === 'KIE_ONLY') return 'kie';
+    const cfg = workspace?.providerConfig;
+    if (cfg) {
+      if (cfg.defaultRoutingMode === 'KIE_ONLY') return 'kie';
+      if (cfg.defaultRoutingMode === 'WAVESPEED_ONLY') return 'wavespeed';
+      if (cfg.wavespeedConfigured && cfg.wavespeedEnabled) return 'wavespeed';
+      if (cfg.kieConfigured && cfg.kieEnabled) return 'kie';
+    }
+    return 'wavespeed';
+  }, [activeTab.routingMode, workspace?.providerConfig]);
+
   const sheetCost = formatUsdEstimate(
     estimateModelCostUsd(currentImageModel, {
       resolution: activeTab.imageResolution,
       count: activeTab.imageCandidateCount,
+      provider: effectiveProvider,
     }),
   );
-  const videoCost = formatUsdEstimate(
-    estimateModelCostUsd(currentVideoModel, {
+
+  const estimatedVideoCostUsd = useMemo(() => {
+    const refDur = effectiveRefDurationSec ?? activeTab.videoDurationSec;
+    const primary = estimateModelCostUsd(currentVideoModel, {
       resolution: activeTab.videoResolution,
       durationSec: activeTab.videoDurationSec,
-    }),
-  );
+      referenceVideoDurationSec: selectedRefVideo ? refDur : null,
+      provider: effectiveProvider,
+    });
+    const compare = compareVideoModel
+      ? estimateModelCostUsd(compareVideoModel, {
+          resolution: activeTab.videoResolution,
+          durationSec: activeTab.videoDurationSec,
+          referenceVideoDurationSec: selectedRefVideo ? refDur : null,
+          provider: effectiveProvider,
+        })
+      : 0;
+    return Number((primary + compare).toFixed(4));
+  }, [
+    currentVideoModel,
+    compareVideoModel,
+    activeTab.videoResolution,
+    activeTab.videoDurationSec,
+    effectiveRefDurationSec,
+    selectedRefVideo,
+    effectiveProvider,
+  ]);
+  const videoCost = formatUsdEstimate(estimatedVideoCostUsd);
+
+  const videoCostCaption = useMemo(() => {
+    const providerLabel =
+      effectiveProvider === 'kie' ? 'Kie.ai' : 'WaveSpeedAI';
+    const modelLabel = currentVideoModel?.label ?? activeTab.videoModelKey;
+    const outSec = activeTab.videoDurationSec;
+    if (
+      selectedRefVideo &&
+      currentVideoModel?.pricing.billsInputVideoDuration
+    ) {
+      const refSec = Math.ceil(effectiveRefDurationSec ?? outSec);
+      const minRatio = currentVideoModel.pricing.minRefVideoRatioOfOutput ?? 0;
+      const billedIn = Math.max(
+        2,
+        Math.min(currentVideoModel.capabilities.maxInputVideoSec ?? 15, refSec),
+        minRatio ? Math.ceil(outSec * minRatio) : 0,
+      );
+      const totalBilled = outSec + billedIn;
+      return `${providerLabel} · ${modelLabel} · ${activeTab.videoResolution} · ${billedIn}s ref + ${outSec}s out (${totalBilled}s billed)${compareVideoModel ? ` + ${compareVideoModel.label}` : ''}`;
+    }
+    return `${providerLabel} · ${modelLabel} · ${activeTab.videoResolution} · ${outSec}s output${compareVideoModel ? ` + ${compareVideoModel.label}` : ''}`;
+  }, [
+    effectiveProvider,
+    currentVideoModel,
+    compareVideoModel,
+    activeTab.videoModelKey,
+    activeTab.videoResolution,
+    activeTab.videoDurationSec,
+    selectedRefVideo,
+    effectiveRefDurationSec,
+  ]);
 
   const activeCharJobs = activeJobs.filter(
     (j) =>
@@ -1628,24 +1987,42 @@ export const DeliveryAiStudioPage = () => {
     (j) =>
       j.jobKind === 'VIDEO_GENERATION' && j.companyId === activeTab.companyId,
   );
-  const recentFailedVideoJobs = useMemo(
-    () =>
-      (workspace?.jobs ?? [])
-        .filter(
-          (j) =>
-            j.jobKind === 'VIDEO_GENERATION' &&
-            j.companyId === activeTab.companyId &&
-            j.status === 'FAILED',
-        )
-        .slice(0, 3),
-    [workspace?.jobs, activeTab.companyId],
-  );
+  // Hide stale failure cards once a newer video job is active or completed, or after 30 min, or when dismissed
+  const recentFailedVideoJobs = useMemo(() => {
+    const companyVideoJobs = (workspace?.jobs ?? []).filter(
+      (j) =>
+        j.jobKind === 'VIDEO_GENERATION' && j.companyId === activeTab.companyId,
+    );
+    const latestHealthyTs = companyVideoJobs
+      .filter((j) =>
+        ['QUEUED', 'STAGING', 'PROCESSING', 'DOWNLOADING', 'COMPLETED'].includes(
+          j.status,
+        ),
+      )
+      .reduce((max, j) => {
+        const ts = Date.parse(j.createdAt || '');
+        return Number.isFinite(ts) && ts > max ? ts : max;
+      }, 0);
+    const cutoffTs = Date.now() - 30 * 60 * 1000;
+
+    return companyVideoJobs
+      .filter((j) => {
+        if (j.status !== 'FAILED') return false;
+        if (dismissedFailedJobIds.has(j.id)) return false;
+        const ts = Date.parse(j.createdAt || '');
+        if (!Number.isFinite(ts)) return false;
+        if (ts < cutoffTs) return false;
+        if (latestHealthyTs > 0 && ts < latestHealthyTs) return false;
+        return true;
+      })
+      .slice(0, 2);
+  }, [workspace?.jobs, activeTab.companyId, dismissedFailedJobIds]);
 
   const plannedVideoApiSnapshot = useMemo<StudioApiRequestSnapshotDTO>(() => {
     const model = currentVideoModel;
     const usesAtTokens = activeTab.videoModelKey.startsWith('seedance');
-    const imgPrefix = usesAtTokens ? '@Image ' : 'Image ';
-    const vidPrefix = usesAtTokens ? '@Video ' : 'Video ';
+    const imgPrefix = usesAtTokens ? '@image' : 'Image ';
+    const vidPrefix = usesAtTokens ? '@video' : 'Video ';
     const maxImages = model?.capabilities.maxReferenceImages ?? 9;
 
     const images: StudioApiInputImageRefDTO[] = [];
@@ -1685,7 +2062,7 @@ export const DeliveryAiStudioPage = () => {
             label: selectedRefVideo.title || selectedRefVideo.originalFileName,
             fileName: selectedRefVideo.originalFileName,
             mimeType: selectedRefVideo.mimeType,
-            durationSec: selectedRefVideo.mediaMeta?.durationSec ?? null,
+            durationSec: effectiveRefDurationSec ?? null,
             mediaPath: selectedRefVideo.streamPath,
             thumbnailPath: selectedRefVideo.thumbnailPath,
             stagedUrl: null,
@@ -1708,7 +2085,7 @@ export const DeliveryAiStudioPage = () => {
       charMeta.environmentPrompt.trim()
         ? charMeta.environmentPrompt.trim()
         : selectedEnvironment?.masterPrompt ||
-          'the exact environment and lighting shown in the Character Sheet (@Image 1)');
+          `the exact environment and lighting shown in the Character Sheet (${imgPrefix}1)`);
     const productName =
       selectedVideoGarment?.name ||
       selectedCharSheet?.title ||
@@ -1716,7 +2093,7 @@ export const DeliveryAiStudioPage = () => {
     const rawTemplate =
       activeTab.videoMasterPrompt.trim() ||
       selectedVideoPreset?.masterPrompt ||
-      'Recreate the exact camera angles, shot transitions, editing rhythm, pacing, and subject actions from @Video 1. Replace the main subject and outfit with the model and exact {{product_name}} shown in @Image 1. Keep the entire scene in the exact same environment and lighting as the Character Sheet: {{environment}}.';
+      `Recreate ${vidPrefix}1 shot for shot, keeping exact camera motion, pacing, and subject actions. Replace the subject and outfit with the model from ${imgPrefix}1 wearing the exact ${productName}. Keep the scene in ${envPrompt}.`;
     const previewBase = rawTemplate
       .replace(/\{\{\s*product_name\s*\}\}/g, productName)
       .replace(/\{\{\s*environment\s*\}\}/g, envPrompt)
@@ -1745,13 +2122,13 @@ export const DeliveryAiStudioPage = () => {
       );
     }
     const previewPrompt =
-      refParts.length > 0 && !/(?:@?Image\s*2\b)/i.test(previewBase)
+      refParts.length > 0 && !/(?:@?image\s*2\b)/i.test(previewBase)
         ? `${previewBase}\nReference inputs: ${refParts.join('; ')}.`
         : previewBase;
 
     return {
       capturedAt: new Date().toISOString(),
-      provider: null,
+      provider: effectiveProvider,
       endpoint: null,
       modelKey: activeTab.videoModelKey,
       modelLabel: model?.label ?? activeTab.videoModelKey,
@@ -1765,6 +2142,8 @@ export const DeliveryAiStudioPage = () => {
     };
   }, [
     currentVideoModel,
+    effectiveProvider,
+    effectiveRefDurationSec,
     activeTab.videoModelKey,
     activeTab.videoPresetId,
     activeTab.videoMasterPrompt,
@@ -1793,8 +2172,8 @@ export const DeliveryAiStudioPage = () => {
 
       // Graceful reconstruction for videos generated before API payload snapshotting
       const usesAtTokens = vid.modelKey.startsWith('seedance');
-      const imgPrefix = usesAtTokens ? '@Image ' : 'Image ';
-      const vidPrefix = usesAtTokens ? '@Video ' : 'Video ';
+      const imgPrefix = usesAtTokens ? '@image' : 'Image ';
+      const vidPrefix = usesAtTokens ? '@video' : 'Video ';
       const images: StudioApiInputImageRefDTO[] = [];
 
       const charSheet = vid.characterAssetId
@@ -2522,7 +2901,9 @@ export const DeliveryAiStudioPage = () => {
                       </strong>
                       <span>
                         {selectedRefVideo
-                          ? `${Math.round(selectedRefVideo.mediaMeta?.durationSec ?? 8)}s · ${selectedRefVideo.notes || selectedRefVideo.originalFileName}`
+                          ? effectiveRefDurationSec !== null
+                            ? `${Math.round(effectiveRefDurationSec)}s · Output ${activeTab.videoDurationAutoMatched ? 'auto-matched to' : 'set to'} ${activeTab.videoDurationSec}s`
+                            : `Detecting length… · ${selectedRefVideo.notes || selectedRefVideo.originalFileName}`
                           : 'Pick from Reference Video Library or upload new'}
                       </span>
                     </StyledPickerMeta>
@@ -2530,17 +2911,157 @@ export const DeliveryAiStudioPage = () => {
                   </StyledPickerTrigger>
                 </StyledSlotCard>
 
+                <StyledSlotCard>
+                  <StyledSlotHeader>
+                    <h4>Auto-Prompt (Gemini)</h4>
+                    <StyledTogglePill
+                      type="button"
+                      data-on={activeTab.autoPromptWithGemini ? 'true' : 'false'}
+                      aria-pressed={activeTab.autoPromptWithGemini}
+                      onClick={() => {
+                        const next = !activeTab.autoPromptWithGemini;
+                        if (!next && activeTab.geminiPromptMeta) {
+                          patchActiveTab({
+                            autoPromptWithGemini: false,
+                            videoMasterPrompt: '',
+                            geminiPromptMeta: null,
+                          });
+                        } else {
+                          patchActiveTab({ autoPromptWithGemini: next });
+                        }
+                      }}
+                    >
+                      <StyledToggleDot
+                        data-on={
+                          activeTab.autoPromptWithGemini ? 'true' : 'false'
+                        }
+                      />
+                      {activeTab.autoPromptWithGemini ? 'ON' : 'OFF'}
+                    </StyledTogglePill>
+                  </StyledSlotHeader>
+
+                  {activeTab.autoPromptWithGemini ? (
+                    <>
+                      <StyledPromptHint>
+                        Gemini watches your Character Sheet, Product Images &amp;
+                        Reference Video and writes a tailored recreation prompt
+                        with strict anti-leakage rules. Runs automatically on
+                        Generate, or preview &amp; edit first.
+                      </StyledPromptHint>
+                      {activeTab.geminiPromptMeta && (
+                        <StyledPromptHint>
+                          {activeTab.geminiPromptMeta.key !==
+                          videoPromptInputKey
+                            ? 'Inputs changed since last analysis — click Re-analyze or Clear to regenerate.'
+                            : activeTab.geminiPromptMeta.source === 'GEMINI'
+                              ? `Prompt ready (${activeTab.geminiPromptMeta.modelId ?? 'Gemini'})`
+                              : activeTab.geminiPromptMeta.summary}
+                        </StyledPromptHint>
+                      )}
+                      <StyledPromptActionsRow>
+                        <StyledSubtleBtn
+                          type="button"
+                          disabled={analyzingPrompt || !selectedRefVideo}
+                          onClick={() => void handleAnalyzeVideoPrompt()}
+                        >
+                          {analyzingPrompt
+                            ? 'Analyzing media…'
+                            : activeTab.videoMasterPrompt.trim()
+                              ? 'Re-analyze Media'
+                              : 'Analyze Images & Video'}
+                        </StyledSubtleBtn>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <StyledSubtleBtn
+                            type="button"
+                            onClick={() => setPromptExpanded((v) => !v)}
+                          >
+                            {promptExpanded
+                              ? 'Hide Prompt'
+                              : activeTab.videoMasterPrompt.trim()
+                                ? 'Edit Prompt'
+                                : 'Custom Prompt'}
+                          </StyledSubtleBtn>
+                          {activeTab.videoMasterPrompt.trim() && (
+                            <StyledSubtleBtn
+                              type="button"
+                              onClick={() =>
+                                patchActiveTab({
+                                  videoMasterPrompt: '',
+                                  geminiPromptMeta: null,
+                                })
+                              }
+                            >
+                              Reset
+                            </StyledSubtleBtn>
+                          )}
+                        </div>
+                      </StyledPromptActionsRow>
+                    </>
+                  ) : (
+                    <>
+                      <StyledPromptHint>
+                        Off — uses the built-in shot-by-shot recreation template
+                        (or your custom prompt below) without calling Gemini.
+                      </StyledPromptHint>
+                      <StyledPromptActionsRow>
+                        <StyledSubtleBtn
+                          type="button"
+                          onClick={() => setPromptExpanded((v) => !v)}
+                        >
+                          {promptExpanded
+                            ? 'Hide Prompt'
+                            : activeTab.videoMasterPrompt.trim()
+                              ? 'Edit Custom Prompt'
+                              : 'Write Custom Prompt'}
+                        </StyledSubtleBtn>
+                        {activeTab.videoMasterPrompt.trim() && (
+                          <StyledSubtleBtn
+                            type="button"
+                            onClick={() =>
+                              patchActiveTab({
+                                videoMasterPrompt: '',
+                                geminiPromptMeta: null,
+                              })
+                            }
+                          >
+                            Reset
+                          </StyledSubtleBtn>
+                        )}
+                      </StyledPromptActionsRow>
+                    </>
+                  )}
+
+                  {promptExpanded && (
+                    <StyledPromptTextarea
+                      value={activeTab.videoMasterPrompt}
+                      placeholder="Leave empty to auto-generate with Gemini (when ON) or use the default recreation prompt (when OFF)…"
+                      onChange={(e) =>
+                        patchActiveTab({
+                          videoMasterPrompt: e.target.value,
+                        })
+                      }
+                    />
+                  )}
+                </StyledSlotCard>
+
                 <StyledPrimaryCta
                   type="button"
                   disabled={
-                    busyGenerate || !selectedRefVideo || !selectedCharSheet
+                    busyGenerate ||
+                    analyzingPrompt ||
+                    !selectedRefVideo ||
+                    !selectedCharSheet
                   }
                   onClick={() => void handleGenerateVideo()}
                 >
                   {busyGenerate
-                    ? 'Queuing…'
+                    ? activeTab.autoPromptWithGemini &&
+                      !activeTab.videoMasterPrompt.trim()
+                      ? 'Analyzing & Queuing…'
+                      : 'Queuing…'
                     : `Generate AI Video · ${videoCost}`}
                 </StyledPrimaryCta>
+                <StyledCostCaption>{videoCostCaption}</StyledCostCaption>
 
                 {(selectedCharSheet || selectedRefVideo) && (
                   <DeliveryStudioApiInputInspector
@@ -2589,6 +3110,7 @@ export const DeliveryAiStudioPage = () => {
                   <StyledProgressCard key={job.id}>
                     <div
                       style={{
+                        alignItems: 'center',
                         display: 'flex',
                         fontSize: 12,
                         fontWeight: 600,
@@ -2596,9 +3118,24 @@ export const DeliveryAiStudioPage = () => {
                       }}
                     >
                       <span>{job.title}</span>
-                      <span style={{ color: themeCssVariables.font.color.danger }}>
-                        FAILED
-                      </span>
+                      <div style={{ alignItems: 'center', display: 'flex', gap: 6 }}>
+                        <span style={{ color: themeCssVariables.font.color.danger }}>
+                          FAILED
+                        </span>
+                        <StyledDismissBtn
+                          type="button"
+                          title="Dismiss failure notice"
+                          onClick={() =>
+                            setDismissedFailedJobIds((prev) => {
+                              const next = new Set(prev);
+                              next.add(job.id);
+                              return next;
+                            })
+                          }
+                        >
+                          ×
+                        </StyledDismissBtn>
+                      </div>
                     </div>
                     {job.errorMessage && (
                       <div style={{ fontSize: 11, opacity: 0.85 }}>
@@ -2821,7 +3358,26 @@ export const DeliveryAiStudioPage = () => {
             }
           }}
           onSelectReferenceVideo={(video) => {
-            patchActiveTab({ selectedReferenceVideoId: video.id });
+            const minSec = currentVideoModel?.capabilities.minDurationSec ?? 4;
+            const maxSec = currentVideoModel?.capabilities.maxDurationSec ?? 15;
+            const knownDur =
+              typeof video.mediaMeta?.durationSec === 'number' &&
+              Number.isFinite(video.mediaMeta.durationSec) &&
+              video.mediaMeta.durationSec > 0
+                ? video.mediaMeta.durationSec
+                : (detectedRefDurations[video.id] ?? null);
+            patchActiveTab({
+              selectedReferenceVideoId: video.id,
+              videoDurationAutoMatched: true,
+              ...(knownDur !== null
+                ? {
+                    videoDurationSec: Math.max(
+                      minSec,
+                      Math.min(maxSec, Math.round(knownDur)),
+                    ),
+                  }
+                : {}),
+            });
           }}
           onCreated={async () => {
             await workspaceQuery.refetch();
@@ -2840,6 +3396,7 @@ export const DeliveryAiStudioPage = () => {
           videoModels={videoModels}
           characterPresets={characterPresets}
           videoPresets={videoPresets}
+          referenceVideoDurationSec={effectiveRefDurationSec}
           onPatchTab={patchActiveTab}
           onOpenProviders={() => setProviderModalOpen(true)}
           onOpenPresets={() => setPresetModalOpen(true)}

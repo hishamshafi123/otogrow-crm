@@ -1,10 +1,12 @@
 import axios from 'axios';
+import { parseMp4DurationSecFromBuffer } from 'src/modules/delivery/deliverables/delivery-media-probe.service';
 import {
   compileStudioPromptTemplate,
   estimateStudioJobCostUsd,
   getStudioModelSpec,
   STUDIO_MODEL_CATALOG,
 } from 'src/modules/delivery/studio/delivery-studio-catalog';
+import { buildStructuredFallbackVideoPrompt } from 'src/modules/delivery/studio/delivery-studio-prompt-ai.service';
 import {
   signStudioMediaToken,
   verifyStudioMediaToken,
@@ -94,16 +96,41 @@ describe('AI Studio Catalog, Policy & Provider Router (Loop 1)', () => {
       }
     });
 
-    it('estimates cost accurately for images and per-second video models', () => {
+    it('estimates cost accurately for images and per-second video models across WaveSpeedAI and Kie.ai', () => {
+      // Nano Banana 2.1 2K: $0.054/image on WaveSpeed, $0.03/image (6 cr) on Kie.ai
       expect(
         Number(
           estimateStudioJobCostUsd({
             modelKey: 'nano-banana-2.1',
             resolution: '2K',
             count: 2,
+            provider: 'wavespeed',
           }),
         ),
-      ).toBeCloseTo(0.12, 4);
+      ).toBeCloseTo(0.108, 4);
+
+      expect(
+        Number(
+          estimateStudioJobCostUsd({
+            modelKey: 'nano-banana-2.1',
+            resolution: '2K',
+            count: 2,
+            provider: 'kie',
+          }),
+        ),
+      ).toBeCloseTo(0.06, 4);
+
+      // MAGI-2 1080p: $0.08/s on WaveSpeed ($0.80), $0.088/s on Kie.ai ($0.88)
+      expect(
+        Number(
+          estimateStudioJobCostUsd({
+            modelKey: 'magi-2',
+            resolution: '1080p',
+            durationSec: 10,
+            provider: 'wavespeed',
+          }),
+        ),
+      ).toBeCloseTo(0.8, 4);
 
       expect(
         Number(
@@ -111,9 +138,36 @@ describe('AI Studio Catalog, Policy & Provider Router (Loop 1)', () => {
             modelKey: 'magi-2',
             resolution: '1080p',
             durationSec: 10,
+            provider: 'kie',
           }),
         ),
       ).toBeCloseTo(0.88, 4);
+
+      // Seedance 2.5 720p with 7s reference video + 7s output -> bills (7 + 7) = 14s
+      // WaveSpeedAI: $0.198/s × 14s = $2.772; Kie.ai: $0.19/s × 14s = $2.66
+      expect(
+        Number(
+          estimateStudioJobCostUsd({
+            modelKey: 'seedance-2.5',
+            resolution: '720p',
+            durationSec: 7,
+            referenceVideoDurationSec: 7,
+            provider: 'wavespeed',
+          }),
+        ),
+      ).toBeCloseTo(2.772, 4);
+
+      expect(
+        Number(
+          estimateStudioJobCostUsd({
+            modelKey: 'seedance-2.5',
+            resolution: '720p',
+            durationSec: 7,
+            referenceVideoDurationSec: 7,
+            provider: 'kie',
+          }),
+        ),
+      ).toBeCloseTo(2.66, 4);
     });
 
     it('compiles dynamic master prompt templates and appends environment override when missing from template', () => {
@@ -606,6 +660,146 @@ describe('AI Studio Catalog, Policy & Provider Router (Loop 1)', () => {
         ['https://cdn.wavespeed.ai/ref.mp4'],
       );
       expect(wanPrimePayload.video).toBe('https://cdn.wavespeed.ai/ref.mp4');
+    });
+
+    it('survives transient 502 errors during polling and captures actual WaveSpeed billing cost', async () => {
+      const transient502 = Object.assign(new Error('Bad Gateway'), {
+        isAxiosError: true,
+        response: { status: 502, data: { message: 'Temporary edge error' } },
+      });
+
+      mockedAxios.post
+        // 1) Submit prediction
+        .mockResolvedValueOnce({
+          data: { code: 200, data: { id: 'ws-pred-resilient', status: 'processing' } },
+        } as never)
+        // 2) Billing lookup after completion
+        .mockResolvedValueOnce({
+          data: {
+            code: 200,
+            data: {
+              items: [{ prediction_uuid: 'ws-pred-resilient', price: 2.576 }],
+            },
+          },
+        } as never);
+
+      mockedAxios.get
+        // Poll 1: transient 502
+        .mockRejectedValueOnce(transient502)
+        // Poll 2: still processing
+        .mockResolvedValueOnce({
+          data: { code: 200, data: { id: 'ws-pred-resilient', status: 'processing' } },
+        } as never)
+        // Poll 3: completed!
+        .mockResolvedValueOnce({
+          data: {
+            code: 200,
+            data: {
+              id: 'ws-pred-resilient',
+              status: 'completed',
+              outputs: ['https://cdn.wavespeed.ai/resilient-out.mp4'],
+            },
+          },
+        } as never);
+
+      const result = await router.execute(
+        {
+          modelKey: 'seedance-2.5',
+          prompt: 'Recreate @video1 with @image1',
+          routingMode: 'WAVESPEED_ONLY',
+          aspectRatio: '9:16',
+          resolution: '720p',
+          durationSec: 7,
+          referenceImages: [
+            makeImageFile({
+              cachedWavespeedUrl: 'https://cdn.wavespeed.ai/sheet.png',
+            }),
+          ],
+          referenceVideos: [
+            makeVideoFile({
+              cachedWavespeedUrl: 'https://cdn.wavespeed.ai/ref.mp4',
+            }),
+          ],
+          pollIntervalMs: 0,
+          maxPollAttempts: 6,
+        },
+        bothCredentials,
+      );
+
+      expect(result.outputUrls).toEqual([
+        'https://cdn.wavespeed.ai/resilient-out.mp4',
+      ]);
+      expect(Number(result.actualCostUsd)).toBeCloseTo(2.576, 4);
+    });
+
+    it('resumes an in-flight Kie.ai task without resubmitting and computes actual USD from creditsConsumed', async () => {
+      mockedAxios.get.mockResolvedValueOnce({
+        data: {
+          code: 200,
+          data: {
+            taskId: 'kie-task-resume-1',
+            state: 'success',
+            creditsConsumed: 336,
+            resultJson: JSON.stringify({
+              resultUrls: ['https://cdn.kie.ai/resumed-video.mp4'],
+            }),
+          },
+        },
+      } as never);
+
+      const resumed = await router.resumeExistingTask({
+        provider: 'kie',
+        modelKey: 'seedance-2.5',
+        externalTaskId: 'kie-task-resume-1',
+        credentials: bothCredentials,
+        pollIntervalMs: 0,
+        maxPollAttempts: 3,
+      });
+
+      expect(mockedAxios.post).not.toHaveBeenCalled();
+      expect(resumed.outputUrls).toEqual(['https://cdn.kie.ai/resumed-video.mp4']);
+      expect(Number(resumed.actualCostUsd)).toBeCloseTo(1.68, 4);
+    });
+  });
+
+  describe('Reference Video Duration Fallback & Structured Prompt Builder', () => {
+    it('parses duration from a minimal MP4 moov->mvhd atom without ffprobe', () => {
+      // Build a minimal ISO-BMFF buffer: ftyp (16 bytes) + moov (40 bytes) containing mvhd v0 (32 bytes)
+      // timescale = 1000, duration = 7400 -> 7.4s
+      const mvhd = Buffer.alloc(32);
+      mvhd.writeUInt32BE(32, 0);
+      mvhd.write('mvhd', 4, 'ascii');
+      mvhd.writeUInt8(0, 8); // version 0
+      mvhd.writeUInt32BE(1000, 20); // timescale
+      mvhd.writeUInt32BE(7400, 24); // duration
+
+      const moovHeader = Buffer.alloc(8);
+      moovHeader.writeUInt32BE(8 + mvhd.length, 0);
+      moovHeader.write('moov', 4, 'ascii');
+
+      const ftyp = Buffer.alloc(16);
+      ftyp.writeUInt32BE(16, 0);
+      ftyp.write('ftyp', 4, 'ascii');
+
+      const mp4 = Buffer.concat([ftyp, moovHeader, mvhd]);
+      expect(parseMp4DurationSecFromBuffer(mp4)).toBeCloseTo(7.4, 2);
+    });
+
+    it('builds a structured anti-leakage recreation prompt with lowercase @image/@video tokens', () => {
+      const prompt = buildStructuredFallbackVideoPrompt({
+        usesAtMentionTokens: true,
+        characterToken: '@image1',
+        productTokens: [{ token: '@image2', label: 'front flatlay' }],
+        videoToken: '@video1',
+        productName: 'Belfort Boxy Graphic Tee',
+        environmentPrompt: 'Clean minimalist rooftop at golden hour',
+      });
+
+      expect(prompt).toContain('@image1 is the character sheet');
+      expect(prompt).toContain('@image2 is the front flatlay');
+      expect(prompt).toContain('@video1 is the reference video');
+      expect(prompt).toContain('keep the back of the garment plain and blank');
+      expect(prompt).toContain('Do not show the original garment design');
     });
   });
 });

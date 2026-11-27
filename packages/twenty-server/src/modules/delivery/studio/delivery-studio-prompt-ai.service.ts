@@ -1,0 +1,363 @@
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import { Injectable, Logger } from '@nestjs/common';
+import { generateText } from 'ai';
+import * as fs from 'node:fs/promises';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import {
+  AiModelRegistryService,
+  type RegisteredAiModel,
+} from 'src/engine/metadata-modules/ai/ai-models/services/ai-model-registry.service';
+import { DeliveryHookRenderAdapter } from 'src/modules/delivery/deliverables/delivery-hook-render.adapter';
+
+const MAX_INLINE_IMAGE_BYTES = 10 * 1024 * 1024;
+const MAX_DIRECT_VIDEO_FALLBACK_BYTES = 18 * 1024 * 1024;
+
+export type StudioPromptImageInput = {
+  token: string;
+  role: 'CHARACTER_SHEET' | 'PRODUCT' | 'AVATAR' | 'ENVIRONMENT';
+  label: string;
+  mimeType: string;
+  bytes: Buffer;
+};
+
+export type StudioPromptVideoInput = {
+  token: string;
+  label: string;
+  mimeType: string;
+  durationSec?: number | null;
+  bytes: Buffer;
+};
+
+export type StudioGeneratedVideoPromptResult = {
+  prompt: string;
+  source: 'GEMINI' | 'FALLBACK';
+  modelId: string | null;
+  summary: string;
+};
+
+export const buildStructuredFallbackVideoPrompt = (params: {
+  usesAtMentionTokens: boolean;
+  characterToken: string | null;
+  productTokens: Array<{ token: string; label: string }>;
+  videoToken: string;
+  productName: string;
+  productNotes?: string;
+  environmentPrompt?: string;
+  brandNotes?: string;
+  customNotes?: string;
+}): string => {
+  const charTok = params.characterToken ?? (params.usesAtMentionTokens ? '@image1' : 'Image 1');
+  const vidTok = params.videoToken;
+
+  const assetDeclarations: string[] = [];
+  if (params.characterToken) {
+    assetDeclarations.push(
+      `${params.characterToken} is the character sheet of the model wearing the full outfit.`,
+    );
+  }
+  const hasBackPhoto = params.productTokens.some((p) =>
+    /back/i.test(p.label),
+  );
+  for (const prod of params.productTokens) {
+    assetDeclarations.push(
+      `${prod.token} is the ${prod.label || 'product reference'} of "${params.productName}".`,
+    );
+  }
+  if (params.productTokens.length > 0 && !hasBackPhoto) {
+    assetDeclarations.push(
+      'No back print is shown in the product references; keep the back of the garment plain and blank unless shown in the character sheet.',
+    );
+  }
+  assetDeclarations.push(`${vidTok} is the reference video.`);
+
+  const prodRefText =
+    params.productTokens.length > 0
+      ? params.productTokens.map((p) => p.token).join(' and ')
+      : charTok;
+
+  const envLine = params.environmentPrompt?.trim()
+    ? `Change the environment from the original setting in ${vidTok} to: ${params.environmentPrompt.trim()}. Remove original background clutter and keep the background sharp.`
+    : `Change the environment from the original setting in ${vidTok} to match the exact environment shown in ${charTok}. Keep the background sharp.`;
+
+  const extraNotes = [
+    params.productNotes?.trim(),
+    params.brandNotes?.trim(),
+    params.customNotes?.trim(),
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  return [
+    assetDeclarations.join(' '),
+    `Recreate ${vidTok} exactly: the same shots, the same cuts and timing, the same camera moves, the same transitions, and the same poses.`,
+    `Replace the original person in ${vidTok} with the model from ${charTok}. Match their face, hair, skin tone, and build exactly across every shot.`,
+    `They wear the exact outfit from ${charTok} in every shot, featuring the exact ${params.productName} from ${prodRefText}. Keep the garment color, fit, drape, and graphic placement 100% identical to ${prodRefText}. Do not center, shrink, or mirror the graphic, and do not redraw, move, or resize the design.`,
+    envLine,
+    `Match the color tone and lighting to ${charTok} and the target environment while keeping the garment and print in their true colors. The background stays sharp.${extraNotes ? ` ${extraNotes}` : ''}`,
+    `No captions or on-screen text in any frame. Do not show the original garment design or the original person from ${vidTok} in the output video. Remake the exact same reference video with the inputted model, garment, environment, and color tone while keeping the edit, shots, timing, and poses identical.`,
+  ].join('\n\n');
+};
+
+@Injectable()
+export class DeliveryStudioPromptAiService {
+  private readonly logger = new Logger(DeliveryStudioPromptAiService.name);
+
+  constructor(
+    private readonly modelRegistry: AiModelRegistryService,
+    private readonly renderAdapter: DeliveryHookRenderAdapter,
+  ) {}
+
+  private pickGeminiModel(): {
+    model: RegisteredAiModel['model'];
+    modelId: string;
+  } | null {
+    try {
+      const models = this.modelRegistry.getAdminFilteredModels();
+      const googleModels = models.filter(
+        (m) => m.sdkPackage === '@ai-sdk/google',
+      );
+      if (googleModels.length > 0) {
+        const picked =
+          googleModels.find((m) => /gemini-2\.5-pro/i.test(m.modelId)) ??
+          googleModels.find((m) => /gemini-2\.5-flash/i.test(m.modelId)) ??
+          googleModels.find((m) => /gemini-2\.0-flash/i.test(m.modelId)) ??
+          googleModels.find((m) => /pro|flash/i.test(m.modelId)) ??
+          googleModels[0];
+        if (picked) {
+          return { model: picked.model, modelId: picked.modelId };
+        }
+      }
+    } catch {
+      // Fall through to direct API key check
+    }
+
+    const envKey =
+      process.env.GEMINI_API_KEY?.trim() ||
+      process.env.GOOGLE_GENERATIVE_AI_API_KEY?.trim();
+    if (envKey) {
+      const google = createGoogleGenerativeAI({ apiKey: envKey });
+      const modelId = 'gemini-2.5-flash';
+      return { model: google(modelId), modelId };
+    }
+
+    return null;
+  }
+
+  async generateVideoPromptFromMedia(params: {
+    usesAtMentionTokens: boolean;
+    images: StudioPromptImageInput[];
+    video: StudioPromptVideoInput;
+    productName: string;
+    productNotes?: string;
+    environmentPrompt?: string;
+    brandNotes?: string;
+    customNotes?: string;
+  }): Promise<StudioGeneratedVideoPromptResult> {
+    const characterImage =
+      params.images.find((img) => img.role === 'CHARACTER_SHEET') ?? null;
+    const productImages = params.images.filter((img) => img.role === 'PRODUCT');
+
+    const fallbackPrompt = buildStructuredFallbackVideoPrompt({
+      usesAtMentionTokens: params.usesAtMentionTokens,
+      characterToken: characterImage?.token ?? null,
+      productTokens: productImages.map((img) => ({
+        token: img.token,
+        label: img.label,
+      })),
+      videoToken: params.video.token,
+      productName: params.productName,
+      productNotes: params.productNotes,
+      environmentPrompt: params.environmentPrompt,
+      brandNotes: params.brandNotes,
+      customNotes: params.customNotes,
+    });
+
+    const gemini = this.pickGeminiModel();
+    if (!gemini) {
+      return {
+        prompt: fallbackPrompt,
+        source: 'FALLBACK',
+        modelId: null,
+        summary:
+          'No Gemini API model is configured in workspace AI settings; used the structured default recreation template.',
+      };
+    }
+
+    const tempDir = await fs.mkdtemp(
+      path.join(os.tmpdir(), 'otogrow-studio-prompt-ai-'),
+    );
+    try {
+      // Prepare lightweight video proxy (480p 15fps, full duration up to 60s)
+      const rawExt =
+        params.video.mimeType === 'video/quicktime'
+          ? 'mov'
+          : params.video.mimeType === 'video/webm'
+            ? 'webm'
+            : 'mp4';
+      const rawVideoPath = path.join(tempDir, `ref.${rawExt}`);
+      const proxyPath = path.join(tempDir, 'proxy.mp4');
+      await fs.writeFile(rawVideoPath, params.video.bytes);
+
+      let videoBytesForGemini: Buffer | null = null;
+      let videoMimeForGemini = 'video/mp4';
+      try {
+        videoBytesForGemini =
+          await this.renderAdapter.prepareLightweightAnalysisProxy(
+            rawVideoPath,
+            proxyPath,
+          );
+      } catch (proxyError) {
+        this.logger.warn(
+          `Video proxy transcode failed; checking direct upload fallback: ${proxyError instanceof Error ? proxyError.message : String(proxyError)}`,
+        );
+        if (params.video.bytes.length <= MAX_DIRECT_VIDEO_FALLBACK_BYTES) {
+          videoBytesForGemini = params.video.bytes;
+          videoMimeForGemini = params.video.mimeType || 'video/mp4';
+        }
+      }
+
+      const contentParts: Array<
+        | { type: 'text'; text: string }
+        | { type: 'image'; image: Buffer; mediaType?: string }
+        | { type: 'file'; data: Buffer; mediaType: string }
+      > = [];
+
+      // Attach every reference image with its exact token label so Gemini never mixes indices
+      for (const img of params.images) {
+        if (img.bytes.length > MAX_INLINE_IMAGE_BYTES) continue;
+        contentParts.push({
+          type: 'text',
+          text: `Reference ${img.token} (Role: ${img.role}, Label: "${img.label}"):`,
+        });
+        contentParts.push({
+          type: 'image',
+          image: img.bytes,
+          mediaType: img.mimeType,
+        });
+      }
+
+      if (videoBytesForGemini) {
+        contentParts.push({
+          type: 'text',
+          text: `Reference ${params.video.token} (Role: REFERENCE_VIDEO, Title: "${params.video.label}", Duration: ${params.video.durationSec ? `${params.video.durationSec.toFixed(1)}s` : 'unknown'}):`,
+        });
+        contentParts.push({
+          type: 'file',
+          data: videoBytesForGemini,
+          mediaType: videoMimeForGemini,
+        });
+      }
+
+      const tokenMappingSummary = [
+        ...params.images.map(
+          (img) => `- ${img.token}: ${img.role} (${img.label})`,
+        ),
+        `- ${params.video.token}: REFERENCE_VIDEO (${params.video.label})`,
+      ].join('\n');
+
+      contentParts.push({
+        type: 'text',
+        text: [
+          'Analyze ALL the attached images and the ENTIRE reference video carefully, then write ONE final, copy-ready video generation prompt.',
+          '',
+          'EXACT TOKEN MAPPING (YOU MUST USE THESE EXACT TOKENS — DO NOT SWAP NUMBERS):',
+          tokenMappingSummary,
+          '',
+          `Product Name: ${params.productName}`,
+          params.productNotes?.trim()
+            ? `Product Notes: ${params.productNotes.trim()}`
+            : '',
+          params.environmentPrompt?.trim()
+            ? `Target Environment / Setting: ${params.environmentPrompt.trim()}`
+            : 'Target Environment / Setting: Match the environment shown in the Character Sheet image.',
+          params.brandNotes?.trim()
+            ? `Brand Notes: ${params.brandNotes.trim()}`
+            : '',
+          params.customNotes?.trim()
+            ? `Extra User Direction: ${params.customNotes.trim()}`
+            : '',
+          '',
+          'Write ONLY the final prompt paragraphs (plain text, no markdown headings, no bullet points, no quotes, no preamble).',
+        ]
+          .filter(Boolean)
+          .join('\n'),
+      });
+
+      const systemPrompt = [
+        'You are an elite AI video director writing reference-to-video prompts (Seedance 2.5 / MAGI-2 / Wan 3.0) for fashion & streetwear brands.',
+        'You MUST inspect every detail of the attached product images, character sheet image, and the entire reference video, and output a single ultra-precise prompt following this EXACT 7-paragraph blueprint:',
+        '',
+        'Paragraph 1 — Asset Role Declarations:',
+        'State clearly what each @imageN (or Image N) is using the EXACT tokens provided. Explicitly state if the product only has a front print (e.g., "This garment has no back print; the back is plain and blank.") OR describe both front and back if a back image is provided. Declare @video1 as the reference video.',
+        '',
+        'Paragraph 2 — Exact Video Recreation:',
+        'Open with: "Recreate [video token] exactly: the same shots, the same cuts and timing, the same camera moves, the same transitions and the same poses." Briefly reinforce key camera motion / pacing observed in the video.',
+        '',
+        'Paragraph 3 — Subject Replacement & Prop Rules:',
+        'Explicitly state who is currently in the reference video (e.g., "Replace the woman in [video token] with the man from [character token]. Match his face, hair and build exactly."). Note accessories to keep (e.g., sunglasses if worn in the video or character sheet) and unwanted props from the reference video to remove (e.g., "No fan." / remove distracting handheld props that do not belong).',
+        '',
+        'Paragraph 4 — Exact Outfit & Graphic Placement Lock:',
+        'List the EXACT full outfit visible on the Character Sheet (top fit/untucked/boxy, bottoms/shorts/pants, socks, sneakers/shoes). Then describe the EXACT garment color and print/graphic layout you see in the product image(s) — e.g. off-center vs centered, chest text vs back graphic, bleeding off side seam or bottom hem, exact ink colors. End with: "Do not center it, shrink it or mirror it, and do not redraw, move or resize the design."',
+        '',
+        'Paragraph 5 — Environment Swap:',
+        'Explicitly state what environment is currently in the reference video and change it to the target environment with concrete visual details (textures, architecture, surfaces) and explicit exclusions of elements from the reference video background (e.g., "No graffiti, no color on the walls...").',
+        '',
+        'Paragraph 6 — Color Tone, Lighting & True Garment Color:',
+        'Specify the exact lighting and color tone matching the Character Sheet / target environment (e.g., overcast/moody/cinematic/clean daylight, film grain, contrast) and explicitly state that the garment keeps its true colors and print vibrancy, and the background stays sharp.',
+        '',
+        'Paragraph 7 — Strict Anti-Leakage Closing:',
+        'Explicitly forbid captions/on-screen text in any frame, forbid showing the original clothing design or original person from the reference video, and close by reiterating: remake the exact same reference video with the inputted model, garment, environment, and color tone while keeping everything else (edit, shots, timing, poses) identical.',
+        '',
+        'Rules:',
+        '- Keep total length focused and crisp (around 220–360 words).',
+        '- NEVER invent print details that are not visible in the product images.',
+        '- NEVER swap the token numbers provided in the EXACT TOKEN MAPPING.',
+        '- Output ONLY the prompt text, with blank lines between paragraphs.',
+      ].join('\n');
+
+      const response = await generateText({
+        model: gemini.model,
+        system: systemPrompt,
+        messages: [
+          {
+            role: 'user',
+            content: contentParts,
+          },
+        ],
+        maxOutputTokens: 1200,
+        maxRetries: 1,
+        abortSignal: AbortSignal.timeout(90_000),
+      });
+
+      const generated = response.text.trim();
+      if (generated.length >= 60) {
+        return {
+          prompt: generated,
+          source: 'GEMINI',
+          modelId: gemini.modelId,
+          summary: `Analyzed ${params.images.length} image${params.images.length === 1 ? '' : 's'} + reference video with ${gemini.modelId}.`,
+        };
+      }
+
+      return {
+        prompt: fallbackPrompt,
+        source: 'FALLBACK',
+        modelId: gemini.modelId,
+        summary: 'Gemini returned an empty prompt; used the default structured recreation prompt.',
+      };
+    } catch (error) {
+      this.logger.warn(
+        `Gemini studio prompt analysis failed; falling back to default template: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return {
+        prompt: fallbackPrompt,
+        source: 'FALLBACK',
+        modelId: gemini.modelId,
+        summary: `Gemini analysis unavailable (${error instanceof Error ? error.message.slice(0, 120) : 'error'}); used the default structured prompt.`,
+      };
+    } finally {
+      await fs.rm(tempDir, { recursive: true, force: true }).catch(() => undefined);
+    }
+  }
+}

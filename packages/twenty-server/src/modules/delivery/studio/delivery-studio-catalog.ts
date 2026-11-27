@@ -48,9 +48,26 @@ export type StudioModelSpec = {
   };
   pricing: {
     unit: 'PER_IMAGE' | 'PER_SECOND';
-    // Indicative USD rates used for upfront batch cost estimation
+    // Fallback base USD rate (at default resolution)
     baseRateUsd: number;
     resolutionMultipliers?: Record<string, number>;
+    // True when provider bills (inputVideoDurationSec + outputDurationSec) * rate
+    billsInputVideoDuration?: boolean;
+    // WaveSpeed Seedance floor: billed reference duration >= ceil(outputSec * 2/3)
+    minRefVideoRatioOfOutput?: number;
+    // Verified exact provider USD rates by resolution
+    providerRates?: {
+      wavespeed?: {
+        perImage?: Record<string, number>;
+        perSecWithoutRefVideo?: Record<string, number>;
+        perSecWithRefVideo?: Record<string, number>;
+      };
+      kie?: {
+        perImage?: Record<string, number>;
+        perSecWithoutRefVideo?: Record<string, number>;
+        perSecWithRefVideo?: Record<string, number>;
+      };
+    };
   };
 };
 
@@ -81,8 +98,18 @@ export const STUDIO_MODEL_CATALOG: readonly StudioModelSpec[] = [
     },
     pricing: {
       unit: 'PER_IMAGE',
-      baseRateUsd: 0.06,
-      resolutionMultipliers: { '1K': 0.75, '2K': 1, '4K': 1.7 },
+      baseRateUsd: 0.054,
+      resolutionMultipliers: { '1K': 0.7, '2K': 1, '4K': 2.25 },
+      providerRates: {
+        // WaveSpeedAI Edit (-10% standard rate; list 1K=$0.042, 2K=$0.06, 4K=$0.135)
+        wavespeed: {
+          perImage: { '1K': 0.0378, '2K': 0.054, '4K': 0.1215 },
+        },
+        // Kie.ai (1 cr = $0.005: 1K=4cr, 2K=6cr, 4K=12cr)
+        kie: {
+          perImage: { '1K': 0.02, '2K': 0.03, '4K': 0.06 },
+        },
+      },
     },
   },
   {
@@ -110,8 +137,18 @@ export const STUDIO_MODEL_CATALOG: readonly StudioModelSpec[] = [
     },
     pricing: {
       unit: 'PER_IMAGE',
-      baseRateUsd: 0.09,
-      resolutionMultipliers: { '1K': 0.8, '2K': 1, '4K': 1.8 },
+      baseRateUsd: 0.126,
+      resolutionMultipliers: { '1K': 1, '2K': 1, '4K': 1.7143 },
+      providerRates: {
+        // WaveSpeedAI Edit (-10% standard rate; list 1K/2K=$0.14, 4K=$0.24)
+        wavespeed: {
+          perImage: { '1K': 0.126, '2K': 0.126, '4K': 0.216 },
+        },
+        // Kie.ai (1K/2K=18cr=$0.09, 4K=24cr=$0.12)
+        kie: {
+          perImage: { '1K': 0.09, '2K': 0.09, '4K': 0.12 },
+        },
+      },
     },
   },
   {
@@ -139,8 +176,18 @@ export const STUDIO_MODEL_CATALOG: readonly StudioModelSpec[] = [
     },
     pricing: {
       unit: 'PER_IMAGE',
-      baseRateUsd: 0.08,
-      resolutionMultipliers: { '1K': 1, '2K': 1.6 },
+      baseRateUsd: 0.0585,
+      resolutionMultipliers: { '1K': 1, '2K': 2 },
+      providerRates: {
+        // WaveSpeedAI Edit medium (-10%: 1K=$0.0585 list $0.065; 2K=$0.117 list $0.13)
+        wavespeed: {
+          perImage: { '1K': 0.0585, '2K': 0.117 },
+        },
+        // Kie.ai token-based typical average with ref images
+        kie: {
+          perImage: { '1K': 0.05, '2K': 0.095 },
+        },
+      },
     },
   },
   {
@@ -169,7 +216,17 @@ export const STUDIO_MODEL_CATALOG: readonly StudioModelSpec[] = [
     pricing: {
       unit: 'PER_IMAGE',
       baseRateUsd: 0.045,
-      resolutionMultipliers: { '1K': 1, '2K': 1.5 },
+      resolutionMultipliers: { '1K': 1, '2K': 2 },
+      providerRates: {
+        // WaveSpeedAI medium (-10%: 1K=$0.045 list $0.05; 2K=$0.090 list $0.10)
+        wavespeed: {
+          perImage: { '1K': 0.045, '2K': 0.09 },
+        },
+        // Kie.ai token-based typical average
+        kie: {
+          perImage: { '1K': 0.04, '2K': 0.075 },
+        },
+      },
     },
   },
 
@@ -181,7 +238,7 @@ export const STUDIO_MODEL_CATALOG: readonly StudioModelSpec[] = [
     kind: 'VIDEO',
     tier: 'FLAGSHIP',
     description:
-      'Reference-to-Video flagship with @Image / @Video anchoring, exact cut/action fidelity & native audio.',
+      'Reference-to-Video flagship with @image / @video anchoring, exact cut/action fidelity & native audio.',
     wavespeed: {
       endpoint: 'bytedance/seedance-2.5/reference-to-video',
       imageInputField: 'reference_images',
@@ -210,8 +267,22 @@ export const STUDIO_MODEL_CATALOG: readonly StudioModelSpec[] = [
     },
     pricing: {
       unit: 'PER_SECOND',
-      baseRateUsd: 0.19,
-      resolutionMultipliers: { '480p': 0.45, '720p': 1, '1080p': 2.5 },
+      baseRateUsd: 0.198,
+      resolutionMultipliers: { '480p': 0.5, '720p': 1, '1080p': 2.5 },
+      billsInputVideoDuration: true,
+      minRefVideoRatioOfOutput: 2 / 3,
+      providerRates: {
+        // WaveSpeedAI (-10% standard rate; list with ref: 480p=$0.11, 720p=$0.22, 1080p=$0.55)
+        wavespeed: {
+          perSecWithoutRefVideo: { '480p': 0.162, '720p': 0.324, '1080p': 0.81 },
+          perSecWithRefVideo: { '480p': 0.099, '720p': 0.198, '1080p': 0.495 },
+        },
+        // Kie.ai (1 cr = $0.005: with ref 480p=17cr, 720p=38cr, 1080p=95cr)
+        kie: {
+          perSecWithoutRefVideo: { '480p': 0.14, '720p': 0.315, '1080p': 0.79 },
+          perSecWithRefVideo: { '480p': 0.085, '720p': 0.19, '1080p': 0.475 },
+        },
+      },
     },
   },
   {
@@ -251,8 +322,22 @@ export const STUDIO_MODEL_CATALOG: readonly StudioModelSpec[] = [
     },
     pricing: {
       unit: 'PER_SECOND',
-      baseRateUsd: 0.085,
-      resolutionMultipliers: { '480p': 0.75, '720p': 1, '1080p': 1.8 },
+      baseRateUsd: 0.135,
+      resolutionMultipliers: { '480p': 0.5, '720p': 1, '1080p': 2.5 },
+      billsInputVideoDuration: true,
+      minRefVideoRatioOfOutput: 2 / 3,
+      providerRates: {
+        // WaveSpeedAI (-10%: with ref 480p=$0.0675, 720p=$0.135, 1080p=$0.3375)
+        wavespeed: {
+          perSecWithoutRefVideo: { '480p': 0.108, '720p': 0.216, '1080p': 0.54 },
+          perSecWithRefVideo: { '480p': 0.0675, '720p': 0.135, '1080p': 0.3375 },
+        },
+        // Kie.ai (clamps max to 720p: with ref 480p=11.5cr=$0.0575, 720p=25.5cr=$0.1275)
+        kie: {
+          perSecWithoutRefVideo: { '480p': 0.0925, '720p': 0.205, '1080p': 0.205 },
+          perSecWithRefVideo: { '480p': 0.0575, '720p': 0.1275, '1080p': 0.1275 },
+        },
+      },
     },
   },
   {
@@ -291,8 +376,20 @@ export const STUDIO_MODEL_CATALOG: readonly StudioModelSpec[] = [
     },
     pricing: {
       unit: 'PER_SECOND',
-      baseRateUsd: 0.19,
-      resolutionMultipliers: { '480p': 0.45, '720p': 1, '1080p': 2.5 },
+      baseRateUsd: 0.198,
+      resolutionMultipliers: { '480p': 0.5, '720p': 1, '1080p': 2.5 },
+      billsInputVideoDuration: true,
+      minRefVideoRatioOfOutput: 2 / 3,
+      providerRates: {
+        wavespeed: {
+          perSecWithoutRefVideo: { '480p': 0.162, '720p': 0.324, '1080p': 0.81 },
+          perSecWithRefVideo: { '480p': 0.099, '720p': 0.198, '1080p': 0.495 },
+        },
+        kie: {
+          perSecWithoutRefVideo: { '480p': 0.14, '720p': 0.315, '1080p': 0.79 },
+          perSecWithRefVideo: { '480p': 0.085, '720p': 0.19, '1080p': 0.475 },
+        },
+      },
     },
   },
   {
@@ -331,8 +428,21 @@ export const STUDIO_MODEL_CATALOG: readonly StudioModelSpec[] = [
     },
     pricing: {
       unit: 'PER_SECOND',
-      baseRateUsd: 0.088,
-      resolutionMultipliers: { '720p': 0.85, '1080p': 1 },
+      baseRateUsd: 0.08,
+      resolutionMultipliers: { '720p': 1, '1080p': 1 },
+      billsInputVideoDuration: false,
+      providerRates: {
+        // WaveSpeedAI flat 1080p with audio included ($0.08/s output only)
+        wavespeed: {
+          perSecWithoutRefVideo: { '720p': 0.08, '1080p': 0.08 },
+          perSecWithRefVideo: { '720p': 0.08, '1080p': 0.08 },
+        },
+        // Kie.ai flat 1080p (17.6 cr/s = $0.088/s output only)
+        kie: {
+          perSecWithoutRefVideo: { '720p': 0.088, '1080p': 0.088 },
+          perSecWithRefVideo: { '720p': 0.088, '1080p': 0.088 },
+        },
+      },
     },
   },
   {
@@ -371,8 +481,21 @@ export const STUDIO_MODEL_CATALOG: readonly StudioModelSpec[] = [
     },
     pricing: {
       unit: 'PER_SECOND',
-      baseRateUsd: 0.045,
-      resolutionMultipliers: { '480p': 0.75, '720p': 1, '1080p': 1.5 },
+      baseRateUsd: 0.09,
+      resolutionMultipliers: { '480p': 0.5, '720p': 1, '1080p': 2 },
+      billsInputVideoDuration: true,
+      providerRates: {
+        // WaveSpeedAI (-10%: 480p=$0.045/s, 720p=$0.09/s, 1080p=$0.18/s)
+        wavespeed: {
+          perSecWithoutRefVideo: { '480p': 0.045, '720p': 0.09, '1080p': 0.18 },
+          perSecWithRefVideo: { '480p': 0.045, '720p': 0.09, '1080p': 0.18 },
+        },
+        // Kie.ai (480p=8cr=$0.040/s, 720p=16cr=$0.080/s, 1080p=32cr=$0.160/s)
+        kie: {
+          perSecWithoutRefVideo: { '480p': 0.04, '720p': 0.08, '1080p': 0.16 },
+          perSecWithRefVideo: { '480p': 0.04, '720p': 0.08, '1080p': 0.16 },
+        },
+      },
     },
   },
   {
@@ -411,8 +534,21 @@ export const STUDIO_MODEL_CATALOG: readonly StudioModelSpec[] = [
     },
     pricing: {
       unit: 'PER_SECOND',
-      baseRateUsd: 0.062,
-      resolutionMultipliers: { '720p': 0.9, '1080p': 1 },
+      baseRateUsd: 0.27,
+      resolutionMultipliers: { '480p': 0.25, '720p': 0.5, '1080p': 1 },
+      billsInputVideoDuration: true,
+      providerRates: {
+        // WaveSpeedAI 1.5x Wan 3.0 (-10%: 480p=$0.0675/s, 720p=$0.135/s, 1080p=$0.27/s)
+        wavespeed: {
+          perSecWithoutRefVideo: { '480p': 0.0675, '720p': 0.135, '1080p': 0.27 },
+          perSecWithRefVideo: { '480p': 0.0675, '720p': 0.135, '1080p': 0.27 },
+        },
+        // Kie.ai (480p=12.2cr=$0.0612/s, 720p=25.2cr=$0.126/s, 1080p=50.4cr=$0.252/s)
+        kie: {
+          perSecWithoutRefVideo: { '480p': 0.0612, '720p': 0.126, '1080p': 0.252 },
+          perSecWithRefVideo: { '480p': 0.0612, '720p': 0.126, '1080p': 0.252 },
+        },
+      },
     },
   },
 ];
@@ -420,25 +556,100 @@ export const STUDIO_MODEL_CATALOG: readonly StudioModelSpec[] = [
 export const getStudioModelSpec = (modelKey: string): StudioModelSpec | null =>
   STUDIO_MODEL_CATALOG.find((item) => item.key === modelKey) ?? null;
 
+export const computeBilledVideoSeconds = (params: {
+  spec: StudioModelSpec;
+  outputDurationSec: number;
+  referenceVideoDurationSec?: number | null;
+}): {
+  outputSec: number;
+  billedRefSec: number;
+  totalBilledSec: number;
+  hasRefVideo: boolean;
+} => {
+  const outputSec = Math.max(
+    params.spec.capabilities.minDurationSec ?? 4,
+    Math.min(
+      params.spec.capabilities.maxDurationSec ?? 30,
+      Math.round(params.outputDurationSec),
+    ),
+  );
+  const rawRefSec =
+    typeof params.referenceVideoDurationSec === 'number' &&
+    Number.isFinite(params.referenceVideoDurationSec) &&
+    params.referenceVideoDurationSec > 0
+      ? params.referenceVideoDurationSec
+      : 0;
+  const hasRefVideo = rawRefSec > 0;
+  if (!hasRefVideo || !params.spec.pricing.billsInputVideoDuration) {
+    return {
+      outputSec,
+      billedRefSec: 0,
+      totalBilledSec: outputSec,
+      hasRefVideo,
+    };
+  }
+
+  const maxIn = params.spec.capabilities.maxInputVideoSec ?? 30;
+  const normalizedRef = Math.ceil(Math.max(2, Math.min(maxIn, rawRefSec)));
+  const minFloor = params.spec.pricing.minRefVideoRatioOfOutput
+    ? Math.ceil(outputSec * params.spec.pricing.minRefVideoRatioOfOutput)
+    : 0;
+  const billedRefSec = Math.max(normalizedRef, minFloor);
+
+  return {
+    outputSec,
+    billedRefSec,
+    totalBilledSec: outputSec + billedRefSec,
+    hasRefVideo: true,
+  };
+};
+
 export const estimateStudioJobCostUsd = (params: {
   modelKey: string;
   resolution?: string;
   durationSec?: number;
+  referenceVideoDurationSec?: number | null;
   count?: number;
+  provider?: 'wavespeed' | 'kie';
 }): string => {
   const spec = getStudioModelSpec(params.modelKey);
   if (!spec) return '0.0000';
   const res = params.resolution || spec.capabilities.defaultResolution;
-  const mult = spec.pricing.resolutionMultipliers?.[res] ?? 1;
   const qty = Math.max(1, params.count ?? 1);
+  const providerKey = params.provider ?? 'wavespeed';
+  const providerTable =
+    spec.pricing.providerRates?.[providerKey] ??
+    spec.pricing.providerRates?.wavespeed ??
+    spec.pricing.providerRates?.kie;
+
   if (spec.pricing.unit === 'PER_IMAGE') {
-    return (spec.pricing.baseRateUsd * mult * qty).toFixed(4);
+    const exactRate =
+      providerTable?.perImage?.[res] ??
+      providerTable?.perImage?.[res.toUpperCase()] ??
+      spec.pricing.baseRateUsd *
+        (spec.pricing.resolutionMultipliers?.[res] ?? 1);
+    return (exactRate * qty).toFixed(4);
   }
-  const sec = Math.max(
-    spec.capabilities.minDurationSec ?? 5,
-    Math.min(spec.capabilities.maxDurationSec ?? 30, params.durationSec ?? 8),
-  );
-  return (spec.pricing.baseRateUsd * mult * sec * qty).toFixed(4);
+
+  const billed = computeBilledVideoSeconds({
+    spec,
+    outputDurationSec: params.durationSec ?? 8,
+    referenceVideoDurationSec: params.referenceVideoDurationSec,
+  });
+
+  const rateMap = billed.hasRefVideo
+    ? (providerTable?.perSecWithRefVideo ??
+      providerTable?.perSecWithoutRefVideo)
+    : (providerTable?.perSecWithoutRefVideo ??
+      providerTable?.perSecWithRefVideo);
+
+  const perSecRate =
+    rateMap?.[res] ??
+    rateMap?.[res.toLowerCase()] ??
+    spec.pricing.baseRateUsd *
+      (spec.pricing.resolutionMultipliers?.[res] ?? 1);
+
+  return (perSecRate * billed.totalBilledSec * qty).toFixed(4);
 };
 
 export type StudioPromptVariables = {
@@ -581,9 +792,15 @@ export const STARTER_STUDIO_PRESETS: readonly StarterStudioPresetSeed[] = [
     kind: 'VIDEO_GENERATION',
     name: 'Reference-Video Apparel Swap (Keep Character Sheet Environment)',
     description:
-      'Remakes @Video 1 with the exact subject, garment, and environment from your Character Sheet (@Image 1).',
-    masterPrompt:
-      'Recreate the exact camera angles, shot transitions, editing rhythm, pacing, and subject actions from @Video 1. Replace the main subject and outfit with the model and exact {{product_name}} shown in @Image 1 (using the additional product images for exact front/back print and fabric fidelity). Keep the entire scene in the exact same environment and lighting as the Character Sheet: {{environment}}. Realistic cloth physics, consistent identity, zero logo morphing. {{brand_notes}} {{custom_notes}}',
+      'Remakes @video1 shot-for-shot with the exact model, outfit, garment graphic fidelity, and environment from your Character Sheet & product photos.',
+    masterPrompt: [
+      'Recreate @video1 exactly: the same shots, the same cuts and timing, the same camera moves, the same transitions, and the same poses.',
+      'Replace the original subject in @video1 with the model from @image1. Match their face, hair, skin tone, and build exactly across every shot.',
+      'They wear the exact outfit from @image1 in every shot, featuring the exact {{product_name}} from the product reference images. Keep the garment color, fabric drape, neckline, and graphic placement 100% identical to the product images. Do not center, shrink, mirror, redraw, move, or resize any print or logo. If no back print is shown, keep the back plain and blank.',
+      'Change the environment from the original setting in @video1 to: {{environment}}. Keep the background sharp and cohesive across every cut.',
+      'Match the color tone and lighting to the Character Sheet and target environment while keeping the garment and print in their true colors. {{product_notes}} {{brand_notes}} {{custom_notes}}',
+      'No captions or on-screen text in any frame. Do not show the original design or the original person from @video1 in the output video. Remake the exact same reference video with the inputted model, garment, environment, and color tone while keeping the edit, shots, timing, and poses identical.',
+    ].join('\n\n'),
     configJson: {
       modelKey: 'seedance-2.5',
       aspectRatio: '9:16',
@@ -600,9 +817,14 @@ export const STARTER_STUDIO_PRESETS: readonly StarterStudioPresetSeed[] = [
     kind: 'VIDEO_GENERATION',
     name: 'Reference-Video Apparel Swap (Keep Reference Video Setting)',
     description:
-      'Replaces the subject & outfit in @Video 1 while keeping the original reference video background.',
-    masterPrompt:
-      'Recreate the exact camera angles, shot transitions, editing rhythm, pacing, lighting continuity, and subject actions from @Video 1. Replace the main subject and outfit with the model and exact {{product_name}} shown in @Image 1 (using additional reference images for exact front/back print and fabric fidelity). Keep the original reference video setting and movement natural and seamless, with realistic cloth physics and zero logo morphing. {{brand_notes}} {{custom_notes}}',
+      'Replaces the subject & outfit in @video1 while keeping the original reference video background.',
+    masterPrompt: [
+      'Recreate @video1 exactly: the same shots, the same cuts and timing, the same camera moves, the same transitions, and the same poses.',
+      'Replace the original subject in @video1 with the model from @image1. Match their face, hair, skin tone, and build exactly across every shot.',
+      'They wear the exact outfit from @image1 in every shot, featuring the exact {{product_name}} from the product reference images. Keep the garment color, fabric drape, and graphic placement 100% identical to the product images. Do not center, shrink, mirror, redraw, move, or resize any print or logo.',
+      'Keep the original reference video environment and lighting continuity seamless and natural. {{product_notes}} {{brand_notes}} {{custom_notes}}',
+      'No captions or on-screen text in any frame. Do not show the original garment design or the original person from @video1 in the output video.',
+    ].join('\n\n'),
     configJson: {
       modelKey: 'seedance-2.5',
       aspectRatio: '9:16',

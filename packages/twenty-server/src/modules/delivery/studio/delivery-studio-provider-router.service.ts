@@ -78,6 +78,7 @@ export type StudioRouterExecutionResult = {
   failoverTriggered: boolean;
   externalTaskId: string;
   outputUrls: string[];
+  actualCostUsd?: string | null;
   requestPayload: Record<string, unknown>;
   stagedImageUrls: string[];
   stagedVideoUrls: string[];
@@ -320,6 +321,7 @@ export class DeliveryStudioProviderRouterService {
           failoverTriggered: index > 0,
           externalTaskId: result.externalTaskId,
           outputUrls: result.outputUrls,
+          actualCostUsd: result.actualCostUsd ?? null,
           requestPayload: result.requestPayload,
           stagedImageUrls: result.stagedImageUrls,
           stagedVideoUrls: result.stagedVideoUrls,
@@ -566,6 +568,45 @@ export class DeliveryStudioProviderRouterService {
     return body;
   }
 
+  private async fetchWaveSpeedActualCostUsd(
+    apiKey: string,
+    predictionId: string,
+  ): Promise<string | null> {
+    try {
+      const res = await axios.post<{
+        data?: { items?: Array<{ price?: number | string }> };
+      }>(
+        `${WAVESPEED_API_BASE}/billings/search`,
+        {
+          prediction_uuids: [predictionId],
+          page: 1,
+          page_size: 5,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          timeout: 6_000,
+          maxRedirects: 0,
+        },
+      );
+      const items = res.data?.data?.items;
+      if (Array.isArray(items) && items.length > 0) {
+        const total = items.reduce((sum, item) => {
+          const val = Number(item?.price);
+          return Number.isFinite(val) && val > 0 ? sum + val : sum;
+        }, 0);
+        if (total > 0) {
+          return total.toFixed(4);
+        }
+      }
+    } catch {
+      // Non-fatal: Developer API keys or eventual consistency may omit billing lookup
+    }
+    return null;
+  }
+
   private async runOnWaveSpeed(
     spec: StudioModelSpec,
     request: StudioNormalizedGenerationRequest,
@@ -573,6 +614,7 @@ export class DeliveryStudioProviderRouterService {
   ): Promise<{
     externalTaskId: string;
     outputUrls: string[];
+    actualCostUsd?: string | null;
     requestPayload: Record<string, unknown>;
     stagedImageUrls: string[];
     stagedVideoUrls: string[];
@@ -657,37 +699,119 @@ export class DeliveryStudioProviderRouterService {
       Array.isArray(submitRes.data.data.outputs) &&
       submitRes.data.data.outputs.length > 0
     ) {
+      const actualCostUsd = await this.fetchWaveSpeedActualCostUsd(
+        apiKey,
+        predictionId,
+      );
       return {
         externalTaskId: predictionId,
         outputUrls: submitRes.data.data.outputs,
+        actualCostUsd,
         requestPayload: payload,
         stagedImageUrls: stagedImages,
         stagedVideoUrls: stagedVideos,
       };
     }
 
-    const pollIntervalMs = request.pollIntervalMs ?? 3000;
+    const polled = await this.pollWaveSpeedPrediction({
+      spec,
+      predictionId,
+      apiKey,
+      pollIntervalMs: request.pollIntervalMs,
+      maxPollAttempts: request.maxPollAttempts,
+      onProgress: request.onProgress,
+    });
+
+    return {
+      externalTaskId: predictionId,
+      outputUrls: polled.outputUrls,
+      actualCostUsd: polled.actualCostUsd,
+      requestPayload: payload,
+      stagedImageUrls: stagedImages,
+      stagedVideoUrls: stagedVideos,
+    };
+  }
+
+  async pollWaveSpeedPrediction(params: {
+    spec: StudioModelSpec;
+    predictionId: string;
+    apiKey: string;
+    pollIntervalMs?: number;
+    maxPollAttempts?: number;
+    onProgress?: StudioNormalizedGenerationRequest['onProgress'];
+  }): Promise<{ outputUrls: string[]; actualCostUsd: string | null }> {
+    const pollIntervalMs = params.pollIntervalMs ?? 4000;
     const maxAttempts =
-      request.maxPollAttempts ?? (spec.kind === 'VIDEO' ? 180 : 60);
+      params.maxPollAttempts ?? (params.spec.kind === 'VIDEO' ? 375 : 90);
+    let consecutivePollErrors = 0;
 
     for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
       await delayMs(pollIntervalMs);
-      const pollRes = await axios.get<{
-        code?: number;
-        message?: string;
+      let pollRes: {
         data?: {
-          id?: string;
-          status?: string;
-          outputs?: string[];
-          error?: string;
-          has_nsfw_contents?: boolean[];
+          code?: number;
+          message?: string;
+          data?: {
+            id?: string;
+            status?: string;
+            outputs?: string[];
+            error?: string;
+            has_nsfw_contents?: boolean[];
+          };
         };
-      }>(`${WAVESPEED_API_BASE}/predictions/${encodeURIComponent(predictionId)}/result`, {
-        headers: { Authorization: `Bearer ${apiKey}` },
-        timeout: 30_000,
-        maxRedirects: 0,
-      });
+      };
+      try {
+        pollRes = await axios.get(
+          `${WAVESPEED_API_BASE}/predictions/${encodeURIComponent(params.predictionId)}/result`,
+          {
+            headers: { Authorization: `Bearer ${params.apiKey}` },
+            timeout: 30_000,
+            maxRedirects: 0,
+          },
+        );
+      } catch (pollErr) {
+        const safe = extractSafeAxiosFailure(
+          pollErr,
+          'wavespeed',
+          'Transient WaveSpeedAI status check error.',
+        );
+        const isEarly404 = safe.errorCode === '404' && attempt < 10;
+        if ((safe.retryable || isEarly404) && consecutivePollErrors < 12) {
+          consecutivePollErrors += 1;
+          this.logger.warn(
+            `WaveSpeedAI poll error #${consecutivePollErrors} for ${params.predictionId} (${safe.errorCode ?? 'NET'}); continuing to poll.`,
+          );
+          continue;
+        }
+        throw new StudioProviderCallError(
+          'wavespeed',
+          safe.message,
+          safe.retryable,
+          safe.errorCode,
+          params.predictionId,
+        );
+      }
 
+      const pollCode = pollRes.data?.code;
+      if (pollCode !== undefined && pollCode !== 200 && pollCode !== 0) {
+        const isEarly404 = pollCode === 404 && attempt < 10;
+        if (
+          (classifyHttpStatusRetryable(pollCode) || isEarly404) &&
+          consecutivePollErrors < 12
+        ) {
+          consecutivePollErrors += 1;
+          continue;
+        }
+        throw new StudioProviderCallError(
+          'wavespeed',
+          pollRes.data?.message || `WaveSpeedAI poll failed (code ${pollCode}).`,
+          classifyHttpStatusRetryable(pollCode),
+          String(pollCode),
+          params.predictionId,
+        );
+      }
+
+      consecutivePollErrors = 0;
       const data = pollRes.data?.data;
       const status = (data?.status ?? '').toLowerCase();
 
@@ -698,11 +822,13 @@ export class DeliveryStudioProviderRouterService {
             'Output was flagged by provider safety filters.',
             false,
             'SAFETY_BLOCKED',
-            predictionId,
+            params.predictionId,
           );
         }
         const outputs = Array.isArray(data?.outputs)
-          ? data.outputs.filter((u): u is string => typeof u === 'string' && u.length > 0)
+          ? data.outputs.filter(
+              (u): u is string => typeof u === 'string' && u.length > 0,
+            )
           : [];
         if (outputs.length === 0) {
           throw new StudioProviderCallError(
@@ -710,17 +836,15 @@ export class DeliveryStudioProviderRouterService {
             'WaveSpeedAI completed without returning any output URLs.',
             true,
             'EMPTY_OUTPUTS',
-            predictionId,
+            params.predictionId,
           );
         }
-        await request.onProgress?.('DOWNLOADING', 90, predictionId);
-        return {
-          externalTaskId: predictionId,
-          outputUrls: outputs,
-          requestPayload: payload,
-          stagedImageUrls: stagedImages,
-          stagedVideoUrls: stagedVideos,
-        };
+        await params.onProgress?.('DOWNLOADING', 90, params.predictionId);
+        const actualCostUsd = await this.fetchWaveSpeedActualCostUsd(
+          params.apiKey,
+          params.predictionId,
+        );
+        return { outputUrls: outputs, actualCostUsd };
       }
 
       if (status === 'failed' || status === 'cancelled') {
@@ -733,7 +857,7 @@ export class DeliveryStudioProviderRouterService {
           errMsg.slice(0, 300),
           !isPolicyError,
           status.toUpperCase(),
-          predictionId,
+          params.predictionId,
         );
       }
 
@@ -741,7 +865,7 @@ export class DeliveryStudioProviderRouterService {
         85,
         25 + Math.round(((attempt + 1) / Math.max(10, maxAttempts * 0.45)) * 60),
       );
-      await request.onProgress?.('PROCESSING', pct, predictionId);
+      await params.onProgress?.('PROCESSING', pct, params.predictionId);
     }
 
     throw new StudioProviderCallError(
@@ -749,7 +873,7 @@ export class DeliveryStudioProviderRouterService {
       'WaveSpeedAI generation timed out while waiting for completion.',
       true,
       'POLL_TIMEOUT',
-      predictionId,
+      params.predictionId,
     );
   }
 
@@ -911,6 +1035,7 @@ export class DeliveryStudioProviderRouterService {
   ): Promise<{
     externalTaskId: string;
     outputUrls: string[];
+    actualCostUsd?: string | null;
     requestPayload: Record<string, unknown>;
     stagedImageUrls: string[];
     stagedVideoUrls: string[];
@@ -983,32 +1108,95 @@ export class DeliveryStudioProviderRouterService {
 
     await request.onProgress?.('PROCESSING', 25, taskId);
 
-    const pollIntervalMs = request.pollIntervalMs ?? 3000;
+    const polled = await this.pollKieTask({
+      spec,
+      taskId,
+      apiKey,
+      pollIntervalMs: request.pollIntervalMs,
+      maxPollAttempts: request.maxPollAttempts,
+      onProgress: request.onProgress,
+    });
+
+    return {
+      externalTaskId: taskId,
+      outputUrls: polled.outputUrls,
+      actualCostUsd: polled.actualCostUsd,
+      requestPayload: payload as unknown as Record<string, unknown>,
+      stagedImageUrls: stagedImages,
+      stagedVideoUrls: stagedVideos,
+    };
+  }
+
+  async pollKieTask(params: {
+    spec: StudioModelSpec;
+    taskId: string;
+    apiKey: string;
+    pollIntervalMs?: number;
+    maxPollAttempts?: number;
+    onProgress?: StudioNormalizedGenerationRequest['onProgress'];
+  }): Promise<{ outputUrls: string[]; actualCostUsd: string | null }> {
+    const pollIntervalMs = params.pollIntervalMs ?? 4000;
     const maxAttempts =
-      request.maxPollAttempts ?? (spec.kind === 'VIDEO' ? 180 : 60);
+      params.maxPollAttempts ?? (params.spec.kind === 'VIDEO' ? 375 : 90);
+    let consecutivePollErrors = 0;
 
     for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
       await delayMs(pollIntervalMs);
-      const pollRes = await axios.get<{
-        code?: number;
-        msg?: string;
+      let pollRes: {
         data?: {
-          taskId?: string;
-          state?: string;
-          resultJson?: string;
-          failCode?: string;
-          failMsg?: string;
+          code?: number;
+          msg?: string;
+          data?: {
+            taskId?: string;
+            state?: string;
+            resultJson?: string;
+            failCode?: string;
+            failMsg?: string;
+            creditsConsumed?: number;
+          };
         };
-      }>(`${KIE_API_BASE}/jobs/recordInfo`, {
-        params: { taskId },
-        headers: { Authorization: `Bearer ${apiKey}` },
-        timeout: 30_000,
-        maxRedirects: 0,
-      });
+      };
+      try {
+        pollRes = await axios.get(`${KIE_API_BASE}/jobs/recordInfo`, {
+          params: { taskId: params.taskId },
+          headers: { Authorization: `Bearer ${params.apiKey}` },
+          timeout: 30_000,
+          maxRedirects: 0,
+        });
+      } catch (pollErr) {
+        const safe = extractSafeAxiosFailure(
+          pollErr,
+          'kie',
+          'Transient Kie.ai status check error.',
+        );
+        const isEarlyMissing =
+          (safe.errorCode === '404' || safe.errorCode === '422') &&
+          attempt < 10;
+        if ((safe.retryable || isEarlyMissing) && consecutivePollErrors < 12) {
+          consecutivePollErrors += 1;
+          this.logger.warn(
+            `Kie.ai poll error #${consecutivePollErrors} for ${params.taskId} (${safe.errorCode ?? 'NET'}); continuing to poll.`,
+          );
+          continue;
+        }
+        throw new StudioProviderCallError(
+          'kie',
+          safe.message,
+          safe.retryable,
+          safe.errorCode,
+          params.taskId,
+        );
+      }
 
       const pollCode = Number(pollRes.data?.code ?? 200);
       if (pollCode !== 200 && pollCode !== 0) {
-        if (classifyHttpStatusRetryable(pollCode)) {
+        const isEarlyMissing =
+          (pollCode === 404 || pollCode === 422) && attempt < 10;
+        if (
+          (classifyHttpStatusRetryable(pollCode) || isEarlyMissing) &&
+          consecutivePollErrors < 12
+        ) {
+          consecutivePollErrors += 1;
           continue;
         }
         throw new StudioProviderCallError(
@@ -1016,10 +1204,11 @@ export class DeliveryStudioProviderRouterService {
           pollRes.data?.msg || `Kie.ai recordInfo failed (code ${pollCode}).`,
           false,
           String(pollCode),
-          taskId,
+          params.taskId,
         );
       }
 
+      consecutivePollErrors = 0;
       const data = pollRes.data?.data;
       const state = (data?.state ?? '').toLowerCase();
 
@@ -1049,17 +1238,20 @@ export class DeliveryStudioProviderRouterService {
             'Kie.ai completed without returning any resultUrls.',
             true,
             'EMPTY_OUTPUTS',
-            taskId,
+            params.taskId,
           );
         }
-        await request.onProgress?.('DOWNLOADING', 90, taskId);
-        return {
-          externalTaskId: taskId,
-          outputUrls: urls,
-          requestPayload: payload as unknown as Record<string, unknown>,
-          stagedImageUrls: stagedImages,
-          stagedVideoUrls: stagedVideos,
-        };
+        await params.onProgress?.('DOWNLOADING', 90, params.taskId);
+        // Kie.ai values 1 credit at $0.005 USD
+        const credits =
+          typeof data?.creditsConsumed === 'number' &&
+          Number.isFinite(data.creditsConsumed) &&
+          data.creditsConsumed > 0
+            ? data.creditsConsumed
+            : null;
+        const actualCostUsd =
+          credits !== null ? (credits * 0.005).toFixed(4) : null;
+        return { outputUrls: urls, actualCostUsd };
       }
 
       if (state === 'fail' || state === 'failed') {
@@ -1072,7 +1264,7 @@ export class DeliveryStudioProviderRouterService {
           failMsg.slice(0, 300),
           !isPolicyError,
           data?.failCode || 'FAILED',
-          taskId,
+          params.taskId,
         );
       }
 
@@ -1080,7 +1272,7 @@ export class DeliveryStudioProviderRouterService {
         85,
         25 + Math.round(((attempt + 1) / Math.max(10, maxAttempts * 0.45)) * 60),
       );
-      await request.onProgress?.('PROCESSING', pct, taskId);
+      await params.onProgress?.('PROCESSING', pct, params.taskId);
     }
 
     throw new StudioProviderCallError(
@@ -1088,8 +1280,67 @@ export class DeliveryStudioProviderRouterService {
       'Kie.ai generation timed out while waiting for completion.',
       true,
       'POLL_TIMEOUT',
-      taskId,
+      params.taskId,
     );
+  }
+
+  async resumeExistingTask(params: {
+    modelKey: string;
+    provider: StudioProviderId;
+    externalTaskId: string;
+    credentials: StudioProviderCredentials;
+    onProgress?: StudioNormalizedGenerationRequest['onProgress'];
+    pollIntervalMs?: number;
+    maxPollAttempts?: number;
+  }): Promise<{ outputUrls: string[]; actualCostUsd: string | null }> {
+    const spec = getStudioModelSpec(params.modelKey);
+    if (!spec) {
+      throw new StudioProviderCallError(
+        params.provider,
+        `Unsupported studio model "${params.modelKey}".`,
+        false,
+        'UNSUPPORTED_MODEL',
+        params.externalTaskId,
+      );
+    }
+    if (params.provider === 'wavespeed') {
+      const apiKey = params.credentials.wavespeedApiKey?.trim();
+      if (!apiKey) {
+        throw new StudioProviderCallError(
+          'wavespeed',
+          'WaveSpeedAI key missing while resuming prediction.',
+          false,
+          'NO_KEY',
+          params.externalTaskId,
+        );
+      }
+      return this.pollWaveSpeedPrediction({
+        spec,
+        predictionId: params.externalTaskId,
+        apiKey,
+        pollIntervalMs: params.pollIntervalMs,
+        maxPollAttempts: params.maxPollAttempts,
+        onProgress: params.onProgress,
+      });
+    }
+    const apiKey = params.credentials.kieApiKey?.trim();
+    if (!apiKey) {
+      throw new StudioProviderCallError(
+        'kie',
+        'Kie.ai key missing while resuming task.',
+        false,
+        'NO_KEY',
+        params.externalTaskId,
+      );
+    }
+    return this.pollKieTask({
+      spec,
+      taskId: params.externalTaskId,
+      apiKey,
+      pollIntervalMs: params.pollIntervalMs,
+      maxPollAttempts: params.maxPollAttempts,
+      onProgress: params.onProgress,
+    });
   }
 
   // =========================================================================

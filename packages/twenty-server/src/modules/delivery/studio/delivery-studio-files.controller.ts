@@ -109,6 +109,10 @@ export class DeliveryStudioFilesController {
         .map((t) => t.trim())
         .filter(Boolean);
 
+      const parsedClientDuration = Number(body.durationSec);
+      const parsedClientWidth = Number(body.width);
+      const parsedClientHeight = Number(body.height);
+
       return await this.studio.registerReferenceVideo(
         getWorkspaceAuthContext(),
         {
@@ -121,6 +125,24 @@ export class DeliveryStudioFilesController {
           originalFileName: file.originalname,
           mimeType: detected,
           sizeBytes: file.size,
+          clientDurationSec:
+            Number.isFinite(parsedClientDuration) &&
+            parsedClientDuration > 0 &&
+            parsedClientDuration <= 600
+              ? Math.round(parsedClientDuration * 100) / 100
+              : undefined,
+          clientWidth:
+            Number.isFinite(parsedClientWidth) &&
+            parsedClientWidth > 0 &&
+            parsedClientWidth <= 10000
+              ? Math.round(parsedClientWidth)
+              : undefined,
+          clientHeight:
+            Number.isFinite(parsedClientHeight) &&
+            parsedClientHeight > 0 &&
+            parsedClientHeight <= 10000
+              ? Math.round(parsedClientHeight)
+              : undefined,
         },
       );
     } finally {

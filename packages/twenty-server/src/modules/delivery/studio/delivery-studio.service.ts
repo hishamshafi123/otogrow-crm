@@ -69,6 +69,7 @@ import {
   STUDIO_MODEL_CATALOG,
 } from 'src/modules/delivery/studio/delivery-studio-catalog';
 import {
+  analyzeVideoPromptSchema,
   batchGenerateVideosSchema,
   generateCharacterSheetSchema,
   generateVideoSchema,
@@ -85,10 +86,16 @@ import {
 } from 'src/modules/delivery/studio/delivery-studio.policy';
 import { scrapeProductImagesFromUrl } from 'src/modules/delivery/studio/studio-product-url-scraper';
 import {
+  buildStructuredFallbackVideoPrompt,
+  DeliveryStudioPromptAiService,
+  type StudioPromptImageInput,
+} from 'src/modules/delivery/studio/delivery-studio-prompt-ai.service';
+import {
   DeliveryStudioProviderRouterService,
   StudioProviderCallError,
   type StudioProviderCredentials,
   type StudioProviderId,
+  type StudioRouterExecutionResult,
   type StudioStageableMediaFile,
 } from 'src/modules/delivery/studio/delivery-studio-provider-router.service';
 import {
@@ -211,11 +218,19 @@ const buildVideoReferenceMappingNote = (params: {
   hasReferenceVideo: boolean;
   existingPrompt: string;
 }): string => {
-  const imgPrefix = params.usesAtMentionTokens ? '@Image ' : 'Image ';
-  const vidPrefix = params.usesAtMentionTokens ? '@Video ' : 'Video ';
+  const imgPrefix = params.usesAtMentionTokens ? '@image' : 'Image ';
+  const vidPrefix = params.usesAtMentionTokens ? '@video' : 'Video ';
 
-  // Skip if prompt already explicitly maps Image 2 or higher
-  if (/(?:@?Image\s*2\b)/i.test(params.existingPrompt)) {
+  // Skip if prompt already explicitly maps Image 2 / @image2 or higher
+  if (/(?:@?image\s*2\b)/i.test(params.existingPrompt)) {
+    return '';
+  }
+  // Also skip if there are no separate product images and the prompt already maps @image1 + @video1
+  if (
+    params.productImageCount === 0 &&
+    /(?:@?image\s*1\b)/i.test(params.existingPrompt) &&
+    /(?:@?video\s*1\b)/i.test(params.existingPrompt)
+  ) {
     return '';
   }
 
@@ -224,7 +239,7 @@ const buildVideoReferenceMappingNote = (params: {
 
   if (params.hasCharacterSheet) {
     parts.push(
-      `${imgPrefix}${nextIdx} is the Character Sheet (locked model identity, outfit fit, and environment)`,
+      `${imgPrefix}${nextIdx} is the character sheet of the model wearing the full outfit`,
     );
     nextIdx += 1;
   }
@@ -235,7 +250,7 @@ const buildVideoReferenceMappingNote = (params: {
       tokens.push(`${imgPrefix}${nextIdx + i}`);
     }
     parts.push(
-      `${tokens.join(', ')} ${tokens.length === 1 ? 'is the exact product photo' : 'are exact product photos'} of "${params.productName}" (match every front/back graphic, logo, neckline, and fabric detail)`,
+      `${tokens.join(', ')} ${tokens.length === 1 ? 'is the exact product photo' : 'are exact product photos'} of "${params.productName}" (match every front/back graphic, logo, placement, neckline, and fabric detail)`,
     );
   }
 
@@ -270,6 +285,7 @@ export type StudioProviderConfigDTO = {
 @Injectable()
 export class DeliveryStudioService {
   private readonly logger = new Logger(DeliveryStudioService.name);
+  private readonly activeJobExecutions = new Set<string>();
 
   constructor(
     @InjectDataSource() private readonly dataSource: DataSource,
@@ -285,7 +301,25 @@ export class DeliveryStudioService {
     @InjectMessageQueue(MessageQueue.aiQueue)
     private readonly aiQueue: MessageQueueService,
     @Optional() private readonly driveService?: DeliveryDriveService,
+    @Optional() private readonly promptAi?: DeliveryStudioPromptAiService,
   ) {}
+
+  private resolvePrimaryProviderForPricing(
+    routingMode: StudioRoutingMode,
+    providerConfig: DeliveryStudioProviderConfigEntity | null,
+  ): StudioProviderId {
+    if (routingMode === 'KIE_ONLY') return 'kie';
+    if (routingMode === 'WAVESPEED_ONLY') return 'wavespeed';
+    const hasWaveSpeed = Boolean(
+      (providerConfig?.wavespeedEnabled ?? true) &&
+        providerConfig?.wavespeedKeyLast4,
+    );
+    const hasKie = Boolean(
+      (providerConfig?.kieEnabled ?? true) && providerConfig?.kieKeyLast4,
+    );
+    if (!hasWaveSpeed && hasKie) return 'kie';
+    return 'wavespeed';
+  }
 
   private identity(auth: WorkspaceAuthContext) {
     if (auth.type !== 'user' || !auth.workspaceMemberId) {
@@ -1151,6 +1185,9 @@ export class DeliveryStudioService {
       originalFileName: string;
       mimeType: string;
       sizeBytes: number;
+      clientDurationSec?: number;
+      clientWidth?: number;
+      clientHeight?: number;
     },
   ) {
     const id = this.identity(auth);
@@ -1161,7 +1198,26 @@ export class DeliveryStudioService {
 
     const bytes = await fs.readFile(input.tempFilePath);
     const sha256 = createHash('sha256').update(bytes).digest('hex');
-    const mediaMeta = await this.probe.probeMedia(input.tempFilePath);
+    const probedMeta = await this.probe.probeMedia(input.tempFilePath);
+    const mediaMeta: DeliverableMediaMeta = {
+      ...probedMeta,
+      ...(!probedMeta.durationSec &&
+      typeof input.clientDurationSec === 'number' &&
+      Number.isFinite(input.clientDurationSec) &&
+      input.clientDurationSec > 0
+        ? { durationSec: Math.round(input.clientDurationSec * 10) / 10 }
+        : {}),
+      ...(!probedMeta.width &&
+      typeof input.clientWidth === 'number' &&
+      input.clientWidth > 0
+        ? { width: Math.round(input.clientWidth) }
+        : {}),
+      ...(!probedMeta.height &&
+      typeof input.clientHeight === 'number' &&
+      input.clientHeight > 0
+        ? { height: Math.round(input.clientHeight) }
+        : {}),
+    };
 
     const tempThumb = path.join(os.tmpdir(), `studio-ref-thumb-${videoId}.jpg`);
     let hasThumb = false;
@@ -1690,10 +1746,15 @@ export class DeliveryStudioService {
         spec.capabilities.defaultResolution;
       const aspectRatio =
         input.aspectRatio ?? preset?.configJson?.aspectRatio ?? '3:4';
+      const pricingProvider = this.resolvePrimaryProviderForPricing(
+        routingMode,
+        providerConfig,
+      );
       const estimatedPerJob = estimateStudioJobCostUsd({
         modelKey: spec.key,
         resolution,
         count: 1,
+        provider: pricingProvider,
       });
 
       const repo = manager.getRepository(DeliveryStudioJobEntity);
@@ -1772,6 +1833,217 @@ export class DeliveryStudioService {
     };
   }
 
+  async analyzeVideoPromptWithGemini(
+    auth: WorkspaceAuthContext,
+    rawInput: unknown,
+  ) {
+    const parsed = analyzeVideoPromptSchema.safeParse(rawInput);
+    if (!parsed.success) {
+      throw new BadRequestException(
+        parsed.error.issues[0]?.message ??
+          'Invalid Gemini video prompt analysis request.',
+      );
+    }
+    const input = parsed.data;
+    const id = this.identity(auth);
+
+    const spec =
+      getStudioModelSpec(input.modelKey || 'seedance-2.5') ??
+      STUDIO_MODEL_CATALOG.find((m) => m.kind === 'VIDEO')!;
+    const usesAtTokens = Boolean(spec.capabilities.usesAtMentionTokens);
+    const imgPrefix = usesAtTokens ? '@image' : 'Image ';
+    const vidPrefix = usesAtTokens ? '@video' : 'Video ';
+
+    const loaded = await this.dataSource.transaction(async (manager) => {
+      await this.resolveActor(manager, id);
+
+      const refVideo = await manager
+        .getRepository(DeliveryStudioReferenceVideoEntity)
+        .findOne({
+          where: { id: input.referenceVideoId, workspaceId: id.workspaceId },
+        });
+      if (!refVideo) {
+        throw new NotFoundException('Selected reference video not found.');
+      }
+
+      const characterAsset = input.characterAssetId
+        ? await manager.getRepository(DeliveryStudioAssetEntity).findOne({
+            where: { id: input.characterAssetId, workspaceId: id.workspaceId },
+          })
+        : null;
+
+      const resolvedProductKitId =
+        input.productKitId ?? characterAsset?.productKitId ?? null;
+      const productKit = resolvedProductKitId
+        ? await manager.getRepository(DeliveryStudioProductKitEntity).findOne({
+            where: { id: resolvedProductKitId, workspaceId: id.workspaceId },
+          })
+        : null;
+
+      const charMeta = (characterAsset?.metadataJson ?? {}) as Record<
+        string,
+        unknown
+      >;
+      const inheritedEnvPresetId =
+        input.environmentPresetId ??
+        (typeof charMeta.environmentPresetId === 'string'
+          ? charMeta.environmentPresetId
+          : null);
+      const environmentPreset = inheritedEnvPresetId
+        ? await manager.getRepository(DeliveryStudioPresetEntity).findOne({
+            where: { id: inheritedEnvPresetId, workspaceId: id.workspaceId },
+          })
+        : null;
+      const inheritedEnvPrompt =
+        typeof charMeta.environmentPrompt === 'string'
+          ? charMeta.environmentPrompt
+          : '';
+      const resolvedEnvironmentPrompt =
+        input.environmentOverride?.trim() ||
+        environmentPreset?.masterPrompt ||
+        inheritedEnvPrompt ||
+        '';
+
+      const resolvedProductAssetIds =
+        input.productAssetIds && input.productAssetIds.length > 0
+          ? input.productAssetIds
+          : productKit &&
+              characterAsset?.productKitId === productKit.id &&
+              Array.isArray(charMeta.productAssetIds) &&
+              charMeta.productAssetIds.length > 0
+            ? (charMeta.productAssetIds.filter(
+                (v): v is string => typeof v === 'string',
+              ) as string[])
+            : null;
+
+      const selectedKitAssets = productKit
+        ? resolvedProductAssetIds
+          ? (productKit.assetsJson ?? []).filter((a) =>
+              resolvedProductAssetIds.includes(a.id),
+            )
+          : (productKit.assetsJson ?? [])
+        : [];
+
+      const brandNotes = await this.readBrandNotesSnippet(
+        manager,
+        id.workspaceId,
+        characterAsset?.projectId ?? refVideo.projectId ?? null,
+      );
+
+      return {
+        refVideo,
+        characterAsset,
+        productKit,
+        selectedKitAssets,
+        resolvedEnvironmentPrompt,
+        brandNotes,
+      };
+    });
+
+    const maxProductImages = Math.max(
+      0,
+      spec.capabilities.maxReferenceImages - (loaded.characterAsset ? 1 : 0),
+    );
+    const plannedKitAssets = loaded.selectedKitAssets.slice(0, maxProductImages);
+    const productName =
+      loaded.productKit?.name ||
+      loaded.characterAsset?.title ||
+      'featured garment';
+
+    if (!this.promptAi) {
+      const charToken = loaded.characterAsset ? `${imgPrefix}1` : null;
+      const prodStart = loaded.characterAsset ? 2 : 1;
+      const prompt = buildStructuredFallbackVideoPrompt({
+        usesAtMentionTokens: usesAtTokens,
+        characterToken: charToken,
+        productTokens: plannedKitAssets.map((item, idx) => ({
+          token: `${imgPrefix}${prodStart + idx}`,
+          label: item.label || item.role || `Product Image ${idx + 1}`,
+        })),
+        videoToken: `${vidPrefix}1`,
+        productName,
+        productNotes: loaded.productKit?.notes || '',
+        environmentPrompt: loaded.resolvedEnvironmentPrompt,
+        brandNotes: loaded.brandNotes,
+        customNotes: input.customNotes?.trim() || '',
+      });
+      return {
+        prompt,
+        source: 'FALLBACK' as const,
+        modelId: null,
+        summary: 'Prompt AI service is unavailable; used structured recreation template.',
+        analyzedImageCount:
+          (loaded.characterAsset ? 1 : 0) + plannedKitAssets.length,
+        referenceVideoDurationSec: loaded.refVideo.mediaMeta?.durationSec ?? null,
+      };
+    }
+
+    const driver = this.storage.getCurrentDriver();
+    const images: StudioPromptImageInput[] = [];
+    if (loaded.characterAsset) {
+      const bytes = await readStreamToBuffer(
+        await driver.readFile({ filePath: loaded.characterAsset.storageKey }),
+      );
+      images.push({
+        token: `${imgPrefix}1`,
+        role: 'CHARACTER_SHEET',
+        label: loaded.characterAsset.title || 'Character Sheet',
+        mimeType: loaded.characterAsset.mimeType,
+        bytes,
+      });
+    }
+
+    for (const item of plannedKitAssets) {
+      const idx = images.length + 1;
+      try {
+        const bytes = await readStreamToBuffer(
+          await driver.readFile({ filePath: item.storageKey }),
+        );
+        images.push({
+          token: `${imgPrefix}${idx}`,
+          role: 'PRODUCT',
+          label: item.label || item.role || `Product Image ${idx}`,
+          mimeType: item.mimeType,
+          bytes,
+        });
+      } catch (err) {
+        this.logger.warn(
+          `Skipped unreadable product image ${item.id} during Gemini prompt analysis: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
+
+    const videoBytes = await readStreamToBuffer(
+      await driver.readFile({ filePath: loaded.refVideo.storageKey }),
+    );
+
+    const generated = await this.promptAi.generateVideoPromptFromMedia({
+      usesAtMentionTokens: usesAtTokens,
+      images,
+      video: {
+        token: `${vidPrefix}1`,
+        label:
+          loaded.refVideo.title ||
+          loaded.refVideo.originalFileName ||
+          'Reference Video',
+        mimeType: loaded.refVideo.mimeType,
+        durationSec: loaded.refVideo.mediaMeta?.durationSec ?? null,
+        bytes: videoBytes,
+      },
+      productName,
+      productNotes: loaded.productKit?.notes || '',
+      environmentPrompt: loaded.resolvedEnvironmentPrompt,
+      brandNotes: loaded.brandNotes,
+      customNotes: input.customNotes?.trim() || '',
+    });
+
+    return {
+      ...generated,
+      analyzedImageCount: images.length,
+      referenceVideoDurationSec: loaded.refVideo.mediaMeta?.durationSec ?? null,
+    };
+  }
+
   async queueVideoGeneration(auth: WorkspaceAuthContext, rawInput: unknown) {
     const parsed = generateVideoSchema.safeParse(rawInput);
     if (!parsed.success) {
@@ -1782,6 +2054,32 @@ export class DeliveryStudioService {
     const input = parsed.data;
     const id = this.identity(auth);
     const batchId = input.modelKeys.length > 1 ? v4() : null;
+
+    // If autoPromptWithGemini is enabled and the caller did not already supply a prompt,
+    // analyze the Character Sheet + Product Images + Reference Video with Gemini BEFORE opening the DB transaction.
+    let autoGeneratedMasterPrompt: string | null = null;
+    if (input.autoPromptWithGemini && !input.masterPrompt?.trim()) {
+      try {
+        const analyzed = await this.analyzeVideoPromptWithGemini(auth, {
+          companyId: input.companyId,
+          referenceVideoId: input.referenceVideoId,
+          characterAssetId: input.characterAssetId ?? null,
+          productKitId: input.productKitId ?? null,
+          productAssetIds: input.productAssetIds,
+          environmentPresetId: input.environmentPresetId ?? null,
+          modelKey: input.modelKeys[0],
+          environmentOverride: input.environmentOverride,
+          customNotes: input.customNotes,
+        });
+        if (analyzed.prompt?.trim()) {
+          autoGeneratedMasterPrompt = analyzed.prompt.trim();
+        }
+      } catch (err) {
+        this.logger.warn(
+          `Auto-prompt with Gemini failed before queueing video; falling back to default template: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
 
     const jobs = await this.dataSource.transaction(async (manager) => {
       await this.resolveActor(manager, id);
@@ -1860,6 +2158,10 @@ export class DeliveryStudioService {
         input.routingMode ??
         providerConfig?.defaultRoutingMode ??
         'AUTO_FAILOVER';
+      const pricingProvider = this.resolvePrimaryProviderForPricing(
+        routingMode,
+        providerConfig,
+      );
 
       const brandNotes = await this.readBrandNotesSnippet(
         manager,
@@ -1867,16 +2169,22 @@ export class DeliveryStudioService {
         input.projectId,
       );
 
+      const fallbackVideoPreset =
+        STARTER_STUDIO_PRESETS.find((p) => p.kind === 'VIDEO_GENERATION') ??
+        STARTER_STUDIO_PRESETS[0];
       const defaultTemplate = resolvedEnvironmentPrompt
         ? STARTER_STUDIO_PRESETS.find(
             (p) =>
               p.kind === 'VIDEO_GENERATION' &&
               p.tagsJson.includes('environment-override'),
-          )?.masterPrompt ?? STARTER_STUDIO_PRESETS[3].masterPrompt
-        : STARTER_STUDIO_PRESETS[3].masterPrompt;
+          )?.masterPrompt ?? fallbackVideoPreset.masterPrompt
+        : fallbackVideoPreset.masterPrompt;
 
       const masterTemplate =
-        input.masterPrompt?.trim() || preset?.masterPrompt || defaultTemplate;
+        input.masterPrompt?.trim() ||
+        autoGeneratedMasterPrompt ||
+        preset?.masterPrompt ||
+        defaultTemplate;
 
       const resolvedProductAssetIds =
         input.productAssetIds && input.productAssetIds.length > 0
@@ -1905,7 +2213,7 @@ export class DeliveryStudioService {
         brand_notes: brandNotes,
         environment:
           resolvedEnvironmentPrompt ||
-          'the exact environment and lighting shown in the Character Sheet (@Image 1)',
+          'the exact environment and lighting shown in the Character Sheet (@image1)',
         reference_notes: refVideo.notes || '',
         custom_notes: input.customNotes?.trim() || '',
       });
@@ -1939,6 +2247,8 @@ export class DeliveryStudioService {
           modelKey: spec.key,
           resolution,
           durationSec,
+          referenceVideoDurationSec: refDuration ?? durationSec,
+          provider: pricingProvider,
         });
 
         const baseTitle =
@@ -1953,8 +2263,8 @@ export class DeliveryStudioService {
         );
         const plannedKitAssets = selectedKitAssets.slice(0, maxProductImages);
         const usesAtTokens = Boolean(spec.capabilities.usesAtMentionTokens);
-        const imgPrefix = usesAtTokens ? '@Image ' : 'Image ';
-        const vidPrefix = usesAtTokens ? '@Video ' : 'Video ';
+        const imgPrefix = usesAtTokens ? '@image' : 'Image ';
+        const vidPrefix = usesAtTokens ? '@video' : 'Video ';
 
         const refMappingNote = buildVideoReferenceMappingNote({
           usesAtMentionTokens: usesAtTokens,
@@ -2055,6 +2365,7 @@ export class DeliveryStudioService {
             estimatedCostUsd,
             inputPayloadJson: {
               referenceVideoId: refVideo.id,
+              referenceVideoDurationSec: refDuration ?? durationSec,
               characterAssetId: characterAsset?.id ?? null,
               productKitId: productKit?.id ?? null,
               productAssetIds: resolvedProductAssetIds,
@@ -2184,6 +2495,9 @@ export class DeliveryStudioService {
       job.status = 'QUEUED';
       job.progress = 0;
       job.errorMessage = null;
+      job.externalTaskId = null;
+      job.providerUsed = null;
+      job.completedAt = null;
       if (overrideRoutingMode) {
         job.routingMode = overrideRoutingMode;
       }
@@ -2715,131 +3029,330 @@ export class DeliveryStudioService {
   // =========================================================================
 
   async executeJob(workspaceId: string, jobId: string): Promise<void> {
+    if (this.activeJobExecutions.has(jobId)) {
+      this.logger.log(
+        `Skipping duplicate concurrent execution for studio job ${jobId}.`,
+      );
+      return;
+    }
+    this.activeJobExecutions.add(jobId);
+
     const jobRepo = this.dataSource.getRepository(DeliveryStudioJobEntity);
-    const job = await jobRepo.findOne({ where: { id: jobId, workspaceId } });
-    if (!job || job.status === 'CANCELLED' || job.status === 'COMPLETED') {
-      return;
-    }
-
-    job.status = 'STAGING';
-    job.progress = 5;
-    job.startedAt = new Date();
-    job.errorMessage = null;
-    await jobRepo.save(job);
-
-    const spec = getStudioModelSpec(job.modelKey);
-    if (!spec) {
-      job.status = 'FAILED';
-      job.errorMessage = `Unsupported model "${job.modelKey}".`;
-      job.completedAt = new Date();
-      await jobRepo.save(job);
-      return;
-    }
-
     try {
-      const credentials = await this.loadDecryptedCredentials(workspaceId);
-      const payload = job.inputPayloadJson ?? {};
-      const driver = this.storage.getCurrentDriver();
-
-      const referenceImages: StudioStageableMediaFile[] = [];
-      const referenceVideos: StudioStageableMediaFile[] = [];
-      const imageRefsMeta: StudioApiInputImageRef[] = [];
-      const videoRefsMeta: StudioApiInputVideoRef[] = [];
-      const usesAtTokens = Boolean(spec.capabilities.usesAtMentionTokens);
-      const imgPrefix = usesAtTokens ? '@Image ' : 'Image ';
-      const vidPrefix = usesAtTokens ? '@Video ' : 'Video ';
-
-      // 1) Attach approved Character Sheet as @Image 1 if present
-      const characterAssetId =
-        typeof payload.characterAssetId === 'string'
-          ? payload.characterAssetId
-          : null;
-      if (characterAssetId) {
-        const charAsset = await this.dataSource
-          .getRepository(DeliveryStudioAssetEntity)
-          .findOne({ where: { id: characterAssetId, workspaceId } });
-        if (charAsset) {
-          const fileName = `character-${charAsset.id}.${extensionForMime(charAsset.mimeType)}`;
-          referenceImages.push({
-            sha256: charAsset.sha256,
-            fileName,
-            mimeType: charAsset.mimeType,
-            kind: 'IMAGE',
-            cachedWavespeedUrl: isFreshStagedUrl(
-              charAsset.stagedUrlsJson,
-              'wavespeed',
-            ),
-            cachedKieUrl: isFreshStagedUrl(charAsset.stagedUrlsJson, 'kie'),
-            readBytes: async () =>
-              readStreamToBuffer(
-                await driver.readFile({ filePath: charAsset.storageKey }),
-              ),
-            onStagedUrl: async (provider, url, expiresAt) => {
-              charAsset.stagedUrlsJson = {
-                ...(charAsset.stagedUrlsJson ?? {}),
-                [provider]: {
-                  url,
-                  uploadedAt: new Date().toISOString(),
-                  expiresAt,
-                },
-              };
-              await this.dataSource
-                .getRepository(DeliveryStudioAssetEntity)
-                .save(charAsset);
-            },
-          });
-          const idx = imageRefsMeta.length + 1;
-          imageRefsMeta.push({
-            index: idx,
-            token: `${imgPrefix}${idx}`,
-            role: 'CHARACTER_SHEET',
-            label: charAsset.title || 'Character Sheet',
-            fileName,
-            mimeType: charAsset.mimeType,
-            mediaPath: null,
-            stagedUrl: null,
-            sourceRef: { mediaKind: 'studio-asset', id: charAsset.id },
-          });
-        }
+      const job = await jobRepo.findOne({ where: { id: jobId, workspaceId } });
+      if (!job || job.status === 'CANCELLED' || job.status === 'COMPLETED') {
+        return;
       }
 
-      // 2) Attach Product Kit images (front, back, detail, etc.)
-      const productKitId =
-        typeof payload.productKitId === 'string' ? payload.productKitId : null;
-      const requestedAssetIds = Array.isArray(payload.productAssetIds)
-        ? (payload.productAssetIds as string[])
-        : null;
-      if (productKitId) {
-        const kit = await this.dataSource
-          .getRepository(DeliveryStudioProductKitEntity)
-          .findOne({ where: { id: productKitId, workspaceId } });
-        if (kit) {
-          const kitAssets = requestedAssetIds
-            ? (kit.assetsJson ?? []).filter((a) =>
-                requestedAssetIds.includes(a.id),
-              )
-            : (kit.assetsJson ?? []);
-          for (const item of kitAssets) {
+      const spec = getStudioModelSpec(job.modelKey);
+      if (!spec) {
+        job.status = 'FAILED';
+        job.errorMessage = `Unsupported model "${job.modelKey}".`;
+        job.completedAt = new Date();
+        await jobRepo.save(job);
+        return;
+      }
+
+      const isResumingInFlight = Boolean(
+        job.externalTaskId &&
+          job.providerUsed &&
+          ['PROCESSING', 'DOWNLOADING'].includes(job.status),
+      );
+
+      if (!isResumingInFlight) {
+        job.status = 'STAGING';
+        job.progress = 5;
+        job.startedAt = job.startedAt ?? new Date();
+        job.errorMessage = null;
+        await jobRepo.save(job);
+      }
+
+      try {
+        const credentials = await this.loadDecryptedCredentials(workspaceId);
+        const payload = job.inputPayloadJson ?? {};
+        const driver = this.storage.getCurrentDriver();
+
+        const characterAssetId =
+          typeof payload.characterAssetId === 'string'
+            ? payload.characterAssetId
+            : null;
+        const productKitId =
+          typeof payload.productKitId === 'string' ? payload.productKitId : null;
+        const requestedAssetIds = Array.isArray(payload.productAssetIds)
+          ? (payload.productAssetIds as string[])
+          : null;
+        const referenceVideoId =
+          typeof payload.referenceVideoId === 'string'
+            ? payload.referenceVideoId
+            : null;
+        const compiledPrompt =
+          typeof payload.compiledPrompt === 'string'
+            ? payload.compiledPrompt
+            : job.title;
+
+        let execResult: StudioRouterExecutionResult;
+        let latestApiRequest: StudioApiRequestSnapshot | null =
+          payload.apiRequest && typeof payload.apiRequest === 'object'
+            ? (payload.apiRequest as StudioApiRequestSnapshot)
+            : null;
+
+        const resumeProvider: StudioProviderId | null =
+          job.providerUsed === 'wavespeed' || job.providerUsed === 'kie'
+            ? job.providerUsed
+            : null;
+
+        if (isResumingInFlight && job.externalTaskId && resumeProvider) {
+          this.logger.log(
+            `Resuming in-flight ${resumeProvider} task ${job.externalTaskId} for studio job ${job.id}.`,
+          );
+          const resumed = await this.router.resumeExistingTask({
+            provider: resumeProvider,
+            modelKey: job.modelKey,
+            externalTaskId: job.externalTaskId,
+            credentials,
+            onProgress: async (status, progress, externalTaskId) => {
+              await jobRepo.update(
+                { id: job.id, workspaceId },
+                {
+                  status,
+                  progress,
+                  ...(externalTaskId ? { externalTaskId } : {}),
+                },
+              );
+            },
+          });
+          execResult = {
+            providerUsed: resumeProvider,
+            endpoint: latestApiRequest?.endpoint ?? resumeProvider,
+            failoverTriggered: job.failoverTriggered,
+            externalTaskId: job.externalTaskId,
+            outputUrls: resumed.outputUrls,
+            actualCostUsd: resumed.actualCostUsd,
+            requestPayload: latestApiRequest?.rawPayload ?? {},
+            stagedImageUrls:
+              latestApiRequest?.images
+                ?.map((i) => i.stagedUrl)
+                .filter((u): u is string => Boolean(u)) ?? [],
+            stagedVideoUrls:
+              latestApiRequest?.videos
+                ?.map((v) => v.stagedUrl)
+                .filter((u): u is string => Boolean(u)) ?? [],
+            attempts: job.attemptsJson ?? [],
+          };
+        } else {
+          const referenceImages: StudioStageableMediaFile[] = [];
+          const referenceVideos: StudioStageableMediaFile[] = [];
+          const imageRefsMeta: StudioApiInputImageRef[] = [];
+          const videoRefsMeta: StudioApiInputVideoRef[] = [];
+          const usesAtTokens = Boolean(spec.capabilities.usesAtMentionTokens);
+          const imgPrefix = usesAtTokens ? '@image' : 'Image ';
+          const vidPrefix = usesAtTokens ? '@video' : 'Video ';
+
+          // 1) Attach approved Character Sheet as @image1 if present
+          if (characterAssetId) {
+            const charAsset = await this.dataSource
+              .getRepository(DeliveryStudioAssetEntity)
+              .findOne({ where: { id: characterAssetId, workspaceId } });
+            if (charAsset) {
+              const fileName = `character-${charAsset.id}.${extensionForMime(charAsset.mimeType)}`;
+              referenceImages.push({
+                sha256: charAsset.sha256,
+                fileName,
+                mimeType: charAsset.mimeType,
+                kind: 'IMAGE',
+                cachedWavespeedUrl: isFreshStagedUrl(
+                  charAsset.stagedUrlsJson,
+                  'wavespeed',
+                ),
+                cachedKieUrl: isFreshStagedUrl(charAsset.stagedUrlsJson, 'kie'),
+                readBytes: async () =>
+                  readStreamToBuffer(
+                    await driver.readFile({ filePath: charAsset.storageKey }),
+                  ),
+                onStagedUrl: async (provider, url, expiresAt) => {
+                  charAsset.stagedUrlsJson = {
+                    ...(charAsset.stagedUrlsJson ?? {}),
+                    [provider]: {
+                      url,
+                      uploadedAt: new Date().toISOString(),
+                      expiresAt,
+                    },
+                  };
+                  await this.dataSource
+                    .getRepository(DeliveryStudioAssetEntity)
+                    .save(charAsset);
+                },
+              });
+              const idx = imageRefsMeta.length + 1;
+              imageRefsMeta.push({
+                index: idx,
+                token: `${imgPrefix}${idx}`,
+                role: 'CHARACTER_SHEET',
+                label: charAsset.title || 'Character Sheet',
+                fileName,
+                mimeType: charAsset.mimeType,
+                mediaPath: null,
+                stagedUrl: null,
+                sourceRef: { mediaKind: 'studio-asset', id: charAsset.id },
+              });
+            }
+          }
+
+          // 2) Attach Product Kit images (front, back, detail, etc.)
+          if (productKitId) {
+            const kit = await this.dataSource
+              .getRepository(DeliveryStudioProductKitEntity)
+              .findOne({ where: { id: productKitId, workspaceId } });
+            if (kit) {
+              const kitAssets = requestedAssetIds
+                ? (kit.assetsJson ?? []).filter((a) =>
+                    requestedAssetIds.includes(a.id),
+                  )
+                : (kit.assetsJson ?? []);
+              for (const item of kitAssets) {
+                const fileName =
+                  item.originalFileName ||
+                  `${item.role.toLowerCase()}.${extensionForMime(item.mimeType)}`;
+                referenceImages.push({
+                  sha256: item.sha256,
+                  fileName,
+                  mimeType: item.mimeType,
+                  kind: 'IMAGE',
+                  cachedWavespeedUrl: isFreshStagedUrl(
+                    item.stagedUrls,
+                    'wavespeed',
+                  ),
+                  cachedKieUrl: isFreshStagedUrl(item.stagedUrls, 'kie'),
+                  readBytes: async () =>
+                    readStreamToBuffer(
+                      await driver.readFile({ filePath: item.storageKey }),
+                    ),
+                  onStagedUrl: async (provider, url, expiresAt) => {
+                    item.stagedUrls = {
+                      ...(item.stagedUrls ?? {}),
+                      [provider]: {
+                        url,
+                        uploadedAt: new Date().toISOString(),
+                        expiresAt,
+                      },
+                    };
+                    await this.dataSource
+                      .getRepository(DeliveryStudioProductKitEntity)
+                      .save(kit);
+                  },
+                });
+                const idx = imageRefsMeta.length + 1;
+                imageRefsMeta.push({
+                  index: idx,
+                  token: `${imgPrefix}${idx}`,
+                  role: 'PRODUCT',
+                  label: item.label || item.role || `Product Image ${idx}`,
+                  fileName,
+                  mimeType: item.mimeType,
+                  mediaPath: null,
+                  stagedUrl: null,
+                  sourceRef: {
+                    mediaKind: 'product-asset',
+                    id: kit.id,
+                    subId: item.id,
+                  },
+                });
+              }
+            }
+          }
+
+          // 2b) Attach uploaded Avatar & Environment preset reference photos (when present)
+          const presetIdsToStage: Array<{
+            id: string;
+            prefix: 'avatar' | 'environment';
+          }> = [];
+          if (typeof payload.avatarPresetId === 'string' && !characterAssetId) {
+            presetIdsToStage.push({
+              id: payload.avatarPresetId,
+              prefix: 'avatar',
+            });
+          }
+          if (
+            typeof payload.environmentPresetId === 'string' &&
+            !characterAssetId
+          ) {
+            presetIdsToStage.push({
+              id: payload.environmentPresetId,
+              prefix: 'environment',
+            });
+          }
+          if (presetIdsToStage.length > 0) {
+            const presetRepo = this.dataSource.getRepository(
+              DeliveryStudioPresetEntity,
+            );
+            for (const specRef of presetIdsToStage) {
+              const refPreset = await presetRepo.findOne({
+                where: { id: specRef.id, workspaceId },
+              });
+              const refKey = refPreset?.configJson?.referenceImageStorageKey;
+              const refMime = refPreset?.configJson?.referenceImageMimeType;
+              const refSha = refPreset?.configJson?.referenceImageSha256;
+              if (refPreset && refKey && refMime && refSha) {
+                const fileName = `${specRef.prefix}-${refPreset.id}.${extensionForMime(refMime)}`;
+                referenceImages.push({
+                  sha256: refSha,
+                  fileName,
+                  mimeType: refMime,
+                  kind: 'IMAGE',
+                  readBytes: async () =>
+                    readStreamToBuffer(
+                      await driver.readFile({ filePath: refKey }),
+                    ),
+                  onStagedUrl: async () => undefined,
+                });
+                const idx = imageRefsMeta.length + 1;
+                imageRefsMeta.push({
+                  index: idx,
+                  token: `${imgPrefix}${idx}`,
+                  role: specRef.prefix === 'avatar' ? 'AVATAR' : 'ENVIRONMENT',
+                  label:
+                    refPreset.name ||
+                    (specRef.prefix === 'avatar' ? 'Avatar' : 'Environment'),
+                  fileName,
+                  mimeType: refMime,
+                  mediaPath: null,
+                  stagedUrl: null,
+                  sourceRef: { mediaKind: 'preset-thumb', id: refPreset.id },
+                });
+              }
+            }
+          }
+
+          // 3) Attach Reference Video (@video1) for video generation
+          if (referenceVideoId) {
+            const refVideo = await this.dataSource
+              .getRepository(DeliveryStudioReferenceVideoEntity)
+              .findOne({ where: { id: referenceVideoId, workspaceId } });
+            if (!refVideo) {
+              throw new Error(
+                'Reference video was removed before generation.',
+              );
+            }
             const fileName =
-              item.originalFileName ||
-              `${item.role.toLowerCase()}.${extensionForMime(item.mimeType)}`;
-            referenceImages.push({
-              sha256: item.sha256,
+              refVideo.originalFileName ||
+              `ref-${refVideo.id}.${extensionForMime(refVideo.mimeType)}`;
+            referenceVideos.push({
+              sha256: refVideo.sha256,
               fileName,
-              mimeType: item.mimeType,
-              kind: 'IMAGE',
+              mimeType: refVideo.mimeType,
+              kind: 'VIDEO',
               cachedWavespeedUrl: isFreshStagedUrl(
-                item.stagedUrls,
+                refVideo.stagedUrlsJson,
                 'wavespeed',
               ),
-              cachedKieUrl: isFreshStagedUrl(item.stagedUrls, 'kie'),
+              cachedKieUrl: isFreshStagedUrl(refVideo.stagedUrlsJson, 'kie'),
               readBytes: async () =>
                 readStreamToBuffer(
-                  await driver.readFile({ filePath: item.storageKey }),
+                  await driver.readFile({ filePath: refVideo.storageKey }),
                 ),
               onStagedUrl: async (provider, url, expiresAt) => {
-                item.stagedUrls = {
-                  ...(item.stagedUrls ?? {}),
+                refVideo.stagedUrlsJson = {
+                  ...(refVideo.stagedUrlsJson ?? {}),
                   [provider]: {
                     url,
                     uploadedAt: new Date().toISOString(),
@@ -2847,413 +3360,324 @@ export class DeliveryStudioService {
                   },
                 };
                 await this.dataSource
-                  .getRepository(DeliveryStudioProductKitEntity)
-                  .save(kit);
+                  .getRepository(DeliveryStudioReferenceVideoEntity)
+                  .save(refVideo);
               },
             });
-            const idx = imageRefsMeta.length + 1;
-            imageRefsMeta.push({
+            const idx = videoRefsMeta.length + 1;
+            videoRefsMeta.push({
               index: idx,
-              token: `${imgPrefix}${idx}`,
-              role: 'PRODUCT',
-              label: item.label || item.role || `Product Image ${idx}`,
+              token: `${vidPrefix}${idx}`,
+              role: 'REFERENCE_VIDEO',
+              label: refVideo.title || fileName,
               fileName,
-              mimeType: item.mimeType,
+              mimeType: refVideo.mimeType,
+              durationSec: refVideo.mediaMeta?.durationSec ?? null,
               mediaPath: null,
+              thumbnailPath: null,
               stagedUrl: null,
-              sourceRef: {
-                mediaKind: 'product-asset',
-                id: kit.id,
-                subId: item.id,
-              },
+              sourceRef: { mediaKind: 'ref-video', id: refVideo.id },
+              thumbRef: refVideo.thumbnailKey
+                ? { mediaKind: 'ref-thumb', id: refVideo.id }
+                : null,
             });
           }
-        }
-      }
 
-      // 2b) Attach uploaded Avatar & Environment preset reference photos (when present)
-      const presetIdsToStage: Array<{
-        id: string;
-        prefix: 'avatar' | 'environment';
-      }> = [];
-      if (typeof payload.avatarPresetId === 'string' && !characterAssetId) {
-        presetIdsToStage.push({ id: payload.avatarPresetId, prefix: 'avatar' });
-      }
-      if (typeof payload.environmentPresetId === 'string' && !characterAssetId) {
-        presetIdsToStage.push({
-          id: payload.environmentPresetId,
-          prefix: 'environment',
-        });
-      }
-      if (presetIdsToStage.length > 0) {
-        const presetRepo = this.dataSource.getRepository(
-          DeliveryStudioPresetEntity,
-        );
-        for (const specRef of presetIdsToStage) {
-          const refPreset = await presetRepo.findOne({
-            where: { id: specRef.id, workspaceId },
+          const buildSnapshot = (params: {
+            provider: StudioProviderId | null;
+            endpoint: string | null;
+            failoverTriggered: boolean;
+            externalTaskId: string | null;
+            stagedImageUrls: string[];
+            stagedVideoUrls: string[];
+            rawPayload: Record<string, unknown> | null;
+          }): StudioApiRequestSnapshot => ({
+            capturedAt: new Date().toISOString(),
+            provider: params.provider,
+            endpoint: params.endpoint,
+            modelKey: spec.key,
+            modelLabel: spec.label,
+            routingMode: job.routingMode,
+            failoverTriggered: params.failoverTriggered,
+            externalTaskId: params.externalTaskId,
+            prompt: compiledPrompt,
+            images: imageRefsMeta
+              .slice(0, spec.capabilities.maxReferenceImages)
+              .map((meta, idx) => ({
+                ...meta,
+                stagedUrl: params.stagedImageUrls[idx] ?? null,
+              })),
+            videos: videoRefsMeta
+              .slice(0, spec.capabilities.maxReferenceVideos)
+              .map((meta, idx) => ({
+                ...meta,
+                stagedUrl: params.stagedVideoUrls[idx] ?? null,
+              })),
+            rawPayload: params.rawPayload,
           });
-          const refKey = refPreset?.configJson?.referenceImageStorageKey;
-          const refMime = refPreset?.configJson?.referenceImageMimeType;
-          const refSha = refPreset?.configJson?.referenceImageSha256;
-          if (refPreset && refKey && refMime && refSha) {
-            const fileName = `${specRef.prefix}-${refPreset.id}.${extensionForMime(refMime)}`;
-            referenceImages.push({
-              sha256: refSha,
-              fileName,
-              mimeType: refMime,
-              kind: 'IMAGE',
-              readBytes: async () =>
-                readStreamToBuffer(await driver.readFile({ filePath: refKey })),
-              onStagedUrl: async () => undefined,
-            });
-            const idx = imageRefsMeta.length + 1;
-            imageRefsMeta.push({
-              index: idx,
-              token: `${imgPrefix}${idx}`,
-              role: specRef.prefix === 'avatar' ? 'AVATAR' : 'ENVIRONMENT',
-              label:
-                refPreset.name ||
-                (specRef.prefix === 'avatar' ? 'Avatar' : 'Environment'),
-              fileName,
-              mimeType: refMime,
-              mediaPath: null,
-              stagedUrl: null,
-              sourceRef: { mediaKind: 'preset-thumb', id: refPreset.id },
-            });
-          }
-        }
-      }
 
-      // 3) Attach Reference Video (@Video 1) for video generation
-      const referenceVideoId =
-        typeof payload.referenceVideoId === 'string'
-          ? payload.referenceVideoId
-          : null;
-      if (referenceVideoId) {
-        const refVideo = await this.dataSource
-          .getRepository(DeliveryStudioReferenceVideoEntity)
-          .findOne({ where: { id: referenceVideoId, workspaceId } });
-        if (!refVideo) {
-          throw new Error('Reference video was removed before generation.');
-        }
-        const fileName =
-          refVideo.originalFileName ||
-          `ref-${refVideo.id}.${extensionForMime(refVideo.mimeType)}`;
-        referenceVideos.push({
-          sha256: refVideo.sha256,
-          fileName,
-          mimeType: refVideo.mimeType,
-          kind: 'VIDEO',
-          cachedWavespeedUrl: isFreshStagedUrl(
-            refVideo.stagedUrlsJson,
-            'wavespeed',
-          ),
-          cachedKieUrl: isFreshStagedUrl(refVideo.stagedUrlsJson, 'kie'),
-          readBytes: async () =>
-            readStreamToBuffer(
-              await driver.readFile({ filePath: refVideo.storageKey }),
-            ),
-          onStagedUrl: async (provider, url, expiresAt) => {
-            refVideo.stagedUrlsJson = {
-              ...(refVideo.stagedUrlsJson ?? {}),
-              [provider]: {
-                url,
-                uploadedAt: new Date().toISOString(),
-                expiresAt,
+          latestApiRequest = buildSnapshot({
+            provider: null,
+            endpoint: null,
+            failoverTriggered: false,
+            externalTaskId: null,
+            stagedImageUrls: [],
+            stagedVideoUrls: [],
+            rawPayload: null,
+          });
+
+          execResult = await this.router.execute(
+            {
+              modelKey: job.modelKey,
+              prompt: compiledPrompt,
+              routingMode: job.routingMode,
+              aspectRatio:
+                typeof payload.aspectRatio === 'string'
+                  ? payload.aspectRatio
+                  : undefined,
+              resolution:
+                typeof payload.resolution === 'string'
+                  ? payload.resolution
+                  : undefined,
+              quality:
+                typeof payload.quality === 'string'
+                  ? (payload.quality as 'low' | 'medium' | 'high' | 'max')
+                  : undefined,
+              durationSec:
+                typeof payload.durationSec === 'number'
+                  ? payload.durationSec
+                  : undefined,
+              generateAudio:
+                typeof payload.generateAudio === 'boolean'
+                  ? payload.generateAudio
+                  : undefined,
+              referenceImages,
+              referenceVideos,
+              onRequestPrepared: async (prepared) => {
+                latestApiRequest = buildSnapshot({
+                  provider: prepared.provider,
+                  endpoint: prepared.endpoint,
+                  failoverTriggered: false,
+                  externalTaskId: null,
+                  stagedImageUrls: prepared.stagedImageUrls,
+                  stagedVideoUrls: prepared.stagedVideoUrls,
+                  rawPayload: prepared.requestPayload,
+                });
+                job.inputPayloadJson = {
+                  ...(job.inputPayloadJson ?? {}),
+                  apiRequest: latestApiRequest,
+                };
+                await jobRepo.update(
+                  { id: job.id, workspaceId },
+                  {
+                    providerUsed: prepared.provider,
+                    inputPayloadJson: job.inputPayloadJson as never,
+                  },
+                );
               },
-            };
-            await this.dataSource
-              .getRepository(DeliveryStudioReferenceVideoEntity)
-              .save(refVideo);
-          },
-        });
-        const idx = videoRefsMeta.length + 1;
-        videoRefsMeta.push({
-          index: idx,
-          token: `${vidPrefix}${idx}`,
-          role: 'REFERENCE_VIDEO',
-          label: refVideo.title || fileName,
-          fileName,
-          mimeType: refVideo.mimeType,
-          durationSec: refVideo.mediaMeta?.durationSec ?? null,
-          mediaPath: null,
-          thumbnailPath: null,
-          stagedUrl: null,
-          sourceRef: { mediaKind: 'ref-video', id: refVideo.id },
-          thumbRef: refVideo.thumbnailKey
-            ? { mediaKind: 'ref-thumb', id: refVideo.id }
-            : null,
-        });
-      }
+              onProgress: async (status, progress, externalTaskId) => {
+                if (externalTaskId && latestApiRequest) {
+                  latestApiRequest = {
+                    ...latestApiRequest,
+                    externalTaskId,
+                  };
+                }
+                await jobRepo.update(
+                  { id: job.id, workspaceId },
+                  {
+                    status,
+                    progress,
+                    ...(externalTaskId ? { externalTaskId } : {}),
+                  },
+                );
+              },
+            },
+            credentials,
+          );
 
-      const compiledPrompt =
-        typeof payload.compiledPrompt === 'string'
-          ? payload.compiledPrompt
-          : job.title;
+          latestApiRequest = buildSnapshot({
+            provider: execResult.providerUsed,
+            endpoint: execResult.endpoint,
+            failoverTriggered: execResult.failoverTriggered,
+            externalTaskId: execResult.externalTaskId,
+            stagedImageUrls: execResult.stagedImageUrls,
+            stagedVideoUrls: execResult.stagedVideoUrls,
+            rawPayload: execResult.requestPayload,
+          });
+        }
 
-      const buildSnapshot = (params: {
-        provider: StudioProviderId | null;
-        endpoint: string | null;
-        failoverTriggered: boolean;
-        externalTaskId: string | null;
-        stagedImageUrls: string[];
-        stagedVideoUrls: string[];
-        rawPayload: Record<string, unknown> | null;
-      }): StudioApiRequestSnapshot => ({
-        capturedAt: new Date().toISOString(),
-        provider: params.provider,
-        endpoint: params.endpoint,
-        modelKey: spec.key,
-        modelLabel: spec.label,
-        routingMode: job.routingMode,
-        failoverTriggered: params.failoverTriggered,
-        externalTaskId: params.externalTaskId,
-        prompt: compiledPrompt,
-        images: imageRefsMeta
-          .slice(0, spec.capabilities.maxReferenceImages)
-          .map((meta, idx) => ({
-            ...meta,
-            stagedUrl: params.stagedImageUrls[idx] ?? null,
-          })),
-        videos: videoRefsMeta
-          .slice(0, spec.capabilities.maxReferenceVideos)
-          .map((meta, idx) => ({
-            ...meta,
-            stagedUrl: params.stagedVideoUrls[idx] ?? null,
-          })),
-        rawPayload: params.rawPayload,
-      });
+        // Download and persist every output canonically before provider TTL expires
+        const expectedKind = spec.kind;
+        const assetKind: StudioAssetKind =
+          job.jobKind === 'CHARACTER_SHEET'
+            ? 'CHARACTER_SHEET'
+            : 'GENERATED_VIDEO';
+        const createdAssetIds: string[] = [];
+        const assetRepo = this.dataSource.getRepository(
+          DeliveryStudioAssetEntity,
+        );
 
-      let latestApiRequest: StudioApiRequestSnapshot = buildSnapshot({
-        provider: null,
-        endpoint: null,
-        failoverTriggered: false,
-        externalTaskId: null,
-        stagedImageUrls: [],
-        stagedVideoUrls: [],
-        rawPayload: null,
-      });
+        for (let idx = 0; idx < execResult.outputUrls.length; idx += 1) {
+          const outUrl = execResult.outputUrls[idx];
+          const downloaded = await this.router.downloadOutput(
+            outUrl,
+            expectedKind,
+          );
+          const assetId = v4();
+          const ext = extensionForMime(downloaded.mimeType);
+          const storageKey = `delivery-studio/${workspaceId}/outputs/${assetId}.${ext}`;
+          const sha256 = createHash('sha256')
+            .update(downloaded.bytes)
+            .digest('hex');
 
-      const execResult = await this.router.execute(
-        {
+          await driver.writeFileStream({
+            filePath: storageKey,
+            stream: Readable.from(downloaded.bytes),
+            mimeType: downloaded.mimeType,
+          });
+
+          let thumbnailKey: string | null = null;
+          let mediaMeta: DeliverableMediaMeta = {};
+
+          if (expectedKind === 'VIDEO') {
+            const tempDir = await fs.mkdtemp(
+              path.join(os.tmpdir(), 'otogrow-studio-out-'),
+            );
+            try {
+              const tempVid = path.join(tempDir, `out.${ext}`);
+              const tempThumb = path.join(tempDir, 'thumb.jpg');
+              await fs.writeFile(tempVid, downloaded.bytes);
+              mediaMeta = await this.probe.probeMedia(tempVid);
+              const okThumb = await this.probe.extractVideoThumbnail(
+                tempVid,
+                tempThumb,
+                mediaMeta.durationSec,
+              );
+              if (okThumb) {
+                thumbnailKey = `delivery-studio/${workspaceId}/outputs/${assetId}-thumb.jpg`;
+                await driver.writeFileStream({
+                  filePath: thumbnailKey,
+                  stream: createReadStream(tempThumb),
+                  mimeType: 'image/jpeg',
+                });
+              }
+            } finally {
+              await fs
+                .rm(tempDir, { recursive: true, force: true })
+                .catch(() => undefined);
+            }
+          }
+
+          const savedAsset = await assetRepo.save(
+            assetRepo.create({
+              id: assetId,
+              workspaceId,
+              companyId: job.companyId,
+              projectId: job.projectId,
+              kind: assetKind,
+              productKitId,
+              referenceVideoId,
+              characterAssetId,
+              presetId:
+                typeof payload.presetId === 'string' ? payload.presetId : null,
+              jobId: job.id,
+              title:
+                execResult.outputUrls.length > 1
+                  ? `${job.title} #${idx + 1}`
+                  : job.title,
+              promptUsed: compiledPrompt,
+              modelKey: job.modelKey,
+              providerUsed: execResult.providerUsed,
+              storageKey,
+              thumbnailKey,
+              mimeType: downloaded.mimeType,
+              sizeBytes: String(downloaded.bytes.length),
+              sha256,
+              mediaMeta,
+              stagedUrlsJson: {},
+              approved: false,
+              tagsJson: [],
+              metadataJson: {
+                failoverTriggered: execResult.failoverTriggered,
+                externalTaskId: execResult.externalTaskId,
+                aspectRatio: payload.aspectRatio ?? null,
+                resolution: payload.resolution ?? null,
+                environmentOverride: payload.environmentOverride ?? null,
+                avatarPresetId: payload.avatarPresetId ?? null,
+                avatarName: payload.avatarName ?? null,
+                environmentPresetId: payload.environmentPresetId ?? null,
+                environmentName: payload.environmentName ?? null,
+                environmentPrompt: payload.environmentPrompt ?? null,
+                productName: payload.productName ?? null,
+                productAssetIds: requestedAssetIds ?? null,
+                apiRequest: latestApiRequest,
+              },
+              archived: false,
+              createdById: job.createdById,
+            }),
+          );
+          createdAssetIds.push(savedAsset.id);
+        }
+
+        const fallbackActualCost = estimateStudioJobCostUsd({
           modelKey: job.modelKey,
-          prompt: compiledPrompt,
-          routingMode: job.routingMode,
-          aspectRatio:
-            typeof payload.aspectRatio === 'string'
-              ? payload.aspectRatio
-              : undefined,
           resolution:
             typeof payload.resolution === 'string'
               ? payload.resolution
-              : undefined,
-          quality:
-            typeof payload.quality === 'string'
-              ? (payload.quality as 'low' | 'medium' | 'high' | 'max')
               : undefined,
           durationSec:
             typeof payload.durationSec === 'number'
               ? payload.durationSec
               : undefined,
-          generateAudio:
-            typeof payload.generateAudio === 'boolean'
-              ? payload.generateAudio
+          referenceVideoDurationSec:
+            typeof payload.referenceVideoDurationSec === 'number'
+              ? payload.referenceVideoDurationSec
               : undefined,
-          referenceImages,
-          referenceVideos,
-          onRequestPrepared: async (prepared) => {
-            latestApiRequest = buildSnapshot({
-              provider: prepared.provider,
-              endpoint: prepared.endpoint,
-              failoverTriggered: false,
-              externalTaskId: null,
-              stagedImageUrls: prepared.stagedImageUrls,
-              stagedVideoUrls: prepared.stagedVideoUrls,
-              rawPayload: prepared.requestPayload,
-            });
-            job.inputPayloadJson = {
-              ...(job.inputPayloadJson ?? {}),
-              apiRequest: latestApiRequest,
-            };
-            await jobRepo.update(
-              { id: job.id, workspaceId },
-              {
-                providerUsed: prepared.provider,
-                inputPayloadJson: job.inputPayloadJson as never,
-              },
-            );
-          },
-          onProgress: async (status, progress, externalTaskId) => {
-            if (externalTaskId) {
-              latestApiRequest = {
-                ...latestApiRequest,
-                externalTaskId,
-              };
-            }
-            await jobRepo.update(
-              { id: job.id, workspaceId },
-              {
-                status,
-                progress,
-                ...(externalTaskId ? { externalTaskId } : {}),
-              },
-            );
-          },
-        },
-        credentials,
-      );
-
-      latestApiRequest = buildSnapshot({
-        provider: execResult.providerUsed,
-        endpoint: execResult.endpoint,
-        failoverTriggered: execResult.failoverTriggered,
-        externalTaskId: execResult.externalTaskId,
-        stagedImageUrls: execResult.stagedImageUrls,
-        stagedVideoUrls: execResult.stagedVideoUrls,
-        rawPayload: execResult.requestPayload,
-      });
-
-      // Download and persist every output canonically before provider TTL expires
-      const expectedKind = spec.kind;
-      const assetKind: StudioAssetKind =
-        job.jobKind === 'CHARACTER_SHEET'
-          ? 'CHARACTER_SHEET'
-          : 'GENERATED_VIDEO';
-      const createdAssetIds: string[] = [];
-      const assetRepo = this.dataSource.getRepository(DeliveryStudioAssetEntity);
-
-      for (let idx = 0; idx < execResult.outputUrls.length; idx += 1) {
-        const outUrl = execResult.outputUrls[idx];
-        const downloaded = await this.router.downloadOutput(
-          outUrl,
-          expectedKind,
-        );
-        const assetId = v4();
-        const ext = extensionForMime(downloaded.mimeType);
-        const storageKey = `delivery-studio/${workspaceId}/outputs/${assetId}.${ext}`;
-        const sha256 = createHash('sha256')
-          .update(downloaded.bytes)
-          .digest('hex');
-
-        await driver.writeFileStream({
-          filePath: storageKey,
-          stream: Readable.from(downloaded.bytes),
-          mimeType: downloaded.mimeType,
+          provider: execResult.providerUsed,
         });
 
-        let thumbnailKey: string | null = null;
-        let mediaMeta: DeliverableMediaMeta = {};
-
-        if (expectedKind === 'VIDEO') {
-          const tempDir = await fs.mkdtemp(
-            path.join(os.tmpdir(), 'otogrow-studio-out-'),
-          );
-          try {
-            const tempVid = path.join(tempDir, `out.${ext}`);
-            const tempThumb = path.join(tempDir, 'thumb.jpg');
-            await fs.writeFile(tempVid, downloaded.bytes);
-            mediaMeta = await this.probe.probeMedia(tempVid);
-            const okThumb = await this.probe.extractVideoThumbnail(
-              tempVid,
-              tempThumb,
-              mediaMeta.durationSec,
-            );
-            if (okThumb) {
-              thumbnailKey = `delivery-studio/${workspaceId}/outputs/${assetId}-thumb.jpg`;
-              await driver.writeFileStream({
-                filePath: thumbnailKey,
-                stream: createReadStream(tempThumb),
-                mimeType: 'image/jpeg',
-              });
-            }
-          } finally {
-            await fs.rm(tempDir, { recursive: true, force: true }).catch(() => undefined);
-          }
+        job.status = 'COMPLETED';
+        job.progress = 100;
+        job.providerUsed = execResult.providerUsed;
+        job.failoverTriggered = execResult.failoverTriggered;
+        job.externalTaskId = execResult.externalTaskId;
+        job.attemptsJson = execResult.attempts;
+        job.outputAssetIdsJson = createdAssetIds;
+        job.actualCostUsd = execResult.actualCostUsd ?? fallbackActualCost;
+        job.inputPayloadJson = {
+          ...(job.inputPayloadJson ?? {}),
+          ...(latestApiRequest ? { apiRequest: latestApiRequest } : {}),
+        };
+        job.completedAt = new Date();
+        await jobRepo.save(job);
+      } catch (error) {
+        const latestJob = await jobRepo.findOne({
+          where: { id: job.id, workspaceId },
+        });
+        if (latestJob?.status === 'CANCELLED') {
+          return;
         }
-
-        const savedAsset = await assetRepo.save(
-          assetRepo.create({
-            id: assetId,
-            workspaceId,
-            companyId: job.companyId,
-            projectId: job.projectId,
-            kind: assetKind,
-            productKitId,
-            referenceVideoId,
-            characterAssetId,
-            presetId:
-              typeof payload.presetId === 'string' ? payload.presetId : null,
-            jobId: job.id,
-            title:
-              execResult.outputUrls.length > 1
-                ? `${job.title} #${idx + 1}`
-                : job.title,
-            promptUsed: compiledPrompt,
-            modelKey: job.modelKey,
-            providerUsed: execResult.providerUsed,
-            storageKey,
-            thumbnailKey,
-            mimeType: downloaded.mimeType,
-            sizeBytes: String(downloaded.bytes.length),
-            sha256,
-            mediaMeta,
-            stagedUrlsJson: {},
-            approved: false,
-            tagsJson: [],
-            metadataJson: {
-              failoverTriggered: execResult.failoverTriggered,
-              externalTaskId: execResult.externalTaskId,
-              aspectRatio: payload.aspectRatio ?? null,
-              resolution: payload.resolution ?? null,
-              environmentOverride: payload.environmentOverride ?? null,
-              avatarPresetId: payload.avatarPresetId ?? null,
-              avatarName: payload.avatarName ?? null,
-              environmentPresetId: payload.environmentPresetId ?? null,
-              environmentName: payload.environmentName ?? null,
-              environmentPrompt: payload.environmentPrompt ?? null,
-              productName: payload.productName ?? null,
-              productAssetIds: requestedAssetIds ?? null,
-              apiRequest: latestApiRequest,
-            },
-            archived: false,
-            createdById: job.createdById,
-          }),
-        );
-        createdAssetIds.push(savedAsset.id);
+        const attempts =
+          (
+            error as StudioProviderCallError & {
+              attempts?: StudioProviderAttemptRecord[];
+            }
+          )?.attempts ??
+          job.attemptsJson ??
+          [];
+        const message =
+          error instanceof Error
+            ? error.message.slice(0, 500)
+            : 'AI Studio generation failed.';
+        this.logger.warn(`Studio job ${job.id} failed: ${message}`);
+        job.status = 'FAILED';
+        job.errorMessage = message;
+        job.attemptsJson = attempts;
+        job.completedAt = new Date();
+        await jobRepo.save(job);
       }
-
-      job.status = 'COMPLETED';
-      job.progress = 100;
-      job.providerUsed = execResult.providerUsed;
-      job.failoverTriggered = execResult.failoverTriggered;
-      job.externalTaskId = execResult.externalTaskId;
-      job.attemptsJson = execResult.attempts;
-      job.outputAssetIdsJson = createdAssetIds;
-      job.actualCostUsd = job.estimatedCostUsd;
-      job.inputPayloadJson = {
-        ...(job.inputPayloadJson ?? {}),
-        apiRequest: latestApiRequest,
-      };
-      job.completedAt = new Date();
-      await jobRepo.save(job);
-    } catch (error) {
-      const attempts =
-        (
-          error as StudioProviderCallError & {
-            attempts?: StudioProviderAttemptRecord[];
-          }
-        )?.attempts ?? job.attemptsJson ?? [];
-      const message =
-        error instanceof Error
-          ? error.message.slice(0, 500)
-          : 'AI Studio generation failed.';
-      this.logger.warn(`Studio job ${job.id} failed: ${message}`);
-      job.status = 'FAILED';
-      job.errorMessage = message;
-      job.attemptsJson = attempts;
-      job.completedAt = new Date();
-      await jobRepo.save(job);
+    } finally {
+      this.activeJobExecutions.delete(jobId);
     }
   }
 

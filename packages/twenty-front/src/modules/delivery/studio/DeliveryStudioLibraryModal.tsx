@@ -546,6 +546,44 @@ export const DeliveryStudioLibraryModal = ({
       setBusy(true);
       setUploadPct(0);
       try {
+        const probedMeta = await new Promise<{
+          durationSec?: number;
+          width?: number;
+          height?: number;
+        }>((resolve) => {
+          const objectUrl = URL.createObjectURL(selectedFile);
+          const videoEl = document.createElement('video');
+          videoEl.preload = 'metadata';
+          videoEl.muted = true;
+          const cleanup = () => {
+            URL.revokeObjectURL(objectUrl);
+            videoEl.src = '';
+          };
+          const timer = window.setTimeout(() => {
+            cleanup();
+            resolve({});
+          }, 5000);
+          videoEl.onloadedmetadata = () => {
+            window.clearTimeout(timer);
+            const dur =
+              Number.isFinite(videoEl.duration) && videoEl.duration > 0
+                ? Math.round(videoEl.duration * 10) / 10
+                : undefined;
+            const width =
+              videoEl.videoWidth > 0 ? videoEl.videoWidth : undefined;
+            const height =
+              videoEl.videoHeight > 0 ? videoEl.videoHeight : undefined;
+            cleanup();
+            resolve({ durationSec: dur, width, height });
+          };
+          videoEl.onerror = () => {
+            window.clearTimeout(timer);
+            cleanup();
+            resolve({});
+          };
+          videoEl.src = objectUrl;
+        });
+
         const formData = new FormData();
         formData.append('file', selectedFile);
         formData.append(
@@ -553,6 +591,15 @@ export const DeliveryStudioLibraryModal = ({
           name.trim() || selectedFile.name.replace(/\.[^.]+$/, ''),
         );
         if (prompt.trim()) formData.append('notes', prompt.trim());
+        if (probedMeta.durationSec) {
+          formData.append('durationSec', String(probedMeta.durationSec));
+        }
+        if (probedMeta.width) {
+          formData.append('width', String(probedMeta.width));
+        }
+        if (probedMeta.height) {
+          formData.append('height', String(probedMeta.height));
+        }
         if (clientOnly && companyId) {
           formData.append('companyId', companyId);
           if (projectId) formData.append('projectId', projectId);

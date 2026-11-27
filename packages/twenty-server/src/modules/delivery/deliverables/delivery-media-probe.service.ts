@@ -48,13 +48,101 @@ type FfprobeOutput = {
   };
 };
 
+const resolveBinaryCandidates = (name: 'ffprobe' | 'ffmpeg'): string[] => [
+  name,
+  `/opt/homebrew/bin/${name}`,
+  `/usr/local/bin/${name}`,
+  `/usr/bin/${name}`,
+];
+
+const execWithBinaryFallback = async (
+  binaryName: 'ffprobe' | 'ffmpeg',
+  args: string[],
+  options: { timeout: number; maxBuffer: number },
+) => {
+  let lastErr: unknown;
+  for (const bin of resolveBinaryCandidates(binaryName)) {
+    try {
+      return await execFileAsync(bin, args, options);
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException)?.code;
+      lastErr = error;
+      if (code === 'ENOENT') {
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw lastErr;
+};
+
+/**
+ * Pure-JS fallback parser for MP4/MOV container duration via the ISO-BMFF `moov -> mvhd` atom.
+ * Works even in minimal containers without `ffprobe`.
+ */
+export const parseMp4DurationSecFromBuffer = (buf: Buffer): number | undefined => {
+  const findBox = (
+    start: number,
+    end: number,
+    targetType: string,
+  ): { dataStart: number; boxEnd: number } | null => {
+    let offset = start;
+    while (offset + 8 <= end) {
+      const size32 = buf.readUInt32BE(offset);
+      const type = buf.toString('ascii', offset + 4, offset + 8);
+      let boxSize = size32;
+      let headerSize = 8;
+      if (size32 === 1 && offset + 16 <= end) {
+        const hi = buf.readUInt32BE(offset + 8);
+        const lo = buf.readUInt32BE(offset + 12);
+        boxSize = hi * 4294967296 + lo;
+        headerSize = 16;
+      } else if (size32 === 0) {
+        boxSize = end - offset;
+      }
+      if (!Number.isFinite(boxSize) || boxSize < headerSize) return null;
+      const boxEnd = Math.min(end, offset + boxSize);
+      if (type === targetType) {
+        return { dataStart: offset + headerSize, boxEnd };
+      }
+      offset = boxEnd;
+    }
+    return null;
+  };
+
+  const moov = findBox(0, buf.length, 'moov');
+  if (!moov) return undefined;
+  const mvhd = findBox(moov.dataStart, moov.boxEnd, 'mvhd');
+  if (!mvhd || mvhd.dataStart + 20 > mvhd.boxEnd) return undefined;
+
+  const version = buf.readUInt8(mvhd.dataStart);
+  if (version === 1) {
+    if (mvhd.dataStart + 32 > mvhd.boxEnd) return undefined;
+    const timescale = buf.readUInt32BE(mvhd.dataStart + 20);
+    const durHi = buf.readUInt32BE(mvhd.dataStart + 24);
+    const durLo = buf.readUInt32BE(mvhd.dataStart + 28);
+    const duration = durHi * 4294967296 + durLo;
+    if (timescale > 0 && duration > 0) {
+      return Math.round((duration / timescale) * 100) / 100;
+    }
+    return undefined;
+  }
+
+  const timescale = buf.readUInt32BE(mvhd.dataStart + 12);
+  const duration = buf.readUInt32BE(mvhd.dataStart + 16);
+  if (timescale > 0 && duration > 0) {
+    return Math.round((duration / timescale) * 100) / 100;
+  }
+  return undefined;
+};
+
 @Injectable()
 export class DeliveryMediaProbeService {
   private readonly logger = new Logger(DeliveryMediaProbeService.name);
 
   async probeMedia(filePath: string): Promise<DeliverableMediaMeta> {
     try {
-      const { stdout } = await execFileAsync(
+      const { stdout } = await execWithBinaryFallback(
         'ffprobe',
         [
           '-v',
@@ -87,10 +175,30 @@ export class DeliveryMediaProbeService {
         [width, height] = [height, width];
       }
 
-      const durationRaw = parsed.format?.duration ?? video?.duration;
-      const durationParsed = durationRaw ? Number(durationRaw) : NaN;
+      const formatDuration = parsed.format?.duration
+        ? Number(parsed.format.duration)
+        : NaN;
+      const videoDuration = video?.duration ? Number(video.duration) : NaN;
+      const durationParsed =
+        Number.isFinite(formatDuration) && formatDuration > 0
+          ? formatDuration
+          : Number.isFinite(videoDuration) && videoDuration > 0
+            ? videoDuration
+            : NaN;
       const bitrateRaw = parsed.format?.bit_rate ?? video?.bit_rate;
       const bitrateParsed = bitrateRaw ? Number(bitrateRaw) : NaN;
+
+      let durationSec =
+        Number.isFinite(durationParsed) && durationParsed > 0
+          ? Math.round(durationParsed * 100) / 100
+          : undefined;
+
+      if (durationSec === undefined) {
+        const bytes = await fs.readFile(filePath).catch(() => null);
+        if (bytes) {
+          durationSec = parseMp4DurationSecFromBuffer(bytes);
+        }
+      }
 
       return {
         width,
@@ -98,10 +206,7 @@ export class DeliveryMediaProbeService {
         fps:
           parseFrameRate(video?.avg_frame_rate) ??
           parseFrameRate(video?.r_frame_rate),
-        durationSec:
-          Number.isFinite(durationParsed) && durationParsed > 0
-            ? Math.round(durationParsed * 100) / 100
-            : undefined,
+        durationSec,
         videoCodec: video?.codec_name,
         audioCodec: audio?.codec_name ?? null,
         bitrate:
@@ -117,7 +222,11 @@ export class DeliveryMediaProbeService {
       this.logger.warn(
         `ffprobe failed for ${filePath}: ${(error as Error).message}`,
       );
-      return {};
+      const bytes = await fs.readFile(filePath).catch(() => null);
+      const fallbackDuration = bytes
+        ? parseMp4DurationSecFromBuffer(bytes)
+        : undefined;
+      return fallbackDuration ? { durationSec: fallbackDuration } : {};
     }
   }
 
@@ -131,7 +240,7 @@ export class DeliveryMediaProbeService {
         ? Math.min(0.5, Math.max(0, durationSec / 3))
         : 0.25;
     try {
-      await execFileAsync(
+      await execWithBinaryFallback(
         'ffmpeg',
         [
           '-y',

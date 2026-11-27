@@ -224,6 +224,7 @@ import { DeliveryStudioProductKitEntity } from 'src/modules/delivery/studio/enti
 import { DeliveryStudioProviderConfigEntity } from 'src/modules/delivery/studio/entities/delivery-studio-provider-config.entity';
 import { DeliveryStudioReferenceVideoEntity } from 'src/modules/delivery/studio/entities/delivery-studio-reference-video.entity';
 import { DeliveryStudioProviderRouterService } from 'src/modules/delivery/studio/delivery-studio-provider-router.service';
+import { DeliveryStudioPromptAiService } from 'src/modules/delivery/studio/delivery-studio-prompt-ai.service';
 import { DeliveryStudioService } from 'src/modules/delivery/studio/delivery-studio.service';
 import { DeliveryStudioResolver } from 'src/modules/delivery/studio/delivery-studio.resolver';
 import {
@@ -358,6 +359,7 @@ import { DeliveryStudioAgentController } from 'src/modules/delivery/studio/deliv
   ],
   providers: [
     DeliveryStudioProviderRouterService,
+    DeliveryStudioPromptAiService,
     DeliveryStudioService,
     DeliveryStudioResolver,
     DeliveryMediaProbeService,

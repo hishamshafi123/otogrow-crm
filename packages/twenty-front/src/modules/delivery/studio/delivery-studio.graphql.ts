@@ -158,3 +158,9 @@ export const SAVE_DELIVERY_STUDIO_HOOK_DEFAULT = gql`
     saveDeliveryStudioHookDefault(input: $input)
   }
 `;
+
+export const ANALYZE_DELIVERY_STUDIO_VIDEO_PROMPT = gql`
+  mutation AnalyzeDeliveryStudioVideoPrompt($input: JSON!) {
+    analyzeDeliveryStudioVideoPrompt(input: $input)
+  }
+`;

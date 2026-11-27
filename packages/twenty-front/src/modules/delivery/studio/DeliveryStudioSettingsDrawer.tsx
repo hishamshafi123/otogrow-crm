@@ -148,6 +148,7 @@ type DeliveryStudioSettingsDrawerProps = {
   videoModels: StudioModelSpecDTO[];
   characterPresets: StudioPresetDTO[];
   videoPresets: StudioPresetDTO[];
+  referenceVideoDurationSec?: number | null;
   onPatchTab: (patch: Partial<StudioTabDraft>) => void;
   onOpenProviders: () => void;
   onOpenPresets: () => void;
@@ -162,11 +163,26 @@ export const DeliveryStudioSettingsDrawer = ({
   videoModels,
   characterPresets,
   videoPresets,
+  referenceVideoDurationSec,
   onPatchTab,
   onOpenProviders,
   onOpenPresets,
   onClose,
 }: DeliveryStudioSettingsDrawerProps) => {
+  const currentVideoModel = videoModels.find((m) => m.key === tab.videoModelKey);
+  const minVideoSec = currentVideoModel?.capabilities.minDurationSec ?? 4;
+  const maxVideoSec = currentVideoModel?.capabilities.maxDurationSec ?? 30;
+  const supportedVideoResolutions =
+    currentVideoModel?.capabilities.resolutions ?? ['480p', '720p', '1080p'];
+  const clampedRefSec =
+    typeof referenceVideoDurationSec === 'number' &&
+    referenceVideoDurationSec > 0
+      ? Math.max(
+          minVideoSec,
+          Math.min(maxVideoSec, Math.round(referenceVideoDurationSec)),
+        )
+      : null;
+
   return (
     <StyledBackdrop onClick={onClose}>
       <StyledDrawer onClick={(e) => e.stopPropagation()}>
@@ -347,7 +363,26 @@ export const DeliveryStudioSettingsDrawer = ({
               Video model
               <select
                 value={tab.videoModelKey}
-                onChange={(e) => onPatchTab({ videoModelKey: e.target.value })}
+                onChange={(e) => {
+                  const nextModel = videoModels.find(
+                    (m) => m.key === e.target.value,
+                  );
+                  const nextMin = nextModel?.capabilities.minDurationSec ?? 4;
+                  const nextMax = nextModel?.capabilities.maxDurationSec ?? 30;
+                  const baseDur =
+                    tab.videoDurationAutoMatched &&
+                    typeof referenceVideoDurationSec === 'number' &&
+                    referenceVideoDurationSec > 0
+                      ? Math.round(referenceVideoDurationSec)
+                      : tab.videoDurationSec;
+                  onPatchTab({
+                    videoModelKey: e.target.value,
+                    videoDurationSec: Math.max(
+                      nextMin,
+                      Math.min(nextMax, baseDur),
+                    ),
+                  });
+                }}
               >
                 {videoModels.map((m) => (
                   <option key={m.key} value={m.key}>
@@ -366,28 +401,72 @@ export const DeliveryStudioSettingsDrawer = ({
                     onPatchTab({ videoResolution: e.target.value })
                   }
                 >
-                  <option value="720p">720p</option>
-                  <option value="1080p">1080p</option>
+                  {supportedVideoResolutions.map((res) => (
+                    <option key={res} value={res}>
+                      {res}
+                    </option>
+                  ))}
                 </select>
               </StyledField>
               <StyledField>
-                Duration (sec)
+                Duration ({minVideoSec}–{maxVideoSec}s)
                 <input
                   type="number"
-                  min={4}
-                  max={15}
+                  min={minVideoSec}
+                  max={maxVideoSec}
                   value={tab.videoDurationSec}
                   onChange={(e) =>
                     onPatchTab({
                       videoDurationSec: Math.max(
-                        4,
-                        Math.min(15, Number(e.target.value) || 8),
+                        minVideoSec,
+                        Math.min(maxVideoSec, Number(e.target.value) || minVideoSec),
                       ),
+                      videoDurationAutoMatched: false,
                     })
                   }
                 />
               </StyledField>
             </StyledTwoCol>
+
+            {clampedRefSec !== null && (
+              <div
+                style={{
+                  alignItems: 'center',
+                  color: themeCssVariables.font.color.secondary,
+                  display: 'flex',
+                  fontSize: 11,
+                  justifyContent: 'space-between',
+                }}
+              >
+                <span>
+                  {tab.videoDurationAutoMatched
+                    ? `Auto-matched to reference video (${Math.round(referenceVideoDurationSec ?? clampedRefSec)}s)`
+                    : `Manual override (ref video is ${Math.round(referenceVideoDurationSec ?? clampedRefSec)}s)`}
+                </span>
+                {!tab.videoDurationAutoMatched && (
+                  <button
+                    type="button"
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: themeCssVariables.color.blue,
+                      cursor: 'pointer',
+                      fontSize: 11,
+                      fontWeight: 600,
+                      padding: 0,
+                    }}
+                    onClick={() =>
+                      onPatchTab({
+                        videoDurationSec: clampedRefSec,
+                        videoDurationAutoMatched: true,
+                      })
+                    }
+                  >
+                    Match ref ({clampedRefSec}s)
+                  </button>
+                )}
+              </div>
+            )}
 
             <StyledField>
               Video Master Prompt Preset

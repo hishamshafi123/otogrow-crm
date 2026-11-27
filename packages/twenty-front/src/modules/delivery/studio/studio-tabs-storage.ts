@@ -51,6 +51,14 @@ export type StudioTabDraft = {
   videoResolution: string;
   videoAspectRatio: string;
   videoDurationSec: number;
+  videoDurationAutoMatched: boolean;
+  autoPromptWithGemini: boolean;
+  geminiPromptMeta?: {
+    source: string;
+    modelId: string | null;
+    summary: string;
+    key: string;
+  } | null;
   generateAudio: boolean;
   // Routing
   routingMode: StudioRoutingMode;
@@ -108,6 +116,9 @@ export const createEmptyStudioTab = (
   videoResolution: '1080p',
   videoAspectRatio: '9:16',
   videoDurationSec: 8,
+  videoDurationAutoMatched: true,
+  autoPromptWithGemini: true,
+  geminiPromptMeta: null,
   generateAudio: true,
   routingMode: 'AUTO_FAILOVER',
   batchRows: [],
