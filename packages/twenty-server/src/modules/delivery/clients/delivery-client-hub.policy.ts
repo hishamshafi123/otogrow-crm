@@ -253,6 +253,18 @@ export type ClientHubCurrencyTotal = {
   count: number;
 };
 
+export type ClientHubPaymentDateTarget =
+  | { kind: 'BUSINESS_RECORD'; id: string; revision: number }
+  | { kind: 'FINANCE_V2_JOURNAL'; id: string };
+
+export type ClientHubPaymentItem = {
+  id: string;
+  date: string;
+  amount: number;
+  currency: string;
+  target: ClientHubPaymentDateTarget;
+};
+
 export type ClientHubFinanceEntry = {
   id: string;
   revision: number;
@@ -262,11 +274,14 @@ export type ClientHubFinanceEntry = {
   currency: string;
   amount: number;
   date: string;
+  paidDate?: string | null;
   dueDate: string | null;
   projectId: string | null;
   projectName: string | null;
   externalReference: string;
   notes: string;
+  paymentTarget?: ClientHubPaymentDateTarget | null;
+  payments?: ClientHubPaymentItem[];
 };
 
 export type ClientHubFinanceSnapshot = {
@@ -542,45 +557,134 @@ export const buildClientHubSnapshot = ({
     );
     const inactiveSyncedJournalRefs = new Set<string>();
     const activeSyncedJournalRefs = new Set<string>();
+    const activeJournalBySyncKey = new Map<
+      string,
+      ClientHubFinanceV2PaymentJournalSource
+    >();
+    const activePaymentJournalsByInvoiceId = new Map<
+      string,
+      ClientHubFinanceV2PaymentJournalSource[]
+    >();
     for (const journal of financeV2PaymentJournals) {
       if (!journal.sourceRefType || !journal.sourceRefId) continue;
       const key = `${journal.sourceRefType}::${journal.sourceRefId}`;
       if (journal.status === 'POSTED' && !journal.reversed) {
         activeSyncedJournalRefs.add(key);
+        activeJournalBySyncKey.set(key, journal);
+        if (journal.sourceRefType === 'INVOICE_PAYMENT') {
+          const [invoiceId] = journal.sourceRefId.split(':');
+          if (invoiceId) {
+            const list = activePaymentJournalsByInvoiceId.get(invoiceId) ?? [];
+            list.push(journal);
+            activePaymentJournalsByInvoiceId.set(invoiceId, list);
+          }
+        }
       } else {
         inactiveSyncedJournalRefs.add(key);
       }
     }
+    for (const list of activePaymentJournalsByInvoiceId.values()) {
+      list.sort((left, right) => right.entryDate.localeCompare(left.entryDate));
+    }
 
     const activeFinanceRecords = businessRecords.filter(
-      (record) => record.kind === 'FINANCE' && record.status !== 'VOID',
+      (record): record is Extract<BusinessRecord, { kind: 'FINANCE' }> =>
+        record.kind === 'FINANCE' && record.status !== 'VOID',
+    );
+    const activeFinanceRecordById = new Map(
+      activeFinanceRecords.map((record) => [record.id, record]),
     );
     const businessRecordIds = new Set(
       businessRecords
         .filter((record) => record.kind === 'FINANCE')
         .map((record) => record.id),
     );
+    const isIncomeRecordVoidedInV2 = (
+      record: Extract<BusinessRecord, { kind: 'FINANCE' }>,
+    ): boolean => {
+      let syncKey: string | null = null;
+      if (record.externalReference.startsWith('receivable:') && workspaceId) {
+        const recId = record.externalReference.slice('receivable:'.length);
+        const linkedInvId = deterministicClientReceivableInvoiceId(
+          workspaceId,
+          recId,
+        );
+        syncKey = `INVOICE_PAYMENT::${linkedInvId}:${CLIENT_BUSINESS_INVOICE_PAYMENT_PREFIX}${record.id}`;
+      } else {
+        syncKey = `${CLIENT_BUSINESS_PAYMENT_REF_TYPE}::${record.id}`;
+      }
+      return Boolean(
+        syncKey &&
+          inactiveSyncedJournalRefs.has(syncKey) &&
+          !activeSyncedJournalRefs.has(syncKey),
+      );
+    };
+
     const linkedReceiptReceivableIds = new Set<string>();
+    const activeReceiptByReceivableId = new Map<
+      string,
+      Extract<BusinessRecord, { kind: 'FINANCE' }>
+    >();
     const receivableIds = new Set<string>();
     for (const record of activeFinanceRecords) {
-      if (record.kind !== 'FINANCE') continue;
       if (record.category === 'RECEIVABLE') {
         receivableIds.add(record.id);
       }
       if (
         record.category === 'INCOME' &&
-        record.externalReference.startsWith('receivable:')
+        record.externalReference.startsWith('receivable:') &&
+        !isIncomeRecordVoidedInV2(record)
       ) {
-        linkedReceiptReceivableIds.add(
-          record.externalReference.slice('receivable:'.length),
+        const receivableId = record.externalReference.slice(
+          'receivable:'.length,
         );
+        linkedReceiptReceivableIds.add(receivableId);
+        activeReceiptByReceivableId.set(receivableId, record);
       }
     }
+
+    const buildPaymentsForInvoiceId = (
+      invoiceId: string,
+    ): ClientHubPaymentItem[] => {
+      const journals = activePaymentJournalsByInvoiceId.get(invoiceId) ?? [];
+      return journals
+        .map((journal): ClientHubPaymentItem | null => {
+          const amountMinor = microsToMinorUnits(journal.amountMicros);
+          if (amountMinor <= 0) return null;
+          let target: ClientHubPaymentDateTarget = {
+            kind: 'FINANCE_V2_JOURNAL',
+            id: journal.id,
+          };
+          if (journal.sourceRefId) {
+            const [, suffix] = journal.sourceRefId.split(':');
+            if (suffix?.startsWith(CLIENT_BUSINESS_INVOICE_PAYMENT_PREFIX)) {
+              const linkedRecId = suffix.slice(
+                CLIENT_BUSINESS_INVOICE_PAYMENT_PREFIX.length,
+              );
+              const linkedRec = activeFinanceRecordById.get(linkedRecId);
+              if (linkedRec) {
+                target = {
+                  kind: 'BUSINESS_RECORD',
+                  id: linkedRec.id,
+                  revision: linkedRec.revision,
+                };
+              }
+            }
+          }
+          return {
+            id: journal.id,
+            date: journal.entryDate,
+            amount: amountMinor,
+            currency: journal.currency,
+            target,
+          };
+        })
+        .filter((item): item is ClientHubPaymentItem => item !== null);
+    };
 
     const syncedBusinessInvoiceIds = new Set<string>();
 
     for (const record of activeFinanceRecords) {
-      if (record.kind !== 'FINANCE') continue;
       if (record.category !== 'RECEIVABLE' && record.category !== 'INCOME')
         continue;
       const project = record.projectId
@@ -589,24 +693,31 @@ export const buildClientHubSnapshot = ({
       const targetCompanyId = project?.companyId ?? record.companyId ?? null;
       if (!targetCompanyId) continue;
 
+      let incomeSyncedJournal: ClientHubFinanceV2PaymentJournalSource | null =
+        null;
       if (record.category === 'INCOME') {
-        let syncKey: string | null = null;
+        if (isIncomeRecordVoidedInV2(record)) {
+          continue;
+        }
         if (record.externalReference.startsWith('receivable:') && workspaceId) {
           const recId = record.externalReference.slice('receivable:'.length);
           const linkedInvId = deterministicClientReceivableInvoiceId(
             workspaceId,
             recId,
           );
-          syncKey = `INVOICE_PAYMENT::${linkedInvId}:${CLIENT_BUSINESS_INVOICE_PAYMENT_PREFIX}${record.id}`;
+          incomeSyncedJournal =
+            activeJournalBySyncKey.get(
+              `INVOICE_PAYMENT::${linkedInvId}:${CLIENT_BUSINESS_INVOICE_PAYMENT_PREFIX}${record.id}`,
+            ) ??
+            activeJournalBySyncKey.get(
+              `${CLIENT_BUSINESS_PAYMENT_REF_TYPE}::${record.id}`,
+            ) ??
+            null;
         } else {
-          syncKey = `${CLIENT_BUSINESS_PAYMENT_REF_TYPE}::${record.id}`;
-        }
-        if (
-          syncKey &&
-          inactiveSyncedJournalRefs.has(syncKey) &&
-          !activeSyncedJournalRefs.has(syncKey)
-        ) {
-          continue;
+          incomeSyncedJournal =
+            activeJournalBySyncKey.get(
+              `${CLIENT_BUSINESS_PAYMENT_REF_TYPE}::${record.id}`,
+            ) ?? null;
         }
       }
 
@@ -657,6 +768,7 @@ export const buildClientHubSnapshot = ({
             bucket.overdueReceivablesCount += 1;
           }
         }
+        const entryPayments = buildPaymentsForInvoiceId(linkedV2Invoice.id);
         bucket.entries.push({
           id: record.id,
           revision: record.revision,
@@ -671,17 +783,107 @@ export const buildClientHubSnapshot = ({
           currency: record.currency,
           amount: remainingMinor > 0 ? remainingMinor : totalMinor,
           date: record.date,
+          paidDate: entryPayments[0]?.date ?? null,
           dueDate: record.dueDate ?? null,
           projectId: record.projectId ?? null,
           projectName: project?.name ?? null,
           externalReference:
             record.externalReference || linkedV2Invoice.invoiceNumber,
           notes: record.notes,
+          paymentTarget:
+            entryPayments.length === 1 ? entryPayments[0].target : null,
+          payments: entryPayments,
         });
         continue;
       }
 
       if (!isAutoReceiptForVisibleReceivable) {
+        let entryDate = record.date;
+        let paidDate: string | null = null;
+        let paymentTarget: ClientHubPaymentDateTarget | null = null;
+        let entryPayments: ClientHubPaymentItem[] = [];
+
+        if (record.category === 'INCOME') {
+          const resolvedDate = incomeSyncedJournal?.entryDate ?? record.date;
+          entryDate = resolvedDate;
+          paidDate = resolvedDate;
+          paymentTarget = {
+            kind: 'BUSINESS_RECORD',
+            id: record.id,
+            revision: record.revision,
+          };
+          entryPayments = [
+            {
+              id: record.id,
+              date: resolvedDate,
+              amount: record.amount,
+              currency: record.currency,
+              target: paymentTarget,
+            },
+          ];
+        } else if (
+          record.category === 'RECEIVABLE' &&
+          record.status === 'PAID'
+        ) {
+          const activeReceipt = activeReceiptByReceivableId.get(record.id);
+          if (activeReceipt) {
+            const linkedInvId = workspaceId
+              ? deterministicClientReceivableInvoiceId(workspaceId, record.id)
+              : null;
+            const receiptJournal =
+              (linkedInvId
+                ? activeJournalBySyncKey.get(
+                    `INVOICE_PAYMENT::${linkedInvId}:${CLIENT_BUSINESS_INVOICE_PAYMENT_PREFIX}${activeReceipt.id}`,
+                  )
+                : undefined) ??
+              activeJournalBySyncKey.get(
+                `${CLIENT_BUSINESS_PAYMENT_REF_TYPE}::${activeReceipt.id}`,
+              ) ??
+              null;
+            paidDate = receiptJournal?.entryDate ?? activeReceipt.date;
+            paymentTarget = {
+              kind: 'BUSINESS_RECORD',
+              id: activeReceipt.id,
+              revision: activeReceipt.revision,
+            };
+            entryPayments = [
+              {
+                id: activeReceipt.id,
+                date: paidDate,
+                amount: activeReceipt.amount,
+                currency: activeReceipt.currency,
+                target: paymentTarget,
+              },
+            ];
+          } else {
+            const invoicePayments = linkedV2Invoice
+              ? buildPaymentsForInvoiceId(linkedV2Invoice.id)
+              : [];
+            if (invoicePayments.length > 0) {
+              entryPayments = invoicePayments;
+              paidDate = invoicePayments[0].date;
+              paymentTarget =
+                invoicePayments.length === 1 ? invoicePayments[0].target : null;
+            } else {
+              paidDate = record.date;
+              paymentTarget = {
+                kind: 'BUSINESS_RECORD',
+                id: record.id,
+                revision: record.revision,
+              };
+              entryPayments = [
+                {
+                  id: record.id,
+                  date: record.date,
+                  amount: record.amount,
+                  currency: record.currency,
+                  target: paymentTarget,
+                },
+              ];
+            }
+          }
+        }
+
         bucket.entries.push({
           id: record.id,
           revision: record.revision,
@@ -690,12 +892,15 @@ export const buildClientHubSnapshot = ({
           status: record.status,
           currency: record.currency,
           amount: record.amount,
-          date: record.date,
+          date: entryDate,
+          paidDate,
           dueDate: record.dueDate ?? null,
           projectId: record.projectId ?? null,
           projectName: project?.name ?? null,
           externalReference: record.externalReference,
           notes: record.notes,
+          paymentTarget,
+          payments: entryPayments,
         });
       }
 
@@ -751,6 +956,7 @@ export const buildClientHubSnapshot = ({
         }
       }
 
+      const invoicePayments = buildPaymentsForInvoiceId(invoice.id);
       bucket.entries.push({
         id: invoice.id,
         revision: 0,
@@ -767,11 +973,15 @@ export const buildClientHubSnapshot = ({
         currency: invoice.currency,
         amount: remainingMinor > 0 ? remainingMinor : totalMinor,
         date: invoice.issueDate,
+        paidDate: invoicePayments[0]?.date ?? null,
         dueDate: invoice.dueDate ?? null,
         projectId: invoice.projectId ?? null,
         projectName: project?.name ?? null,
         externalReference: invoice.invoiceNumber,
         notes: invoice.notes,
+        paymentTarget:
+          invoicePayments.length === 1 ? invoicePayments[0].target : null,
+        payments: invoicePayments,
       });
     }
 
@@ -805,6 +1015,10 @@ export const buildClientHubSnapshot = ({
       if (amountMinor <= 0) continue;
       const bucket = getOrCreateFinanceBucket(targetCompanyId);
       addCurrencyTotal(bucket.collected, journal.currency, amountMinor);
+      const paymentTarget: ClientHubPaymentDateTarget = {
+        kind: 'FINANCE_V2_JOURNAL',
+        id: journal.id,
+      };
       bucket.entries.push({
         id: journal.id,
         revision: 0,
@@ -814,11 +1028,22 @@ export const buildClientHubSnapshot = ({
         currency: journal.currency,
         amount: amountMinor,
         date: journal.entryDate,
+        paidDate: journal.entryDate,
         dueDate: null,
         projectId: journal.projectId ?? null,
         projectName: project?.name ?? null,
         externalReference: '',
         notes: journal.notes,
+        paymentTarget,
+        payments: [
+          {
+            id: journal.id,
+            date: journal.entryDate,
+            amount: amountMinor,
+            currency: journal.currency,
+            target: paymentTarget,
+          },
+        ],
       });
     }
 
@@ -829,7 +1054,9 @@ export const buildClientHubSnapshot = ({
         const rightOpen =
           right.category === 'RECEIVABLE' && right.status !== 'PAID';
         if (leftOpen !== rightOpen) return leftOpen ? -1 : 1;
-        const dateDiff = right.date.localeCompare(left.date);
+        const leftDate = left.paidDate ?? left.date;
+        const rightDate = right.paidDate ?? right.date;
+        const dateDiff = rightDate.localeCompare(leftDate);
         if (dateDiff !== 0) return dateDiff;
         return left.title.localeCompare(right.title);
       });
@@ -1038,7 +1265,7 @@ export const buildClientHubSnapshot = ({
           collectedByCurrency: financeBucket
             ? toCurrencyList(financeBucket.collected)
             : [],
-          entries: (financeBucket?.entries ?? []).slice(0, 20),
+          entries: (financeBucket?.entries ?? []).slice(0, 50),
         }
       : null;
 

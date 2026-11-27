@@ -154,6 +154,7 @@ const STRUCTURAL_FIELDS = new Set([
   'hookProjectStatus',
   'clientReview',
   'clientFee',
+  'paymentDate',
   'includedClientCount',
   'excludedClientCount',
 ]);

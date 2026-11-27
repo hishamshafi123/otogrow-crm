@@ -9,6 +9,7 @@ import {
   type ClientFeeCadence,
   type ClientHubFinanceEntry,
   type ClientHubItem,
+  type ClientHubPaymentDateTarget,
   type ClientRosterUpdateInput,
   type DeliveryCurrency,
 } from '@/delivery/client-workspace/client-hub.types';
@@ -52,6 +53,9 @@ const parseMajorToMinor = (raw: string): number | null => {
   if (!Number.isFinite(parsed) || parsed <= 0) return null;
   return Math.round(parsed * 100);
 };
+
+const paymentTargetKey = (target: ClientHubPaymentDateTarget): string =>
+  `${target.kind}:${target.id}`;
 
 type ClientBillingSectionProps = {
   companyId: string;
@@ -114,8 +118,19 @@ export const ClientBillingSection = ({
   // Inline mark-paid state for open receivables
   const [settlingEntryId, setSettlingEntryId] = useState<string | null>(null);
   const [settleEvidenceUrl, setSettleEvidenceUrl] = useState('');
+  const [settlePaymentDate, setSettlePaymentDate] = useState(todayIso);
   const [settleSaving, setSettleSaving] = useState(false);
   const [settleError, setSettleError] = useState<string | null>(null);
+
+  // Inline payment-date editor state
+  const [editingPaymentTarget, setEditingPaymentTarget] =
+    useState<ClientHubPaymentDateTarget | null>(null);
+  const [editingPaymentDate, setEditingPaymentDate] = useState('');
+  const [editingPaymentSaving, setEditingPaymentSaving] = useState(false);
+  const [editingPaymentError, setEditingPaymentError] = useState<string | null>(
+    null,
+  );
+  const [showAllEntries, setShowAllEntries] = useState(false);
 
   if (!finance) return null;
 
@@ -260,6 +275,10 @@ export const ClientBillingSection = ({
       );
       return;
     }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(settlePaymentDate)) {
+      setSettleError(t`Choose a valid payment date.`);
+      return;
+    }
     setSettleSaving(true);
     try {
       await mutateBusiness({
@@ -271,14 +290,16 @@ export const ClientBillingSection = ({
             status: 'PAID',
             note: `Payment confirmed for ${companyName}`,
             evidence,
+            paymentDate: settlePaymentDate,
           },
         },
       });
       await onRefreshHub();
       setSettlingEntryId(null);
       setSettleEvidenceUrl('');
+      setSettlePaymentDate(todayIso());
       setStatusMessage(
-        t`Marked "${entry.title}" as paid and posted to Business → Finance.`,
+        t`Marked "${entry.title}" as paid (${formatIsoDateShort(settlePaymentDate)}) and posted to Business → Finance.`,
       );
     } catch (error) {
       setSettleError(
@@ -288,6 +309,65 @@ export const ClientBillingSection = ({
       );
     } finally {
       setSettleSaving(false);
+    }
+  };
+
+  const openPaymentDateEditor = (
+    target: ClientHubPaymentDateTarget,
+    currentDate: string,
+  ) => {
+    setSettlingEntryId(null);
+    setEditingPaymentTarget(target);
+    setEditingPaymentDate(currentDate);
+    setEditingPaymentError(null);
+    setStatusMessage(null);
+  };
+
+  const closePaymentDateEditor = () => {
+    setEditingPaymentTarget(null);
+    setEditingPaymentDate('');
+    setEditingPaymentError(null);
+  };
+
+  const handleSavePaymentDate = async (
+    entryTitleLabel: string,
+    target: ClientHubPaymentDateTarget,
+    event: React.FormEvent,
+  ) => {
+    event.preventDefault();
+    setEditingPaymentError(null);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(editingPaymentDate)) {
+      setEditingPaymentError(t`Choose a valid payment date.`);
+      return;
+    }
+    setEditingPaymentSaving(true);
+    try {
+      await mutateBusiness({
+        variables: {
+          input: {
+            action: 'updatePaymentDate',
+            target: target.kind,
+            id: target.id,
+            ...(target.kind === 'BUSINESS_RECORD'
+              ? { revision: target.revision }
+              : {}),
+            paymentDate: editingPaymentDate,
+          },
+        },
+      });
+      await onRefreshHub();
+      closePaymentDateEditor();
+      setStatusMessage(
+        t`Updated payment date for "${entryTitleLabel}" to ${formatIsoDateShort(editingPaymentDate)} and synced to Business → Finance.`,
+      );
+    } catch (error) {
+      setEditingPaymentError(
+        error instanceof Error
+          ? error.message
+          : t`Unable to update this payment date. Please refresh and try again.`,
+      );
+    } finally {
+      setEditingPaymentSaving(false);
     }
   };
 
@@ -740,126 +820,332 @@ export const ClientBillingSection = ({
 
         {/* Recent billing entries */}
         {finance.entries.length > 0 ? (
-          <StyledLedgerList aria-label={t`Recent client billing entries`}>
-            {finance.entries.slice(0, 8).map((entry) => {
-              const isOpenReceivable =
-                entry.category === 'RECEIVABLE' &&
-                (entry.status === 'OPEN' || entry.status === 'PARTIALLY_PAID');
-              const isPartiallyPaid = entry.status === 'PARTIALLY_PAID';
-              const isNativeFinanceV2Entry = entry.revision === 0;
-              const isOverdue =
-                isOpenReceivable &&
-                Boolean(entry.dueDate) &&
-                (entry.dueDate as string) < today;
-              const tone =
-                entry.category === 'INCOME' || entry.status === 'PAID'
+          <>
+            <StyledLedgerList aria-label={t`Recent client billing entries`}>
+              {(showAllEntries
+                ? finance.entries
+                : finance.entries.slice(0, 8)
+              ).map((entry) => {
+                const isOpenReceivable =
+                  entry.category === 'RECEIVABLE' &&
+                  (entry.status === 'OPEN' || entry.status === 'PARTIALLY_PAID');
+                const isPartiallyPaid = entry.status === 'PARTIALLY_PAID';
+                const isPaidEntry =
+                  entry.category === 'INCOME' || entry.status === 'PAID';
+                const isNativeFinanceV2Entry = entry.revision === 0;
+                const isOverdue =
+                  isOpenReceivable &&
+                  Boolean(entry.dueDate) &&
+                  (entry.dueDate as string) < today;
+                const tone = isPaidEntry
                   ? 'success'
                   : isOverdue
                     ? 'danger'
                     : 'warning';
-              const badgeLabel =
-                entry.category === 'INCOME'
-                  ? t`Collected`
-                  : entry.status === 'PAID'
-                    ? t`Paid`
-                    : isPartiallyPaid
-                      ? t`Partially paid`
-                      : isOverdue
-                        ? t`Overdue`
-                        : t`Open invoice`;
+                const badgeLabel =
+                  entry.category === 'INCOME'
+                    ? t`Collected`
+                    : entry.status === 'PAID'
+                      ? t`Paid`
+                      : isPartiallyPaid
+                        ? t`Partially paid`
+                        : isOverdue
+                          ? t`Overdue`
+                          : t`Open invoice`;
 
-              return (
-                <StyledLedgerRow key={entry.id}>
-                  <div className="ledger-info">
-                    <StyledDeliveryRow>
-                      <strong>{entry.title}</strong>
-                      <StyledClientTag data-tone={tone}>
-                        {badgeLabel}
-                      </StyledClientTag>
-                    </StyledDeliveryRow>
-                    <small>
-                      {formatIsoDateShort(entry.date)}
-                      {entry.dueDate && isOpenReceivable
-                        ? ` · ${t`Due ${formatIsoDateShort(entry.dueDate)}`}`
-                        : ''}
-                      {entry.projectName ? ` · ${entry.projectName}` : ''}
-                      {entry.externalReference
-                        ? ` · ${entry.externalReference}`
-                        : ''}
-                    </small>
-                    {settlingEntryId === entry.id && !isNativeFinanceV2Entry && (
-                      <form
-                        onSubmit={(event) =>
-                          void handleConfirmPaid(entry, event)
-                        }
-                        style={{ marginTop: '8px' }}
-                      >
-                        <StyledDeliveryRow>
-                          <input
-                            aria-label={t`Payment proof URL`}
-                            type="url"
-                            required
-                            placeholder="https://receipt-or-bank-proof-link"
-                            value={settleEvidenceUrl}
-                            onChange={(event) =>
-                              setSettleEvidenceUrl(event.target.value)
+                const singleTarget = entry.paymentTarget ?? null;
+                const entryPayments = entry.payments ?? [];
+                const hasMultiplePayments = entryPayments.length > 1;
+                const activeEditKey = editingPaymentTarget
+                  ? paymentTargetKey(editingPaymentTarget)
+                  : null;
+                const isEditingSingle = Boolean(
+                  singleTarget &&
+                    activeEditKey === paymentTargetKey(singleTarget),
+                );
+                const resolvedPaidDate = entry.paidDate ?? entry.date;
+
+                return (
+                  <StyledLedgerRow key={entry.id}>
+                    <div className="ledger-info">
+                      <StyledDeliveryRow>
+                        <strong>{entry.title}</strong>
+                        <StyledClientTag data-tone={tone}>
+                          {badgeLabel}
+                        </StyledClientTag>
+                      </StyledDeliveryRow>
+                      <small>
+                        {isPaidEntry ? (
+                          <>
+                            {t`Paid ${formatIsoDateShort(resolvedPaidDate)}`}
+                            {entry.category === 'RECEIVABLE' &&
+                            entry.paidDate &&
+                            entry.paidDate !== entry.date
+                              ? ` · ${t`Issued ${formatIsoDateShort(entry.date)}`}`
+                              : ''}
+                          </>
+                        ) : (
+                          <>
+                            {formatIsoDateShort(entry.date)}
+                            {entry.dueDate && isOpenReceivable
+                              ? ` · ${t`Due ${formatIsoDateShort(entry.dueDate)}`}`
+                              : ''}
+                            {isPartiallyPaid &&
+                            entry.paidDate &&
+                            !hasMultiplePayments
+                              ? ` · ${t`Paid ${formatIsoDateShort(entry.paidDate)}`}`
+                              : ''}
+                          </>
+                        )}
+                        {entry.projectName ? ` · ${entry.projectName}` : ''}
+                        {entry.externalReference
+                          ? ` · ${entry.externalReference}`
+                          : ''}
+                      </small>
+
+                      {isEditingSingle && singleTarget && (
+                        <form
+                          onSubmit={(event) =>
+                            void handleSavePaymentDate(
+                              entry.title,
+                              singleTarget,
+                              event,
+                            )
+                          }
+                          style={{ marginTop: '8px' }}
+                        >
+                          <StyledDeliveryRow>
+                            <input
+                              aria-label={t`Payment date`}
+                              type="date"
+                              required
+                              value={editingPaymentDate}
+                              onChange={(event) =>
+                                setEditingPaymentDate(event.target.value)
+                              }
+                            />
+                            <StyledDeliveryButton
+                              type="submit"
+                              data-primary="true"
+                              disabled={editingPaymentSaving}
+                            >
+                              {editingPaymentSaving
+                                ? t`Saving…`
+                                : t`Save date`}
+                            </StyledDeliveryButton>
+                            <StyledDeliveryButton
+                              type="button"
+                              disabled={editingPaymentSaving}
+                              onClick={closePaymentDateEditor}
+                            >
+                              <Trans>Cancel</Trans>
+                            </StyledDeliveryButton>
+                          </StyledDeliveryRow>
+                          {editingPaymentError && (
+                            <p role="alert">{editingPaymentError}</p>
+                          )}
+                        </form>
+                      )}
+
+                      {hasMultiplePayments && (
+                        <div
+                          style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '4px',
+                            marginTop: '6px',
+                          }}
+                        >
+                          {entryPayments.map((payment) => {
+                            const itemKey = paymentTargetKey(payment.target);
+                            const isEditingItem = activeEditKey === itemKey;
+                            return (
+                              <div key={payment.id}>
+                                <StyledDeliveryRow>
+                                  <small>
+                                    {t`Paid ${formatMoneyMinor(payment.amount, payment.currency)} on ${formatIsoDateShort(payment.date)}`}
+                                  </small>
+                                  {finance.canManage && !isEditingItem && (
+                                    <StyledClientSubtleButton
+                                      type="button"
+                                      onClick={() =>
+                                        openPaymentDateEditor(
+                                          payment.target,
+                                          payment.date,
+                                        )
+                                      }
+                                    >
+                                      <Trans>Edit date</Trans>
+                                    </StyledClientSubtleButton>
+                                  )}
+                                </StyledDeliveryRow>
+                                {isEditingItem && (
+                                  <form
+                                    onSubmit={(event) =>
+                                      void handleSavePaymentDate(
+                                        entry.title,
+                                        payment.target,
+                                        event,
+                                      )
+                                    }
+                                    style={{ marginTop: '6px' }}
+                                  >
+                                    <StyledDeliveryRow>
+                                      <input
+                                        aria-label={t`Payment date`}
+                                        type="date"
+                                        required
+                                        value={editingPaymentDate}
+                                        onChange={(event) =>
+                                          setEditingPaymentDate(
+                                            event.target.value,
+                                          )
+                                        }
+                                      />
+                                      <StyledDeliveryButton
+                                        type="submit"
+                                        data-primary="true"
+                                        disabled={editingPaymentSaving}
+                                      >
+                                        {editingPaymentSaving
+                                          ? t`Saving…`
+                                          : t`Save date`}
+                                      </StyledDeliveryButton>
+                                      <StyledDeliveryButton
+                                        type="button"
+                                        disabled={editingPaymentSaving}
+                                        onClick={closePaymentDateEditor}
+                                      >
+                                        <Trans>Cancel</Trans>
+                                      </StyledDeliveryButton>
+                                    </StyledDeliveryRow>
+                                    {editingPaymentError && (
+                                      <p role="alert">{editingPaymentError}</p>
+                                    )}
+                                  </form>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {settlingEntryId === entry.id &&
+                        !isNativeFinanceV2Entry && (
+                          <form
+                            onSubmit={(event) =>
+                              void handleConfirmPaid(entry, event)
                             }
-                            style={{ minWidth: '240px' }}
-                          />
-                          <StyledDeliveryButton
-                            type="submit"
-                            data-primary="true"
-                            disabled={settleSaving}
+                            style={{ marginTop: '8px' }}
                           >
-                            {settleSaving ? t`Confirming…` : t`Confirm paid`}
-                          </StyledDeliveryButton>
+                            <StyledDeliveryRow>
+                              <input
+                                aria-label={t`Payment date`}
+                                type="date"
+                                required
+                                value={settlePaymentDate}
+                                onChange={(event) =>
+                                  setSettlePaymentDate(event.target.value)
+                                }
+                              />
+                              <input
+                                aria-label={t`Payment proof URL`}
+                                type="url"
+                                required
+                                placeholder="https://receipt-or-bank-proof-link"
+                                value={settleEvidenceUrl}
+                                onChange={(event) =>
+                                  setSettleEvidenceUrl(event.target.value)
+                                }
+                                style={{ minWidth: '220px' }}
+                              />
+                              <StyledDeliveryButton
+                                type="submit"
+                                data-primary="true"
+                                disabled={settleSaving}
+                              >
+                                {settleSaving
+                                  ? t`Confirming…`
+                                  : t`Confirm paid`}
+                              </StyledDeliveryButton>
+                              <StyledDeliveryButton
+                                type="button"
+                                disabled={settleSaving}
+                                onClick={() => {
+                                  setSettlingEntryId(null);
+                                  setSettleError(null);
+                                }}
+                              >
+                                <Trans>Cancel</Trans>
+                              </StyledDeliveryButton>
+                            </StyledDeliveryRow>
+                            {settleError && <p role="alert">{settleError}</p>}
+                          </form>
+                        )}
+                    </div>
+
+                    <div className="ledger-right">
+                      <span className="ledger-amount">
+                        {formatMoneyMinor(entry.amount, entry.currency)}
+                      </span>
+                      {finance.canManage &&
+                        singleTarget &&
+                        !hasMultiplePayments &&
+                        !isEditingSingle && (
+                          <StyledClientSubtleButton
+                            type="button"
+                            onClick={() =>
+                              openPaymentDateEditor(
+                                singleTarget,
+                                resolvedPaidDate,
+                              )
+                            }
+                          >
+                            <Trans>Edit date</Trans>
+                          </StyledClientSubtleButton>
+                        )}
+                      {isOpenReceivable &&
+                        finance.canManage &&
+                        !isNativeFinanceV2Entry &&
+                        settlingEntryId !== entry.id && (
                           <StyledDeliveryButton
                             type="button"
-                            disabled={settleSaving}
                             onClick={() => {
-                              setSettlingEntryId(null);
+                              closePaymentDateEditor();
+                              setSettlingEntryId(entry.id);
+                              setSettleEvidenceUrl('');
+                              setSettlePaymentDate(todayIso());
                               setSettleError(null);
                             }}
                           >
-                            <Trans>Cancel</Trans>
+                            <Trans>Mark paid</Trans>
                           </StyledDeliveryButton>
-                        </StyledDeliveryRow>
-                        {settleError && <p role="alert">{settleError}</p>}
-                      </form>
-                    )}
-                  </div>
-
-                  <div className="ledger-right">
-                    <span className="ledger-amount">
-                      {formatMoneyMinor(entry.amount, entry.currency)}
-                    </span>
-                    {isOpenReceivable &&
-                      finance.canManage &&
-                      !isNativeFinanceV2Entry &&
-                      settlingEntryId !== entry.id && (
-                        <StyledDeliveryButton
-                          type="button"
-                          onClick={() => {
-                            setSettlingEntryId(entry.id);
-                            setSettleEvidenceUrl('');
-                            setSettleError(null);
-                          }}
-                        >
-                          <Trans>Mark paid</Trans>
-                        </StyledDeliveryButton>
-                      )}
-                    {isOpenReceivable &&
-                      finance.canManage &&
-                      isNativeFinanceV2Entry && (
-                        <Link to="/delivery?view=finance&financeView=documents">
-                          <Trans>Record in Finance →</Trans>
-                        </Link>
-                      )}
-                  </div>
-                </StyledLedgerRow>
-              );
-            })}
-          </StyledLedgerList>
+                        )}
+                      {isOpenReceivable &&
+                        finance.canManage &&
+                        isNativeFinanceV2Entry && (
+                          <Link to="/delivery?view=finance&financeView=documents">
+                            <Trans>Record in Finance →</Trans>
+                          </Link>
+                        )}
+                    </div>
+                  </StyledLedgerRow>
+                );
+              })}
+            </StyledLedgerList>
+            {finance.entries.length > 8 && (
+              <div>
+                <StyledClientSubtleButton
+                  type="button"
+                  onClick={() => setShowAllEntries((previous) => !previous)}
+                >
+                  {showAllEntries
+                    ? t`Show recent 8`
+                    : t`Show all ${finance.entries.length} entries`}
+                </StyledClientSubtleButton>
+              </div>
+            )}
+          </>
         ) : (
           <small>
             <Trans>No payments or invoices recorded for this client yet.</Trans>

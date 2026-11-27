@@ -257,6 +257,17 @@ export const businessCommandSchema = z.discriminatedUnion('action', [
       ]),
       note: title,
       evidence: url.nullable(),
+      paymentDate: z.iso.date().optional(),
+    })
+    .strict(),
+  z
+    .object({
+      action: z.literal('updatePaymentDate'),
+      target: z.enum(['BUSINESS_RECORD', 'FINANCE_V2_JOURNAL']),
+      id: identifier,
+      revision: z.number().int().positive().optional(),
+      paymentDate: z.iso.date(),
+      note: z.string().trim().max(240).optional(),
     })
     .strict(),
   z

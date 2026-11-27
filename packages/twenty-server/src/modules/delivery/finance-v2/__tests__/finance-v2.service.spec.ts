@@ -4174,5 +4174,211 @@ describe('DeliveryFinanceV2Service End-to-End Accounting, Payroll, Quotes & Auto
       collectionPercent: 60,
     });
   });
+
+  it('updates client payment dates across BusinessRecord-synced and native Finance V2 journals while enforcing period locks', async () => {
+    const { service, stores, manager } = setup();
+    const nowUtc = new Date('2026-11-26T09:00:00Z');
+    const alphaCompanyId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const paymentRecordId = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+
+    await service.snapshot(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      { fromDate: '2026-11-01', toDate: '2026-11-30', asOfDate: '2026-11-26' },
+      nowUtc,
+    );
+
+    stores.set(DeliveryOperationsEntity, [
+      {
+        workspaceId: workspace.id,
+        state: {
+          clientRoster: { includedIds: [alphaCompanyId], excludedIds: [] },
+          clientFees: {
+            [alphaCompanyId]: {
+              amount: 600000,
+              currency: 'AED',
+              cadence: 'MONTHLY',
+              notes: '',
+              updatedAt: '2026-11-01T00:00:00Z',
+              updatedBy: adminMemberId,
+            },
+          },
+          business: {
+            records: [
+              {
+                id: paymentRecordId,
+                revision: 1,
+                kind: 'FINANCE',
+                category: 'INCOME',
+                companyId: alphaCompanyId,
+                projectId: null,
+                title: 'Alpha November Retainer',
+                currency: 'AED',
+                amount: 600000,
+                date: '2026-11-12',
+                dueDate: null,
+                externalReference: 'PAY-ALPHA-DATE-1',
+                evidenceUrl: null,
+                notes: '',
+                status: 'POSTED',
+                createdBy: adminMemberId,
+                createdAt: '2026-11-12T00:00:00Z',
+                updatedAt: '2026-11-12T00:00:00Z',
+              },
+            ],
+          },
+        },
+      },
+    ]);
+
+    await service.syncClientBusinessFinanceEntryInTransaction(
+      manager as never,
+      {
+        workspaceId: workspace.id,
+        memberId: adminMemberId,
+        recordId: paymentRecordId,
+        category: 'INCOME',
+        title: 'Alpha November Retainer',
+        clientName: 'Alpha Studio',
+        currency: 'AED',
+        amountMinor: 600000,
+        date: '2026-11-12',
+        dueDate: null,
+        projectId: null,
+        externalReference: 'PAY-ALPHA-DATE-1',
+        evidenceUrl: null,
+        notes: '',
+      },
+    );
+
+    const beforeEdit = await service.snapshot(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      { fromDate: '2026-11-01', toDate: '2026-11-30', asOfDate: '2026-11-26' },
+      nowUtc,
+    );
+    expect(beforeEdit.profitAndLoss.revenueAedMicros).toBe('6000000000');
+    expect(beforeEdit.analytics.projectedMrr?.collectedTowardMrrAedMicros).toBe(
+      '6000000000',
+    );
+
+    // Move payment from November to October -> November P&L and November MRR immediately update
+    const moved = await service.updateClientPaymentDateInTransaction(
+      manager as never,
+      {
+        workspaceId: workspace.id,
+        memberId: adminMemberId,
+        newDate: '2026-10-28',
+        businessRecord: {
+          id: paymentRecordId,
+          category: 'INCOME',
+          externalReference: 'PAY-ALPHA-DATE-1',
+          currentDate: '2026-11-12',
+        },
+      },
+    );
+    expect(moved).toMatchObject({
+      oldDate: '2026-11-12',
+      newDate: '2026-10-28',
+    });
+
+    const afterEdit = await service.snapshot(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      { fromDate: '2026-11-01', toDate: '2026-11-30', asOfDate: '2026-11-26' },
+      nowUtc,
+    );
+    expect(afterEdit.profitAndLoss.revenueAedMicros).toBe('0');
+    expect(afterEdit.analytics.projectedMrr?.collectedTowardMrrAedMicros).toBe(
+      '0',
+    );
+    expect(afterEdit.analytics.projectedMrr?.clients[0]?.status).toBe('UNPAID');
+
+    // Create and pay a native Finance V2 invoice, then edit its payment journal date by journalId
+    const invRes = await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'saveInvoice',
+        clientName: 'Alpha Studio',
+        currency: 'AED',
+        issueDate: '2026-11-01',
+        dueDate: '2026-11-15',
+        lineItems: [
+          {
+            label: 'Sprint',
+            quantity: '1',
+            unitPriceMicros: '2000000000',
+            discountPercent: '0',
+          },
+        ],
+      },
+      nowUtc,
+    );
+    const payRes = await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      {
+        action: 'recordInvoicePayment',
+        invoiceId: String(invRes.invoiceId),
+        paymentDate: '2026-11-20',
+        amountMicros: '2000000000',
+      },
+      nowUtc,
+    );
+    const nativeJournalId = String(payRes.journalId);
+
+    const movedNative = await service.updateClientPaymentDateInTransaction(
+      manager as never,
+      {
+        workspaceId: workspace.id,
+        memberId: adminMemberId,
+        journalId: nativeJournalId,
+        newDate: '2026-11-09',
+      },
+    );
+    expect(movedNative).toMatchObject({
+      journalId: nativeJournalId,
+      oldDate: '2026-11-20',
+      newDate: '2026-11-09',
+    });
+
+    // Lock October 2026 -> cannot move November payment into October OR move October payment out of October
+    await service.command(
+      workspace,
+      adminMemberId,
+      userWorkspaceId,
+      { action: 'setPeriodLock', lockedThroughDate: '2026-10-31' },
+      nowUtc,
+    );
+
+    await expect(
+      service.updateClientPaymentDateInTransaction(manager as never, {
+        workspaceId: workspace.id,
+        memberId: adminMemberId,
+        journalId: nativeJournalId,
+        newDate: '2026-10-15',
+      }),
+    ).rejects.toThrow(/locked/i);
+
+    await expect(
+      service.updateClientPaymentDateInTransaction(manager as never, {
+        workspaceId: workspace.id,
+        memberId: adminMemberId,
+        newDate: '2026-11-05',
+        businessRecord: {
+          id: paymentRecordId,
+          category: 'INCOME',
+          externalReference: 'PAY-ALPHA-DATE-1',
+          currentDate: '2026-10-28',
+        },
+      }),
+    ).rejects.toThrow(/locked/i);
+  });
 });
 

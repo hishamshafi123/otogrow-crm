@@ -26,6 +26,10 @@ import { DataSource, type EntityManager } from 'typeorm';
 import { randomUUID } from 'node:crypto';
 import { WorkspaceEntity } from 'src/engine/core-modules/workspace/workspace.entity';
 import { DeliveryService } from 'src/modules/delivery/delivery.service';
+import {
+  CLIENT_BUSINESS_INVOICE_PAYMENT_PREFIX,
+  CLIENT_BUSINESS_PAYMENT_REF_TYPE,
+} from 'src/modules/delivery/finance-v2/finance-v2-client-sync.util';
 import { DeliveryFinanceV2Service } from 'src/modules/delivery/finance-v2/finance-v2.service';
 import { DeliveryOperationsEntity } from 'src/modules/delivery/entities/delivery-operations.entity';
 import { DeliveryProjectEntity } from 'src/modules/delivery/entities/delivery-project.entity';
@@ -1199,6 +1203,186 @@ export class DeliveryBusinessService {
         });
         return;
       }
+      if (command.action === 'updatePaymentDate') {
+        if (!canManageFinance(actor)) {
+          throw new ForbiddenException(
+            'Finance management access is required to edit payment dates.',
+          );
+        }
+        if (command.target === 'BUSINESS_RECORD') {
+          if (command.revision === undefined) {
+            throw new BadRequestException(
+              'Refresh before updating the payment date.',
+            );
+          }
+          const target = business.records.find(
+            (item) => item.id === command.id,
+          );
+          if (!target || !canReadBusinessRecord(target, actor, projectIds)) {
+            throw new NotFoundException('Payment record not found.');
+          }
+          if (target.revision !== command.revision) {
+            throw new ConflictException(
+              'This record changed. Refresh before continuing.',
+            );
+          }
+          if (
+            target.kind !== 'FINANCE' ||
+            target.status === 'VOID' ||
+            !(
+              target.category === 'INCOME' ||
+              (target.category === 'RECEIVABLE' && target.status === 'PAID')
+            )
+          ) {
+            throw new BadRequestException(
+              'Only posted client payments can have their payment date edited.',
+            );
+          }
+          if (
+            target.category === 'RECEIVABLE' &&
+            target.status === 'PAID' &&
+            business.records.some(
+              (item) =>
+                item.kind === 'FINANCE' &&
+                item.status !== 'VOID' &&
+                item.category === 'INCOME' &&
+                item.externalReference === `receivable:${target.id}`,
+            )
+          ) {
+            throw new BadRequestException(
+              'Edit the linked payment receipt to change this payment date.',
+            );
+          }
+          const previousDate = target.date;
+          const synced = this.financeV2
+            ? await this.financeV2.updateClientPaymentDateInTransaction(
+                manager,
+                {
+                  workspaceId: workspace.id,
+                  memberId,
+                  newDate: command.paymentDate,
+                  businessRecord: {
+                    id: target.id,
+                    category: target.category,
+                    externalReference: target.externalReference,
+                    currentDate: target.date,
+                  },
+                },
+              )
+            : null;
+          if (
+            previousDate === command.paymentDate &&
+            (!synced || synced.oldDate === command.paymentDate)
+          ) {
+            return;
+          }
+          target.date = command.paymentDate;
+          target.revision += 1;
+          target.updatedAt = now;
+          target.history.push({
+            at: now,
+            actorId: memberId,
+            action: 'PAYMENT_DATE_UPDATED',
+            note:
+              command.note?.trim() ||
+              `Payment date changed from ${previousDate} to ${command.paymentDate}`,
+          });
+          await this.recordActivity(manager, workspace.id, memberId, target, {
+            action: 'FINANCE_PAYMENT_DATE_UPDATED',
+            summary: 'Updated a client payment date.',
+            changes: [
+              {
+                field: 'paymentDate',
+                before: synced?.oldDate ?? previousDate,
+                after: command.paymentDate,
+              },
+              {
+                field: 'revision',
+                before: String(command.revision),
+                after: String(target.revision),
+              },
+            ],
+          });
+          return;
+        }
+
+        if (!this.financeV2) {
+          throw new BadRequestException('Finance ledger is unavailable.');
+        }
+        const updated =
+          await this.financeV2.updateClientPaymentDateInTransaction(manager, {
+            workspaceId: workspace.id,
+            memberId,
+            journalId: command.id,
+            newDate: command.paymentDate,
+          });
+        if (!updated) {
+          throw new NotFoundException('Payment entry not found.');
+        }
+
+        // Keep any matching BusinessRecord in sync when a synced Finance V2 journal is edited directly.
+        let linkedRecordId: string | null = null;
+        if (
+          updated.sourceRefType === CLIENT_BUSINESS_PAYMENT_REF_TYPE &&
+          updated.sourceRefId
+        ) {
+          linkedRecordId = updated.sourceRefId;
+        } else if (
+          updated.sourceRefType === 'INVOICE_PAYMENT' &&
+          updated.sourceRefId
+        ) {
+          const [, suffix] = updated.sourceRefId.split(':');
+          if (suffix?.startsWith(CLIENT_BUSINESS_INVOICE_PAYMENT_PREFIX)) {
+            linkedRecordId = suffix.slice(
+              CLIENT_BUSINESS_INVOICE_PAYMENT_PREFIX.length,
+            );
+          }
+        }
+        if (linkedRecordId) {
+          const linkedRecord = business.records.find(
+            (item) =>
+              item.id === linkedRecordId &&
+              item.kind === 'FINANCE' &&
+              item.status !== 'VOID',
+          );
+          if (linkedRecord && linkedRecord.kind === 'FINANCE' && linkedRecord.date !== updated.newDate) {
+            const previousRecordDate = linkedRecord.date;
+            linkedRecord.date = updated.newDate;
+            linkedRecord.revision += 1;
+            linkedRecord.updatedAt = now;
+            linkedRecord.history.push({
+              at: now,
+              actorId: memberId,
+              action: 'PAYMENT_DATE_UPDATED',
+              note:
+                command.note?.trim() ||
+                `Payment date changed from ${previousRecordDate} to ${updated.newDate}`,
+            });
+          }
+        }
+
+        if (updated.oldDate !== updated.newDate) {
+          await recordOtogrowActivity(manager, {
+            workspaceId: workspace.id,
+            actorId: memberId,
+            category: 'BUSINESS',
+            sourceType: 'finance-payment',
+            sourceId: updated.journalId,
+            projectId: updated.projectId,
+            outcome: 'RECORDED',
+            action: 'FINANCE_PAYMENT_DATE_UPDATED',
+            summary: 'Updated a client payment date.',
+            changes: [
+              {
+                field: 'paymentDate',
+                before: updated.oldDate,
+                after: updated.newDate,
+              },
+            ],
+          });
+        }
+        return;
+      }
       const record = business.records.find((item) => item.id === command.id);
       if (!record || !canReadBusinessRecord(record, actor, projectIds))
         throw new NotFoundException();
@@ -1398,8 +1582,10 @@ export class DeliveryBusinessService {
             id: randomUUID(),
             revision: 1,
             category: 'INCOME',
-            date: financeReportingClock(reportingClocks, record.currency)
-              .businessDate,
+            date:
+              command.paymentDate ??
+              financeReportingClock(reportingClocks, record.currency)
+                .businessDate,
             dueDate: null,
             externalReference: `receivable:${record.id}`,
             title: `Payment: ${record.title}`,

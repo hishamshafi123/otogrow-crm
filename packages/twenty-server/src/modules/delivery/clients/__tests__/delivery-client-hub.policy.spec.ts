@@ -496,4 +496,233 @@ describe('delivery-client-hub.policy', () => {
       amount: 250000,
     });
   });
+
+  it('exposes actual paidDate and editable paymentTarget for direct payments, paid receivables with auto-receipts, and native Finance V2 invoices', () => {
+    const workspaceId = randomUUID();
+    const companyId = randomUUID();
+    const projectId = randomUUID();
+    const memberId = randomUUID();
+    const directPaymentId = randomUUID();
+    const paidReceivableId = randomUUID();
+    const autoReceiptId = randomUUID();
+    const nativeInvoiceId = randomUUID();
+    const nativePaymentJournal1 = randomUUID();
+    const nativePaymentJournal2 = randomUUID();
+    const now = new Date('2026-11-26T12:00:00.000Z');
+    const syncedReceivableInvId = deterministicClientReceivableInvoiceId(
+      workspaceId,
+      paidReceivableId,
+    );
+
+    const snapshot = buildClientHubSnapshot({
+      workspaceId,
+      companies: [
+        {
+          id: companyId,
+          name: 'Apex Media',
+          domainName: 'apex.media',
+          updatedAt: now.toISOString(),
+          sourceToken: 'a'.repeat(64),
+        },
+      ],
+      roster: { includedIds: [companyId], excludedIds: [] },
+      clientFees: {},
+      projects: [
+        {
+          id: projectId,
+          name: 'Apex Retainer',
+          companyId,
+          memberIds: [memberId],
+        },
+      ],
+      tasks: [],
+      engagements: [],
+      links: [],
+      shares: [],
+      businessRecords: [
+        {
+          id: directPaymentId,
+          revision: 2,
+          kind: 'FINANCE',
+          projectId,
+          companyId,
+          title: 'Direct retainer payment',
+          currency: 'USD',
+          amount: 100000,
+          date: '2026-11-05',
+          category: 'INCOME',
+          dueDate: null,
+          externalReference: 'PAY-1',
+          evidenceUrl: null,
+          notes: '',
+          status: 'POSTED',
+          createdBy: memberId,
+          createdAt: now.toISOString(),
+          updatedAt: now.toISOString(),
+          history: [],
+        },
+        {
+          id: paidReceivableId,
+          revision: 2,
+          kind: 'FINANCE',
+          projectId,
+          companyId,
+          title: 'October Invoice',
+          currency: 'USD',
+          amount: 200000,
+          date: '2026-10-01', // issue date
+          category: 'RECEIVABLE',
+          dueDate: '2026-10-15',
+          externalReference: 'INV-100',
+          evidenceUrl: null,
+          notes: '',
+          status: 'PAID',
+          createdBy: memberId,
+          createdAt: now.toISOString(),
+          updatedAt: now.toISOString(),
+          history: [],
+        },
+        {
+          id: autoReceiptId,
+          revision: 1,
+          kind: 'FINANCE',
+          projectId,
+          companyId,
+          title: 'Payment: October Invoice',
+          currency: 'USD',
+          amount: 200000,
+          date: '2026-11-18', // actual date paid
+          category: 'INCOME',
+          dueDate: null,
+          externalReference: `receivable:${paidReceivableId}`,
+          evidenceUrl: 'https://receipt.example/1',
+          notes: '',
+          status: 'POSTED',
+          createdBy: memberId,
+          createdAt: now.toISOString(),
+          updatedAt: now.toISOString(),
+          history: [],
+        },
+      ] as unknown as BusinessRecord[],
+      financeV2Invoices: [
+        {
+          id: syncedReceivableInvId,
+          invoiceNumber: 'INV-100',
+          clientName: 'Apex Media',
+          projectId,
+          currency: 'USD',
+          totalMicros: '2000000000',
+          paidMicros: '2000000000',
+          status: 'PAID',
+          issueDate: '2026-10-01',
+          dueDate: '2026-10-15',
+          notes: '',
+        },
+        {
+          id: nativeInvoiceId,
+          invoiceNumber: 'INV-901',
+          clientName: 'Apex Media',
+          projectId,
+          currency: 'USD',
+          totalMicros: '3000000000',
+          paidMicros: '3000000000',
+          status: 'PAID',
+          issueDate: '2026-11-01',
+          dueDate: '2026-11-15',
+          notes: '',
+        },
+      ],
+      financeV2PaymentJournals: [
+        {
+          id: randomUUID(),
+          entryDate: '2026-11-18',
+          title: 'Payment: October Invoice',
+          notes: '',
+          currency: 'USD',
+          amountMicros: '2000000000',
+          projectId,
+          sourceRefType: 'INVOICE_PAYMENT',
+          sourceRefId: `${syncedReceivableInvId}:client-business-pay-${autoReceiptId}`,
+          status: 'POSTED',
+        },
+        {
+          id: nativePaymentJournal1,
+          entryDate: '2026-11-08',
+          title: 'Invoice payment 1',
+          notes: '',
+          currency: 'USD',
+          amountMicros: '1500000000',
+          projectId,
+          sourceRefType: 'INVOICE_PAYMENT',
+          sourceRefId: `${nativeInvoiceId}:pay-1`,
+          status: 'POSTED',
+        },
+        {
+          id: nativePaymentJournal2,
+          entryDate: '2026-11-22',
+          title: 'Invoice payment 2',
+          notes: '',
+          currency: 'USD',
+          amountMicros: '1500000000',
+          projectId,
+          sourceRefType: 'INVOICE_PAYMENT',
+          sourceRefId: `${nativeInvoiceId}:pay-2`,
+          status: 'POSTED',
+        },
+      ],
+      memberNamesById: new Map([[memberId, 'Maya']]),
+      canReadFinance: true,
+      canManageFinance: true,
+      now,
+    });
+
+    const entries = snapshot.clients[0].finance?.entries ?? [];
+    // Sorted newest paidDate first: nativeInvoice (2026-11-22), paidReceivable (2026-11-18), directPayment (2026-11-05)
+    expect(entries.map((entry) => entry.id)).toEqual([
+      nativeInvoiceId,
+      paidReceivableId,
+      directPaymentId,
+    ]);
+
+    const directEntry = entries.find((entry) => entry.id === directPaymentId);
+    expect(directEntry?.paidDate).toBe('2026-11-05');
+    expect(directEntry?.paymentTarget).toEqual({
+      kind: 'BUSINESS_RECORD',
+      id: directPaymentId,
+      revision: 2,
+    });
+
+    // Paid receivable surfaces its linked receipt's paid date and targets the receipt for editing
+    const receivableEntry = entries.find(
+      (entry) => entry.id === paidReceivableId,
+    );
+    expect(receivableEntry?.date).toBe('2026-10-01');
+    expect(receivableEntry?.paidDate).toBe('2026-11-18');
+    expect(receivableEntry?.paymentTarget).toEqual({
+      kind: 'BUSINESS_RECORD',
+      id: autoReceiptId,
+      revision: 1,
+    });
+
+    // Multi-payment native Finance V2 invoice exposes each individual payment target
+    const nativeEntry = entries.find((entry) => entry.id === nativeInvoiceId);
+    expect(nativeEntry?.paidDate).toBe('2026-11-22');
+    expect(nativeEntry?.paymentTarget).toBeNull();
+    expect(nativeEntry?.payments).toEqual([
+      {
+        id: nativePaymentJournal2,
+        date: '2026-11-22',
+        amount: 150000,
+        currency: 'USD',
+        target: { kind: 'FINANCE_V2_JOURNAL', id: nativePaymentJournal2 },
+      },
+      {
+        id: nativePaymentJournal1,
+        date: '2026-11-08',
+        amount: 150000,
+        currency: 'USD',
+        target: { kind: 'FINANCE_V2_JOURNAL', id: nativePaymentJournal1 },
+      },
+    ]);
+  });
 });

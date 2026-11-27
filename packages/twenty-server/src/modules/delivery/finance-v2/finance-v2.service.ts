@@ -6389,6 +6389,149 @@ export class DeliveryFinanceV2Service {
     }
   }
 
+  async updateClientPaymentDateInTransaction(
+    manager: EntityManager,
+    params: {
+      workspaceId: string;
+      memberId: string;
+      newDate: string;
+      journalId?: string;
+      businessRecord?: {
+        id: string;
+        category: 'INCOME' | 'RECEIVABLE';
+        externalReference: string;
+        currentDate: string;
+      };
+    },
+  ): Promise<{
+    journalId: string;
+    oldDate: string;
+    newDate: string;
+    title: string;
+    projectId: string | null;
+    sourceRefType: string | null;
+    sourceRefId: string | null;
+  } | null> {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(params.newDate)) {
+      throw new BadRequestException(
+        'Enter a valid payment date in YYYY-MM-DD format.',
+      );
+    }
+    await this.lockWorkspace(manager, params.workspaceId, true);
+    const profile = await this.ensureProfile(manager, params.workspaceId);
+    const journalRepo = manager.getRepository(DeliveryFinanceV2JournalEntity);
+
+    assertDateNotLocked(
+      profile.lockedThroughDate,
+      params.newDate,
+      'move payment dates',
+    );
+
+    let journal: DeliveryFinanceV2JournalEntity | null = null;
+    if (params.journalId) {
+      journal = await journalRepo.findOneBy({
+        workspaceId: params.workspaceId,
+        id: params.journalId,
+      });
+      if (!journal) {
+        throw new NotFoundException('Payment entry not found in Finance.');
+      }
+      if (
+        journal.status !== 'POSTED' ||
+        journal.entryType !== 'INVOICE_PAYMENT'
+      ) {
+        throw new BadRequestException(
+          'Only posted client payment entries can have their payment date edited.',
+        );
+      }
+    } else if (params.businessRecord) {
+      const { id, category, externalReference } = params.businessRecord;
+      if (category === 'INCOME' && externalReference.startsWith('receivable:')) {
+        const receivableId = externalReference.slice('receivable:'.length);
+        const linkedInvoiceId = deterministicClientReceivableInvoiceId(
+          params.workspaceId,
+          receivableId,
+        );
+        journal =
+          (await journalRepo.findOneBy({
+            workspaceId: params.workspaceId,
+            sourceRefType: 'INVOICE_PAYMENT',
+            sourceRefId: `${linkedInvoiceId}:${CLIENT_BUSINESS_INVOICE_PAYMENT_PREFIX}${id}`,
+            status: 'POSTED',
+          })) ??
+          (await journalRepo.findOneBy({
+            workspaceId: params.workspaceId,
+            sourceRefType: CLIENT_BUSINESS_PAYMENT_REF_TYPE,
+            sourceRefId: id,
+            status: 'POSTED',
+          }));
+      } else if (category === 'INCOME') {
+        journal = await journalRepo.findOneBy({
+          workspaceId: params.workspaceId,
+          sourceRefType: CLIENT_BUSINESS_PAYMENT_REF_TYPE,
+          sourceRefId: id,
+          status: 'POSTED',
+        });
+      } else if (category === 'RECEIVABLE') {
+        const linkedInvoiceId = deterministicClientReceivableInvoiceId(
+          params.workspaceId,
+          id,
+        );
+        journal = await journalRepo.findOneBy({
+          workspaceId: params.workspaceId,
+          sourceRefType: 'INVOICE_PAYMENT',
+          sourceRefId: `${linkedInvoiceId}:${CLIENT_BUSINESS_INVOICE_PAYMENT_PREFIX}${id}`,
+          status: 'POSTED',
+        });
+      }
+    }
+
+    if (!journal) {
+      if (params.businessRecord?.currentDate) {
+        assertDateNotLocked(
+          profile.lockedThroughDate,
+          params.businessRecord.currentDate,
+          'edit payment dates',
+        );
+      }
+      return null;
+    }
+
+    const reversal = await journalRepo.findOneBy({
+      workspaceId: params.workspaceId,
+      entryType: 'REVERSAL',
+      reversalOfJournalId: journal.id,
+      status: 'POSTED',
+    });
+    if (reversal) {
+      throw new BadRequestException(
+        'Cannot edit the date of a reversed payment entry.',
+      );
+    }
+
+    const oldDate = String(journal.entryDate).slice(0, 10);
+    assertDateNotLocked(
+      profile.lockedThroughDate,
+      oldDate,
+      'edit payment dates',
+    );
+
+    if (oldDate !== params.newDate) {
+      journal.entryDate = params.newDate;
+      await journalRepo.save(journal);
+    }
+
+    return {
+      journalId: journal.id,
+      oldDate,
+      newDate: params.newDate,
+      title: journal.title,
+      projectId: journal.projectId,
+      sourceRefType: journal.sourceRefType,
+      sourceRefId: journal.sourceRefId,
+    };
+  }
+
   private async hasUnsyncedClientBusinessBilling(
     manager: EntityManager,
     workspaceId: string,

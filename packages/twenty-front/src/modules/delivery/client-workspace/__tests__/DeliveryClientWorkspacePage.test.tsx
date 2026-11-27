@@ -342,11 +342,17 @@ const buildHubFixture = (): ClientHubSnapshot => ({
             currency: 'USD',
             amount: 250000,
             date: '2026-11-01',
+            paidDate: '2026-11-01',
             dueDate: null,
             projectId: SETUP_PROJECT,
             projectName: 'Acme Retainer',
             externalReference: 'INV-100',
             notes: '',
+            paymentTarget: {
+              kind: 'BUSINESS_RECORD',
+              id: 'fin-1',
+              revision: 1,
+            },
           },
         ],
       },
@@ -654,5 +660,93 @@ it('displays Projected MRR summary on Clients overview and surfaces inline fee s
       ),
     ),
   ).toBe(true);
+});
+
+it('lets managers edit payment dates inline and pick a custom payment date when marking an invoice paid', async () => {
+  const fixture = buildHubFixture();
+  fixture.clients[0].finance!.entries.push({
+    id: 'inv-open-1',
+    revision: 1,
+    title: 'December retainer invoice',
+    category: 'RECEIVABLE',
+    status: 'OPEN',
+    currency: 'USD',
+    amount: 150000,
+    date: '2026-11-20',
+    paidDate: null,
+    dueDate: '2026-12-05',
+    projectId: SETUP_PROJECT,
+    projectName: 'Acme Retainer',
+    externalReference: 'INV-101',
+    notes: '',
+    paymentTarget: null,
+    payments: [],
+  });
+  mockHubData = fixture;
+
+  const view = setup(`clientCompany=${SETUP_COMPANY}&clientSection=overview`);
+
+  // Edit payment date on existing paid entry
+  await view.user.click(screen.getByRole('button', { name: 'Edit date' }));
+  const dateInput = screen.getByLabelText('Payment date');
+  expect(dateInput).toHaveValue('2026-11-01');
+  await view.user.clear(dateInput);
+  await view.user.type(dateInput, '2026-11-18');
+  await view.user.click(screen.getByRole('button', { name: 'Save date' }));
+
+  expect(mockMutateBusiness).toHaveBeenCalledWith({
+    variables: {
+      input: {
+        action: 'updatePaymentDate',
+        target: 'BUSINESS_RECORD',
+        id: 'fin-1',
+        revision: 1,
+        paymentDate: '2026-11-18',
+      },
+    },
+  });
+  expect(mockRefetch).toHaveBeenCalled();
+  expect(screen.getByRole('status')).toHaveTextContent(
+    /Updated payment date for "November retainer".*Business → Finance/i,
+  );
+
+  // Mark open invoice paid with a custom payment date
+  await view.user.click(screen.getByRole('button', { name: 'Mark paid' }));
+  const settleDateInput = screen.getByLabelText('Payment date');
+  await view.user.clear(settleDateInput);
+  await view.user.type(settleDateInput, '2026-11-14');
+  await view.user.type(
+    screen.getByLabelText('Payment proof URL'),
+    'https://receipts.example/acme-dec',
+  );
+  await view.user.click(screen.getByRole('button', { name: 'Confirm paid' }));
+
+  expect(mockMutateBusiness).toHaveBeenLastCalledWith({
+    variables: {
+      input: {
+        action: 'transition',
+        id: 'inv-open-1',
+        revision: 1,
+        status: 'PAID',
+        note: 'Payment confirmed for Current client company',
+        evidence: 'https://receipts.example/acme-dec',
+        paymentDate: '2026-11-14',
+      },
+    },
+  });
+
+  // Surface inline period-lock error when editing a payment date fails
+  mockMutateBusiness.mockRejectedValueOnce(
+    new Error('Accounting period through 2026-10-31 is locked.'),
+  );
+  await view.user.click(screen.getByRole('button', { name: 'Edit date' }));
+  const lockedDateInput = screen.getByLabelText('Payment date');
+  await view.user.clear(lockedDateInput);
+  await view.user.type(lockedDateInput, '2026-10-15');
+  await view.user.click(screen.getByRole('button', { name: 'Save date' }));
+
+  expect(screen.getByRole('alert')).toHaveTextContent(
+    'Accounting period through 2026-10-31 is locked.',
+  );
 });
 

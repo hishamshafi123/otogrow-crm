@@ -50,6 +50,18 @@ export type ClientHubCurrencyTotal = {
   count: number;
 };
 
+export type ClientHubPaymentDateTarget =
+  | { kind: 'BUSINESS_RECORD'; id: string; revision: number }
+  | { kind: 'FINANCE_V2_JOURNAL'; id: string };
+
+export type ClientHubPaymentItem = {
+  id: string;
+  date: string;
+  amount: number;
+  currency: string;
+  target: ClientHubPaymentDateTarget;
+};
+
 export type ClientHubFinanceEntry = {
   id: string;
   revision: number;
@@ -59,11 +71,14 @@ export type ClientHubFinanceEntry = {
   currency: string;
   amount: number;
   date: string;
+  paidDate?: string | null;
   dueDate: string | null;
   projectId: string | null;
   projectName: string | null;
   externalReference: string;
   notes: string;
+  paymentTarget?: ClientHubPaymentDateTarget | null;
+  payments?: ClientHubPaymentItem[];
 };
 
 export type ProjectedMrrStatus = 'PAID' | 'PARTIAL' | 'UNPAID' | 'ONE_TIME';
