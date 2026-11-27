@@ -407,6 +407,33 @@ const StyledThumbActions = styled.div`
   }
 `;
 
+const StyledUploadLabel = styled.label`
+  align-items: center;
+  background: ${themeCssVariables.background.primary};
+  border: 1px solid ${themeCssVariables.border.color.medium};
+  border-radius: 7px;
+  color: ${themeCssVariables.font.color.primary};
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 6px 10px;
+  white-space: nowrap;
+
+  &:hover {
+    border-color: ${themeCssVariables.font.color.primary};
+  }
+
+  &[data-disabled='true'] {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  input {
+    display: none;
+  }
+`;
+
 const StyledPickerTrigger = styled.button`
   align-items: center;
   background: ${themeCssVariables.background.primary};
@@ -853,7 +880,7 @@ export const DeliveryAiStudioPage = () => {
     activeTab.layoutModeOverride === 'AUTO'
       ? isClothingBrandClient
         ? 'CLOTHING'
-        : 'CLOTHING'
+        : 'GENERAL'
       : activeTab.layoutModeOverride;
 
   const presets = useMemo(() => workspace?.presets ?? [], [workspace?.presets]);
@@ -1030,39 +1057,48 @@ export const DeliveryAiStudioPage = () => {
     }
   };
 
-  const handleManualPhotoUpload = async (file: File) => {
-    if (!activeTab.companyId) return;
+  const handleManualPhotoUpload = async (
+    files: File[],
+    opts?: { createNew?: boolean },
+  ) => {
+    if (!activeTab.companyId || files.length === 0) return;
     setBanner(null);
     setUploadingPhoto(true);
     try {
-      let targetKitId: string | undefined = selectedGarment?.id;
+      let targetKitId: string | undefined = opts?.createNew
+        ? undefined
+        : selectedGarment?.id;
+      let nextIndex = opts?.createNew ? 0 : (selectedGarment?.assets.length ?? 0);
       if (!targetKitId) {
         const created = await upsertProductMutation({
           variables: {
             input: {
               companyId: activeTab.companyId,
               projectId: activeTab.projectId,
-              name: file.name.replace(/\.[^.]+$/, '') || 'Garment',
+              name: files[0].name.replace(/\.[^.]+$/, '') || 'Garment',
             },
           },
         });
         targetKitId = created.data?.upsertDeliveryStudioProductKit?.id;
       }
       if (!targetKitId) throw new Error('Could not prepare garment folder.');
-      const nextIndex = (selectedGarment?.assets.length ?? 0) + 1;
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('role', nextIndex === 1 ? 'FRONT' : 'DETAIL');
-      formData.append('label', `Image ${nextIndex}`);
-      const updated = await uploadStudioMultipart<StudioProductKitDTO>({
-        store,
-        endpointPath: `/portal/delivery-studio/product-kits/${targetKitId}/assets/upload`,
-        formData,
-      });
-      if (updated?.id) {
+      let latestUpdated: StudioProductKitDTO | null = null;
+      for (const file of files) {
+        nextIndex += 1;
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('role', nextIndex === 1 ? 'FRONT' : 'DETAIL');
+        formData.append('label', `Image ${nextIndex}`);
+        latestUpdated = await uploadStudioMultipart<StudioProductKitDTO>({
+          store,
+          endpointPath: `/portal/delivery-studio/product-kits/${targetKitId}/assets/upload`,
+          formData,
+        });
+      }
+      if (latestUpdated?.id) {
         patchActiveTab({
-          selectedProductKitId: updated.id,
-          selectedProductAssetIds: updated.assets.map((a) => a.id),
+          selectedProductKitId: latestUpdated.id,
+          selectedProductAssetIds: latestUpdated.assets.map((a) => a.id),
         });
       }
       await workspaceQuery.refetch();
@@ -1512,32 +1548,46 @@ export const DeliveryAiStudioPage = () => {
                       </span>
                     )}
 
-                    <label
-                      style={{
-                        border: '1px solid var(--t-border-color-medium, currentColor)',
-                        borderRadius: 7,
-                        cursor: uploadingPhoto ? 'not-allowed' : 'pointer',
-                        display: 'inline-flex',
-                        fontSize: 12,
-                        fontWeight: 500,
-                        opacity: uploadingPhoto ? 0.5 : 1,
-                        padding: '6px 10px',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
+                    <StyledUploadLabel data-disabled={uploadingPhoto}>
                       {uploadingPhoto ? 'Uploading…' : '+ Upload'}
                       <input
                         type="file"
                         accept="image/png,image/jpeg,image/webp"
+                        multiple
                         disabled={uploadingPhoto}
-                        style={{ display: 'none' }}
                         onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) void handleManualPhotoUpload(file);
+                          const list = Array.from(e.target.files ?? []);
+                          if (list.length > 0) {
+                            void handleManualPhotoUpload(list);
+                          }
                           e.target.value = '';
                         }}
                       />
-                    </label>
+                    </StyledUploadLabel>
+
+                    {selectedGarment && (
+                      <StyledUploadLabel
+                        data-disabled={uploadingPhoto}
+                        title="Start a new garment with these photos"
+                      >
+                        + New
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp"
+                          multiple
+                          disabled={uploadingPhoto}
+                          onChange={(e) => {
+                            const list = Array.from(e.target.files ?? []);
+                            if (list.length > 0) {
+                              void handleManualPhotoUpload(list, {
+                                createNew: true,
+                              });
+                            }
+                            e.target.value = '';
+                          }}
+                        />
+                      </StyledUploadLabel>
+                    )}
                   </StyledClothControls>
 
                   {selectedGarment && selectedGarment.assets.length > 0 && (
@@ -2095,7 +2145,9 @@ export const DeliveryAiStudioPage = () => {
           onSelectReferenceVideo={(video) => {
             patchActiveTab({ selectedReferenceVideoId: video.id });
           }}
-          onCreated={() => void workspaceQuery.refetch()}
+          onCreated={async () => {
+            await workspaceQuery.refetch();
+          }}
           onClose={() => setLibraryModal(null)}
         />
       )}

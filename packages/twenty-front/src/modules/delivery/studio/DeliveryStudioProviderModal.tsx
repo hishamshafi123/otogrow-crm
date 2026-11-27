@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from '@apollo/client/react';
 import { styled } from '@linaria/react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
 import {
   GET_DELIVERY_STUDIO_AGENT_CAPABILITIES,
@@ -222,6 +222,18 @@ export const DeliveryStudioProviderModal = ({
   const [statusMessage, setStatusMessage] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [copiedPath, setCopiedPath] = useState<string>('');
+
+  useEffect(() => {
+    if (!open) return;
+    setWavespeedEnabled(config.wavespeedEnabled);
+    setKieEnabled(config.kieEnabled);
+    setRoutingMode(config.defaultRoutingMode);
+    setDefaultImageModel(config.defaultImageModel);
+    setDefaultVideoModel(config.defaultVideoModel);
+    setMaxConcurrentJobs(config.maxConcurrentJobs);
+    setStatusMessage('');
+    setErrorMessage('');
+  }, [open, config]);
 
   const [saveConfig, { loading: saving }] = useMutation(
     SAVE_DELIVERY_STUDIO_PROVIDER_CONFIG,

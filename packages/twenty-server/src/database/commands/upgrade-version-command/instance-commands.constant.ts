@@ -211,6 +211,7 @@ import { AddDeliveryFinanceV2M9IndexesAndSettingsFastInstanceCommand } from 'src
 import { UpgradeDeliveryTeamChatFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1795508600000-upgrade-delivery-team-chat';
 import { AddClientPortalDeliverablesAndHookStudioFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1795508700000-add-client-portal-deliverables-and-hook-studio';
 import { AddAiStudioAutomationFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1795508800000-add-ai-studio-automation';
+import { AllowEnvironmentStudioPresetKindFastInstanceCommand } from 'src/database/commands/upgrade-version-command/2-34/2-34-instance-command-fast-1795508900000-allow-environment-studio-preset-kind';
 
 export const INSTANCE_COMMANDS = [
   AddViewFieldGroupIdIndexOnViewFieldFastInstanceCommand,
@@ -424,4 +425,5 @@ export const INSTANCE_COMMANDS = [
   UpgradeDeliveryTeamChatFastInstanceCommand,
   AddClientPortalDeliverablesAndHookStudioFastInstanceCommand,
   AddAiStudioAutomationFastInstanceCommand,
+  AllowEnvironmentStudioPresetKindFastInstanceCommand,
 ];

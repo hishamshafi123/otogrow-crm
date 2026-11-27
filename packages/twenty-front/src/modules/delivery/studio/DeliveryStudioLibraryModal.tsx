@@ -1,7 +1,7 @@
 import { useMutation } from '@apollo/client/react';
 import { styled } from '@linaria/react';
 import { useStore } from 'jotai';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
 import { UPSERT_DELIVERY_STUDIO_PRESET } from '@/delivery/studio/delivery-studio.graphql';
 import {
@@ -175,6 +175,58 @@ const StyledCreateRow = styled.div`
   justify-content: space-between;
 `;
 
+const StyledFilePickerRow = styled.div`
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+`;
+
+const StyledFileButton = styled.label`
+  align-items: center;
+  background: ${themeCssVariables.background.primary};
+  border: 1px dashed ${themeCssVariables.border.color.strong};
+  border-radius: 8px;
+  color: ${themeCssVariables.font.color.primary};
+  cursor: pointer;
+  display: inline-flex !important;
+  flex-direction: row !important;
+  font-size: 12px;
+  font-weight: 500;
+  gap: 6px;
+  padding: 7px 12px;
+  transition: border-color 120ms ease;
+
+  &:hover {
+    border-color: ${themeCssVariables.font.color.primary};
+  }
+
+  input {
+    display: none;
+  }
+`;
+
+const StyledPreviewThumb = styled.img`
+  border: 1px solid ${themeCssVariables.border.color.medium};
+  border-radius: 6px;
+  height: 40px;
+  object-fit: cover;
+  width: 40px;
+`;
+
+const StyledClearFileButton = styled.button`
+  background: transparent;
+  border: none;
+  color: ${themeCssVariables.font.color.tertiary};
+  cursor: pointer;
+  font-size: 11px;
+  padding: 2px 4px;
+
+  &:hover {
+    color: ${themeCssVariables.color.red};
+  }
+`;
+
 const StyledPrimaryButton = styled.button`
   background: ${themeCssVariables.font.color.primary};
   border: none;
@@ -197,7 +249,7 @@ const StyledGrid = styled.div`
   grid-template-columns: repeat(auto-fill, minmax(176px, 1fr));
 `;
 
-const StyledCard = styled.button`
+const StyledCard = styled.div`
   background: ${themeCssVariables.background.secondary};
   border: 1.5px solid ${themeCssVariables.border.color.light};
   border-radius: 10px;
@@ -236,6 +288,31 @@ const StyledVisualBox = styled.div`
     height: 100%;
     object-fit: cover;
     width: 100%;
+  }
+`;
+
+const StyledCardPhotoButton = styled.label`
+  background: ${themeCssVariables.background.primary};
+  border: 1px solid ${themeCssVariables.border.color.medium};
+  border-radius: 6px;
+  bottom: 6px;
+  color: ${themeCssVariables.font.color.primary};
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 600;
+  opacity: 0.92;
+  padding: 3px 7px;
+  position: absolute;
+  right: 6px;
+  z-index: 2;
+
+  &:hover {
+    border-color: ${themeCssVariables.font.color.primary};
+    opacity: 1;
+  }
+
+  input {
+    display: none;
   }
 `;
 
@@ -310,8 +387,12 @@ const StyledScopeTag = styled.small`
 `;
 
 const StyledError = styled.div`
+  background: ${themeCssVariables.color.transparent.red1};
+  border: 1px solid ${themeCssVariables.color.red};
+  border-radius: 8px;
   color: ${themeCssVariables.color.red};
   font-size: 12px;
+  padding: 8px 10px;
 `;
 
 const StyledEmpty = styled.div`
@@ -360,6 +441,9 @@ export const DeliveryStudioLibraryModal = ({
   const [creating, setCreating] = useState(false);
   const [busy, setBusy] = useState(false);
   const [uploadPct, setUploadPct] = useState<number | null>(null);
+  const [uploadingPresetId, setUploadingPresetId] = useState<string | null>(
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
 
   // Create form state
@@ -367,10 +451,50 @@ export const DeliveryStudioLibraryModal = ({
   const [prompt, setPrompt] = useState('');
   const [clientOnly, setClientOnly] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!selectedFile || mode === 'REFERENCE_VIDEO') {
+      setPreviewUrl(null);
+      return;
+    }
+    const objectUrl = URL.createObjectURL(selectedFile);
+    setPreviewUrl(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [selectedFile, mode]);
 
   const [upsertPreset] = useMutation<{
     upsertDeliveryStudioPreset: StudioPresetDTO;
   }>(UPSERT_DELIVERY_STUDIO_PRESET);
+
+  const handleUploadExistingPresetPhoto = async (
+    preset: StudioPresetDTO,
+    file: File,
+  ) => {
+    setError(null);
+    setUploadingPresetId(preset.id);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const updated = await uploadStudioMultipart<StudioPresetDTO>({
+        store,
+        endpointPath: `/portal/delivery-studio/presets/${preset.id}/image/upload`,
+        formData,
+      });
+      await onCreated();
+      if (updated?.id && preset.id === selectedId) {
+        onSelectPreset(updated);
+      }
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Failed to upload photo. Use PNG, JPG, or WebP up to 25 MB.',
+      );
+    } finally {
+      setUploadingPresetId(null);
+    }
+  };
 
   const presetKind =
     mode === 'AVATAR' ? 'CASTING_PERSONA' : 'ENVIRONMENT';
@@ -556,6 +680,8 @@ export const DeliveryStudioLibraryModal = ({
         </StyledToolbar>
 
         <StyledBody>
+          {error && <StyledError>{error}</StyledError>}
+
           {creating && (
             <StyledCreatePanel onSubmit={(e) => void handleCreateSubmit(e)}>
               <label>
@@ -577,7 +703,7 @@ export const DeliveryStudioLibraryModal = ({
               <label>
                 {mode === 'REFERENCE_VIDEO'
                   ? 'Camera / pacing notes (optional)'
-                  : 'Visual description'}
+                  : 'Visual description (optional if uploading a photo)'}
                 <textarea
                   placeholder={
                     mode === 'AVATAR'
@@ -592,19 +718,42 @@ export const DeliveryStudioLibraryModal = ({
               </label>
 
               <StyledCreateRow>
-                <div>
-                  <input
-                    type="file"
-                    accept={
-                      mode === 'REFERENCE_VIDEO'
-                        ? 'video/mp4,video/quicktime,video/webm'
-                        : 'image/png,image/jpeg,image/webp'
-                    }
-                    onChange={(e) =>
-                      setSelectedFile(e.target.files?.[0] ?? null)
-                    }
-                  />
-                </div>
+                <StyledFilePickerRow>
+                  {previewUrl && (
+                    <StyledPreviewThumb src={previewUrl} alt="Selected preview" />
+                  )}
+                  <StyledFileButton>
+                    {selectedFile
+                      ? mode === 'REFERENCE_VIDEO'
+                        ? `Video: ${selectedFile.name}`
+                        : `Photo: ${selectedFile.name}`
+                      : mode === 'REFERENCE_VIDEO'
+                        ? '+ Choose video (MP4 / MOV / WebM)'
+                        : mode === 'AVATAR'
+                          ? '+ Upload avatar picture'
+                          : '+ Upload environment photo'}
+                    <input
+                      type="file"
+                      accept={
+                        mode === 'REFERENCE_VIDEO'
+                          ? 'video/mp4,video/quicktime,video/webm'
+                          : 'image/png,image/jpeg,image/webp'
+                      }
+                      onChange={(e) => {
+                        setSelectedFile(e.target.files?.[0] ?? null);
+                        e.target.value = '';
+                      }}
+                    />
+                  </StyledFileButton>
+                  {selectedFile && (
+                    <StyledClearFileButton
+                      type="button"
+                      onClick={() => setSelectedFile(null)}
+                    >
+                      Remove
+                    </StyledClearFileButton>
+                  )}
+                </StyledFilePickerRow>
 
                 <div style={{ alignItems: 'center', display: 'flex', gap: 10 }}>
                   {companyId && (
@@ -632,8 +781,6 @@ export const DeliveryStudioLibraryModal = ({
                   </StyledPrimaryButton>
                 </div>
               </StyledCreateRow>
-
-              {error && <StyledError>{error}</StyledError>}
             </StyledCreatePanel>
           )}
 
@@ -645,41 +792,81 @@ export const DeliveryStudioLibraryModal = ({
               </StyledEmpty>
             ) : (
               <StyledGrid>
-                {filteredPresets.map((preset) => (
-                  <StyledCard
-                    key={preset.id}
-                    type="button"
-                    data-selected={preset.id === selectedId}
-                    onClick={() => {
-                      onSelectPreset(preset);
-                      onClose();
-                    }}
-                  >
-                    <StyledVisualBox>
-                      {preset.thumbnailPath ? (
-                        <img
-                          src={studioMediaUrl(preset.thumbnailPath)}
-                          alt={preset.name}
-                        />
-                      ) : (
-                        <StyledGlyph>
-                          {preset.name
-                            .split(/\s+/)
-                            .slice(0, 2)
-                            .map((w) => w[0]?.toUpperCase() ?? '')
-                            .join('')}
-                        </StyledGlyph>
-                      )}
-                    </StyledVisualBox>
-                    <StyledCardMeta>
-                      <strong>{preset.name}</strong>
-                      <span>{preset.description || preset.masterPrompt}</span>
-                      <StyledScopeTag>
-                        {preset.companyId ? 'Client' : 'Shared agency'}
-                      </StyledScopeTag>
-                    </StyledCardMeta>
-                  </StyledCard>
-                ))}
+                {filteredPresets.map((preset) => {
+                  const isUploadingThis = uploadingPresetId === preset.id;
+                  return (
+                    <StyledCard
+                      key={preset.id}
+                      role="button"
+                      tabIndex={0}
+                      data-selected={preset.id === selectedId}
+                      onClick={() => {
+                        onSelectPreset(preset);
+                        onClose();
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          onSelectPreset(preset);
+                          onClose();
+                        }
+                      }}
+                    >
+                      <StyledVisualBox>
+                        {preset.thumbnailPath ? (
+                          <img
+                            src={studioMediaUrl(preset.thumbnailPath)}
+                            alt={preset.name}
+                          />
+                        ) : (
+                          <StyledGlyph>
+                            {preset.name
+                              .split(/\s+/)
+                              .slice(0, 2)
+                              .map((w) => w[0]?.toUpperCase() ?? '')
+                              .join('')}
+                          </StyledGlyph>
+                        )}
+                        <StyledCardPhotoButton
+                          onClick={(e) => e.stopPropagation()}
+                          title={
+                            preset.thumbnailPath
+                              ? 'Change reference photo'
+                              : 'Add reference photo'
+                          }
+                        >
+                          {isUploadingThis
+                            ? 'Uploading…'
+                            : preset.thumbnailPath
+                              ? 'Change photo'
+                              : '+ Photo'}
+                          <input
+                            type="file"
+                            accept="image/png,image/jpeg,image/webp"
+                            disabled={isUploadingThis}
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                void handleUploadExistingPresetPhoto(
+                                  preset,
+                                  file,
+                                );
+                              }
+                              e.target.value = '';
+                            }}
+                          />
+                        </StyledCardPhotoButton>
+                      </StyledVisualBox>
+                      <StyledCardMeta>
+                        <strong>{preset.name}</strong>
+                        <span>{preset.description || preset.masterPrompt}</span>
+                        <StyledScopeTag>
+                          {preset.companyId ? 'Client' : 'Shared agency'}
+                        </StyledScopeTag>
+                      </StyledCardMeta>
+                    </StyledCard>
+                  );
+                })}
               </StyledGrid>
             )
           ) : filteredVideos.length === 0 ? (
@@ -692,11 +879,19 @@ export const DeliveryStudioLibraryModal = ({
               {filteredVideos.map((vid) => (
                 <StyledCard
                   key={vid.id}
-                  type="button"
+                  role="button"
+                  tabIndex={0}
                   data-selected={vid.id === selectedId}
                   onClick={() => {
                     onSelectReferenceVideo(vid);
                     onClose();
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      onSelectReferenceVideo(vid);
+                      onClose();
+                    }
                   }}
                 >
                   <StyledVideoBox>

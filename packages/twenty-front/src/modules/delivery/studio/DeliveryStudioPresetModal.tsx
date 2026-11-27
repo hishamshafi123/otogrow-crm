@@ -199,7 +199,7 @@ type DeliveryStudioPresetModalProps = {
   companyId: string | null;
   projectId: string | null;
   onClose: () => void;
-  onSaved: (preset: StudioPresetDTO) => void;
+  onSaved: (preset?: StudioPresetDTO) => void;
 };
 
 export const DeliveryStudioPresetModal = ({
@@ -296,12 +296,19 @@ export const DeliveryStudioPresetModal = ({
         .filter(Boolean)
         .slice(0, 30);
 
+      const existingPreset = selectedId
+        ? presets.find((p) => p.id === selectedId)
+        : undefined;
+      const baseConfig = (existingPreset?.configJson ?? {}) as Record<
+        string,
+        unknown
+      >;
       const configJson: Record<string, unknown> =
         kind === 'CHARACTER_SHEET'
-          ? { angleLayout, angles }
+          ? { ...baseConfig, angleLayout, angles }
           : kind === 'TEXT_HOOK'
-            ? { platform, funnelStage }
-            : {};
+            ? { ...baseConfig, platform, funnelStage }
+            : { ...baseConfig };
 
       const res = await upsertPreset({
         variables: {
@@ -333,7 +340,8 @@ export const DeliveryStudioPresetModal = ({
     try {
       await archivePreset({ variables: { id: selectedId } });
       resetForNew(kind);
-      onSaved(presets[0]);
+      const next = presets.find((p) => p.id !== selectedId);
+      onSaved(next);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to archive preset.');
     }
@@ -347,7 +355,7 @@ export const DeliveryStudioPresetModal = ({
             <h3>Dynamic Master Prompt Presets</h3>
             <p>
               Create reusable styles for 2-angle, 4-angle, video prompts,
-              casting personas, and text-hook master prompts with examples.
+              casting personas, environments, and text-hook master prompts with examples.
             </p>
           </div>
           <StyledDeliveryButton type="button" onClick={onClose}>
@@ -398,7 +406,10 @@ export const DeliveryStudioPresetModal = ({
                     AI Text Hooks (Master Prompt + Examples)
                   </option>
                   <option value="CASTING_PERSONA">
-                    Casting Persona / Talent Profile
+                    Avatar / Casting Persona
+                  </option>
+                  <option value="ENVIRONMENT">
+                    Environment / Scene
                   </option>
                 </select>
               </StyledField>

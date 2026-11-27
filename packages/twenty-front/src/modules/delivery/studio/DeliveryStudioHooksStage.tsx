@@ -364,7 +364,7 @@ type HookDraftItem = {
 };
 
 type OverlayVisualStyle = {
-  presetKey: 'TIKTOK_PILL' | 'MINIMAL_CLEAN' | 'BOLD_OUTLINE' | 'SUBTLE_BOX';
+  presetKey: 'TIKTOK_PILL' | 'IG_SHADOW' | 'AD_BOX' | 'EDITORIAL' | 'BRAND_KIT';
   fontFamily: string;
   fontSizePct: number;
   textColor: string;
@@ -373,7 +373,7 @@ type OverlayVisualStyle = {
   xPct: number;
   yPct: number;
   maxWidthPct: number;
-  borderRadiusPx: number;
+  backgroundRadiusPx: number;
   strokeWidthPx: number;
   strokeColor: string;
 };
@@ -388,38 +388,48 @@ const STYLE_PRESET_MAP: Record<
       textColor: '#111111',
       backgroundColor: '#FFFFFF',
       backgroundOpacity: 0.96,
-      borderRadiusPx: 14,
+      backgroundRadiusPx: 14,
       strokeWidthPx: 0,
     },
   },
-  MINIMAL_CLEAN: {
-    label: 'Minimal Clean',
+  IG_SHADOW: {
+    label: 'Clean Shadow',
     style: {
       textColor: '#FFFFFF',
       backgroundColor: '#000000',
       backgroundOpacity: 0,
-      borderRadiusPx: 0,
+      backgroundRadiusPx: 0,
       strokeWidthPx: 0,
     },
   },
-  BOLD_OUTLINE: {
-    label: 'Bold Outline',
+  AD_BOX: {
+    label: 'Bold Ad Box',
+    style: {
+      textColor: '#FFFFFF',
+      backgroundColor: '#111111',
+      backgroundOpacity: 0.72,
+      backgroundRadiusPx: 12,
+      strokeWidthPx: 0,
+    },
+  },
+  EDITORIAL: {
+    label: 'Editorial Outline',
     style: {
       textColor: '#FFFFFF',
       backgroundColor: '#000000',
       backgroundOpacity: 0,
-      borderRadiusPx: 0,
+      backgroundRadiusPx: 0,
       strokeWidthPx: 3,
       strokeColor: '#000000',
     },
   },
-  SUBTLE_BOX: {
-    label: 'Subtle Dark',
+  BRAND_KIT: {
+    label: 'Brand Kit',
     style: {
-      textColor: '#FFFFFF',
-      backgroundColor: '#000000',
-      backgroundOpacity: 0.58,
-      borderRadiusPx: 12,
+      textColor: '#111111',
+      backgroundColor: '#F6E05E',
+      backgroundOpacity: 0.94,
+      backgroundRadiusPx: 14,
       strokeWidthPx: 0,
     },
   },
@@ -435,7 +445,7 @@ const DEFAULT_VISUAL_STYLE: OverlayVisualStyle = {
   xPct: 50,
   yPct: 24,
   maxWidthPct: 82,
-  borderRadiusPx: 14,
+  backgroundRadiusPx: 14,
   strokeWidthPx: 0,
   strokeColor: '#000000',
 };
@@ -520,10 +530,12 @@ export const DeliveryStudioHooksStage = ({
       yPct: typeof cfg.yPct === 'number' ? cfg.yPct : prev.yPct,
       maxWidthPct:
         typeof cfg.maxWidthPct === 'number' ? cfg.maxWidthPct : prev.maxWidthPct,
-      borderRadiusPx:
-        typeof cfg.borderRadiusPx === 'number'
-          ? cfg.borderRadiusPx
-          : prev.borderRadiusPx,
+      backgroundRadiusPx:
+        typeof cfg.backgroundRadiusPx === 'number'
+          ? cfg.backgroundRadiusPx
+          : typeof cfg.borderRadiusPx === 'number'
+            ? cfg.borderRadiusPx
+            : prev.backgroundRadiusPx,
       strokeWidthPx:
         typeof cfg.strokeWidthPx === 'number'
           ? cfg.strokeWidthPx
@@ -576,27 +588,32 @@ export const DeliveryStudioHooksStage = ({
   const driveInfo = driveFoldersQuery.data?.deliveryStudioClientDriveFolders;
   const driveSubfolders = driveInfo?.subfolders ?? driveInfo?.folders ?? [];
 
-  // Hydrate suggestions from existing hook project
+  // Reset hook list when switching to a different generated video
+  useEffect(() => {
+    setHooks([]);
+    setPreviewHookId(null);
+    setError(null);
+    setFeedback(null);
+  }, [selectedVideo?.id]);
+
+  // Hydrate suggestions from existing hook project for the active video
   useEffect(() => {
     if (!hookProject) {
-      setHooks([]);
-      setPreviewHookId(null);
       return;
     }
     const existingSuggestions = hookProject.aiSuggestions ?? [];
-    if (existingSuggestions.length > 0 && hooks.length === 0) {
+    if (existingSuggestions.length > 0) {
       const mapped: HookDraftItem[] = existingSuggestions.map((s, idx) => ({
-        id: `sug-${idx}-${s.hookText.slice(0, 12)}`,
+        id: `sug-${hookProject.id}-${idx}`,
         hookText: s.hookText,
         angleTag: s.angleTag ?? '',
         rationale: s.rationale ?? '',
         selected: false,
       }));
-      setHooks(mapped);
-      setPreviewHookId(mapped[0]?.id ?? null);
+      setHooks((prev) => (prev.length === 0 ? mapped : prev));
+      setPreviewHookId((prev) => prev ?? mapped[0]?.id ?? null);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hookProject?.id]);
+  }, [hookProject]);
 
   // Poll while rendering variations
   const isRendering = Boolean(
@@ -709,7 +726,7 @@ export const DeliveryStudioHooksStage = ({
     xPct: visualStyle.xPct,
     yPct: visualStyle.yPct,
     maxWidthPct: visualStyle.maxWidthPct,
-    borderRadiusPx: visualStyle.borderRadiusPx,
+    backgroundRadiusPx: visualStyle.backgroundRadiusPx,
     strokeWidthPx: visualStyle.strokeWidthPx,
     strokeColor: visualStyle.strokeColor,
   });
@@ -896,7 +913,7 @@ export const DeliveryStudioHooksStage = ({
                           visualStyle.backgroundOpacity,
                         )
                       : 'transparent',
-                  borderRadius: `${visualStyle.borderRadiusPx}px`,
+                  borderRadius: `${visualStyle.backgroundRadiusPx}px`,
                   color: visualStyle.textColor,
                   fontFamily: visualStyle.fontFamily,
                   fontSize: `${previewFontPx}px`,

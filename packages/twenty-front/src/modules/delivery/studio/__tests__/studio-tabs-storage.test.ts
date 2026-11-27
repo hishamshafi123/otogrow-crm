@@ -150,5 +150,34 @@ describe('studio-tabs-storage & cost helpers', () => {
       }),
     ).toBeCloseTo(1.05, 4);
     expect(formatUsdEstimate(1.05)).toBe('$1.05');
+
+    const backendCatalogModel: StudioModelSpecDTO = {
+      key: 'nano-banana-2.1',
+      label: 'Google Nano Banana 2.1',
+      vendor: 'Google',
+      kind: 'IMAGE',
+      tier: 'FLAGSHIP',
+      description: 'Backend catalog shape',
+      capabilities: {
+        maxReferenceImages: 10,
+        maxReferenceVideos: 0,
+        aspectRatios: ['3:4'],
+        resolutions: ['1K', '2K', '4K'],
+        defaultResolution: '2K',
+      },
+      pricing: {
+        unit: 'PER_IMAGE',
+        baseRateUsd: 0.06,
+        resolutionMultipliers: { '1K': 0.75, '2K': 1, '4K': 1.7 },
+      },
+    };
+    expect(
+      estimateModelCostUsd(backendCatalogModel, { resolution: '2K', count: 2 }),
+    ).toBeCloseTo(0.12, 4);
+    expect(
+      formatUsdEstimate(
+        estimateModelCostUsd(backendCatalogModel, { resolution: '4K', count: 1 }),
+      ),
+    ).toBe('$0.10');
   });
 });

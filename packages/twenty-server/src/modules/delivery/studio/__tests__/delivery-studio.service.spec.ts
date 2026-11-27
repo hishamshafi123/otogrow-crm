@@ -608,4 +608,74 @@ describe('DeliveryStudioService', () => {
     expect(hookDef.hookDefault.startSec).toBe(0.2);
     expect(hookDef.hookDefault.durationSec).toBe(3.2);
   });
+
+  it('preserves preset reference image metadata when updating an existing avatar or environment preset', async () => {
+    const { service, repos } = buildHarness();
+    const presetRepo = repos.get(DeliveryStudioPresetEntity)!;
+
+    const created = await service.upsertPreset(makeAuth(), {
+      kind: 'CASTING_PERSONA',
+      name: 'Studio Model A',
+      description: 'Original',
+      masterPrompt: 'Natural skin, studio light',
+    });
+
+    const presetUuid = '99999999-9999-4999-8999-999999999999';
+    const stored = presetRepo.store.find(
+      (p) => (p as Record<string, unknown>).id === created.id,
+    ) as Record<string, unknown>;
+    stored.id = presetUuid;
+    stored.configJson = {
+      referenceImageStorageKey: 'delivery-studio/ws/presets/avatar.png',
+      referenceImageMimeType: 'image/png',
+      referenceImageSha256: 'abc123',
+    };
+
+    const updated = await service.upsertPreset(makeAuth(), {
+      id: presetUuid,
+      kind: 'CASTING_PERSONA',
+      name: 'Studio Model A (Edited)',
+      description: 'Updated description',
+      masterPrompt: 'Updated prompt',
+      configJson: {},
+    });
+
+    expect(updated.thumbnailPath).toContain('/delivery-studio/media/preset-thumb/');
+    expect(
+      (updated.configJson as Record<string, unknown>).referenceImageStorageKey,
+    ).toBe('delivery-studio/ws/presets/avatar.png');
+  });
+
+  it('saves workspace-level hook defaults under __workspace__ and sanitizes styleConfig keys during hook render', async () => {
+    const { service, videoHooks } = buildHarness();
+
+    const wsDefault = await service.saveHookDefault(makeAuth(), {
+      companyId: null,
+      styleConfig: { fontSizePct: 4.4, borderRadiusPx: 14, presetKey: 'TIKTOK_PILL' },
+      startSec: 0,
+      durationSec: 3.5,
+    });
+    expect(wsDefault.key).toBe('__workspace__');
+    expect(wsDefault.hookDefault.styleConfig.backgroundRadiusPx).toBe(14);
+    expect(wsDefault.hookDefault.styleConfig.borderRadiusPx).toBeUndefined();
+
+    await service.renderSelectedHooksForVideo(makeAuth(), {
+      assetId: VID_ASSET_ID,
+      stylePreset: 'AD_BOX',
+      styleConfig: {
+        fontSizePct: 4.8,
+        borderRadiusPx: 12,
+        unknownExtraField: 'should-be-stripped',
+      },
+      hooks: [{ hookText: 'Clean hook test', startSec: 0, endSec: 3.2 }],
+    });
+
+    const calls = videoHooks.saveProject.mock.calls;
+    const saveCallArg = calls[calls.length - 1]?.[1] as {
+      defaultStyleConfig: Record<string, unknown>;
+    };
+    expect(saveCallArg.defaultStyleConfig.backgroundRadiusPx).toBe(12);
+    expect(saveCallArg.defaultStyleConfig.borderRadiusPx).toBeUndefined();
+    expect(saveCallArg.defaultStyleConfig.unknownExtraField).toBeUndefined();
+  });
 });

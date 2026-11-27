@@ -40,6 +40,7 @@ import {
 import {
   DEFAULT_HOOK_STYLE,
   HOOK_STYLE_PRESETS,
+  hookStyleConfigSchema,
 } from 'src/modules/delivery/deliverables/delivery-video-hooks.policy';
 import {
   DeliveryDeliverableEntity,
@@ -402,6 +403,13 @@ export class DeliveryStudioService {
     workspaceId: string,
     memberId: string,
   ) {
+    if (typeof manager.query === 'function') {
+      await manager
+        .query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+          `studio-starter-presets:${workspaceId}`,
+        ])
+        .catch(() => undefined);
+    }
     const repo = manager.getRepository(DeliveryStudioPresetEntity);
     const existing = await repo.find({
       where: { workspaceId },
@@ -848,9 +856,12 @@ export class DeliveryStudioService {
 
     const hookDefaultsMap = operations?.state.studioHookDefaults ?? {};
     const workspaceHookDefault: StudioHookDefaultSetting | null =
-      hookDefaultsMap.__workspace__ ?? null;
+      hookDefaultsMap.__workspace__ ?? hookDefaultsMap.default ?? null;
     const clientHookDefault: StudioHookDefaultSetting | null =
       (companyId ? hookDefaultsMap[companyId] : null) ?? null;
+    const selectedClientInfo = companyId
+      ? clients.find((c) => c.id === companyId) ?? null
+      : null;
 
     return {
       canManageProviders: actor.isAdmin || actor.isManager,
@@ -858,6 +869,10 @@ export class DeliveryStudioService {
       hookStylePresets: HOOK_STYLE_PRESETS,
       providerConfig: this.mapProviderConfig(providerConfig),
       clients,
+      selectedClientTags: selectedClientInfo?.tags ?? [],
+      selectedClientIsClothingBrand: Boolean(
+        selectedClientInfo?.isClothingBrand,
+      ),
       presets: scopedPresets.map((p) => this.mapPreset(p)),
       referenceVideos: refVideos.map((rv) => this.mapReferenceVideo(rv)),
       productKits: scopedProductKits.map((pk) => this.mapProductKit(pk)),
@@ -910,7 +925,21 @@ export class DeliveryStudioService {
       row.name = input.name;
       row.description = input.description ?? row.description ?? '';
       row.masterPrompt = input.masterPrompt ?? row.masterPrompt ?? '';
-      row.configJson = (input.configJson ?? row.configJson ?? {}) as StudioPresetConfig;
+      const existingConfig = (row.configJson ?? {}) as StudioPresetConfig;
+      const incomingConfig = input.configJson as StudioPresetConfig | undefined;
+      row.configJson = incomingConfig
+        ? {
+            ...(existingConfig.referenceImageStorageKey
+              ? {
+                  referenceImageStorageKey:
+                    existingConfig.referenceImageStorageKey,
+                  referenceImageMimeType: existingConfig.referenceImageMimeType,
+                  referenceImageSha256: existingConfig.referenceImageSha256,
+                }
+              : {}),
+            ...incomingConfig,
+          }
+        : existingConfig;
       row.examplesJson = input.examplesJson ?? row.examplesJson ?? [];
       row.tagsJson = input.tagsJson ?? row.tagsJson ?? [];
       row.isDefault = input.isDefault ?? row.isDefault ?? false;
@@ -2085,10 +2114,20 @@ export class DeliveryStudioService {
     }
     const input = parsed.data;
     const id = this.identity(auth);
-    const key = input.companyId ?? 'default';
+    const key = input.companyId ?? '__workspace__';
+
+    const rawStyle: Record<string, unknown> = { ...(input.styleConfig ?? {}) };
+    if (
+      typeof rawStyle.borderRadiusPx === 'number' &&
+      rawStyle.backgroundRadiusPx === undefined
+    ) {
+      rawStyle.backgroundRadiusPx = rawStyle.borderRadiusPx;
+    }
+    delete rawStyle.borderRadiusPx;
+    delete rawStyle.presetKey;
 
     const setting: StudioHookDefaultSetting = {
-      styleConfig: input.styleConfig ?? {},
+      styleConfig: rawStyle,
       startSec: input.startSec ?? 0,
       durationSec: input.durationSec ?? 3.5,
       updatedAt: new Date().toISOString(),
@@ -2279,11 +2318,34 @@ export class DeliveryStudioService {
     const presetStyle = input.stylePreset
       ? HOOK_STYLE_PRESETS[input.stylePreset]
       : {};
-    const defaultStyleConfig: Partial<HookStyleConfig> = {
+    const rawStyleConfig: Record<string, unknown> = {
+      ...(input.styleConfig ?? {}),
+    };
+    if (
+      typeof rawStyleConfig.borderRadiusPx === 'number' &&
+      rawStyleConfig.backgroundRadiusPx === undefined
+    ) {
+      rawStyleConfig.backgroundRadiusPx = rawStyleConfig.borderRadiusPx;
+    }
+    const allowedStyleKeys = new Set(Object.keys(hookStyleConfigSchema.shape));
+    const filteredStyleConfig: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(rawStyleConfig)) {
+      if (allowedStyleKeys.has(k) && v !== undefined) {
+        filteredStyleConfig[k] = v;
+      }
+    }
+    const mergedStyleCandidate = {
       ...DEFAULT_HOOK_STYLE,
       ...presetStyle,
-      ...((input.styleConfig ?? {}) as Partial<HookStyleConfig>),
+      ...filteredStyleConfig,
     };
+    const parsedStyle = hookStyleConfigSchema.safeParse(mergedStyleCandidate);
+    if (!parsedStyle.success) {
+      throw new BadRequestException(
+        parsedStyle.error.issues[0]?.message ?? 'Invalid hook text style configuration.',
+      );
+    }
+    const defaultStyleConfig: Partial<HookStyleConfig> = parsedStyle.data;
 
     const maxDur =
       asset.mediaMeta?.durationSec && asset.mediaMeta.durationSec > 1

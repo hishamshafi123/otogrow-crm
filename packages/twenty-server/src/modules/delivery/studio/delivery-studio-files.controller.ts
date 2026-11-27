@@ -59,6 +59,14 @@ const detectFileMime = async (filePath: string): Promise<string | null> => {
   }
 };
 
+const normalizeImageMime = (mime: string | null | undefined): string => {
+  const lowered = (mime ?? '').trim().toLowerCase();
+  if (lowered === 'image/jpg' || lowered === 'image/pjpeg') {
+    return 'image/jpeg';
+  }
+  return lowered;
+};
+
 type StudioUploadedFile = {
   path: string;
   originalname: string;
@@ -140,7 +148,9 @@ export class DeliveryStudioFilesController {
       throw new BadRequestException('Attach a product image (PNG, JPG, or WebP).');
     }
     try {
-      const detected = (await detectFileMime(file.path)) ?? file.mimetype;
+      const detected = normalizeImageMime(
+        (await detectFileMime(file.path)) ?? file.mimetype,
+      );
       if (!STUDIO_ALLOWED_IMAGE_MIMES.has(detected)) {
         throw new BadRequestException(
           `Unsupported image format "${detected}". Upload PNG, JPG, or WebP.`,
@@ -179,7 +189,9 @@ export class DeliveryStudioFilesController {
       throw new BadRequestException('Attach an image (PNG, JPG, or WebP).');
     }
     try {
-      const detected = (await detectFileMime(file.path)) ?? file.mimetype;
+      const detected = normalizeImageMime(
+        (await detectFileMime(file.path)) ?? file.mimetype,
+      );
       if (!STUDIO_ALLOWED_IMAGE_MIMES.has(detected)) {
         throw new BadRequestException(
           `Unsupported image format "${detected}". Upload PNG, JPG, or WebP.`,

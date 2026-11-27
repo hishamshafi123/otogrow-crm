@@ -18,10 +18,9 @@ export const uploadStudioMultipart = <T = unknown>(params: {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', url);
 
+    xhr.withCredentials = true;
     const cookieAuth = params.store.get(isCookieAuthActiveState.atom);
-    if (cookieAuth) {
-      xhr.withCredentials = true;
-    } else {
+    if (!cookieAuth) {
       const token = params.store.get(tokenPairState.atom)
         ?.accessOrWorkspaceAgnosticToken?.token;
       if (token) {

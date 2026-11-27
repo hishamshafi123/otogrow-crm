@@ -19,26 +19,34 @@ export type StudioModelSpecDTO = {
   label: string;
   vendor: string;
   kind: 'IMAGE' | 'VIDEO';
-  tier: 'DRAFT' | 'STANDARD' | 'PRO' | 'PREMIUM';
-  summary: string;
-  recommendedFor: string[];
+  tier: 'FLAGSHIP' | 'FAST' | 'VALUE' | 'SPECIALIZED' | 'DRAFT' | 'STANDARD' | 'PRO' | 'PREMIUM';
+  description?: string;
+  summary?: string;
+  recommendedFor?: string[];
   capabilities: {
-    supportsMultiImageRef: boolean;
+    supportsMultiImageRef?: boolean;
     maxReferenceImages: number;
-    supportsReferenceVideo: boolean;
-    supportsAudioGeneration: boolean;
-    supportsAspectRatios: string[];
-    supportsResolutions: string[];
+    maxReferenceVideos?: number;
+    supportsReferenceVideo?: boolean;
+    supportsAudio?: boolean;
+    supportsAudioGeneration?: boolean;
+    aspectRatios?: string[];
+    supportsAspectRatios?: string[];
+    resolutions?: string[];
+    supportsResolutions?: string[];
     defaultResolution: string;
     minDurationSec?: number;
     maxDurationSec?: number;
   };
   pricing: {
     unit: 'PER_IMAGE' | 'PER_SECOND';
-    baseUsd: number;
+    baseRateUsd?: number;
+    baseUsd?: number;
     resolutionMultipliers?: Record<string, number>;
   };
-  providers: {
+  wavespeed?: { endpoint: string };
+  kie?: { model: string };
+  providers?: {
     wavespeed: { endpoint: string } | null;
     kie: { model: string } | null;
   };
@@ -331,16 +339,17 @@ export const estimateModelCostUsd = (
   opts: { resolution?: string; durationSec?: number; count?: number },
 ): number => {
   if (!model) return 0;
+  const baseRate = model.pricing.baseRateUsd ?? model.pricing.baseUsd ?? 0;
   const mult =
     opts.resolution && model.pricing.resolutionMultipliers?.[opts.resolution]
       ? model.pricing.resolutionMultipliers[opts.resolution]
       : 1;
   const count = Math.max(1, opts.count ?? 1);
   if (model.pricing.unit === 'PER_IMAGE') {
-    return Number((model.pricing.baseUsd * mult * count).toFixed(4));
+    return Number((baseRate * mult * count).toFixed(4));
   }
   const dur = Math.max(1, opts.durationSec ?? 8);
-  return Number((model.pricing.baseUsd * dur * mult * count).toFixed(4));
+  return Number((baseRate * dur * mult * count).toFixed(4));
 };
 
 export const formatUsdEstimate = (usd: number): string => {
