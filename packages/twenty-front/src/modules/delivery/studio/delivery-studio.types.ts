@@ -185,14 +185,60 @@ export type StudioAssetDTO = {
   updatedAt: string;
 };
 
+export type StudioApiInputImageRefDTO = {
+  index: number;
+  token: string;
+  role: 'CHARACTER_SHEET' | 'PRODUCT' | 'AVATAR' | 'ENVIRONMENT';
+  label: string;
+  fileName: string;
+  mimeType: string;
+  mediaPath: string | null;
+  stagedUrl: string | null;
+};
+
+export type StudioApiInputVideoRefDTO = {
+  index: number;
+  token: string;
+  role: 'REFERENCE_VIDEO';
+  label: string;
+  fileName: string;
+  mimeType: string;
+  durationSec?: number | null;
+  mediaPath: string | null;
+  thumbnailPath: string | null;
+  stagedUrl: string | null;
+};
+
+export type StudioApiRequestSnapshotDTO = {
+  capturedAt: string;
+  provider: StudioProviderId | null;
+  endpoint: string | null;
+  modelKey: string;
+  modelLabel: string;
+  routingMode: StudioRoutingMode;
+  failoverTriggered: boolean;
+  externalTaskId: string | null;
+  prompt: string;
+  images: StudioApiInputImageRefDTO[];
+  videos: StudioApiInputVideoRefDTO[];
+  rawPayload: Record<string, unknown> | null;
+};
+
 export type StudioJobAttemptDTO = {
   provider: StudioProviderId;
   endpoint: string;
   startedAt: string;
+  finishedAt?: string | null;
   endedAt?: string;
+  status?: 'SUCCESS' | 'FAILED';
   httpStatus?: number;
+  errorCode?: string | null;
+  errorMessage?: string | null;
   error?: string;
-  succeeded: boolean;
+  succeeded?: boolean;
+  requestPayload?: Record<string, unknown> | null;
+  stagedImageUrls?: string[];
+  stagedVideoUrls?: string[];
 };
 
 export type StudioJobDTO = {
@@ -221,6 +267,7 @@ export type StudioJobDTO = {
   outputAssetIds: string[];
   externalTaskId: string | null;
   errorMessage: string | null;
+  apiRequest?: StudioApiRequestSnapshotDTO | null;
   startedAt: string | null;
   completedAt: string | null;
   createdAt: string;

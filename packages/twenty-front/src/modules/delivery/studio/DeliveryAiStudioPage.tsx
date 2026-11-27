@@ -19,12 +19,16 @@ import {
 import {
   estimateModelCostUsd,
   formatUsdEstimate,
+  type StudioApiInputImageRefDTO,
+  type StudioApiInputVideoRefDTO,
+  type StudioApiRequestSnapshotDTO,
   type StudioAssetDTO,
   type StudioProductKitDTO,
   type StudioStageKey,
   type StudioWorkspacePayload,
   studioMediaUrl,
 } from '@/delivery/studio/delivery-studio.types';
+import { DeliveryStudioApiInputInspector } from '@/delivery/studio/DeliveryStudioApiInputInspector';
 import { DeliveryStudioHooksStage } from '@/delivery/studio/DeliveryStudioHooksStage';
 import {
   DeliveryStudioLibraryModal,
@@ -1440,6 +1444,45 @@ export const DeliveryAiStudioPage = () => {
     setBanner(null);
   };
 
+  const selectedVideoGarment = useMemo(() => {
+    const kitId = selectedCharSheet?.productKitId ?? selectedGarment?.id ?? null;
+    if (!kitId) return null;
+    return garments.find((g) => g.id === kitId) ?? null;
+  }, [garments, selectedCharSheet?.productKitId, selectedGarment?.id]);
+
+  const selectedVideoProductAssets = useMemo(() => {
+    if (!selectedVideoGarment) return [];
+    const charMeta = (selectedCharSheet?.metadata ?? {}) as Record<
+      string,
+      unknown
+    >;
+    const savedIds =
+      selectedCharSheet?.productKitId === selectedVideoGarment.id &&
+      Array.isArray(charMeta.productAssetIds)
+        ? charMeta.productAssetIds.filter(
+            (v): v is string => typeof v === 'string',
+          )
+        : [];
+    if (savedIds.length > 0) {
+      const filtered = selectedVideoGarment.assets.filter((a) =>
+        savedIds.includes(a.id),
+      );
+      if (filtered.length > 0) return filtered;
+    }
+    if (selectedGarment && selectedVideoGarment.id === selectedGarment.id) {
+      const filtered = selectedVideoGarment.assets.filter((a) =>
+        includedAssetIdSet.has(a.id),
+      );
+      if (filtered.length > 0) return filtered;
+    }
+    return selectedVideoGarment.assets;
+  }, [
+    selectedVideoGarment,
+    selectedCharSheet,
+    selectedGarment,
+    includedAssetIdSet,
+  ]);
+
   const handleGenerateVideo = async () => {
     if (!activeTab.companyId || !selectedRefVideo) return;
     setBanner(null);
@@ -1449,6 +1492,7 @@ export const DeliveryAiStudioPage = () => {
         activeTab.compareMode && activeTab.compareModelKey !== activeTab.videoModelKey
           ? [activeTab.videoModelKey, activeTab.compareModelKey]
           : [activeTab.videoModelKey];
+      const videoProductAssetIds = selectedVideoProductAssets.map((a) => a.id);
       await generateVideoMutation({
         variables: {
           input: {
@@ -1456,11 +1500,16 @@ export const DeliveryAiStudioPage = () => {
             projectId: activeTab.projectId,
             referenceVideoId: selectedRefVideo.id,
             characterAssetId: selectedCharSheet?.id ?? null,
-            productKitId:
-              selectedCharSheet?.productKitId ?? selectedGarment?.id ?? null,
+            productKitId: selectedVideoGarment?.id ?? null,
+            productAssetIds:
+              videoProductAssetIds.length > 0 ? videoProductAssetIds : undefined,
             presetId: activeTab.videoPresetId ?? undefined,
             modelKeys,
             routingMode: activeTab.routingMode,
+            masterPrompt: activeTab.videoMasterPrompt.trim() || undefined,
+            environmentOverride:
+              activeTab.videoEnvironmentOverride.trim() || undefined,
+            customNotes: activeTab.videoCustomNotes.trim() || undefined,
             aspectRatio: activeTab.videoAspectRatio,
             resolution: activeTab.videoResolution,
             durationSec: activeTab.videoDurationSec,
@@ -1578,6 +1627,260 @@ export const DeliveryAiStudioPage = () => {
   const activeVideoJobs = activeJobs.filter(
     (j) =>
       j.jobKind === 'VIDEO_GENERATION' && j.companyId === activeTab.companyId,
+  );
+  const recentFailedVideoJobs = useMemo(
+    () =>
+      (workspace?.jobs ?? [])
+        .filter(
+          (j) =>
+            j.jobKind === 'VIDEO_GENERATION' &&
+            j.companyId === activeTab.companyId &&
+            j.status === 'FAILED',
+        )
+        .slice(0, 3),
+    [workspace?.jobs, activeTab.companyId],
+  );
+
+  const plannedVideoApiSnapshot = useMemo<StudioApiRequestSnapshotDTO>(() => {
+    const model = currentVideoModel;
+    const usesAtTokens = activeTab.videoModelKey.startsWith('seedance');
+    const imgPrefix = usesAtTokens ? '@Image ' : 'Image ';
+    const vidPrefix = usesAtTokens ? '@Video ' : 'Video ';
+    const maxImages = model?.capabilities.maxReferenceImages ?? 9;
+
+    const images: StudioApiInputImageRefDTO[] = [];
+    if (selectedCharSheet) {
+      images.push({
+        index: 1,
+        token: `${imgPrefix}1`,
+        role: 'CHARACTER_SHEET',
+        label: selectedCharSheet.title || 'Character Sheet',
+        fileName: `character-${selectedCharSheet.id}.png`,
+        mimeType: selectedCharSheet.mimeType,
+        mediaPath: selectedCharSheet.mediaPath,
+        stagedUrl: null,
+      });
+    }
+    const maxProductImgs = Math.max(0, maxImages - images.length);
+    for (const item of selectedVideoProductAssets.slice(0, maxProductImgs)) {
+      const idx = images.length + 1;
+      images.push({
+        index: idx,
+        token: `${imgPrefix}${idx}`,
+        role: 'PRODUCT',
+        label: item.label || item.role || `Product Image ${idx}`,
+        fileName: item.originalFileName || `${item.role.toLowerCase()}.png`,
+        mimeType: item.mimeType,
+        mediaPath: item.imagePath,
+        stagedUrl: null,
+      });
+    }
+
+    const videos: StudioApiInputVideoRefDTO[] = selectedRefVideo
+      ? [
+          {
+            index: 1,
+            token: `${vidPrefix}1`,
+            role: 'REFERENCE_VIDEO',
+            label: selectedRefVideo.title || selectedRefVideo.originalFileName,
+            fileName: selectedRefVideo.originalFileName,
+            mimeType: selectedRefVideo.mimeType,
+            durationSec: selectedRefVideo.mediaMeta?.durationSec ?? null,
+            mediaPath: selectedRefVideo.streamPath,
+            thumbnailPath: selectedRefVideo.thumbnailPath,
+            stagedUrl: null,
+          },
+        ]
+      : [];
+
+    const selectedVideoPreset =
+      videoPresets.find((p) => p.id === activeTab.videoPresetId) ??
+      videoPresets.find((p) => p.isDefault) ??
+      videoPresets[0] ??
+      null;
+    const charMeta = (selectedCharSheet?.metadata ?? {}) as Record<
+      string,
+      unknown
+    >;
+    const envPrompt =
+      activeTab.videoEnvironmentOverride.trim() ||
+      (typeof charMeta.environmentPrompt === 'string' &&
+      charMeta.environmentPrompt.trim()
+        ? charMeta.environmentPrompt.trim()
+        : selectedEnvironment?.masterPrompt ||
+          'the exact environment and lighting shown in the Character Sheet (@Image 1)');
+    const productName =
+      selectedVideoGarment?.name ||
+      selectedCharSheet?.title ||
+      'featured garment';
+    const rawTemplate =
+      activeTab.videoMasterPrompt.trim() ||
+      selectedVideoPreset?.masterPrompt ||
+      'Recreate the exact camera angles, shot transitions, editing rhythm, pacing, and subject actions from @Video 1. Replace the main subject and outfit with the model and exact {{product_name}} shown in @Image 1. Keep the entire scene in the exact same environment and lighting as the Character Sheet: {{environment}}.';
+    const previewBase = rawTemplate
+      .replace(/\{\{\s*product_name\s*\}\}/g, productName)
+      .replace(/\{\{\s*environment\s*\}\}/g, envPrompt)
+      .replace(
+        /\{\{\s*custom_notes\s*\}\}/g,
+        activeTab.videoCustomNotes.trim(),
+      )
+      .replace(/\{\{\s*[a-zA-Z0-9_]+\s*\}\}/g, '')
+      .trim();
+
+    const refParts: string[] = [];
+    if (selectedCharSheet) {
+      refParts.push(
+        `${imgPrefix}1 is the Character Sheet (locked model identity, outfit fit, and environment)`,
+      );
+    }
+    const productRefs = images.filter((i) => i.role === 'PRODUCT');
+    if (productRefs.length > 0) {
+      refParts.push(
+        `${productRefs.map((i) => i.token).join(', ')} ${productRefs.length === 1 ? 'is the exact product photo' : 'are exact product photos'} of "${productName}" (match every front/back graphic, logo, neckline, and fabric detail)`,
+      );
+    }
+    if (selectedRefVideo) {
+      refParts.push(
+        `${vidPrefix}1 is the reference video (preserve exact camera angles, subject motion, shot transitions, and pacing)`,
+      );
+    }
+    const previewPrompt =
+      refParts.length > 0 && !/(?:@?Image\s*2\b)/i.test(previewBase)
+        ? `${previewBase}\nReference inputs: ${refParts.join('; ')}.`
+        : previewBase;
+
+    return {
+      capturedAt: new Date().toISOString(),
+      provider: null,
+      endpoint: null,
+      modelKey: activeTab.videoModelKey,
+      modelLabel: model?.label ?? activeTab.videoModelKey,
+      routingMode: activeTab.routingMode,
+      failoverTriggered: false,
+      externalTaskId: null,
+      prompt: previewPrompt,
+      images,
+      videos,
+      rawPayload: null,
+    };
+  }, [
+    currentVideoModel,
+    activeTab.videoModelKey,
+    activeTab.videoPresetId,
+    activeTab.videoMasterPrompt,
+    activeTab.videoEnvironmentOverride,
+    activeTab.videoCustomNotes,
+    activeTab.routingMode,
+    selectedCharSheet,
+    selectedVideoProductAssets,
+    selectedRefVideo,
+    videoPresets,
+    selectedEnvironment,
+    selectedVideoGarment,
+  ]);
+
+  const resolveVideoApiSnapshot = useCallback(
+    (
+      vid: StudioAssetDTO,
+    ): { snapshot: StudioApiRequestSnapshotDTO; legacyNote?: string } => {
+      const meta = (vid.metadata ?? {}) as Record<string, unknown>;
+      const recorded = meta.apiRequest as
+        | StudioApiRequestSnapshotDTO
+        | undefined;
+      if (recorded && typeof recorded === 'object') {
+        return { snapshot: recorded };
+      }
+
+      // Graceful reconstruction for videos generated before API payload snapshotting
+      const usesAtTokens = vid.modelKey.startsWith('seedance');
+      const imgPrefix = usesAtTokens ? '@Image ' : 'Image ';
+      const vidPrefix = usesAtTokens ? '@Video ' : 'Video ';
+      const images: StudioApiInputImageRefDTO[] = [];
+
+      const charSheet = vid.characterAssetId
+        ? characterSheets.find((c) => c.id === vid.characterAssetId) ?? null
+        : null;
+      if (charSheet) {
+        images.push({
+          index: 1,
+          token: `${imgPrefix}1`,
+          role: 'CHARACTER_SHEET',
+          label: charSheet.title || 'Character Sheet',
+          fileName: `character-${charSheet.id}.png`,
+          mimeType: charSheet.mimeType,
+          mediaPath: charSheet.mediaPath,
+          stagedUrl: null,
+        });
+      }
+
+      const kit = vid.productKitId
+        ? garments.find((g) => g.id === vid.productKitId) ?? null
+        : null;
+      if (kit) {
+        for (const item of kit.assets) {
+          const idx = images.length + 1;
+          images.push({
+            index: idx,
+            token: `${imgPrefix}${idx}`,
+            role: 'PRODUCT',
+            label: item.label || item.role || `Product Image ${idx}`,
+            fileName: item.originalFileName || `${item.role.toLowerCase()}.png`,
+            mimeType: item.mimeType,
+            mediaPath: item.imagePath,
+            stagedUrl: null,
+          });
+        }
+      }
+
+      const refVid = vid.referenceVideoId
+        ? referenceVideos.find((r) => r.id === vid.referenceVideoId) ?? null
+        : null;
+      const videos: StudioApiInputVideoRefDTO[] = refVid
+        ? [
+            {
+              index: 1,
+              token: `${vidPrefix}1`,
+              role: 'REFERENCE_VIDEO',
+              label: refVid.title || refVid.originalFileName,
+              fileName: refVid.originalFileName,
+              mimeType: refVid.mimeType,
+              durationSec: refVid.mediaMeta?.durationSec ?? null,
+              mediaPath: refVid.streamPath,
+              thumbnailPath: refVid.thumbnailPath,
+              stagedUrl: null,
+            },
+          ]
+        : [];
+
+      const modelSpec = videoModels.find((m) => m.key === vid.modelKey);
+      const provider: 'wavespeed' | 'kie' | null =
+        vid.providerUsed === 'wavespeed' || vid.providerUsed === 'kie'
+          ? vid.providerUsed
+          : null;
+
+      return {
+        snapshot: {
+          capturedAt: vid.createdAt,
+          provider,
+          endpoint: null,
+          modelKey: vid.modelKey,
+          modelLabel: modelSpec?.label ?? vid.modelKey,
+          routingMode: 'AUTO_FAILOVER',
+          failoverTriggered: Boolean(meta.failoverTriggered),
+          externalTaskId:
+            typeof meta.externalTaskId === 'string'
+              ? meta.externalTaskId
+              : null,
+          prompt: vid.promptUsed || '',
+          images,
+          videos,
+          rawPayload: null,
+        },
+        legacyNote:
+          'Generated before API payload snapshotting — showing linked Character Sheet, Garment, Reference Video & prompt. New videos also capture exact staged URLs and raw JSON sent to the provider.',
+      };
+    },
+    [characterSheets, garments, referenceVideos, videoModels],
   );
 
   const stepItems: Array<{ key: StudioStageKey; num: string; label: string }> =
@@ -2174,8 +2477,8 @@ export const DeliveryAiStudioPage = () => {
                       <StyledPickerMeta>
                         <strong>{selectedCharSheet.title}</strong>
                         <span>
-                          {selectedGarment
-                            ? `${selectedGarment.name} · ${selectedGarment.assets.length} garment image${selectedGarment.assets.length === 1 ? '' : 's'}`
+                          {selectedVideoGarment
+                            ? `${selectedVideoGarment.name} · ${selectedVideoProductAssets.length} garment image${selectedVideoProductAssets.length === 1 ? '' : 's'}`
                             : 'Character Sheet ready'}
                         </span>
                       </StyledPickerMeta>
@@ -2238,6 +2541,14 @@ export const DeliveryAiStudioPage = () => {
                     ? 'Queuing…'
                     : `Generate AI Video · ${videoCost}`}
                 </StyledPrimaryCta>
+
+                {(selectedCharSheet || selectedRefVideo) && (
+                  <DeliveryStudioApiInputInspector
+                    snapshot={plannedVideoApiSnapshot}
+                    buttonLabel="Inspect API Input (Preview)"
+                    isPreview
+                  />
+                )}
               </StyledBuilderStack>
 
               {/* Right: Generated AI Videos */}
@@ -2265,6 +2576,41 @@ export const DeliveryAiStudioPage = () => {
                     <StyledProgressTrack>
                       <StyledProgressFill style={{ width: `${job.progress}%` }} />
                     </StyledProgressTrack>
+                    {job.apiRequest && (
+                      <DeliveryStudioApiInputInspector
+                        snapshot={job.apiRequest}
+                        buttonLabel="Inspect API Input"
+                      />
+                    )}
+                  </StyledProgressCard>
+                ))}
+
+                {recentFailedVideoJobs.map((job) => (
+                  <StyledProgressCard key={job.id}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        fontSize: 12,
+                        fontWeight: 600,
+                        justifyContent: 'space-between',
+                      }}
+                    >
+                      <span>{job.title}</span>
+                      <span style={{ color: themeCssVariables.font.color.danger }}>
+                        FAILED
+                      </span>
+                    </div>
+                    {job.errorMessage && (
+                      <div style={{ fontSize: 11, opacity: 0.85 }}>
+                        {job.errorMessage}
+                      </div>
+                    )}
+                    {job.apiRequest && (
+                      <DeliveryStudioApiInputInspector
+                        snapshot={job.apiRequest}
+                        buttonLabel="Inspect API Input"
+                      />
+                    )}
                   </StyledProgressCard>
                 ))}
 
@@ -2275,35 +2621,43 @@ export const DeliveryAiStudioPage = () => {
                   </StyledEmptyState>
                 ) : (
                   <StyledAssetGrid>
-                    {generatedVideos.map((vid) => (
-                      <StyledAssetCard
-                        key={vid.id}
-                        data-selected={vid.id === selectedVideo?.id}
-                      >
-                        <StyledAssetMedia data-video="true">
-                          <video
-                            src={studioMediaUrl(vid.mediaPath)}
-                            poster={studioMediaUrl(vid.thumbnailPath)}
-                            controls
-                            playsInline
-                          />
-                        </StyledAssetMedia>
-                        <StyledAssetFooter>
-                          <strong>{vid.title}</strong>
-                          <StyledPrimaryCta
-                            type="button"
-                            style={{ padding: '8px 12px', fontSize: 12 }}
-                            onClick={() =>
-                              void handleApproveVideoAndContinue(vid)
-                            }
-                          >
-                            {vid.approved
-                              ? 'Open Text Hooks & Drive →'
-                              : 'Approve & Continue →'}
-                          </StyledPrimaryCta>
-                        </StyledAssetFooter>
-                      </StyledAssetCard>
-                    ))}
+                    {generatedVideos.map((vid) => {
+                      const resolvedApi = resolveVideoApiSnapshot(vid);
+                      return (
+                        <StyledAssetCard
+                          key={vid.id}
+                          data-selected={vid.id === selectedVideo?.id}
+                        >
+                          <StyledAssetMedia data-video="true">
+                            <video
+                              src={studioMediaUrl(vid.mediaPath)}
+                              poster={studioMediaUrl(vid.thumbnailPath)}
+                              controls
+                              playsInline
+                            />
+                          </StyledAssetMedia>
+                          <StyledAssetFooter>
+                            <strong>{vid.title}</strong>
+                            <DeliveryStudioApiInputInspector
+                              snapshot={resolvedApi.snapshot}
+                              buttonLabel="Inspect API Input"
+                              legacyNote={resolvedApi.legacyNote}
+                            />
+                            <StyledPrimaryCta
+                              type="button"
+                              style={{ padding: '8px 12px', fontSize: 12 }}
+                              onClick={() =>
+                                void handleApproveVideoAndContinue(vid)
+                              }
+                            >
+                              {vid.approved
+                                ? 'Open Text Hooks & Drive →'
+                                : 'Approve & Continue →'}
+                            </StyledPrimaryCta>
+                          </StyledAssetFooter>
+                        </StyledAssetCard>
+                      );
+                    })}
                   </StyledAssetGrid>
                 )}
               </StyledGalleryColumn>

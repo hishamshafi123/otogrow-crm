@@ -144,6 +144,7 @@ export const generateVideoSchema = z
     referenceVideoId: z.string().uuid(),
     characterAssetId: z.string().uuid().nullable().optional(),
     productKitId: z.string().uuid().nullable().optional(),
+    productAssetIds: z.array(z.string().uuid()).max(16).optional(),
     environmentPresetId: z.string().uuid().nullable().optional(),
     extraReferenceAssetIds: z.array(z.string().uuid()).max(8).optional(),
     presetId: z.string().uuid().nullable().optional(),

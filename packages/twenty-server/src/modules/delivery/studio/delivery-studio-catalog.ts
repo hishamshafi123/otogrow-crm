@@ -15,13 +15,23 @@ export type StudioModelSpec = {
   wavespeed: {
     endpoint: string;
     imageInputField?: 'images' | 'reference_images' | 'image';
-    videoInputField?: 'reference_videos' | 'video';
+    videoInputField?: 'reference_videos' | 'videos' | 'video';
+    omitResolution?: boolean;
     supportsSyncMode?: boolean;
   };
   kie: {
     model: string;
-    imageInputField?: 'input_urls' | 'image_input' | 'image_urls' | 'reference_images';
-    videoInputField?: 'video_urls' | 'reference_videos' | 'video_url';
+    imageInputField?:
+      | 'input_urls'
+      | 'image_input'
+      | 'image_urls'
+      | 'reference_image_urls';
+    videoInputField?: 'reference_video_urls' | 'video_urls' | 'video_url';
+    audioInputField?: 'generate_audio' | 'audio';
+    omniReferenceTaskType?: 'reference' | 'edit';
+    resolutionFormat?: 'LOWER' | 'UPPER';
+    maxResolution?: '480p' | '720p' | '1080p';
+    durationAsNumber?: boolean;
   };
   capabilities: {
     maxReferenceImages: number;
@@ -179,8 +189,11 @@ export const STUDIO_MODEL_CATALOG: readonly StudioModelSpec[] = [
     },
     kie: {
       model: 'bytedance/seedance-2-5',
-      imageInputField: 'reference_images',
-      videoInputField: 'reference_videos',
+      imageInputField: 'reference_image_urls',
+      videoInputField: 'reference_video_urls',
+      audioInputField: 'generate_audio',
+      omniReferenceTaskType: 'reference',
+      durationAsNumber: true,
     },
     capabilities: {
       maxReferenceImages: 9,
@@ -216,8 +229,12 @@ export const STUDIO_MODEL_CATALOG: readonly StudioModelSpec[] = [
     },
     kie: {
       model: 'bytedance/seedance-2-5-flash',
-      imageInputField: 'reference_images',
-      videoInputField: 'reference_videos',
+      imageInputField: 'reference_image_urls',
+      videoInputField: 'reference_video_urls',
+      audioInputField: 'generate_audio',
+      omniReferenceTaskType: 'reference',
+      maxResolution: '720p',
+      durationAsNumber: true,
     },
     capabilities: {
       maxReferenceImages: 9,
@@ -249,12 +266,15 @@ export const STUDIO_MODEL_CATALOG: readonly StudioModelSpec[] = [
     wavespeed: {
       endpoint: 'bytedance/seedance-2.5/video-edit',
       imageInputField: 'reference_images',
-      videoInputField: 'reference_videos',
+      videoInputField: 'video',
     },
     kie: {
       model: 'bytedance/seedance-2-5',
-      imageInputField: 'reference_images',
-      videoInputField: 'reference_videos',
+      imageInputField: 'reference_image_urls',
+      videoInputField: 'reference_video_urls',
+      audioInputField: 'generate_audio',
+      omniReferenceTaskType: 'edit',
+      durationAsNumber: true,
     },
     capabilities: {
       maxReferenceImages: 9,
@@ -285,13 +305,16 @@ export const STUDIO_MODEL_CATALOG: readonly StudioModelSpec[] = [
       'Native 1080p 25fps + audio, up to 10 images & 5 reference videos — standout value for 120-video batches.',
     wavespeed: {
       endpoint: 'sand-ai/magi-2/reference-to-video',
-      imageInputField: 'reference_images',
-      videoInputField: 'reference_videos',
+      imageInputField: 'images',
+      videoInputField: 'videos',
+      omitResolution: true,
     },
     kie: {
       model: 'magi-2/reference-to-video',
-      imageInputField: 'reference_images',
-      videoInputField: 'reference_videos',
+      imageInputField: 'reference_image_urls',
+      videoInputField: 'reference_video_urls',
+      audioInputField: 'generate_audio',
+      durationAsNumber: true,
     },
     capabilities: {
       maxReferenceImages: 10,
@@ -326,9 +349,12 @@ export const STUDIO_MODEL_CATALOG: readonly StudioModelSpec[] = [
       videoInputField: 'reference_videos',
     },
     kie: {
-      model: 'wan-3-0',
-      imageInputField: 'reference_images',
-      videoInputField: 'reference_videos',
+      model: 'wan/3-0-video',
+      imageInputField: 'reference_image_urls',
+      videoInputField: 'reference_video_urls',
+      audioInputField: 'audio',
+      resolutionFormat: 'UPPER',
+      durationAsNumber: true,
     },
     capabilities: {
       maxReferenceImages: 6,
@@ -360,12 +386,15 @@ export const STUDIO_MODEL_CATALOG: readonly StudioModelSpec[] = [
     wavespeed: {
       endpoint: 'alibaba/wan-3.0-prime/video-edit',
       imageInputField: 'reference_images',
-      videoInputField: 'reference_videos',
+      videoInputField: 'video',
     },
     kie: {
-      model: 'wan-3-0-prime',
-      imageInputField: 'reference_images',
-      videoInputField: 'reference_videos',
+      model: 'wan/3-0-video-prime',
+      imageInputField: 'reference_image_urls',
+      videoInputField: 'reference_video_urls',
+      audioInputField: 'audio',
+      resolutionFormat: 'UPPER',
+      durationAsNumber: true,
     },
     capabilities: {
       maxReferenceImages: 6,

@@ -41,6 +41,14 @@ export type StudioStageableMediaFile = {
   ) => Promise<void>;
 };
 
+export type StudioPreparedRequestSnapshot = {
+  provider: StudioProviderId;
+  endpoint: string;
+  requestPayload: Record<string, unknown>;
+  stagedImageUrls: string[];
+  stagedVideoUrls: string[];
+};
+
 export type StudioNormalizedGenerationRequest = {
   modelKey: string;
   prompt: string;
@@ -53,6 +61,7 @@ export type StudioNormalizedGenerationRequest = {
   referenceImages: StudioStageableMediaFile[];
   referenceVideos: StudioStageableMediaFile[];
   onProgress?: (status: 'STAGING' | 'PROCESSING' | 'DOWNLOADING', progress: number, externalTaskId?: string) => Promise<void>;
+  onRequestPrepared?: (snapshot: StudioPreparedRequestSnapshot) => Promise<void>;
   pollIntervalMs?: number;
   maxPollAttempts?: number;
 };
@@ -65,9 +74,13 @@ export type StudioDownloadedOutput = {
 
 export type StudioRouterExecutionResult = {
   providerUsed: StudioProviderId;
+  endpoint: string;
   failoverTriggered: boolean;
   externalTaskId: string;
   outputUrls: string[];
+  requestPayload: Record<string, unknown>;
+  stagedImageUrls: string[];
+  stagedVideoUrls: string[];
   attempts: StudioProviderAttemptRecord[];
 };
 
@@ -263,18 +276,26 @@ export class DeliveryStudioProviderRouterService {
           ? `${WAVESPEED_API_BASE}/${spec.wavespeed.endpoint}`
           : `${KIE_API_BASE}/jobs/createTask (${spec.kie.model})`;
       const startedAt = new Date().toISOString();
+      let preparedForAttempt: StudioPreparedRequestSnapshot | null = null;
+      const attemptRequest: StudioNormalizedGenerationRequest = {
+        ...request,
+        onRequestPrepared: async (snapshot) => {
+          preparedForAttempt = snapshot;
+          await request.onRequestPrepared?.(snapshot);
+        },
+      };
 
       try {
         const result =
           provider === 'wavespeed'
             ? await this.runOnWaveSpeed(
                 spec,
-                request,
+                attemptRequest,
                 credentials.wavespeedApiKey as string,
               )
             : await this.runOnKie(
                 spec,
-                request,
+                attemptRequest,
                 credentials.kieApiKey as string,
               );
 
@@ -288,13 +309,20 @@ export class DeliveryStudioProviderRouterService {
           retryable: false,
           errorCode: null,
           errorMessage: null,
+          requestPayload: result.requestPayload,
+          stagedImageUrls: result.stagedImageUrls,
+          stagedVideoUrls: result.stagedVideoUrls,
         });
 
         return {
           providerUsed: provider,
+          endpoint,
           failoverTriggered: index > 0,
           externalTaskId: result.externalTaskId,
           outputUrls: result.outputUrls,
+          requestPayload: result.requestPayload,
+          stagedImageUrls: result.stagedImageUrls,
+          stagedVideoUrls: result.stagedVideoUrls,
           attempts,
         };
       } catch (error) {
@@ -304,6 +332,7 @@ export class DeliveryStudioProviderRouterService {
           `${provider} generation failed.`,
         );
         lastError = classified;
+        const captured = preparedForAttempt as StudioPreparedRequestSnapshot | null;
         attempts.push({
           provider,
           endpoint,
@@ -314,6 +343,9 @@ export class DeliveryStudioProviderRouterService {
           retryable: classified.retryable,
           errorCode: classified.errorCode,
           errorMessage: classified.message,
+          requestPayload: captured?.requestPayload ?? null,
+          stagedImageUrls: captured?.stagedImageUrls ?? [],
+          stagedVideoUrls: captured?.stagedVideoUrls ?? [],
         });
 
         const hasNextProvider = index + 1 < plan.length;
@@ -491,7 +523,7 @@ export class DeliveryStudioProviderRouterService {
     }
 
     if (spec.kind === 'IMAGE') {
-      if (request.resolution) {
+      if (request.resolution && !spec.wavespeed.omitResolution) {
         body.resolution = request.resolution.toLowerCase();
       }
       if (request.quality) {
@@ -505,7 +537,7 @@ export class DeliveryStudioProviderRouterService {
             : stagedImageUrls.slice(0, spec.capabilities.maxReferenceImages);
       }
     } else {
-      if (request.resolution) {
+      if (request.resolution && !spec.wavespeed.omitResolution) {
         body.resolution = request.resolution.toLowerCase();
       }
       if (request.durationSec) {
@@ -538,7 +570,13 @@ export class DeliveryStudioProviderRouterService {
     spec: StudioModelSpec,
     request: StudioNormalizedGenerationRequest,
     apiKey: string,
-  ): Promise<{ externalTaskId: string; outputUrls: string[] }> {
+  ): Promise<{
+    externalTaskId: string;
+    outputUrls: string[];
+    requestPayload: Record<string, unknown>;
+    stagedImageUrls: string[];
+    stagedVideoUrls: string[];
+  }> {
     await request.onProgress?.('STAGING', 12);
     const stagedImages: string[] = [];
     for (const img of request.referenceImages.slice(
@@ -555,12 +593,21 @@ export class DeliveryStudioProviderRouterService {
       stagedVideos.push(await this.stageFileToWaveSpeed(apiKey, vid));
     }
 
+    const endpoint = `${WAVESPEED_API_BASE}/${spec.wavespeed.endpoint}`;
     const payload = this.buildWaveSpeedPayload(
       spec,
       request,
       stagedImages,
       stagedVideos,
     );
+
+    await request.onRequestPrepared?.({
+      provider: 'wavespeed',
+      endpoint,
+      requestPayload: payload,
+      stagedImageUrls: stagedImages,
+      stagedVideoUrls: stagedVideos,
+    });
 
     const submitRes = await axios.post<{
       code?: number;
@@ -571,7 +618,7 @@ export class DeliveryStudioProviderRouterService {
         outputs?: string[];
         error?: string;
       };
-    }>(`${WAVESPEED_API_BASE}/${spec.wavespeed.endpoint}`, payload, {
+    }>(endpoint, payload, {
       headers: {
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
@@ -613,6 +660,9 @@ export class DeliveryStudioProviderRouterService {
       return {
         externalTaskId: predictionId,
         outputUrls: submitRes.data.data.outputs,
+        requestPayload: payload,
+        stagedImageUrls: stagedImages,
+        stagedVideoUrls: stagedVideos,
       };
     }
 
@@ -664,7 +714,13 @@ export class DeliveryStudioProviderRouterService {
           );
         }
         await request.onProgress?.('DOWNLOADING', 90, predictionId);
-        return { externalTaskId: predictionId, outputUrls: outputs };
+        return {
+          externalTaskId: predictionId,
+          outputUrls: outputs,
+          requestPayload: payload,
+          stagedImageUrls: stagedImages,
+          stagedVideoUrls: stagedVideos,
+        };
       }
 
       if (status === 'failed' || status === 'cancelled') {
@@ -788,17 +844,48 @@ export class DeliveryStudioProviderRouterService {
         );
       }
     } else {
+      const hasRefs =
+        stagedImageUrls.length > 0 || stagedVideoUrls.length > 0;
+      const isKieEditMode =
+        spec.kie.omniReferenceTaskType === 'edit' && stagedVideoUrls.length > 0;
+
       if (request.resolution) {
-        input.resolution = request.resolution.toLowerCase();
+        let normalizedRes = request.resolution.toLowerCase();
+        if (spec.kie.model === 'magi-2/reference-to-video') {
+          normalizedRes = '1080p';
+        } else if (
+          spec.kie.maxResolution === '720p' &&
+          (normalizedRes === '1080p' || normalizedRes === '4k')
+        ) {
+          normalizedRes = '720p';
+        }
+        input.resolution =
+          spec.kie.resolutionFormat === 'UPPER'
+            ? normalizedRes.toUpperCase()
+            : normalizedRes;
       }
-      if (request.durationSec) {
-        input.duration = String(request.durationSec);
+
+      if (isKieEditMode) {
+        input.omni_reference_task_type = 'edit';
+        input.aspect_ratio = 'adaptive';
+        input.duration = -1;
+      } else {
+        if (spec.kie.omniReferenceTaskType === 'reference' && hasRefs) {
+          input.omni_reference_task_type = 'reference';
+        }
+        if (request.durationSec) {
+          input.duration = spec.kie.durationAsNumber
+            ? request.durationSec
+            : String(request.durationSec);
+        }
       }
+
       if (
         spec.capabilities.supportsAudio &&
         request.generateAudio !== undefined
       ) {
-        input.generate_audio = request.generateAudio;
+        const audioField = spec.kie.audioInputField ?? 'generate_audio';
+        input[audioField] = request.generateAudio;
       }
       if (stagedImageUrls.length > 0 && spec.kie.imageInputField) {
         input[spec.kie.imageInputField] = stagedImageUrls.slice(
@@ -821,7 +908,13 @@ export class DeliveryStudioProviderRouterService {
     spec: StudioModelSpec,
     request: StudioNormalizedGenerationRequest,
     apiKey: string,
-  ): Promise<{ externalTaskId: string; outputUrls: string[] }> {
+  ): Promise<{
+    externalTaskId: string;
+    outputUrls: string[];
+    requestPayload: Record<string, unknown>;
+    stagedImageUrls: string[];
+    stagedVideoUrls: string[];
+  }> {
     await request.onProgress?.('STAGING', 15);
     const stagedImages: string[] = [];
     for (const img of request.referenceImages.slice(
@@ -838,12 +931,21 @@ export class DeliveryStudioProviderRouterService {
       stagedVideos.push(await this.stageFileToKie(apiKey, vid));
     }
 
+    const endpoint = `${KIE_API_BASE}/jobs/createTask (${spec.kie.model})`;
     const payload = this.buildKiePayload(
       spec,
       request,
       stagedImages,
       stagedVideos,
     );
+
+    await request.onRequestPrepared?.({
+      provider: 'kie',
+      endpoint,
+      requestPayload: payload as unknown as Record<string, unknown>,
+      stagedImageUrls: stagedImages,
+      stagedVideoUrls: stagedVideos,
+    });
 
     const submitRes = await axios.post<{
       code?: number;
@@ -951,7 +1053,13 @@ export class DeliveryStudioProviderRouterService {
           );
         }
         await request.onProgress?.('DOWNLOADING', 90, taskId);
-        return { externalTaskId: taskId, outputUrls: urls };
+        return {
+          externalTaskId: taskId,
+          outputUrls: urls,
+          requestPayload: payload as unknown as Record<string, unknown>,
+          stagedImageUrls: stagedImages,
+          stagedVideoUrls: stagedVideos,
+        };
       }
 
       if (state === 'fail' || state === 'failed') {

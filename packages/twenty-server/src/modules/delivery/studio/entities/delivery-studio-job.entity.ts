@@ -30,6 +30,9 @@ export type StudioProviderAttemptRecord = {
   retryable: boolean;
   errorCode: string | null;
   errorMessage: string | null;
+  requestPayload?: Record<string, unknown> | null;
+  stagedImageUrls?: string[];
+  stagedVideoUrls?: string[];
 };
 
 @Entity({ name: 'deliveryStudioJob', schema: 'core' })

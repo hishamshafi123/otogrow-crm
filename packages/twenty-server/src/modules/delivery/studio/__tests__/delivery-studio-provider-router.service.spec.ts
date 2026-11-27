@@ -406,5 +406,206 @@ describe('AI Studio Catalog, Policy & Provider Router (Loop 1)', () => {
         'https://tempfile.redpandaai.co/b.png',
       ]);
     });
+
+    it('maps Kie.ai Seedance 2.5, Seedance Flash, Seedance Edit, MAGI-2, and Wan 3.0 video fields accurately', () => {
+      const seedanceSpec = getStudioModelSpec('seedance-2.5')!;
+      const seedanceFlashSpec = getStudioModelSpec('seedance-2.5-flash')!;
+      const seedanceEditSpec = getStudioModelSpec('seedance-2.5-edit')!;
+      const magiSpec = getStudioModelSpec('magi-2')!;
+      const wanSpec = getStudioModelSpec('wan-3.0')!;
+
+      const seedancePayload = router.buildKiePayload(
+        seedanceSpec,
+        {
+          modelKey: seedanceSpec.key,
+          prompt: 'Swap @Image 1 into @Video 1',
+          routingMode: 'KIE_ONLY',
+          aspectRatio: '9:16',
+          resolution: '1080p',
+          durationSec: 8,
+          generateAudio: true,
+          referenceImages: [],
+          referenceVideos: [],
+        },
+        ['https://tempfile.redpandaai.co/sheet.png', 'https://tempfile.redpandaai.co/tee.png'],
+        ['https://tempfile.redpandaai.co/ref.mp4'],
+      );
+      expect(seedancePayload.model).toBe('bytedance/seedance-2-5');
+      expect(seedancePayload.input).toMatchObject({
+        reference_image_urls: [
+          'https://tempfile.redpandaai.co/sheet.png',
+          'https://tempfile.redpandaai.co/tee.png',
+        ],
+        reference_video_urls: ['https://tempfile.redpandaai.co/ref.mp4'],
+        omni_reference_task_type: 'reference',
+        duration: 8,
+        resolution: '1080p',
+        generate_audio: true,
+      });
+      expect(seedancePayload.input).not.toHaveProperty('reference_images');
+      expect(seedancePayload.input).not.toHaveProperty('reference_videos');
+
+      const flashPayload = router.buildKiePayload(
+        seedanceFlashSpec,
+        {
+          modelKey: seedanceFlashSpec.key,
+          prompt: 'Fast swap',
+          routingMode: 'KIE_ONLY',
+          aspectRatio: '9:16',
+          resolution: '1080p',
+          durationSec: 6,
+          generateAudio: true,
+          referenceImages: [],
+          referenceVideos: [],
+        },
+        ['https://tempfile.redpandaai.co/sheet.png'],
+        ['https://tempfile.redpandaai.co/ref.mp4'],
+      );
+      expect(flashPayload.input.resolution).toBe('720p');
+      expect(flashPayload.input.omni_reference_task_type).toBe('reference');
+
+      const editPayload = router.buildKiePayload(
+        seedanceEditSpec,
+        {
+          modelKey: seedanceEditSpec.key,
+          prompt: 'Edit outfit',
+          routingMode: 'KIE_ONLY',
+          aspectRatio: '9:16',
+          resolution: '720p',
+          durationSec: 8,
+          referenceImages: [],
+          referenceVideos: [],
+        },
+        ['https://tempfile.redpandaai.co/sheet.png'],
+        ['https://tempfile.redpandaai.co/ref.mp4'],
+      );
+      expect(editPayload.input).toMatchObject({
+        omni_reference_task_type: 'edit',
+        aspect_ratio: 'adaptive',
+        duration: -1,
+        reference_image_urls: ['https://tempfile.redpandaai.co/sheet.png'],
+        reference_video_urls: ['https://tempfile.redpandaai.co/ref.mp4'],
+      });
+
+      const magiPayload = router.buildKiePayload(
+        magiSpec,
+        {
+          modelKey: magiSpec.key,
+          prompt: 'Use Image 1 and Video 1',
+          routingMode: 'KIE_ONLY',
+          aspectRatio: '9:16',
+          resolution: '720p',
+          durationSec: 10,
+          generateAudio: true,
+          referenceImages: [],
+          referenceVideos: [],
+        },
+        ['https://tempfile.redpandaai.co/sheet.png'],
+        ['https://tempfile.redpandaai.co/ref.mp4'],
+      );
+      expect(magiPayload.model).toBe('magi-2/reference-to-video');
+      expect(magiPayload.input).toMatchObject({
+        reference_image_urls: ['https://tempfile.redpandaai.co/sheet.png'],
+        reference_video_urls: ['https://tempfile.redpandaai.co/ref.mp4'],
+        resolution: '1080p',
+        duration: 10,
+        generate_audio: true,
+      });
+
+      const wanPayload = router.buildKiePayload(
+        wanSpec,
+        {
+          modelKey: wanSpec.key,
+          prompt: 'Use Image 1 and Video 1',
+          routingMode: 'KIE_ONLY',
+          aspectRatio: '9:16',
+          resolution: '720p',
+          durationSec: 8,
+          generateAudio: true,
+          referenceImages: [],
+          referenceVideos: [],
+        },
+        ['https://tempfile.redpandaai.co/sheet.png'],
+        ['https://tempfile.redpandaai.co/ref.mp4'],
+      );
+      expect(wanPayload.model).toBe('wan/3-0-video');
+      expect(wanPayload.input).toMatchObject({
+        reference_image_urls: ['https://tempfile.redpandaai.co/sheet.png'],
+        reference_video_urls: ['https://tempfile.redpandaai.co/ref.mp4'],
+        resolution: '720P',
+        duration: 8,
+        audio: true,
+      });
+      expect(wanPayload.input).not.toHaveProperty('generate_audio');
+    });
+
+    it('maps WaveSpeedAI MAGI-2 (images/videos, no resolution) and Video Edit (singular video) fields accurately', () => {
+      const magiSpec = getStudioModelSpec('magi-2')!;
+      const seedanceEditSpec = getStudioModelSpec('seedance-2.5-edit')!;
+      const wanPrimeSpec = getStudioModelSpec('wan-3.0-prime')!;
+
+      const magiPayload = router.buildWaveSpeedPayload(
+        magiSpec,
+        {
+          modelKey: magiSpec.key,
+          prompt: 'Swap garment',
+          routingMode: 'WAVESPEED_ONLY',
+          aspectRatio: '9:16',
+          resolution: '1080p',
+          durationSec: 8,
+          generateAudio: true,
+          referenceImages: [],
+          referenceVideos: [],
+        },
+        ['https://cdn.wavespeed.ai/sheet.png'],
+        ['https://cdn.wavespeed.ai/ref.mp4'],
+      );
+      expect(magiPayload).toMatchObject({
+        images: ['https://cdn.wavespeed.ai/sheet.png'],
+        videos: ['https://cdn.wavespeed.ai/ref.mp4'],
+        duration: 8,
+        generate_audio: true,
+      });
+      expect(magiPayload).not.toHaveProperty('resolution');
+      expect(magiPayload).not.toHaveProperty('reference_images');
+      expect(magiPayload).not.toHaveProperty('reference_videos');
+
+      const seedanceEditPayload = router.buildWaveSpeedPayload(
+        seedanceEditSpec,
+        {
+          modelKey: seedanceEditSpec.key,
+          prompt: 'Edit video',
+          routingMode: 'WAVESPEED_ONLY',
+          aspectRatio: '9:16',
+          resolution: '720p',
+          durationSec: 8,
+          referenceImages: [],
+          referenceVideos: [],
+        },
+        ['https://cdn.wavespeed.ai/sheet.png'],
+        ['https://cdn.wavespeed.ai/ref.mp4'],
+      );
+      expect(seedanceEditPayload.video).toBe('https://cdn.wavespeed.ai/ref.mp4');
+      expect(seedanceEditPayload.reference_images).toEqual([
+        'https://cdn.wavespeed.ai/sheet.png',
+      ]);
+
+      const wanPrimePayload = router.buildWaveSpeedPayload(
+        wanPrimeSpec,
+        {
+          modelKey: wanPrimeSpec.key,
+          prompt: 'Edit video',
+          routingMode: 'WAVESPEED_ONLY',
+          aspectRatio: '9:16',
+          resolution: '1080p',
+          durationSec: 8,
+          referenceImages: [],
+          referenceVideos: [],
+        },
+        ['https://cdn.wavespeed.ai/sheet.png'],
+        ['https://cdn.wavespeed.ai/ref.mp4'],
+      );
+      expect(wanPrimePayload.video).toBe('https://cdn.wavespeed.ai/ref.mp4');
+    });
   });
 });

@@ -149,6 +149,106 @@ const extensionForMime = (mimeType: string): string => {
   return 'png';
 };
 
+export type StudioApiInputMediaRef = {
+  mediaKind:
+    | 'ref-video'
+    | 'ref-thumb'
+    | 'product-asset'
+    | 'studio-asset'
+    | 'studio-thumb'
+    | 'preset-thumb';
+  id: string;
+  subId?: string;
+};
+
+export type StudioApiInputImageRef = {
+  index: number;
+  token: string;
+  role: 'CHARACTER_SHEET' | 'PRODUCT' | 'AVATAR' | 'ENVIRONMENT';
+  label: string;
+  fileName: string;
+  mimeType: string;
+  mediaPath: string | null;
+  stagedUrl: string | null;
+  sourceRef?: StudioApiInputMediaRef;
+};
+
+export type StudioApiInputVideoRef = {
+  index: number;
+  token: string;
+  role: 'REFERENCE_VIDEO';
+  label: string;
+  fileName: string;
+  mimeType: string;
+  durationSec?: number | null;
+  mediaPath: string | null;
+  thumbnailPath: string | null;
+  stagedUrl: string | null;
+  sourceRef?: StudioApiInputMediaRef;
+  thumbRef?: StudioApiInputMediaRef | null;
+};
+
+export type StudioApiRequestSnapshot = {
+  capturedAt: string;
+  provider: StudioProviderId | null;
+  endpoint: string | null;
+  modelKey: string;
+  modelLabel: string;
+  routingMode: StudioRoutingMode;
+  failoverTriggered: boolean;
+  externalTaskId: string | null;
+  prompt: string;
+  images: StudioApiInputImageRef[];
+  videos: StudioApiInputVideoRef[];
+  rawPayload: Record<string, unknown> | null;
+};
+
+const buildVideoReferenceMappingNote = (params: {
+  usesAtMentionTokens: boolean;
+  hasCharacterSheet: boolean;
+  productImageCount: number;
+  productName: string;
+  hasReferenceVideo: boolean;
+  existingPrompt: string;
+}): string => {
+  const imgPrefix = params.usesAtMentionTokens ? '@Image ' : 'Image ';
+  const vidPrefix = params.usesAtMentionTokens ? '@Video ' : 'Video ';
+
+  // Skip if prompt already explicitly maps Image 2 or higher
+  if (/(?:@?Image\s*2\b)/i.test(params.existingPrompt)) {
+    return '';
+  }
+
+  const parts: string[] = [];
+  let nextIdx = 1;
+
+  if (params.hasCharacterSheet) {
+    parts.push(
+      `${imgPrefix}${nextIdx} is the Character Sheet (locked model identity, outfit fit, and environment)`,
+    );
+    nextIdx += 1;
+  }
+
+  if (params.productImageCount > 0) {
+    const tokens: string[] = [];
+    for (let i = 0; i < params.productImageCount; i += 1) {
+      tokens.push(`${imgPrefix}${nextIdx + i}`);
+    }
+    parts.push(
+      `${tokens.join(', ')} ${tokens.length === 1 ? 'is the exact product photo' : 'are exact product photos'} of "${params.productName}" (match every front/back graphic, logo, neckline, and fabric detail)`,
+    );
+  }
+
+  if (params.hasReferenceVideo) {
+    parts.push(
+      `${vidPrefix}1 is the reference video (preserve exact camera angles, subject motion, shot transitions, and pacing)`,
+    );
+  }
+
+  if (parts.length === 0) return '';
+  return `Reference inputs: ${parts.join('; ')}.`;
+};
+
 export type StudioProviderConfigDTO = {
   wavespeedConfigured: boolean;
   wavespeedKeyLast4: string | null;
@@ -337,7 +437,63 @@ export class DeliveryStudioService {
     };
   }
 
+  private hydrateApiRequestSnapshot(
+    workspaceId: string,
+    raw: unknown,
+  ): StudioApiRequestSnapshot | null {
+    if (!raw || typeof raw !== 'object') return null;
+    const snap = raw as StudioApiRequestSnapshot;
+    const images: StudioApiInputImageRef[] = Array.isArray(snap.images)
+      ? snap.images.map((img) => ({
+          ...img,
+          mediaPath: img.sourceRef
+            ? this.signedMediaPath(
+                workspaceId,
+                img.sourceRef.mediaKind,
+                img.sourceRef.id,
+                img.sourceRef.subId,
+              )
+            : (img.mediaPath ?? null),
+        }))
+      : [];
+    const videos: StudioApiInputVideoRef[] = Array.isArray(snap.videos)
+      ? snap.videos.map((vid) => ({
+          ...vid,
+          mediaPath: vid.sourceRef
+            ? this.signedMediaPath(
+                workspaceId,
+                vid.sourceRef.mediaKind,
+                vid.sourceRef.id,
+                vid.sourceRef.subId,
+              )
+            : (vid.mediaPath ?? null),
+          thumbnailPath: vid.thumbRef
+            ? this.signedMediaPath(
+                workspaceId,
+                vid.thumbRef.mediaKind,
+                vid.thumbRef.id,
+                vid.thumbRef.subId,
+              )
+            : (vid.thumbnailPath ?? null),
+        }))
+      : [];
+
+    return {
+      ...snap,
+      images,
+      videos,
+    };
+  }
+
   private mapAsset(row: DeliveryStudioAssetEntity) {
+    const rawMeta = (row.metadataJson ?? {}) as Record<string, unknown>;
+    const hydratedApiRequest = this.hydrateApiRequestSnapshot(
+      row.workspaceId,
+      rawMeta.apiRequest,
+    );
+    const metadata = hydratedApiRequest
+      ? { ...rawMeta, apiRequest: hydratedApiRequest }
+      : rawMeta;
     return {
       id: row.id,
       companyId: row.companyId,
@@ -359,7 +515,7 @@ export class DeliveryStudioService {
       deliverableId: row.deliverableId,
       hookProjectId: row.hookProjectId,
       tags: row.tagsJson ?? [],
-      metadata: row.metadataJson ?? {},
+      metadata,
       mediaPath: this.signedMediaPath(row.workspaceId, 'studio-asset', row.id),
       thumbnailPath: row.thumbnailKey
         ? this.signedMediaPath(row.workspaceId, 'studio-thumb', row.id)
@@ -372,6 +528,11 @@ export class DeliveryStudioService {
   }
 
   private mapJob(row: DeliveryStudioJobEntity) {
+    const payload = (row.inputPayloadJson ?? {}) as Record<string, unknown>;
+    const apiRequest = this.hydrateApiRequestSnapshot(
+      row.workspaceId,
+      payload.apiRequest,
+    );
     return {
       id: row.id,
       batchId: row.batchId,
@@ -391,6 +552,7 @@ export class DeliveryStudioService {
       outputAssetIds: row.outputAssetIdsJson ?? [],
       externalTaskId: row.externalTaskId,
       errorMessage: row.errorMessage,
+      apiRequest,
       startedAt: row.startedAt ? row.startedAt.toISOString() : null,
       completedAt: row.completedAt ? row.completedAt.toISOString() : null,
       createdAt: row.createdAt.toISOString(),
@@ -1716,7 +1878,27 @@ export class DeliveryStudioService {
       const masterTemplate =
         input.masterPrompt?.trim() || preset?.masterPrompt || defaultTemplate;
 
-      const compiledPrompt = compileStudioPromptTemplate(masterTemplate, {
+      const resolvedProductAssetIds =
+        input.productAssetIds && input.productAssetIds.length > 0
+          ? input.productAssetIds
+          : productKit &&
+              characterAsset?.productKitId === productKit.id &&
+              Array.isArray(charMeta.productAssetIds) &&
+              charMeta.productAssetIds.length > 0
+            ? (charMeta.productAssetIds.filter(
+                (v): v is string => typeof v === 'string',
+              ) as string[])
+            : null;
+
+      const selectedKitAssets = productKit
+        ? resolvedProductAssetIds
+          ? (productKit.assetsJson ?? []).filter((a) =>
+              resolvedProductAssetIds.includes(a.id),
+            )
+          : (productKit.assetsJson ?? [])
+        : [];
+
+      const baseCompiledPrompt = compileStudioPromptTemplate(masterTemplate, {
         product_name:
           productKit?.name || characterAsset?.title || 'featured garment',
         product_notes: productKit?.notes || '',
@@ -1765,6 +1947,99 @@ export class DeliveryStudioService {
         const title =
           input.modelKeys.length > 1 ? `${baseTitle} [${spec.label}]` : baseTitle;
 
+        const maxProductImages = Math.max(
+          0,
+          spec.capabilities.maxReferenceImages - (characterAsset ? 1 : 0),
+        );
+        const plannedKitAssets = selectedKitAssets.slice(0, maxProductImages);
+        const usesAtTokens = Boolean(spec.capabilities.usesAtMentionTokens);
+        const imgPrefix = usesAtTokens ? '@Image ' : 'Image ';
+        const vidPrefix = usesAtTokens ? '@Video ' : 'Video ';
+
+        const refMappingNote = buildVideoReferenceMappingNote({
+          usesAtMentionTokens: usesAtTokens,
+          hasCharacterSheet: Boolean(characterAsset),
+          productImageCount: plannedKitAssets.length,
+          productName:
+            productKit?.name || characterAsset?.title || 'featured garment',
+          hasReferenceVideo: true,
+          existingPrompt: baseCompiledPrompt,
+        });
+        const compiledPrompt = refMappingNote
+          ? `${baseCompiledPrompt}\n${refMappingNote}`.trim()
+          : baseCompiledPrompt;
+
+        const plannedImages: StudioApiInputImageRef[] = [];
+        if (characterAsset) {
+          plannedImages.push({
+            index: 1,
+            token: `${imgPrefix}1`,
+            role: 'CHARACTER_SHEET',
+            label: characterAsset.title || 'Character Sheet',
+            fileName: `character-${characterAsset.id}.${extensionForMime(characterAsset.mimeType)}`,
+            mimeType: characterAsset.mimeType,
+            mediaPath: null,
+            stagedUrl: null,
+            sourceRef: { mediaKind: 'studio-asset', id: characterAsset.id },
+          });
+        }
+        for (const item of plannedKitAssets) {
+          const idx = plannedImages.length + 1;
+          plannedImages.push({
+            index: idx,
+            token: `${imgPrefix}${idx}`,
+            role: 'PRODUCT',
+            label: item.label || item.role || `Product Image ${idx}`,
+            fileName:
+              item.originalFileName ||
+              `${item.role.toLowerCase()}.${extensionForMime(item.mimeType)}`,
+            mimeType: item.mimeType,
+            mediaPath: null,
+            stagedUrl: null,
+            sourceRef: {
+              mediaKind: 'product-asset',
+              id: productKit!.id,
+              subId: item.id,
+            },
+          });
+        }
+
+        const plannedVideos: StudioApiInputVideoRef[] = [
+          {
+            index: 1,
+            token: `${vidPrefix}1`,
+            role: 'REFERENCE_VIDEO',
+            label: refVideo.title || refVideo.originalFileName || 'Reference Video',
+            fileName:
+              refVideo.originalFileName ||
+              `ref-${refVideo.id}.${extensionForMime(refVideo.mimeType)}`,
+            mimeType: refVideo.mimeType,
+            durationSec: refVideo.mediaMeta?.durationSec ?? null,
+            mediaPath: null,
+            thumbnailPath: null,
+            stagedUrl: null,
+            sourceRef: { mediaKind: 'ref-video', id: refVideo.id },
+            thumbRef: refVideo.thumbnailKey
+              ? { mediaKind: 'ref-thumb', id: refVideo.id }
+              : null,
+          },
+        ];
+
+        const plannedApiRequest: StudioApiRequestSnapshot = {
+          capturedAt: new Date().toISOString(),
+          provider: null,
+          endpoint: null,
+          modelKey: spec.key,
+          modelLabel: spec.label,
+          routingMode,
+          failoverTriggered: false,
+          externalTaskId: null,
+          prompt: compiledPrompt,
+          images: plannedImages,
+          videos: plannedVideos,
+          rawPayload: null,
+        };
+
         const job = await repo.save(
           repo.create({
             workspaceId: id.workspaceId,
@@ -1782,6 +2057,7 @@ export class DeliveryStudioService {
               referenceVideoId: refVideo.id,
               characterAssetId: characterAsset?.id ?? null,
               productKitId: productKit?.id ?? null,
+              productAssetIds: resolvedProductAssetIds,
               productName: productKit?.name ?? null,
               environmentPresetId: environmentPreset?.id ?? inheritedEnvPresetId,
               environmentName: resolvedEnvironmentName,
@@ -1794,6 +2070,7 @@ export class DeliveryStudioService {
               resolution,
               durationSec,
               generateAudio: input.generateAudio ?? true,
+              apiRequest: plannedApiRequest,
             },
             attemptsJson: [],
             outputAssetIdsJson: [],
@@ -2466,6 +2743,11 @@ export class DeliveryStudioService {
 
       const referenceImages: StudioStageableMediaFile[] = [];
       const referenceVideos: StudioStageableMediaFile[] = [];
+      const imageRefsMeta: StudioApiInputImageRef[] = [];
+      const videoRefsMeta: StudioApiInputVideoRef[] = [];
+      const usesAtTokens = Boolean(spec.capabilities.usesAtMentionTokens);
+      const imgPrefix = usesAtTokens ? '@Image ' : 'Image ';
+      const vidPrefix = usesAtTokens ? '@Video ' : 'Video ';
 
       // 1) Attach approved Character Sheet as @Image 1 if present
       const characterAssetId =
@@ -2477,9 +2759,10 @@ export class DeliveryStudioService {
           .getRepository(DeliveryStudioAssetEntity)
           .findOne({ where: { id: characterAssetId, workspaceId } });
         if (charAsset) {
+          const fileName = `character-${charAsset.id}.${extensionForMime(charAsset.mimeType)}`;
           referenceImages.push({
             sha256: charAsset.sha256,
-            fileName: `character-${charAsset.id}.${extensionForMime(charAsset.mimeType)}`,
+            fileName,
             mimeType: charAsset.mimeType,
             kind: 'IMAGE',
             cachedWavespeedUrl: isFreshStagedUrl(
@@ -2505,6 +2788,18 @@ export class DeliveryStudioService {
                 .save(charAsset);
             },
           });
+          const idx = imageRefsMeta.length + 1;
+          imageRefsMeta.push({
+            index: idx,
+            token: `${imgPrefix}${idx}`,
+            role: 'CHARACTER_SHEET',
+            label: charAsset.title || 'Character Sheet',
+            fileName,
+            mimeType: charAsset.mimeType,
+            mediaPath: null,
+            stagedUrl: null,
+            sourceRef: { mediaKind: 'studio-asset', id: charAsset.id },
+          });
         }
       }
 
@@ -2525,11 +2820,12 @@ export class DeliveryStudioService {
               )
             : (kit.assetsJson ?? []);
           for (const item of kitAssets) {
+            const fileName =
+              item.originalFileName ||
+              `${item.role.toLowerCase()}.${extensionForMime(item.mimeType)}`;
             referenceImages.push({
               sha256: item.sha256,
-              fileName:
-                item.originalFileName ||
-                `${item.role.toLowerCase()}.${extensionForMime(item.mimeType)}`,
+              fileName,
               mimeType: item.mimeType,
               kind: 'IMAGE',
               cachedWavespeedUrl: isFreshStagedUrl(
@@ -2555,6 +2851,22 @@ export class DeliveryStudioService {
                   .save(kit);
               },
             });
+            const idx = imageRefsMeta.length + 1;
+            imageRefsMeta.push({
+              index: idx,
+              token: `${imgPrefix}${idx}`,
+              role: 'PRODUCT',
+              label: item.label || item.role || `Product Image ${idx}`,
+              fileName,
+              mimeType: item.mimeType,
+              mediaPath: null,
+              stagedUrl: null,
+              sourceRef: {
+                mediaKind: 'product-asset',
+                id: kit.id,
+                subId: item.id,
+              },
+            });
           }
         }
       }
@@ -2562,7 +2874,7 @@ export class DeliveryStudioService {
       // 2b) Attach uploaded Avatar & Environment preset reference photos (when present)
       const presetIdsToStage: Array<{
         id: string;
-        prefix: string;
+        prefix: 'avatar' | 'environment';
       }> = [];
       if (typeof payload.avatarPresetId === 'string' && !characterAssetId) {
         presetIdsToStage.push({ id: payload.avatarPresetId, prefix: 'avatar' });
@@ -2585,14 +2897,29 @@ export class DeliveryStudioService {
           const refMime = refPreset?.configJson?.referenceImageMimeType;
           const refSha = refPreset?.configJson?.referenceImageSha256;
           if (refPreset && refKey && refMime && refSha) {
+            const fileName = `${specRef.prefix}-${refPreset.id}.${extensionForMime(refMime)}`;
             referenceImages.push({
               sha256: refSha,
-              fileName: `${specRef.prefix}-${refPreset.id}.${extensionForMime(refMime)}`,
+              fileName,
               mimeType: refMime,
               kind: 'IMAGE',
               readBytes: async () =>
                 readStreamToBuffer(await driver.readFile({ filePath: refKey })),
               onStagedUrl: async () => undefined,
+            });
+            const idx = imageRefsMeta.length + 1;
+            imageRefsMeta.push({
+              index: idx,
+              token: `${imgPrefix}${idx}`,
+              role: specRef.prefix === 'avatar' ? 'AVATAR' : 'ENVIRONMENT',
+              label:
+                refPreset.name ||
+                (specRef.prefix === 'avatar' ? 'Avatar' : 'Environment'),
+              fileName,
+              mimeType: refMime,
+              mediaPath: null,
+              stagedUrl: null,
+              sourceRef: { mediaKind: 'preset-thumb', id: refPreset.id },
             });
           }
         }
@@ -2610,11 +2937,12 @@ export class DeliveryStudioService {
         if (!refVideo) {
           throw new Error('Reference video was removed before generation.');
         }
+        const fileName =
+          refVideo.originalFileName ||
+          `ref-${refVideo.id}.${extensionForMime(refVideo.mimeType)}`;
         referenceVideos.push({
           sha256: refVideo.sha256,
-          fileName:
-            refVideo.originalFileName ||
-            `ref-${refVideo.id}.${extensionForMime(refVideo.mimeType)}`,
+          fileName,
           mimeType: refVideo.mimeType,
           kind: 'VIDEO',
           cachedWavespeedUrl: isFreshStagedUrl(
@@ -2640,12 +2968,72 @@ export class DeliveryStudioService {
               .save(refVideo);
           },
         });
+        const idx = videoRefsMeta.length + 1;
+        videoRefsMeta.push({
+          index: idx,
+          token: `${vidPrefix}${idx}`,
+          role: 'REFERENCE_VIDEO',
+          label: refVideo.title || fileName,
+          fileName,
+          mimeType: refVideo.mimeType,
+          durationSec: refVideo.mediaMeta?.durationSec ?? null,
+          mediaPath: null,
+          thumbnailPath: null,
+          stagedUrl: null,
+          sourceRef: { mediaKind: 'ref-video', id: refVideo.id },
+          thumbRef: refVideo.thumbnailKey
+            ? { mediaKind: 'ref-thumb', id: refVideo.id }
+            : null,
+        });
       }
 
       const compiledPrompt =
         typeof payload.compiledPrompt === 'string'
           ? payload.compiledPrompt
           : job.title;
+
+      const buildSnapshot = (params: {
+        provider: StudioProviderId | null;
+        endpoint: string | null;
+        failoverTriggered: boolean;
+        externalTaskId: string | null;
+        stagedImageUrls: string[];
+        stagedVideoUrls: string[];
+        rawPayload: Record<string, unknown> | null;
+      }): StudioApiRequestSnapshot => ({
+        capturedAt: new Date().toISOString(),
+        provider: params.provider,
+        endpoint: params.endpoint,
+        modelKey: spec.key,
+        modelLabel: spec.label,
+        routingMode: job.routingMode,
+        failoverTriggered: params.failoverTriggered,
+        externalTaskId: params.externalTaskId,
+        prompt: compiledPrompt,
+        images: imageRefsMeta
+          .slice(0, spec.capabilities.maxReferenceImages)
+          .map((meta, idx) => ({
+            ...meta,
+            stagedUrl: params.stagedImageUrls[idx] ?? null,
+          })),
+        videos: videoRefsMeta
+          .slice(0, spec.capabilities.maxReferenceVideos)
+          .map((meta, idx) => ({
+            ...meta,
+            stagedUrl: params.stagedVideoUrls[idx] ?? null,
+          })),
+        rawPayload: params.rawPayload,
+      });
+
+      let latestApiRequest: StudioApiRequestSnapshot = buildSnapshot({
+        provider: null,
+        endpoint: null,
+        failoverTriggered: false,
+        externalTaskId: null,
+        stagedImageUrls: [],
+        stagedVideoUrls: [],
+        rawPayload: null,
+      });
 
       const execResult = await this.router.execute(
         {
@@ -2674,7 +3062,35 @@ export class DeliveryStudioService {
               : undefined,
           referenceImages,
           referenceVideos,
+          onRequestPrepared: async (prepared) => {
+            latestApiRequest = buildSnapshot({
+              provider: prepared.provider,
+              endpoint: prepared.endpoint,
+              failoverTriggered: false,
+              externalTaskId: null,
+              stagedImageUrls: prepared.stagedImageUrls,
+              stagedVideoUrls: prepared.stagedVideoUrls,
+              rawPayload: prepared.requestPayload,
+            });
+            job.inputPayloadJson = {
+              ...(job.inputPayloadJson ?? {}),
+              apiRequest: latestApiRequest,
+            };
+            await jobRepo.update(
+              { id: job.id, workspaceId },
+              {
+                providerUsed: prepared.provider,
+                inputPayloadJson: job.inputPayloadJson as never,
+              },
+            );
+          },
           onProgress: async (status, progress, externalTaskId) => {
+            if (externalTaskId) {
+              latestApiRequest = {
+                ...latestApiRequest,
+                externalTaskId,
+              };
+            }
             await jobRepo.update(
               { id: job.id, workspaceId },
               {
@@ -2687,6 +3103,16 @@ export class DeliveryStudioService {
         },
         credentials,
       );
+
+      latestApiRequest = buildSnapshot({
+        provider: execResult.providerUsed,
+        endpoint: execResult.endpoint,
+        failoverTriggered: execResult.failoverTriggered,
+        externalTaskId: execResult.externalTaskId,
+        stagedImageUrls: execResult.stagedImageUrls,
+        stagedVideoUrls: execResult.stagedVideoUrls,
+        rawPayload: execResult.requestPayload,
+      });
 
       // Download and persist every output canonically before provider TTL expires
       const expectedKind = spec.kind;
@@ -2787,6 +3213,8 @@ export class DeliveryStudioService {
               environmentName: payload.environmentName ?? null,
               environmentPrompt: payload.environmentPrompt ?? null,
               productName: payload.productName ?? null,
+              productAssetIds: requestedAssetIds ?? null,
+              apiRequest: latestApiRequest,
             },
             archived: false,
             createdById: job.createdById,
@@ -2803,6 +3231,10 @@ export class DeliveryStudioService {
       job.attemptsJson = execResult.attempts;
       job.outputAssetIdsJson = createdAssetIds;
       job.actualCostUsd = job.estimatedCostUsd;
+      job.inputPayloadJson = {
+        ...(job.inputPayloadJson ?? {}),
+        apiRequest: latestApiRequest,
+      };
       job.completedAt = new Date();
       await jobRepo.save(job);
     } catch (error) {
