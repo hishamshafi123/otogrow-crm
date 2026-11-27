@@ -275,4 +275,290 @@ export class DeliveryMediaProbeService {
       return false;
     }
   }
+
+  async trimVideo(
+    inputFilePath: string,
+    outputMp4Path: string,
+    startSec: number,
+    durationSec: number,
+  ): Promise<void> {
+    const safeStart = Math.max(0, startSec);
+    const safeDuration = Math.max(0.25, durationSec);
+
+    try {
+      await execWithBinaryFallback(
+        'ffmpeg',
+        [
+          '-y',
+          '-hide_banner',
+          '-loglevel',
+          'error',
+          '-ss',
+          safeStart.toFixed(3),
+          '-i',
+          inputFilePath,
+          '-t',
+          safeDuration.toFixed(3),
+          '-map',
+          '0:v:0',
+          '-map',
+          '0:a?',
+          '-vf',
+          'scale=trunc(iw/2)*2:trunc(ih/2)*2',
+          '-c:v',
+          'libx264',
+          '-preset',
+          'veryfast',
+          '-crf',
+          '18',
+          '-pix_fmt',
+          'yuv420p',
+          '-c:a',
+          'aac',
+          '-b:a',
+          '128k',
+          '-movflags',
+          '+faststart',
+          outputMp4Path,
+        ],
+        { timeout: 120_000, maxBuffer: 2 * 1024 * 1024 },
+      );
+
+      const stats = await fs.stat(outputMp4Path).catch(() => null);
+      if (!stats || stats.size <= 0) {
+        throw new Error('Trimmed video output file was empty.');
+      }
+    } catch (error) {
+      await fs.rm(outputMp4Path, { force: true }).catch(() => undefined);
+      this.logger.warn(
+        `ffmpeg trim failed for ${inputFilePath}: ${(error as Error).message}`,
+      );
+      throw error;
+    }
+  }
+
+  async composeVideos(
+    clips: VideoComposeClipInput[],
+    outputMp4Path: string,
+    options?: VideoComposeOptions,
+  ): Promise<void> {
+    if (clips.length === 0) {
+      throw new Error('At least one video clip is required to compose.');
+    }
+    if (clips.length > 8) {
+      throw new Error('Maximum of 8 clips can be stitched in a single cut.');
+    }
+
+    const { width: targetW, height: targetH } = resolveEvenCanvasDimensions(
+      options?.targetWidth,
+      options?.targetHeight,
+    );
+    const fps =
+      typeof options?.fps === 'number' &&
+      Number.isFinite(options.fps) &&
+      options.fps >= 12 &&
+      options.fps <= 60
+        ? Math.round(options.fps)
+        : 30;
+    const hasAnyAudio = clips.some((c) => c.hasAudio && !c.muted);
+
+    const args: string[] = ['-y', '-hide_banner', '-loglevel', 'error'];
+    const filterParts: string[] = [];
+    const concatInputs: string[] = [];
+
+    clips.forEach((clip, idx) => {
+      const safeStart =
+        typeof clip.startSec === 'number' &&
+        Number.isFinite(clip.startSec) &&
+        clip.startSec > 0.01
+          ? clip.startSec
+          : 0;
+      const safeDur =
+        typeof clip.durationSec === 'number' &&
+        Number.isFinite(clip.durationSec) &&
+        clip.durationSec >= 0.25
+          ? clip.durationSec
+          : undefined;
+
+      if (safeStart > 0) {
+        args.push('-ss', safeStart.toFixed(3));
+      }
+      if (safeDur !== undefined) {
+        args.push('-t', safeDur.toFixed(3));
+      }
+      args.push('-i', clip.filePath);
+
+      filterParts.push(
+        `[${idx}:v:0]scale=${targetW}:${targetH}:force_original_aspect_ratio=increase,crop=${targetW}:${targetH},fps=${fps},setsar=1,format=yuv420p,setpts=PTS-STARTPTS[v${idx}]`,
+      );
+
+      if (hasAnyAudio) {
+        if (clip.hasAudio && !clip.muted) {
+          filterParts.push(
+            `[${idx}:a:0]aformat=sample_rates=48000:channel_layouts=stereo,asetpts=PTS-STARTPTS[a${idx}]`,
+          );
+        } else {
+          const silenceDur = Math.max(0.25, safeDur ?? 1);
+          filterParts.push(
+            `anullsrc=channel_layout=stereo:sample_rate=48000,atrim=0:${silenceDur.toFixed(3)},asetpts=PTS-STARTPTS[a${idx}]`,
+          );
+        }
+        concatInputs.push(`[v${idx}][a${idx}]`);
+      } else {
+        concatInputs.push(`[v${idx}]`);
+      }
+    });
+
+    if (clips.length === 1) {
+      args.push('-filter_complex', filterParts.join(';'));
+      args.push('-map', '[v0]');
+      if (hasAnyAudio) {
+        args.push('-map', '[a0]');
+      }
+    } else {
+      filterParts.push(
+        `${concatInputs.join('')}concat=n=${clips.length}:v=1:a=${hasAnyAudio ? 1 : 0}[vout]${hasAnyAudio ? '[aout]' : ''}`,
+      );
+      args.push('-filter_complex', filterParts.join(';'));
+      args.push('-map', '[vout]');
+      if (hasAnyAudio) {
+        args.push('-map', '[aout]');
+      }
+    }
+
+    args.push(
+      '-c:v',
+      'libx264',
+      '-preset',
+      'veryfast',
+      '-crf',
+      '18',
+      '-pix_fmt',
+      'yuv420p',
+    );
+    if (hasAnyAudio) {
+      args.push('-c:a', 'aac', '-b:a', '128k');
+    } else {
+      args.push('-an');
+    }
+    args.push('-movflags', '+faststart', outputMp4Path);
+
+    try {
+      await execWithBinaryFallback('ffmpeg', args, {
+        timeout: 180_000,
+        maxBuffer: 4 * 1024 * 1024,
+      });
+
+      const stats = await fs.stat(outputMp4Path).catch(() => null);
+      if (!stats || stats.size <= 0) {
+        throw new Error('Composed video output file was empty.');
+      }
+    } catch (error) {
+      await fs.rm(outputMp4Path, { force: true }).catch(() => undefined);
+      this.logger.warn(
+        `ffmpeg compose failed (${clips.length} clip(s)): ${(error as Error).message}`,
+      );
+      throw error;
+    }
+  }
 }
+
+export type VideoComposeClipInput = {
+  filePath: string;
+  startSec?: number;
+  durationSec?: number;
+  hasAudio: boolean;
+  muted?: boolean;
+};
+
+export type VideoComposeOptions = {
+  targetWidth?: number;
+  targetHeight?: number;
+  fps?: number;
+};
+
+export const resolveEvenCanvasDimensions = (
+  rawWidth?: number,
+  rawHeight?: number,
+): { width: number; height: number } => {
+  const validW =
+    typeof rawWidth === 'number' && Number.isFinite(rawWidth) && rawWidth >= 64
+      ? rawWidth
+      : undefined;
+  const validH =
+    typeof rawHeight === 'number' &&
+    Number.isFinite(rawHeight) &&
+    rawHeight >= 64
+      ? rawHeight
+      : undefined;
+
+  let width = validW ?? 1080;
+  let height = validH ?? 1920;
+
+  // Cap ultra-high-res inputs (e.g. 4K iPhone footage) to 1920px on the long edge
+  const maxLongEdge = 1920;
+  const longEdge = Math.max(width, height);
+  if (longEdge > maxLongEdge) {
+    const scale = maxLongEdge / longEdge;
+    width = Math.round(width * scale);
+    height = Math.round(height * scale);
+  }
+
+  return {
+    width: Math.max(2, Math.floor(width / 2) * 2),
+    height: Math.max(2, Math.floor(height / 2) * 2),
+  };
+};
+
+export type NormalizedTrimRange = {
+  shouldTrim: boolean;
+  startSec: number;
+  endSec: number;
+  durationSec: number;
+};
+
+export const normalizeTrimRange = (input: {
+  trimStartSec?: number;
+  trimEndSec?: number;
+  originalDurationSec?: number;
+}): NormalizedTrimRange | null => {
+  const hasStart =
+    typeof input.trimStartSec === 'number' &&
+    Number.isFinite(input.trimStartSec);
+  const hasEnd =
+    typeof input.trimEndSec === 'number' && Number.isFinite(input.trimEndSec);
+
+  if (!hasStart && !hasEnd) {
+    return null;
+  }
+
+  const origDur =
+    typeof input.originalDurationSec === 'number' &&
+    Number.isFinite(input.originalDurationSec) &&
+    input.originalDurationSec > 0
+      ? input.originalDurationSec
+      : undefined;
+
+  const rawStart = hasStart ? Math.max(0, input.trimStartSec as number) : 0;
+  const rawEnd = hasEnd ? (input.trimEndSec as number) : origDur;
+
+  if (rawEnd === undefined || !Number.isFinite(rawEnd) || rawEnd <= 0) {
+    return null;
+  }
+
+  const endSec = origDur !== undefined ? Math.min(origDur, rawEnd) : rawEnd;
+  const startSec = Math.max(0, Math.min(rawStart, endSec));
+  const durationSec = Math.round((endSec - startSec) * 1000) / 1000;
+
+  const coversStart = startSec <= 0.05;
+  const coversEnd = origDur !== undefined && endSec >= origDur - 0.05;
+  const shouldTrim = !(coversStart && coversEnd);
+
+  return {
+    shouldTrim,
+    startSec: Math.round(startSec * 1000) / 1000,
+    endSec: Math.round(endSec * 1000) / 1000,
+    durationSec,
+  };
+};
+

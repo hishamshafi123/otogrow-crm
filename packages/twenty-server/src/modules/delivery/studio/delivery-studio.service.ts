@@ -8,11 +8,12 @@ import {
 } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { createHash } from 'node:crypto';
-import { createReadStream } from 'node:fs';
+import { createReadStream, createWriteStream } from 'node:fs';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import { DataSource, type EntityManager, In } from 'typeorm';
 import { v4 } from 'uuid';
 import { type WorkspaceAuthContext } from 'src/engine/core-modules/auth/types/workspace-auth-context.type';
@@ -32,7 +33,11 @@ import {
 } from 'src/modules/delivery/deliverables/delivery-deliverables.policy';
 import { DeliveryDeliverablesService } from 'src/modules/delivery/deliverables/delivery-deliverables.service';
 import { DeliveryDriveService } from 'src/modules/delivery/deliverables/delivery-drive.service';
-import { DeliveryMediaProbeService } from 'src/modules/delivery/deliverables/delivery-media-probe.service';
+import {
+  DeliveryMediaProbeService,
+  normalizeTrimRange,
+  type VideoComposeClipInput,
+} from 'src/modules/delivery/deliverables/delivery-media-probe.service';
 import {
   DeliveryVideoHooksService,
   type HookProjectDTO,
@@ -1389,50 +1394,113 @@ export class DeliveryStudioService {
       clientDurationSec?: number;
       clientWidth?: number;
       clientHeight?: number;
+      trimStartSec?: number;
+      trimEndSec?: number;
     },
   ) {
     const id = this.identity(auth);
     const videoId = v4();
-    const ext = extensionForMime(input.mimeType);
-    const storageKey = `delivery-studio/${id.workspaceId}/ref-videos/${videoId}.${ext}`;
     const thumbKey = `delivery-studio/${id.workspaceId}/ref-videos/${videoId}-thumb.jpg`;
 
-    const bytes = await fs.readFile(input.tempFilePath);
-    const sha256 = createHash('sha256').update(bytes).digest('hex');
-    const probedMeta = await this.probe.probeMedia(input.tempFilePath);
-    const mediaMeta: DeliverableMediaMeta = {
-      ...probedMeta,
-      ...(!probedMeta.durationSec &&
-      typeof input.clientDurationSec === 'number' &&
-      Number.isFinite(input.clientDurationSec) &&
-      input.clientDurationSec > 0
-        ? { durationSec: Math.round(input.clientDurationSec * 10) / 10 }
-        : {}),
-      ...(!probedMeta.width &&
-      typeof input.clientWidth === 'number' &&
-      input.clientWidth > 0
-        ? { width: Math.round(input.clientWidth) }
-        : {}),
-      ...(!probedMeta.height &&
-      typeof input.clientHeight === 'number' &&
-      input.clientHeight > 0
-        ? { height: Math.round(input.clientHeight) }
-        : {}),
-    };
+    const initialProbe = await this.probe.probeMedia(input.tempFilePath);
+    const originalDurationSec =
+      typeof initialProbe.durationSec === 'number' &&
+      Number.isFinite(initialProbe.durationSec) &&
+      initialProbe.durationSec > 0
+        ? initialProbe.durationSec
+        : typeof input.clientDurationSec === 'number' &&
+            Number.isFinite(input.clientDurationSec) &&
+            input.clientDurationSec > 0
+          ? input.clientDurationSec
+          : undefined;
 
+    const trimRange = normalizeTrimRange({
+      trimStartSec: input.trimStartSec,
+      trimEndSec: input.trimEndSec,
+      originalDurationSec,
+    });
+
+    if (trimRange && trimRange.durationSec < 0.25) {
+      throw new BadRequestException(
+        'Selected trim range must be at least 0.3 seconds long.',
+      );
+    }
+
+    const tempTrimmed = path.join(
+      os.tmpdir(),
+      `studio-ref-trimmed-${videoId}.mp4`,
+    );
     const tempThumb = path.join(os.tmpdir(), `studio-ref-thumb-${videoId}.jpg`);
+
+    let effectiveFilePath = input.tempFilePath;
+    let effectiveMimeType = input.mimeType;
+    let effectiveSizeBytes = input.sizeBytes;
+    let probedMeta = initialProbe;
+    let storageKey = `delivery-studio/${id.workspaceId}/ref-videos/${videoId}.${extensionForMime(effectiveMimeType)}`;
+    let sha256 = '';
+    let mediaMeta: DeliverableMediaMeta = {};
     let hasThumb = false;
+
     try {
+      if (trimRange?.shouldTrim) {
+        try {
+          await this.probe.trimVideo(
+            input.tempFilePath,
+            tempTrimmed,
+            trimRange.startSec,
+            trimRange.durationSec,
+          );
+        } catch (error) {
+          throw new BadRequestException(
+            `Could not trim reference video: ${(error as Error).message}`,
+          );
+        }
+        const trimmedStats = await fs.stat(tempTrimmed);
+        effectiveFilePath = tempTrimmed;
+        effectiveMimeType = 'video/mp4';
+        effectiveSizeBytes = trimmedStats.size;
+        storageKey = `delivery-studio/${id.workspaceId}/ref-videos/${videoId}.mp4`;
+        probedMeta = await this.probe.probeMedia(effectiveFilePath);
+      }
+
+      const bytes = await fs.readFile(effectiveFilePath);
+      sha256 = createHash('sha256').update(bytes).digest('hex');
+
+      const fallbackDuration = trimRange?.shouldTrim
+        ? Math.round(trimRange.durationSec * 100) / 100
+        : typeof input.clientDurationSec === 'number' &&
+            Number.isFinite(input.clientDurationSec) &&
+            input.clientDurationSec > 0
+          ? Math.round(input.clientDurationSec * 10) / 10
+          : undefined;
+
+      mediaMeta = {
+        ...probedMeta,
+        ...(!probedMeta.durationSec && fallbackDuration
+          ? { durationSec: fallbackDuration }
+          : {}),
+        ...(!probedMeta.width &&
+        typeof input.clientWidth === 'number' &&
+        input.clientWidth > 0
+          ? { width: Math.round(input.clientWidth) }
+          : {}),
+        ...(!probedMeta.height &&
+        typeof input.clientHeight === 'number' &&
+        input.clientHeight > 0
+          ? { height: Math.round(input.clientHeight) }
+          : {}),
+      };
+
       hasThumb = await this.probe.extractVideoThumbnail(
-        input.tempFilePath,
+        effectiveFilePath,
         tempThumb,
         mediaMeta.durationSec,
       );
       const driver = this.storage.getCurrentDriver();
       await driver.writeFileStream({
         filePath: storageKey,
-        stream: createReadStream(input.tempFilePath),
-        mimeType: input.mimeType,
+        stream: createReadStream(effectiveFilePath),
+        mimeType: effectiveMimeType,
       });
       if (hasThumb) {
         await driver.writeFileStream({
@@ -1443,6 +1511,7 @@ export class DeliveryStudioService {
       }
     } finally {
       await fs.rm(tempThumb, { force: true }).catch(() => undefined);
+      await fs.rm(tempTrimmed, { force: true }).catch(() => undefined);
     }
 
     const saved = await this.dataSource.transaction(async (manager) => {
@@ -1460,8 +1529,8 @@ export class DeliveryStudioService {
           storageKey,
           thumbnailKey: hasThumb ? thumbKey : null,
           originalFileName: input.originalFileName.slice(0, 240),
-          mimeType: input.mimeType,
-          sizeBytes: String(input.sizeBytes),
+          mimeType: effectiveMimeType,
+          sizeBytes: String(effectiveSizeBytes),
           sha256,
           mediaMeta,
           stagedUrlsJson: {},
@@ -1605,6 +1674,317 @@ export class DeliveryStudioService {
         action: 'STUDIO_VIDEO_UPLOADED',
         outcome: 'RECORDED',
         summary: `Uploaded video "${cleanTitle}" directly to AI Studio for text hooks & variations.`,
+        sourceType: 'creative',
+        sourceId: created.id,
+        changes: [],
+      });
+
+      return created;
+    });
+
+    return this.mapAsset(saved);
+  }
+
+  async composeStudioVideoAsset(
+    auth: WorkspaceAuthContext,
+    input: {
+      companyId: string;
+      projectId?: string | null;
+      title?: string;
+      clips: Array<{
+        sourceType: 'ASSET' | 'UPLOAD';
+        assetId?: string;
+        uploadIndex?: number;
+        trimStartSec?: number;
+        trimEndSec?: number;
+        muted?: boolean;
+      }>;
+      uploadedFiles: Array<{
+        tempFilePath: string;
+        originalFileName: string;
+        mimeType: string;
+        sizeBytes: number;
+      }>;
+    },
+  ) {
+    if (!isUuidString(input.companyId)) {
+      throw new BadRequestException(
+        'Select a client before saving an edited video cut.',
+      );
+    }
+    if (!Array.isArray(input.clips) || input.clips.length === 0) {
+      throw new BadRequestException('Add at least one clip to render a cut.');
+    }
+    if (input.clips.length > 8) {
+      throw new BadRequestException(
+        'You can stitch up to 8 clips in a single edited cut.',
+      );
+    }
+
+    const id = this.identity(auth);
+    const assetId = v4();
+    const storageKey = `delivery-studio/${id.workspaceId}/assets/${assetId}.mp4`;
+    const thumbKey = `delivery-studio/${id.workspaceId}/assets/${assetId}-thumb.jpg`;
+
+    // Resolve any referenced existing studio assets scoped to this workspace
+    const requestedAssetIds = Array.from(
+      new Set(
+        input.clips
+          .filter((c) => c.sourceType === 'ASSET')
+          .map((c) => c.assetId ?? '')
+          .filter(Boolean),
+      ),
+    );
+    for (const reqId of requestedAssetIds) {
+      if (!isUuidString(reqId)) {
+        throw new BadRequestException(`Invalid clip asset ID "${reqId}".`);
+      }
+    }
+
+    const existingAssets =
+      requestedAssetIds.length > 0
+        ? await this.dataSource.transaction(async (manager) => {
+            await this.resolveActor(manager, id);
+            return manager.getRepository(DeliveryStudioAssetEntity).find({
+              where: {
+                id: In(requestedAssetIds),
+                workspaceId: id.workspaceId,
+                kind: 'GENERATED_VIDEO',
+                archived: false,
+              },
+            });
+          })
+        : [];
+    const assetById = new Map(existingAssets.map((a) => [a.id, a]));
+
+    const workDir = await fs.mkdtemp(
+      path.join(os.tmpdir(), `studio-compose-${assetId}-`),
+    );
+    const downloadedAssetPaths = new Map<string, string>();
+    const driver = this.storage.getCurrentDriver();
+
+    let outputMeta: DeliverableMediaMeta = {};
+    let outputSizeBytes = 0;
+    let sha256 = '';
+    let hasThumb = false;
+    let primaryAsset: DeliveryStudioAssetEntity | null = null;
+    const clipSummaries: Array<{
+      sourceType: 'ASSET' | 'UPLOAD';
+      assetId?: string;
+      fileName?: string;
+      trimStartSec: number;
+      trimEndSec: number | null;
+      durationSec: number | null;
+      muted: boolean;
+    }> = [];
+
+    try {
+      const composeInputs: VideoComposeClipInput[] = [];
+      let targetWidth: number | undefined;
+      let targetHeight: number | undefined;
+
+      for (let i = 0; i < input.clips.length; i += 1) {
+        const spec = input.clips[i];
+        let localPath = '';
+        let fileName = '';
+
+        if (spec.sourceType === 'ASSET') {
+          if (!spec.assetId) {
+            throw new BadRequestException(`Clip #${i + 1} is missing assetId.`);
+          }
+          const assetRow = assetById.get(spec.assetId);
+          if (!assetRow) {
+            throw new NotFoundException(
+              `Clip #${i + 1} video was not found in this workspace.`,
+            );
+          }
+          if (!primaryAsset) {
+            primaryAsset = assetRow;
+          }
+          fileName = assetRow.title;
+          const cachedPath = downloadedAssetPaths.get(assetRow.id);
+          if (cachedPath) {
+            localPath = cachedPath;
+          } else {
+            const ext = extensionForMime(assetRow.mimeType);
+            const destPath = path.join(workDir, `asset-${assetRow.id}.${ext}`);
+            const stream = await driver.readFile({
+              filePath: assetRow.storageKey,
+            });
+            await pipeline(stream, createWriteStream(destPath));
+            downloadedAssetPaths.set(assetRow.id, destPath);
+            localPath = destPath;
+          }
+        } else if (spec.sourceType === 'UPLOAD') {
+          const uploadIdx = spec.uploadIndex;
+          const uploaded =
+            typeof uploadIdx === 'number' &&
+            Number.isInteger(uploadIdx) &&
+            uploadIdx >= 0
+              ? input.uploadedFiles[uploadIdx]
+              : undefined;
+          if (!uploaded) {
+            throw new BadRequestException(
+              `Clip #${i + 1} references an uploaded file that was not attached.`,
+            );
+          }
+          localPath = uploaded.tempFilePath;
+          fileName = uploaded.originalFileName;
+        } else {
+          throw new BadRequestException(
+            `Clip #${i + 1} has an unsupported sourceType.`,
+          );
+        }
+
+        const probed = await this.probe.probeMedia(localPath);
+        if (i === 0) {
+          targetWidth = probed.width;
+          targetHeight = probed.height;
+        }
+
+        const trimRange = normalizeTrimRange({
+          trimStartSec: spec.trimStartSec,
+          trimEndSec: spec.trimEndSec,
+          originalDurationSec: probed.durationSec,
+        });
+
+        if (trimRange && trimRange.durationSec < 0.25) {
+          throw new BadRequestException(
+            `Clip #${i + 1} must be at least 0.3 seconds long after trimming.`,
+          );
+        }
+
+        const startSec = trimRange?.shouldTrim ? trimRange.startSec : 0;
+        const durationSec = trimRange?.shouldTrim
+          ? trimRange.durationSec
+          : probed.durationSec;
+
+        composeInputs.push({
+          filePath: localPath,
+          startSec,
+          durationSec,
+          hasAudio: Boolean(probed.audioCodec),
+          muted: Boolean(spec.muted),
+        });
+
+        clipSummaries.push({
+          sourceType: spec.sourceType,
+          ...(spec.assetId ? { assetId: spec.assetId } : {}),
+          fileName,
+          trimStartSec: startSec,
+          trimEndSec: trimRange?.shouldTrim ? trimRange.endSec : (probed.durationSec ?? null),
+          durationSec: durationSec ?? null,
+          muted: Boolean(spec.muted),
+        });
+      }
+
+      const outputMp4Path = path.join(workDir, `composed-${assetId}.mp4`);
+      const tempThumbPath = path.join(workDir, `composed-${assetId}-thumb.jpg`);
+
+      try {
+        await this.probe.composeVideos(composeInputs, outputMp4Path, {
+          targetWidth,
+          targetHeight,
+          fps: 30,
+        });
+      } catch (error) {
+        throw new BadRequestException(
+          `Could not render edited video cut: ${(error as Error).message}`,
+        );
+      }
+
+      const outputStats = await fs.stat(outputMp4Path);
+      outputSizeBytes = outputStats.size;
+      const bytes = await fs.readFile(outputMp4Path);
+      sha256 = createHash('sha256').update(bytes).digest('hex');
+      outputMeta = await this.probe.probeMedia(outputMp4Path);
+      hasThumb = await this.probe.extractVideoThumbnail(
+        outputMp4Path,
+        tempThumbPath,
+        outputMeta.durationSec,
+      );
+
+      await driver.writeFileStream({
+        filePath: storageKey,
+        stream: createReadStream(outputMp4Path),
+        mimeType: 'video/mp4',
+      });
+      if (hasThumb) {
+        await driver.writeFileStream({
+          filePath: thumbKey,
+          stream: createReadStream(tempThumbPath),
+          mimeType: 'image/jpeg',
+        });
+      }
+    } finally {
+      await fs.rm(workDir, { recursive: true, force: true }).catch(() => undefined);
+    }
+
+    const defaultSuffix = input.clips.length > 1 ? 'Edited Cut' : 'Trimmed';
+    const baseTitle = primaryAsset?.title || 'Studio Video';
+    const cleanTitle =
+      input.title?.trim().slice(0, 180) ||
+      `${baseTitle} (${defaultSuffix})`.slice(0, 180);
+
+    const primaryMeta = (primaryAsset?.metadataJson ?? {}) as Record<
+      string,
+      unknown
+    >;
+
+    const saved = await this.dataSource.transaction(async (manager) => {
+      await this.resolveActor(manager, id);
+      const repo = manager.getRepository(DeliveryStudioAssetEntity);
+      const created = await repo.save(
+        repo.create({
+          id: assetId,
+          workspaceId: id.workspaceId,
+          companyId: input.companyId,
+          projectId:
+            input.projectId && isUuidString(input.projectId)
+              ? input.projectId
+              : (primaryAsset?.projectId ?? null),
+          kind: 'GENERATED_VIDEO',
+          productKitId: primaryAsset?.productKitId ?? null,
+          referenceVideoId: primaryAsset?.referenceVideoId ?? null,
+          characterAssetId: primaryAsset?.characterAssetId ?? null,
+          presetId: primaryAsset?.presetId ?? null,
+          jobId: null,
+          title: cleanTitle,
+          promptUsed: primaryAsset?.promptUsed ?? '',
+          modelKey: 'clip-editor',
+          providerUsed: 'editor',
+          storageKey,
+          thumbnailKey: hasThumb ? thumbKey : null,
+          mimeType: 'video/mp4',
+          sizeBytes: String(outputSizeBytes),
+          sha256,
+          mediaMeta: outputMeta,
+          stagedUrlsJson: {},
+          approved: true,
+          deliverableId: null,
+          hookProjectId: null,
+          tagsJson: ['edited'],
+          metadataJson: {
+            ...(typeof primaryMeta.productName === 'string'
+              ? { productName: primaryMeta.productName }
+              : {}),
+            source: 'clip-editor',
+            clipCount: input.clips.length,
+            editedFromAssetIds: requestedAssetIds,
+            clips: clipSummaries,
+          },
+          archived: false,
+          createdById: id.memberId,
+        }),
+      );
+
+      await recordOtogrowActivity(manager, {
+        workspaceId: id.workspaceId,
+        actorId: id.memberId,
+        category: 'CREATIVE',
+        action: 'STUDIO_VIDEO_EDITED',
+        outcome: 'RECORDED',
+        summary: `Created edited video cut "${cleanTitle}" (${input.clips.length} clip${input.clips.length === 1 ? '' : 's'}) in AI Studio.`,
         sourceType: 'creative',
         sourceId: created.id,
         changes: [],

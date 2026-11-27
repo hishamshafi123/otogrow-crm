@@ -20,6 +20,7 @@ import {
   type StudioPresetDTO,
   studioMediaUrl,
 } from '@/delivery/studio/delivery-studio.types';
+import { DeliveryStudioVideoEditorModal } from '@/delivery/studio/DeliveryStudioVideoEditorModal';
 import { uploadStudioMultipart } from '@/delivery/studio/studio-upload';
 
 const StyledStageWrapper = styled.div`
@@ -604,6 +605,7 @@ export const DeliveryStudioHooksStage = ({
   const [uploadProgressText, setUploadProgressText] = useState<string | null>(
     null,
   );
+  const [editorOpen, setEditorOpen] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -832,7 +834,11 @@ export const DeliveryStudioHooksStage = ({
           >
             {videos.map((v) => {
               const sourceTag =
-                v.providerUsed === 'upload' ? 'Uploaded' : 'AI';
+                v.providerUsed === 'editor'
+                  ? 'Edited'
+                  : v.providerUsed === 'upload'
+                    ? 'Uploaded'
+                    : 'AI';
               const dur = v.mediaMeta?.durationSec
                 ? ` · ${Math.round(v.mediaMeta.durationSec)}s`
                 : '';
@@ -856,21 +862,34 @@ export const DeliveryStudioHooksStage = ({
         )}
       </div>
 
-      <StyledUploadLabel disabled={!companyId || uploadingVideos}>
-        {uploadingVideos
-          ? uploadProgressText || 'Uploading…'
-          : '+ Upload Video(s)'}
-        <input
-          type="file"
-          accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm"
-          multiple
-          disabled={!companyId || uploadingVideos}
-          onChange={(e) => {
-            void handleUploadVideos(e.target.files);
-            e.target.value = '';
-          }}
-        />
-      </StyledUploadLabel>
+      <div style={{ alignItems: 'center', display: 'flex', gap: 8 }}>
+        {selectedVideo && companyId && (
+          <StyledSubtleButton
+            type="button"
+            disabled={uploadingVideos}
+            onClick={() => setEditorOpen(true)}
+            title="Trim this video or stitch another clip onto it before rendering text hook variations"
+          >
+            ✂ Edit / Add Clips
+          </StyledSubtleButton>
+        )}
+
+        <StyledUploadLabel disabled={!companyId || uploadingVideos}>
+          {uploadingVideos
+            ? uploadProgressText || 'Uploading…'
+            : '+ Upload Video(s)'}
+          <input
+            type="file"
+            accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm"
+            multiple
+            disabled={!companyId || uploadingVideos}
+            onChange={(e) => {
+              void handleUploadVideos(e.target.files);
+              e.target.value = '';
+            }}
+          />
+        </StyledUploadLabel>
+      </div>
     </StyledSourceBar>
   );
 
@@ -1518,6 +1537,27 @@ export const DeliveryStudioHooksStage = ({
         </StyledPanel>
       </StyledRightColumn>
       </StyledStageGrid>
+
+      {editorOpen && companyId && (
+        <DeliveryStudioVideoEditorModal
+          companyId={companyId}
+          projectId={projectId ?? null}
+          initialVideo={selectedVideo}
+          availableVideos={videos}
+          primaryCtaLabel="Save Edited Cut"
+          onSaved={async (savedVideo) => {
+            await onRefreshWorkspace();
+            if (onSelectVideo) {
+              onSelectVideo(savedVideo);
+            }
+            setEditorOpen(false);
+            setFeedback(
+              `Saved edited cut "${savedVideo.title}" — ready for text hook variations.`,
+            );
+          }}
+          onClose={() => setEditorOpen(false)}
+        />
+      )}
     </StyledStageWrapper>
   );
 };

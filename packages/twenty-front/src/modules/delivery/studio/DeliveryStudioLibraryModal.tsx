@@ -10,6 +10,7 @@ import {
   studioMediaUrl,
 } from '@/delivery/studio/delivery-studio.types';
 import { uploadStudioMultipart } from '@/delivery/studio/studio-upload';
+import { DeliveryStudioVideoTrimmerModal } from '@/delivery/studio/DeliveryStudioVideoTrimmerModal';
 
 const StyledBackdrop = styled.div`
   align-items: center;
@@ -121,6 +122,28 @@ const StyledAddButton = styled.button`
 
   &:hover {
     border-color: ${themeCssVariables.font.color.primary};
+  }
+`;
+
+const StyledAddFileButton = styled.label`
+  align-items: center;
+  background: ${themeCssVariables.background.tertiary};
+  border: 1px solid ${themeCssVariables.border.color.medium};
+  border-radius: 8px;
+  color: ${themeCssVariables.font.color.primary};
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 600;
+  gap: 5px;
+  padding: 6px 12px;
+
+  &:hover {
+    border-color: ${themeCssVariables.font.color.primary};
+  }
+
+  input {
+    display: none;
   }
 `;
 
@@ -440,13 +463,13 @@ export const DeliveryStudioLibraryModal = ({
   const [search, setSearch] = useState('');
   const [creating, setCreating] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [uploadPct, setUploadPct] = useState<number | null>(null);
+  const [pendingTrimFile, setPendingTrimFile] = useState<File | null>(null);
   const [uploadingPresetId, setUploadingPresetId] = useState<string | null>(
     null,
   );
   const [error, setError] = useState<string | null>(null);
 
-  // Create form state
+  // Create form state (Avatars & Environments)
   const [name, setName] = useState('');
   const [prompt, setPrompt] = useState('');
   const [clientOnly, setClientOnly] = useState(false);
@@ -539,90 +562,6 @@ export const DeliveryStudioLibraryModal = ({
     setError(null);
 
     if (mode === 'REFERENCE_VIDEO') {
-      if (!selectedFile) {
-        setError('Choose a reference video file (MP4, MOV, or WebM).');
-        return;
-      }
-      setBusy(true);
-      setUploadPct(0);
-      try {
-        const probedMeta = await new Promise<{
-          durationSec?: number;
-          width?: number;
-          height?: number;
-        }>((resolve) => {
-          const objectUrl = URL.createObjectURL(selectedFile);
-          const videoEl = document.createElement('video');
-          videoEl.preload = 'metadata';
-          videoEl.muted = true;
-          const cleanup = () => {
-            URL.revokeObjectURL(objectUrl);
-            videoEl.src = '';
-          };
-          const timer = window.setTimeout(() => {
-            cleanup();
-            resolve({});
-          }, 5000);
-          videoEl.onloadedmetadata = () => {
-            window.clearTimeout(timer);
-            const dur =
-              Number.isFinite(videoEl.duration) && videoEl.duration > 0
-                ? Math.round(videoEl.duration * 10) / 10
-                : undefined;
-            const width =
-              videoEl.videoWidth > 0 ? videoEl.videoWidth : undefined;
-            const height =
-              videoEl.videoHeight > 0 ? videoEl.videoHeight : undefined;
-            cleanup();
-            resolve({ durationSec: dur, width, height });
-          };
-          videoEl.onerror = () => {
-            window.clearTimeout(timer);
-            cleanup();
-            resolve({});
-          };
-          videoEl.src = objectUrl;
-        });
-
-        const formData = new FormData();
-        formData.append('file', selectedFile);
-        formData.append(
-          'title',
-          name.trim() || selectedFile.name.replace(/\.[^.]+$/, ''),
-        );
-        if (prompt.trim()) formData.append('notes', prompt.trim());
-        if (probedMeta.durationSec) {
-          formData.append('durationSec', String(probedMeta.durationSec));
-        }
-        if (probedMeta.width) {
-          formData.append('width', String(probedMeta.width));
-        }
-        if (probedMeta.height) {
-          formData.append('height', String(probedMeta.height));
-        }
-        if (clientOnly && companyId) {
-          formData.append('companyId', companyId);
-          if (projectId) formData.append('projectId', projectId);
-        }
-        const uploaded = await uploadStudioMultipart<StudioReferenceVideoDTO>({
-          store,
-          endpointPath: '/portal/delivery-studio/reference-videos/upload',
-          formData,
-          onProgress: (pct) => setUploadPct(pct),
-        });
-        await onCreated();
-        if (uploaded?.id) {
-          onSelectReferenceVideo(uploaded);
-        }
-        onClose();
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : 'Failed to upload reference video.',
-        );
-      } finally {
-        setBusy(false);
-        setUploadPct(null);
-      }
       return;
     }
 
@@ -676,7 +615,8 @@ export const DeliveryStudioLibraryModal = ({
   };
 
   return (
-    <StyledBackdrop onClick={onClose}>
+    <>
+      <StyledBackdrop onClick={onClose}>
       <StyledModal onClick={(e) => e.stopPropagation()}>
         <StyledHeader>
           <h3>{titleForMode(mode)}</h3>
@@ -711,36 +651,50 @@ export const DeliveryStudioLibraryModal = ({
             />
           </StyledFilterGroup>
 
-          <StyledAddButton
-            type="button"
-            onClick={() => {
-              setCreating((prev) => !prev);
-              setError(null);
-            }}
-          >
-            {creating
-              ? 'Cancel'
-              : mode === 'REFERENCE_VIDEO'
-                ? '+ Upload video'
+          {mode === 'REFERENCE_VIDEO' ? (
+            <StyledAddFileButton>
+              + Upload video
+              <input
+                type="file"
+                accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm"
+                onChange={(e) => {
+                  const file = e.target.files?.[0] ?? null;
+                  if (file) {
+                    setError(null);
+                    setPendingTrimFile(file);
+                  }
+                  e.target.value = '';
+                }}
+              />
+            </StyledAddFileButton>
+          ) : (
+            <StyledAddButton
+              type="button"
+              onClick={() => {
+                setCreating((prev) => !prev);
+                setError(null);
+              }}
+            >
+              {creating
+                ? 'Cancel'
                 : `+ Add ${mode === 'AVATAR' ? 'avatar' : 'environment'}`}
-          </StyledAddButton>
+            </StyledAddButton>
+          )}
         </StyledToolbar>
 
         <StyledBody>
           {error && <StyledError>{error}</StyledError>}
 
-          {creating && (
+          {creating && mode !== 'REFERENCE_VIDEO' && (
             <StyledCreatePanel onSubmit={(e) => void handleCreateSubmit(e)}>
               <label>
-                {mode === 'REFERENCE_VIDEO' ? 'Video title' : 'Name'}
+                Name
                 <input
                   type="text"
                   placeholder={
                     mode === 'AVATAR'
                       ? 'e.g. Minimalist Tokyo Streetwear Model'
-                      : mode === 'ENVIRONMENT'
-                        ? 'e.g. Sunlit Concrete Loft'
-                        : 'e.g. Slow Walking Fit Check Ref'
+                      : 'e.g. Sunlit Concrete Loft'
                   }
                   value={name}
                   onChange={(e) => setName(e.target.value)}
@@ -748,16 +702,12 @@ export const DeliveryStudioLibraryModal = ({
               </label>
 
               <label>
-                {mode === 'REFERENCE_VIDEO'
-                  ? 'Camera / pacing notes (optional)'
-                  : 'Visual description (optional if uploading a photo)'}
+                Visual description (optional if uploading a photo)
                 <textarea
                   placeholder={
                     mode === 'AVATAR'
                       ? 'Age, styling, hair, pose vibe, natural skin texture…'
-                      : mode === 'ENVIRONMENT'
-                        ? 'Location, lighting, background textures, mood…'
-                        : 'Optional notes about camera movement or vibe…'
+                      : 'Location, lighting, background textures, mood…'
                   }
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
@@ -771,21 +721,13 @@ export const DeliveryStudioLibraryModal = ({
                   )}
                   <StyledFileButton>
                     {selectedFile
-                      ? mode === 'REFERENCE_VIDEO'
-                        ? `Video: ${selectedFile.name}`
-                        : `Photo: ${selectedFile.name}`
-                      : mode === 'REFERENCE_VIDEO'
-                        ? '+ Choose video (MP4 / MOV / WebM)'
-                        : mode === 'AVATAR'
-                          ? '+ Upload avatar picture'
-                          : '+ Upload environment photo'}
+                      ? `Photo: ${selectedFile.name}`
+                      : mode === 'AVATAR'
+                        ? '+ Upload avatar picture'
+                        : '+ Upload environment photo'}
                     <input
                       type="file"
-                      accept={
-                        mode === 'REFERENCE_VIDEO'
-                          ? 'video/mp4,video/quicktime,video/webm'
-                          : 'image/png,image/jpeg,image/webp'
-                      }
+                      accept="image/png,image/jpeg,image/webp"
                       onChange={(e) => {
                         setSelectedFile(e.target.files?.[0] ?? null);
                         e.target.value = '';
@@ -820,11 +762,7 @@ export const DeliveryStudioLibraryModal = ({
                     </label>
                   )}
                   <StyledPrimaryButton type="submit" disabled={busy}>
-                    {busy
-                      ? uploadPct !== null
-                        ? `Uploading ${uploadPct}%…`
-                        : 'Saving…'
-                      : 'Save & Select'}
+                    {busy ? 'Saving…' : 'Save & Select'}
                   </StyledPrimaryButton>
                 </div>
               </StyledCreateRow>
@@ -975,5 +913,23 @@ export const DeliveryStudioLibraryModal = ({
         </StyledBody>
       </StyledModal>
     </StyledBackdrop>
+
+      {pendingTrimFile && (
+        <DeliveryStudioVideoTrimmerModal
+          file={pendingTrimFile}
+          companyId={companyId}
+          projectId={projectId}
+          onSaved={async (uploaded) => {
+            await onCreated();
+            if (uploaded?.id) {
+              onSelectReferenceVideo(uploaded);
+            }
+            setPendingTrimFile(null);
+            onClose();
+          }}
+          onCancel={() => setPendingTrimFile(null)}
+        />
+      )}
+    </>
   );
 };

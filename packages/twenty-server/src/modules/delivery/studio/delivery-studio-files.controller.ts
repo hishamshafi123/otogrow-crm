@@ -12,10 +12,11 @@ import {
   Res,
   UnauthorizedException,
   UploadedFile,
+  UploadedFiles,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { type Request, type Response } from 'express';
 import { FileTypeParser } from 'file-type';
 import { mkdirSync } from 'node:fs';
@@ -86,7 +87,7 @@ export class DeliveryStudioFilesController {
       limits: {
         fileSize: STUDIO_MAX_VIDEO_UPLOAD_BYTES,
         files: 1,
-        fields: 10,
+        fields: 16,
       },
     }),
   )
@@ -112,6 +113,14 @@ export class DeliveryStudioFilesController {
       const parsedClientDuration = Number(body.durationSec);
       const parsedClientWidth = Number(body.width);
       const parsedClientHeight = Number(body.height);
+      const parsedTrimStart =
+        body.trimStartSec !== undefined && body.trimStartSec.trim() !== ''
+          ? Number(body.trimStartSec)
+          : undefined;
+      const parsedTrimEnd =
+        body.trimEndSec !== undefined && body.trimEndSec.trim() !== ''
+          ? Number(body.trimEndSec)
+          : undefined;
 
       return await this.studio.registerReferenceVideo(
         getWorkspaceAuthContext(),
@@ -142,6 +151,20 @@ export class DeliveryStudioFilesController {
             parsedClientHeight > 0 &&
             parsedClientHeight <= 10000
               ? Math.round(parsedClientHeight)
+              : undefined,
+          trimStartSec:
+            parsedTrimStart !== undefined &&
+            Number.isFinite(parsedTrimStart) &&
+            parsedTrimStart >= 0 &&
+            parsedTrimStart <= 600
+              ? Math.round(parsedTrimStart * 1000) / 1000
+              : undefined,
+          trimEndSec:
+            parsedTrimEnd !== undefined &&
+            Number.isFinite(parsedTrimEnd) &&
+            parsedTrimEnd > 0 &&
+            parsedTrimEnd <= 600
+              ? Math.round(parsedTrimEnd * 1000) / 1000
               : undefined,
         },
       );
@@ -222,6 +245,132 @@ export class DeliveryStudioFilesController {
       );
     } finally {
       await fs.rm(file.path, { force: true }).catch(() => undefined);
+    }
+  }
+
+  @Post('videos/compose')
+  @UseInterceptors(
+    FilesInterceptor('files', 8, {
+      dest: STUDIO_UPLOAD_TMP,
+      limits: {
+        fileSize: STUDIO_MAX_VIDEO_UPLOAD_BYTES,
+        files: 8,
+        fields: 12,
+      },
+    }),
+  )
+  async composeStudioVideo(
+    @UploadedFiles() files: StudioUploadedFile[] | undefined,
+    @Body() body: Record<string, string | undefined>,
+  ) {
+    const uploadedList = Array.isArray(files) ? files : [];
+    try {
+      const companyId = body.companyId?.trim() || '';
+      if (!companyId) {
+        throw new BadRequestException(
+          'Select a client before saving an edited video.',
+        );
+      }
+
+      if (!body.clipsJson?.trim()) {
+        throw new BadRequestException('Provide clipsJson describing the cut.');
+      }
+
+      let rawClips: unknown;
+      try {
+        rawClips = JSON.parse(body.clipsJson);
+      } catch {
+        throw new BadRequestException('Invalid clipsJson payload.');
+      }
+      if (!Array.isArray(rawClips) || rawClips.length === 0) {
+        throw new BadRequestException(
+          'Add at least one clip before rendering.',
+        );
+      }
+
+      const verifiedFiles: Array<{
+        tempFilePath: string;
+        originalFileName: string;
+        mimeType: string;
+        sizeBytes: number;
+      }> = [];
+      for (const f of uploadedList) {
+        const detected = (await detectFileMime(f.path)) ?? f.mimetype;
+        if (!STUDIO_ALLOWED_VIDEO_MIMES.has(detected)) {
+          throw new BadRequestException(
+            `Unsupported video format "${detected}" for "${f.originalname}". Upload MP4, MOV, or WebM.`,
+          );
+        }
+        verifiedFiles.push({
+          tempFilePath: f.path,
+          originalFileName: f.originalname,
+          mimeType: detected,
+          sizeBytes: f.size,
+        });
+      }
+
+      const clips = rawClips.map((item, idx) => {
+        if (!item || typeof item !== 'object') {
+          throw new BadRequestException(`Clip #${idx + 1} is invalid.`);
+        }
+        const rec = item as Record<string, unknown>;
+        const sourceType: 'ASSET' | 'UPLOAD' | null =
+          rec.sourceType === 'ASSET'
+            ? 'ASSET'
+            : rec.sourceType === 'UPLOAD'
+              ? 'UPLOAD'
+              : null;
+        if (!sourceType) {
+          throw new BadRequestException(
+            `Clip #${idx + 1} must have sourceType ASSET or UPLOAD.`,
+          );
+        }
+        const rawStart =
+          typeof rec.trimStartSec === 'number'
+            ? rec.trimStartSec
+            : undefined;
+        const rawEnd =
+          typeof rec.trimEndSec === 'number' ? rec.trimEndSec : undefined;
+
+        return {
+          sourceType,
+          assetId: typeof rec.assetId === 'string' ? rec.assetId.trim() : undefined,
+          uploadIndex:
+            typeof rec.uploadIndex === 'number' ? rec.uploadIndex : undefined,
+          trimStartSec:
+            rawStart !== undefined &&
+            Number.isFinite(rawStart) &&
+            rawStart >= 0 &&
+            rawStart <= 600
+              ? Math.round(rawStart * 1000) / 1000
+              : undefined,
+          trimEndSec:
+            rawEnd !== undefined &&
+            Number.isFinite(rawEnd) &&
+            rawEnd > 0 &&
+            rawEnd <= 600
+              ? Math.round(rawEnd * 1000) / 1000
+              : undefined,
+          muted: Boolean(rec.muted),
+        };
+      });
+
+      return await this.studio.composeStudioVideoAsset(
+        getWorkspaceAuthContext(),
+        {
+          companyId,
+          projectId: body.projectId?.trim() || null,
+          title: body.title?.trim() || undefined,
+          clips,
+          uploadedFiles: verifiedFiles,
+        },
+      );
+    } finally {
+      await Promise.all(
+        uploadedList.map((f) =>
+          fs.rm(f.path, { force: true }).catch(() => undefined),
+        ),
+      );
     }
   }
 

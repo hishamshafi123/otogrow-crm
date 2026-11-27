@@ -26,6 +26,7 @@ import {
   type StudioAssetDTO,
   type StudioProductKitDTO,
   type StudioProviderId,
+  type StudioReferenceVideoDTO,
   type StudioStageKey,
   type StudioWorkspacePayload,
   studioMediaUrl,
@@ -40,6 +41,8 @@ import { DeliveryStudioPresetModal } from '@/delivery/studio/DeliveryStudioPrese
 import { DeliveryStudioProviderModal } from '@/delivery/studio/DeliveryStudioProviderModal';
 import { DeliveryStudioQueueDock } from '@/delivery/studio/DeliveryStudioQueueDock';
 import { DeliveryStudioSettingsDrawer } from '@/delivery/studio/DeliveryStudioSettingsDrawer';
+import { DeliveryStudioVideoEditorModal } from '@/delivery/studio/DeliveryStudioVideoEditorModal';
+import { DeliveryStudioVideoTrimmerModal } from '@/delivery/studio/DeliveryStudioVideoTrimmerModal';
 import {
   closeStudioTab,
   createEmptyStudioTab,
@@ -340,6 +343,29 @@ const StyledSubtleBtn = styled.button`
   &:disabled {
     cursor: not-allowed;
     opacity: 0.5;
+  }
+`;
+
+const StyledSubtleUploadLabel = styled.label`
+  align-items: center;
+  background: ${themeCssVariables.background.primary};
+  border: 1px solid ${themeCssVariables.border.color.medium};
+  border-radius: 7px;
+  color: ${themeCssVariables.font.color.primary};
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 600;
+  gap: 4px;
+  padding: 4px 9px;
+  white-space: nowrap;
+
+  &:hover {
+    border-color: ${themeCssVariables.font.color.primary};
+  }
+
+  input {
+    display: none;
   }
 `;
 
@@ -975,6 +1001,11 @@ export const DeliveryAiStudioPage = () => {
   const [libraryModal, setLibraryModal] = useState<StudioLibraryMode | null>(
     null,
   );
+  const [pendingRefTrimFile, setPendingRefTrimFile] = useState<File | null>(
+    null,
+  );
+  const [editingVideoAsset, setEditingVideoAsset] =
+    useState<StudioAssetDTO | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [providerModalOpen, setProviderModalOpen] = useState(false);
   const [presetModalOpen, setPresetModalOpen] = useState(false);
@@ -3128,7 +3159,23 @@ export const DeliveryAiStudioPage = () => {
                 <StyledSlotCard>
                   <StyledSlotHeader>
                     <h4>Reference Video</h4>
-                    <span>Motion &amp; camera guide</span>
+                    <div style={{ alignItems: 'center', display: 'flex', gap: 8 }}>
+                      <span>Motion &amp; camera guide</span>
+                      <StyledSubtleUploadLabel title="Upload a new reference video and trim it before saving">
+                        + Upload
+                        <input
+                          type="file"
+                          accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0] ?? null;
+                            if (file) {
+                              setPendingRefTrimFile(file);
+                            }
+                            e.target.value = '';
+                          }}
+                        />
+                      </StyledSubtleUploadLabel>
+                    </div>
                   </StyledSlotHeader>
                   <StyledPickerTrigger
                     type="button"
@@ -3458,6 +3505,13 @@ export const DeliveryAiStudioPage = () => {
                               buttonLabel="Inspect API Input"
                               legacyNote={resolvedApi.legacyNote}
                             />
+                            <StyledSubtleBtn
+                              type="button"
+                              style={{ width: '100%', padding: '7px 10px' }}
+                              onClick={() => setEditingVideoAsset(vid)}
+                            >
+                              ✂ Edit / Add Clips
+                            </StyledSubtleBtn>
                             <StyledPrimaryCta
                               type="button"
                               style={{ padding: '8px 12px', fontSize: 12 }}
@@ -3666,6 +3720,60 @@ export const DeliveryAiStudioPage = () => {
             await workspaceQuery.refetch();
           }}
           onClose={() => setLibraryModal(null)}
+        />
+      )}
+
+      {/* Seamless Reference Video Trim Pop-Up (direct upload from Step 2) */}
+      {pendingRefTrimFile && (
+        <DeliveryStudioVideoTrimmerModal
+          file={pendingRefTrimFile}
+          companyId={activeTab.companyId}
+          projectId={activeTab.projectId}
+          onSaved={async (video: StudioReferenceVideoDTO) => {
+            await workspaceQuery.refetch();
+            const minSec = currentVideoModel?.capabilities.minDurationSec ?? 4;
+            const maxSec = currentVideoModel?.capabilities.maxDurationSec ?? 15;
+            const knownDur =
+              typeof video.mediaMeta?.durationSec === 'number' &&
+              Number.isFinite(video.mediaMeta.durationSec) &&
+              video.mediaMeta.durationSec > 0
+                ? video.mediaMeta.durationSec
+                : null;
+            patchActiveTab({
+              selectedReferenceVideoId: video.id,
+              videoDurationAutoMatched: true,
+              ...(knownDur !== null
+                ? {
+                    videoDurationSec: Math.max(
+                      minSec,
+                      Math.min(maxSec, Math.round(knownDur)),
+                    ),
+                  }
+                : {}),
+            });
+            setPendingRefTrimFile(null);
+          }}
+          onCancel={() => setPendingRefTrimFile(null)}
+        />
+      )}
+
+      {/* Mini Multi-Clip Video Editor Pop-Up (trim AI video, add & trim extra clips -> Text Hooks) */}
+      {editingVideoAsset && activeTab.companyId && (
+        <DeliveryStudioVideoEditorModal
+          companyId={activeTab.companyId}
+          projectId={activeTab.projectId}
+          initialVideo={editingVideoAsset}
+          availableVideos={generatedVideos}
+          primaryCtaLabel="Save & Open Text Hooks →"
+          onSaved={async (savedVideo) => {
+            await workspaceQuery.refetch();
+            patchActiveTab({
+              selectedVideoAssetId: savedVideo.id,
+              stage: 'TEXT_HOOKS',
+            });
+            setEditingVideoAsset(null);
+          }}
+          onClose={() => setEditingVideoAsset(null)}
         />
       )}
 
