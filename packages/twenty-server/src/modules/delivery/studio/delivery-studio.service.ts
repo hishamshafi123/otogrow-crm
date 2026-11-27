@@ -58,6 +58,7 @@ import { readDeliveryKnowledgeContext } from 'src/modules/delivery/knowledge/del
 import { DeliveryClientSetupSourceService } from 'src/modules/delivery/onboarding/delivery-client-setup-source.service';
 import {
   newDeliveryOperations,
+  type StudioGeminiConfigSetting,
   type StudioHookDefaultSetting,
 } from 'src/modules/delivery/operations/delivery-operations.types';
 import { recordOtogrowActivity } from 'src/modules/otogrow-activity/record-otogrow-activity';
@@ -88,6 +89,7 @@ import { scrapeProductImagesFromUrl } from 'src/modules/delivery/studio/studio-p
 import {
   buildStructuredFallbackVideoPrompt,
   DeliveryStudioPromptAiService,
+  type StudioGeminiStatus,
   type StudioPromptImageInput,
 } from 'src/modules/delivery/studio/delivery-studio-prompt-ai.service';
 import {
@@ -275,6 +277,12 @@ export type StudioProviderConfigDTO = {
   kieEnabled: boolean;
   kieVerifiedAt: string | null;
   kieLastError: string | null;
+  geminiConfigured: boolean;
+  geminiKeyLast4: string | null;
+  geminiModelId: string | null;
+  geminiSource: 'STUDIO_KEY' | 'ADMIN_CONFIG' | 'ENV' | null;
+  geminiVerifiedAt: string | null;
+  geminiLastError: string | null;
   defaultRoutingMode: StudioRoutingMode;
   defaultImageModel: string;
   defaultVideoModel: string;
@@ -372,9 +380,39 @@ export class DeliveryStudioService {
       : `${base}?token=${encodeURIComponent(token)}`;
   }
 
+  private readDecryptedGeminiKeyFromConfig(
+    workspaceId: string,
+    geminiCfg: StudioGeminiConfigSetting | null | undefined,
+  ): string | null {
+    const encrypted = geminiCfg?.encryptedApiKey;
+    if (!encrypted) return null;
+    try {
+      return this.encryption.decryptVersionedOrThrow(
+        encrypted as EncryptedString,
+        { workspaceId },
+      );
+    } catch (err) {
+      this.logger.warn(
+        `Failed to decrypt studio Gemini API key for workspace ${workspaceId}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      return null;
+    }
+  }
+
   private mapProviderConfig(
     row: DeliveryStudioProviderConfigEntity | null,
+    geminiCfg?: StudioGeminiConfigSetting | null,
+    geminiStatus?: StudioGeminiStatus | null,
   ): StudioProviderConfigDTO {
+    const status =
+      geminiStatus ??
+      this.promptAi?.getGeminiStatus(
+        geminiCfg?.encryptedApiKey ? '__configured__' : null,
+      ) ?? {
+        configured: Boolean(geminiCfg?.keyLast4),
+        modelId: geminiCfg?.keyLast4 ? 'gemini-2.5-flash' : null,
+        source: geminiCfg?.keyLast4 ? ('STUDIO_KEY' as const) : null,
+      };
     return {
       wavespeedConfigured: Boolean(row?.wavespeedKeyLast4),
       wavespeedKeyLast4: row?.wavespeedKeyLast4 ?? null,
@@ -388,6 +426,12 @@ export class DeliveryStudioService {
       kieEnabled: row?.kieEnabled ?? true,
       kieVerifiedAt: row?.kieVerifiedAt ? row.kieVerifiedAt.toISOString() : null,
       kieLastError: row?.kieLastError ?? null,
+      geminiConfigured: status.configured,
+      geminiKeyLast4: geminiCfg?.keyLast4 ?? null,
+      geminiModelId: status.modelId,
+      geminiSource: status.source,
+      geminiVerifiedAt: geminiCfg?.verifiedAt ?? null,
+      geminiLastError: geminiCfg?.lastError ?? null,
       defaultRoutingMode: row?.defaultRoutingMode ?? 'AUTO_FAILOVER',
       defaultImageModel: row?.defaultImageModel ?? 'nano-banana-2.1',
       defaultVideoModel: row?.defaultVideoModel ?? 'seedance-2.5',
@@ -686,13 +730,25 @@ export class DeliveryStudioService {
     auth: WorkspaceAuthContext,
   ): Promise<StudioProviderConfigDTO> {
     const id = this.identity(auth);
-    const row = await this.dataSource.transaction(async (manager) => {
+    const { row, ops } = await this.dataSource.transaction(async (manager) => {
       await this.resolveActor(manager, id);
-      return manager
-        .getRepository(DeliveryStudioProviderConfigEntity)
-        .findOne({ where: { workspaceId: id.workspaceId } });
+      const [configRow, opsRow] = await Promise.all([
+        manager
+          .getRepository(DeliveryStudioProviderConfigEntity)
+          .findOne({ where: { workspaceId: id.workspaceId } }),
+        manager
+          .getRepository(DeliveryOperationsEntity)
+          .findOneBy({ workspaceId: id.workspaceId }),
+      ]);
+      return { row: configRow, ops: opsRow };
     });
-    return this.mapProviderConfig(row);
+    const geminiCfg = ops?.state?.studioGeminiConfig ?? null;
+    const decryptedGeminiKey = this.readDecryptedGeminiKeyFromConfig(
+      id.workspaceId,
+      geminiCfg,
+    );
+    const geminiStatus = this.promptAi?.getGeminiStatus(decryptedGeminiKey);
+    return this.mapProviderConfig(row, geminiCfg, geminiStatus);
   }
 
   async saveProviderConfig(
@@ -708,114 +764,234 @@ export class DeliveryStudioService {
     const input = parsed.data;
     const id = this.identity(auth);
 
-    const saved = await this.dataSource.transaction(async (manager) => {
-      const actor = await this.resolveActor(manager, id);
-      if (!actor.isManager && !actor.isAdmin) {
-        throw new ForbiddenException(
-          'Only workspace managers or admins can configure AI Studio API keys.',
-        );
-      }
+    const { saved, geminiCfg } = await this.dataSource.transaction(
+      async (manager) => {
+        const actor = await this.resolveActor(manager, id);
+        if (!actor.isManager && !actor.isAdmin) {
+          throw new ForbiddenException(
+            'Only workspace managers or admins can configure AI Studio API keys.',
+          );
+        }
 
-      const repo = manager.getRepository(DeliveryStudioProviderConfigEntity);
-      let row = await repo
-        .createQueryBuilder('cfg')
-        .addSelect('cfg.encryptedWavespeedKey')
-        .addSelect('cfg.encryptedKieKey')
-        .where('cfg."workspaceId" = :workspaceId', {
-          workspaceId: id.workspaceId,
-        })
-        .getOne();
+        const repo = manager.getRepository(DeliveryStudioProviderConfigEntity);
+        let row = await repo
+          .createQueryBuilder('cfg')
+          .addSelect('cfg.encryptedWavespeedKey')
+          .addSelect('cfg.encryptedKieKey')
+          .where('cfg."workspaceId" = :workspaceId', {
+            workspaceId: id.workspaceId,
+          })
+          .getOne();
 
-      if (!row) {
-        row = repo.create({
-          workspaceId: id.workspaceId,
-          defaultRoutingMode: 'AUTO_FAILOVER',
-          defaultImageModel: 'nano-banana-2.1',
-          defaultVideoModel: 'seedance-2.5',
-          maxConcurrentJobs: 4,
+        if (!row) {
+          row = repo.create({
+            workspaceId: id.workspaceId,
+            defaultRoutingMode: 'AUTO_FAILOVER',
+            defaultImageModel: 'nano-banana-2.1',
+            defaultVideoModel: 'seedance-2.5',
+            maxConcurrentJobs: 4,
+          });
+        }
+
+        if (input.clearWavespeedKey) {
+          row.encryptedWavespeedKey = null;
+          row.wavespeedKeyLast4 = null;
+          row.wavespeedVerifiedAt = null;
+          row.wavespeedLastError = null;
+        } else if (input.wavespeedApiKey && input.wavespeedApiKey.trim()) {
+          const clean = input.wavespeedApiKey.trim();
+          row.encryptedWavespeedKey = this.encryption.encryptVersioned(
+            clean as PlaintextString,
+            { workspaceId: id.workspaceId },
+          );
+          row.wavespeedKeyLast4 = clean.slice(-4);
+          row.wavespeedVerifiedAt = null;
+          row.wavespeedLastError = null;
+        }
+
+        if (input.clearKieKey) {
+          row.encryptedKieKey = null;
+          row.kieKeyLast4 = null;
+          row.kieVerifiedAt = null;
+          row.kieLastError = null;
+        } else if (input.kieApiKey && input.kieApiKey.trim()) {
+          const clean = input.kieApiKey.trim();
+          row.encryptedKieKey = this.encryption.encryptVersioned(
+            clean as PlaintextString,
+            { workspaceId: id.workspaceId },
+          );
+          row.kieKeyLast4 = clean.slice(-4);
+          row.kieVerifiedAt = null;
+          row.kieLastError = null;
+        }
+
+        if (input.wavespeedEnabled !== undefined) {
+          row.wavespeedEnabled = input.wavespeedEnabled;
+        }
+        if (input.kieEnabled !== undefined) {
+          row.kieEnabled = input.kieEnabled;
+        }
+        if (input.defaultRoutingMode !== undefined) {
+          row.defaultRoutingMode = input.defaultRoutingMode;
+        }
+        if (input.defaultImageModel !== undefined) {
+          row.defaultImageModel = input.defaultImageModel;
+        }
+        if (input.defaultVideoModel !== undefined) {
+          row.defaultVideoModel = input.defaultVideoModel;
+        }
+        if (input.maxConcurrentJobs !== undefined) {
+          row.maxConcurrentJobs = input.maxConcurrentJobs;
+        }
+        row.updatedById = id.memberId;
+
+        const persisted = await repo.save(row);
+
+        const opsRepo = manager.getRepository(DeliveryOperationsEntity);
+        let ops = await opsRepo.findOne({
+          where: { workspaceId: id.workspaceId },
         });
-      }
+        let nextGeminiCfg: StudioGeminiConfigSetting | null =
+          ops?.state?.studioGeminiConfig ?? null;
 
-      if (input.clearWavespeedKey) {
-        row.encryptedWavespeedKey = null;
-        row.wavespeedKeyLast4 = null;
-        row.wavespeedVerifiedAt = null;
-        row.wavespeedLastError = null;
-      } else if (input.wavespeedApiKey && input.wavespeedApiKey.trim()) {
-        const clean = input.wavespeedApiKey.trim();
-        row.encryptedWavespeedKey = this.encryption.encryptVersioned(
-          clean as PlaintextString,
-          { workspaceId: id.workspaceId },
-        );
-        row.wavespeedKeyLast4 = clean.slice(-4);
-        row.wavespeedVerifiedAt = null;
-        row.wavespeedLastError = null;
-      }
+        if (input.clearGeminiKey || (input.geminiApiKey && input.geminiApiKey.trim())) {
+          if (!ops) {
+            ops = opsRepo.create({
+              workspaceId: id.workspaceId,
+              state: newDeliveryOperations(),
+            });
+          }
+          if (input.clearGeminiKey) {
+            nextGeminiCfg = {
+              encryptedApiKey: null,
+              keyLast4: null,
+              verifiedAt: null,
+              lastError: null,
+              updatedAt: new Date().toISOString(),
+            };
+          } else if (input.geminiApiKey && input.geminiApiKey.trim()) {
+            const clean = input.geminiApiKey.trim();
+            nextGeminiCfg = {
+              encryptedApiKey: this.encryption.encryptVersioned(
+                clean as PlaintextString,
+                { workspaceId: id.workspaceId },
+              ),
+              keyLast4: clean.slice(-4),
+              verifiedAt: null,
+              lastError: null,
+              updatedAt: new Date().toISOString(),
+            };
+          }
+          ops.state = {
+            ...newDeliveryOperations(),
+            ...(ops.state ?? {}),
+            studioGeminiConfig: nextGeminiCfg ?? undefined,
+          };
+          await opsRepo.save(ops);
+        }
 
-      if (input.clearKieKey) {
-        row.encryptedKieKey = null;
-        row.kieKeyLast4 = null;
-        row.kieVerifiedAt = null;
-        row.kieLastError = null;
-      } else if (input.kieApiKey && input.kieApiKey.trim()) {
-        const clean = input.kieApiKey.trim();
-        row.encryptedKieKey = this.encryption.encryptVersioned(
-          clean as PlaintextString,
-          { workspaceId: id.workspaceId },
-        );
-        row.kieKeyLast4 = clean.slice(-4);
-        row.kieVerifiedAt = null;
-        row.kieLastError = null;
-      }
+        await recordOtogrowActivity(manager, {
+          workspaceId: id.workspaceId,
+          actorId: id.memberId,
+          category: 'CREATIVE',
+          action: 'STUDIO_PROVIDER_CONFIG_UPDATED',
+          outcome: 'RECORDED',
+          summary: `Updated AI Studio provider settings (routing: ${persisted.defaultRoutingMode}).`,
+          sourceType: 'settings',
+          sourceId: persisted.id,
+          changes: [],
+        });
 
-      if (input.wavespeedEnabled !== undefined) {
-        row.wavespeedEnabled = input.wavespeedEnabled;
-      }
-      if (input.kieEnabled !== undefined) {
-        row.kieEnabled = input.kieEnabled;
-      }
-      if (input.defaultRoutingMode !== undefined) {
-        row.defaultRoutingMode = input.defaultRoutingMode;
-      }
-      if (input.defaultImageModel !== undefined) {
-        row.defaultImageModel = input.defaultImageModel;
-      }
-      if (input.defaultVideoModel !== undefined) {
-        row.defaultVideoModel = input.defaultVideoModel;
-      }
-      if (input.maxConcurrentJobs !== undefined) {
-        row.maxConcurrentJobs = input.maxConcurrentJobs;
-      }
-      row.updatedById = id.memberId;
+        return { saved: persisted, geminiCfg: nextGeminiCfg };
+      },
+    );
 
-      const persisted = await repo.save(row);
-
-      await recordOtogrowActivity(manager, {
-        workspaceId: id.workspaceId,
-        actorId: id.memberId,
-        category: 'CREATIVE',
-        action: 'STUDIO_PROVIDER_CONFIG_UPDATED',
-        outcome: 'RECORDED',
-        summary: `Updated AI Studio provider settings (routing: ${persisted.defaultRoutingMode}).`,
-        sourceType: 'settings',
-        sourceId: persisted.id,
-        changes: [],
-      });
-
-      return persisted;
-    });
-
-    return this.mapProviderConfig(saved);
+    const decryptedGeminiKey = this.readDecryptedGeminiKeyFromConfig(
+      id.workspaceId,
+      geminiCfg,
+    );
+    const geminiStatus = this.promptAi?.getGeminiStatus(decryptedGeminiKey);
+    return this.mapProviderConfig(saved, geminiCfg, geminiStatus);
   }
 
   async testProviderConnection(
     auth: WorkspaceAuthContext,
-    provider: StudioProviderId,
+    provider: StudioProviderId | 'gemini',
     rawApiKey?: string | null,
   ): Promise<{ ok: boolean; message: string; config: StudioProviderConfigDTO }> {
     const id = this.identity(auth);
-    if (provider !== 'wavespeed' && provider !== 'kie') {
-      throw new BadRequestException('Provider must be "wavespeed" or "kie".');
+    if (provider !== 'wavespeed' && provider !== 'kie' && provider !== 'gemini') {
+      throw new BadRequestException(
+        'Provider must be "wavespeed", "kie", or "gemini".',
+      );
+    }
+
+    if (provider === 'gemini') {
+      const { keyToTest, hadStoredKey } = await this.dataSource.transaction(
+        async (manager) => {
+          await this.resolveActor(manager, id);
+          if (rawApiKey && rawApiKey.trim()) {
+            return { keyToTest: rawApiKey.trim(), hadStoredKey: false };
+          }
+          const ops = await manager
+            .getRepository(DeliveryOperationsEntity)
+            .findOneBy({ workspaceId: id.workspaceId });
+          const decrypted = this.readDecryptedGeminiKeyFromConfig(
+            id.workspaceId,
+            ops?.state?.studioGeminiConfig,
+          );
+          if (decrypted) {
+            return { keyToTest: decrypted, hadStoredKey: true };
+          }
+          const fallbackEnvKey =
+            this.twentyConfig.get('GOOGLE_API_KEY')?.trim() ||
+            process.env.GOOGLE_API_KEY?.trim() ||
+            process.env.GEMINI_API_KEY?.trim() ||
+            process.env.GOOGLE_GENERATIVE_AI_API_KEY?.trim() ||
+            null;
+          return { keyToTest: fallbackEnvKey, hadStoredKey: false };
+        },
+      );
+
+      if (!keyToTest) {
+        return {
+          ok: false,
+          message:
+            'No Google Gemini API key configured yet. Paste an AIza… key from Google AI Studio and click Test Key.',
+          config: await this.getProviderConfig(auth),
+        };
+      }
+
+      const check = this.promptAi
+        ? await this.promptAi.testGeminiApiKey(keyToTest)
+        : { ok: false, message: 'Prompt AI service is unavailable.' };
+
+      if (hadStoredKey || (rawApiKey && rawApiKey.trim())) {
+        await this.dataSource.transaction(async (manager) => {
+          const opsRepo = manager.getRepository(DeliveryOperationsEntity);
+          const ops = await opsRepo.findOne({
+            where: { workspaceId: id.workspaceId },
+          });
+          if (!ops?.state?.studioGeminiConfig?.encryptedApiKey) return;
+          ops.state = {
+            ...newDeliveryOperations(),
+            ...(ops.state ?? {}),
+            studioGeminiConfig: {
+              ...ops.state.studioGeminiConfig,
+              verifiedAt: check.ok ? new Date().toISOString() : null,
+              lastError: check.ok ? null : check.message,
+              updatedAt: new Date().toISOString(),
+            },
+          };
+          await opsRepo.save(ops);
+        });
+      }
+
+      return {
+        ok: check.ok,
+        message: check.message,
+        config: await this.getProviderConfig(auth),
+      };
     }
 
     const keyToTest = await this.dataSource.transaction(async (manager) => {
@@ -853,24 +1029,38 @@ export class DeliveryStudioService {
 
     const check = await this.router.verifyProviderKey(provider, keyToTest);
 
-    const updated = await this.dataSource.transaction(async (manager) => {
-      const repo = manager.getRepository(DeliveryStudioProviderConfigEntity);
-      const row = await repo.findOne({ where: { workspaceId: id.workspaceId } });
-      if (!row) return null;
-      if (provider === 'wavespeed') {
-        row.wavespeedVerifiedAt = check.ok ? new Date() : null;
-        row.wavespeedLastError = check.ok ? null : check.message;
-      } else {
-        row.kieVerifiedAt = check.ok ? new Date() : null;
-        row.kieLastError = check.ok ? null : check.message;
-      }
-      return repo.save(row);
-    });
+    const { updated, ops } = await this.dataSource.transaction(
+      async (manager) => {
+        const repo = manager.getRepository(DeliveryStudioProviderConfigEntity);
+        const [row, opsRow] = await Promise.all([
+          repo.findOne({ where: { workspaceId: id.workspaceId } }),
+          manager
+            .getRepository(DeliveryOperationsEntity)
+            .findOneBy({ workspaceId: id.workspaceId }),
+        ]);
+        if (!row) return { updated: null, ops: opsRow };
+        if (provider === 'wavespeed') {
+          row.wavespeedVerifiedAt = check.ok ? new Date() : null;
+          row.wavespeedLastError = check.ok ? null : check.message;
+        } else {
+          row.kieVerifiedAt = check.ok ? new Date() : null;
+          row.kieLastError = check.ok ? null : check.message;
+        }
+        return { updated: await repo.save(row), ops: opsRow };
+      },
+    );
+
+    const geminiCfg = ops?.state?.studioGeminiConfig ?? null;
+    const decryptedGeminiKey = this.readDecryptedGeminiKeyFromConfig(
+      id.workspaceId,
+      geminiCfg,
+    );
+    const geminiStatus = this.promptAi?.getGeminiStatus(decryptedGeminiKey);
 
     return {
       ok: check.ok,
       message: check.message,
-      config: this.mapProviderConfig(updated),
+      config: this.mapProviderConfig(updated, geminiCfg, geminiStatus),
     };
   }
 
@@ -1064,11 +1254,22 @@ export class DeliveryStudioService {
       ? clients.find((c) => c.id === companyId) ?? null
       : null;
 
+    const geminiCfg = operations?.state.studioGeminiConfig ?? null;
+    const decryptedGeminiKey = this.readDecryptedGeminiKeyFromConfig(
+      id.workspaceId,
+      geminiCfg,
+    );
+    const geminiStatus = this.promptAi?.getGeminiStatus(decryptedGeminiKey);
+
     return {
       canManageProviders: actor.isAdmin || actor.isManager,
       catalog: STUDIO_MODEL_CATALOG,
       hookStylePresets: HOOK_STYLE_PRESETS,
-      providerConfig: this.mapProviderConfig(providerConfig),
+      providerConfig: this.mapProviderConfig(
+        providerConfig,
+        geminiCfg,
+        geminiStatus,
+      ),
       clients,
       selectedClientTags: selectedClientInfo?.tags ?? [],
       selectedClientIsClothingBrand: Boolean(
@@ -1271,6 +1472,148 @@ export class DeliveryStudioService {
     });
 
     return this.mapReferenceVideo(saved);
+  }
+
+  async uploadStudioVideoAsset(
+    auth: WorkspaceAuthContext,
+    input: {
+      companyId: string;
+      projectId?: string | null;
+      title?: string;
+      tempFilePath: string;
+      originalFileName: string;
+      mimeType: string;
+      sizeBytes: number;
+      clientDurationSec?: number;
+      clientWidth?: number;
+      clientHeight?: number;
+    },
+  ) {
+    if (!isUuidString(input.companyId)) {
+      throw new BadRequestException(
+        'Select a client before uploading a video for hook variations.',
+      );
+    }
+    const id = this.identity(auth);
+    const assetId = v4();
+    const ext = extensionForMime(input.mimeType);
+    const storageKey = `delivery-studio/${id.workspaceId}/assets/${assetId}.${ext}`;
+    const thumbKey = `delivery-studio/${id.workspaceId}/assets/${assetId}-thumb.jpg`;
+
+    const bytes = await fs.readFile(input.tempFilePath);
+    const sha256 = createHash('sha256').update(bytes).digest('hex');
+    const probedMeta = await this.probe.probeMedia(input.tempFilePath);
+    const mediaMeta: DeliverableMediaMeta = {
+      ...probedMeta,
+      ...(!probedMeta.durationSec &&
+      typeof input.clientDurationSec === 'number' &&
+      Number.isFinite(input.clientDurationSec) &&
+      input.clientDurationSec > 0
+        ? { durationSec: Math.round(input.clientDurationSec * 10) / 10 }
+        : {}),
+      ...(!probedMeta.width &&
+      typeof input.clientWidth === 'number' &&
+      input.clientWidth > 0
+        ? { width: Math.round(input.clientWidth) }
+        : {}),
+      ...(!probedMeta.height &&
+      typeof input.clientHeight === 'number' &&
+      input.clientHeight > 0
+        ? { height: Math.round(input.clientHeight) }
+        : {}),
+    };
+
+    const tempThumb = path.join(
+      os.tmpdir(),
+      `studio-upload-video-thumb-${assetId}.jpg`,
+    );
+    let hasThumb = false;
+    try {
+      hasThumb = await this.probe.extractVideoThumbnail(
+        input.tempFilePath,
+        tempThumb,
+        mediaMeta.durationSec,
+      );
+      const driver = this.storage.getCurrentDriver();
+      await driver.writeFileStream({
+        filePath: storageKey,
+        stream: createReadStream(input.tempFilePath),
+        mimeType: input.mimeType,
+      });
+      if (hasThumb) {
+        await driver.writeFileStream({
+          filePath: thumbKey,
+          stream: createReadStream(tempThumb),
+          mimeType: 'image/jpeg',
+        });
+      }
+    } finally {
+      await fs.rm(tempThumb, { force: true }).catch(() => undefined);
+    }
+
+    const cleanTitle =
+      input.title?.trim().slice(0, 180) ||
+      input.originalFileName.replace(/\.[^.]+$/, '').slice(0, 180) ||
+      'Uploaded Video';
+
+    const saved = await this.dataSource.transaction(async (manager) => {
+      await this.resolveActor(manager, id);
+      const repo = manager.getRepository(DeliveryStudioAssetEntity);
+      const created = await repo.save(
+        repo.create({
+          id: assetId,
+          workspaceId: id.workspaceId,
+          companyId: input.companyId,
+          projectId:
+            input.projectId && isUuidString(input.projectId)
+              ? input.projectId
+              : null,
+          kind: 'GENERATED_VIDEO',
+          productKitId: null,
+          referenceVideoId: null,
+          characterAssetId: null,
+          presetId: null,
+          jobId: null,
+          title: cleanTitle,
+          promptUsed: '',
+          modelKey: 'uploaded-video',
+          providerUsed: 'upload',
+          storageKey,
+          thumbnailKey: hasThumb ? thumbKey : null,
+          mimeType: input.mimeType,
+          sizeBytes: String(input.sizeBytes),
+          sha256,
+          mediaMeta,
+          stagedUrlsJson: {},
+          approved: true,
+          deliverableId: null,
+          hookProjectId: null,
+          tagsJson: ['uploaded'],
+          metadataJson: {
+            source: 'direct-upload',
+            originalFileName: input.originalFileName.slice(0, 240),
+          },
+          archived: false,
+          createdById: id.memberId,
+        }),
+      );
+
+      await recordOtogrowActivity(manager, {
+        workspaceId: id.workspaceId,
+        actorId: id.memberId,
+        category: 'CREATIVE',
+        action: 'STUDIO_VIDEO_UPLOADED',
+        outcome: 'RECORDED',
+        summary: `Uploaded video "${cleanTitle}" directly to AI Studio for text hooks & variations.`,
+        sourceType: 'creative',
+        sourceId: created.id,
+        changes: [],
+      });
+
+      return created;
+    });
+
+    return this.mapAsset(saved);
   }
 
   async archiveReferenceVideo(auth: WorkspaceAuthContext, refVideoId: string) {
@@ -1930,6 +2273,14 @@ export class DeliveryStudioService {
         characterAsset?.projectId ?? refVideo.projectId ?? null,
       );
 
+      const ops = await manager
+        .getRepository(DeliveryOperationsEntity)
+        .findOneBy({ workspaceId: id.workspaceId });
+      const overrideGeminiApiKey = this.readDecryptedGeminiKeyFromConfig(
+        id.workspaceId,
+        ops?.state?.studioGeminiConfig,
+      );
+
       return {
         refVideo,
         characterAsset,
@@ -1937,6 +2288,7 @@ export class DeliveryStudioService {
         selectedKitAssets,
         resolvedEnvironmentPrompt,
         brandNotes,
+        overrideGeminiApiKey,
       };
     });
 
@@ -2035,6 +2387,7 @@ export class DeliveryStudioService {
       environmentPrompt: loaded.resolvedEnvironmentPrompt,
       brandNotes: loaded.brandNotes,
       customNotes: input.customNotes?.trim() || '',
+      overrideApiKey: loaded.overrideGeminiApiKey,
     });
 
     return {
@@ -2180,11 +2533,11 @@ export class DeliveryStudioService {
           )?.masterPrompt ?? fallbackVideoPreset.masterPrompt
         : fallbackVideoPreset.masterPrompt;
 
-      const masterTemplate =
+      const explicitMasterTemplate =
         input.masterPrompt?.trim() ||
         autoGeneratedMasterPrompt ||
         preset?.masterPrompt ||
-        defaultTemplate;
+        null;
 
       const resolvedProductAssetIds =
         input.productAssetIds && input.productAssetIds.length > 0
@@ -2206,17 +2559,24 @@ export class DeliveryStudioService {
           : (productKit.assetsJson ?? [])
         : [];
 
-      const baseCompiledPrompt = compileStudioPromptTemplate(masterTemplate, {
-        product_name:
-          productKit?.name || characterAsset?.title || 'featured garment',
-        product_notes: productKit?.notes || '',
-        brand_notes: brandNotes,
-        environment:
-          resolvedEnvironmentPrompt ||
-          'the exact environment and lighting shown in the Character Sheet (@image1)',
-        reference_notes: refVideo.notes || '',
-        custom_notes: input.customNotes?.trim() || '',
-      });
+      const baseCompiledPrompt = explicitMasterTemplate || characterAsset
+        ? compileStudioPromptTemplate(
+            explicitMasterTemplate ?? defaultTemplate,
+            {
+              product_name:
+                productKit?.name || characterAsset?.title || 'featured garment',
+              product_notes: productKit?.notes || '',
+              brand_notes: brandNotes,
+              environment:
+                resolvedEnvironmentPrompt ||
+                (characterAsset
+                  ? 'the exact environment and lighting shown in the Character Sheet (@image1)'
+                  : 'the exact environment and lighting shown in the reference video'),
+              reference_notes: refVideo.notes || '',
+              custom_notes: input.customNotes?.trim() || '',
+            },
+          )
+        : '';
 
       const refDuration = refVideo.mediaMeta?.durationSec;
       const repo = manager.getRepository(DeliveryStudioJobEntity);
@@ -2266,6 +2626,23 @@ export class DeliveryStudioService {
         const imgPrefix = usesAtTokens ? '@image' : 'Image ';
         const vidPrefix = usesAtTokens ? '@video' : 'Video ';
 
+        const effectiveBasePrompt =
+          baseCompiledPrompt ||
+          buildStructuredFallbackVideoPrompt({
+            usesAtMentionTokens: usesAtTokens,
+            characterToken: null,
+            productTokens: plannedKitAssets.map((item, idx) => ({
+              token: `${imgPrefix}${idx + 1}`,
+              label: item.label || item.role || `Product Image ${idx + 1}`,
+            })),
+            videoToken: `${vidPrefix}1`,
+            productName: productKit?.name || 'featured garment',
+            productNotes: productKit?.notes || '',
+            environmentPrompt: resolvedEnvironmentPrompt,
+            brandNotes,
+            customNotes: input.customNotes?.trim() || '',
+          });
+
         const refMappingNote = buildVideoReferenceMappingNote({
           usesAtMentionTokens: usesAtTokens,
           hasCharacterSheet: Boolean(characterAsset),
@@ -2273,11 +2650,11 @@ export class DeliveryStudioService {
           productName:
             productKit?.name || characterAsset?.title || 'featured garment',
           hasReferenceVideo: true,
-          existingPrompt: baseCompiledPrompt,
+          existingPrompt: effectiveBasePrompt,
         });
         const compiledPrompt = refMappingNote
-          ? `${baseCompiledPrompt}\n${refMappingNote}`.trim()
-          : baseCompiledPrompt;
+          ? `${effectiveBasePrompt}\n${refMappingNote}`.trim()
+          : effectiveBasePrompt;
 
         const plannedImages: StudioApiInputImageRef[] = [];
         if (characterAsset) {

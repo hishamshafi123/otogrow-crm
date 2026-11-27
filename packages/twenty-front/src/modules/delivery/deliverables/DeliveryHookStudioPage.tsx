@@ -42,6 +42,7 @@ import {
   StyledDeliveryStack,
 } from '@/delivery/deliveryStyles';
 import { DeliveryOperationalPage } from '@/delivery/operations-pages/DeliveryOperationalPage';
+import { uploadStudioMultipart } from '@/delivery/studio/studio-upload';
 import { useWorkflowAccess } from '@/delivery/workflows/useWorkflowAccess';
 
 type DraftVariation = {
@@ -360,6 +361,7 @@ export const DeliveryHookStudioPage = () => {
     data: deliverablesListData,
     loading: loadingList,
     error: deliverablesListError,
+    refetch: refetchDeliverablesList,
   } = useQuery<{
     deliveryDeliverables: DeliverableListResponse;
   }>(GET_DELIVERY_DELIVERABLES, {
@@ -375,13 +377,30 @@ export const DeliveryHookStudioPage = () => {
     [deliverablesListData],
   );
 
+  const availableClients = useMemo(
+    () => deliverablesListData?.deliveryDeliverables?.clients ?? [],
+    [deliverablesListData],
+  );
+
   const clientNameMap = useMemo(() => {
     const map = new Map<string, string>();
-    for (const c of deliverablesListData?.deliveryDeliverables?.clients ?? []) {
+    for (const c of availableClients) {
       map.set(c.id, c.name);
     }
     return map;
-  }, [deliverablesListData]);
+  }, [availableClients]);
+
+  const [uploadCompanyId, setUploadCompanyId] = useState('');
+  const [uploadingDirectVideo, setUploadingDirectVideo] = useState(false);
+  const [uploadDirectProgress, setUploadDirectProgress] = useState<
+    string | null
+  >(null);
+
+  useEffect(() => {
+    if (!uploadCompanyId && availableClients.length > 0) {
+      setUploadCompanyId(availableClients[0].id);
+    }
+  }, [uploadCompanyId, availableClients]);
 
   const {
     data: projectData,
@@ -1074,6 +1093,62 @@ export const DeliveryHookStudioPage = () => {
       ? `rendered:${activeVariation?.id ?? 'none'}:${activeVariation?.outputSizeBytes ?? 0}`
       : `editor:${currentProject?.deliverable.id ?? 'none'}`;
 
+  const handleDirectVideoUpload = async (file: File | null) => {
+    if (!file) return;
+    if (!uploadCompanyId) {
+      setStatusMessage({
+        tone: 'error',
+        text: 'Select a client before uploading a video.',
+      });
+      return;
+    }
+    setUploadingDirectVideo(true);
+    setUploadDirectProgress(`Uploading ${file.name} (0%)`);
+    setStatusMessage(null);
+    try {
+      const now = new Date();
+      const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('companyId', uploadCompanyId);
+      formData.append('serviceKey', 'video_ads');
+      formData.append('monthKey', monthKey);
+      formData.append('title', file.name.replace(/\.[^.]+$/, ''));
+
+      const uploaded = await uploadStudioMultipart<{ id?: string }>({
+        store,
+        endpointPath: '/portal/delivery-deliverables/upload',
+        formData,
+        onProgress: (pct) => {
+          setUploadDirectProgress(`Uploading ${file.name} (${pct}%)`);
+        },
+      });
+      await refetchDeliverablesList();
+      if (uploaded?.id) {
+        const next = new URLSearchParams(params);
+        next.set('view', 'creative');
+        next.set('creativeView', 'hooks');
+        next.set('deliverableId', uploaded.id);
+        setParams(next);
+        setStatusMessage({
+          tone: 'success',
+          text: `Uploaded "${file.name}" — ready to build text-hook variations.`,
+        });
+      }
+    } catch (err) {
+      setStatusMessage({
+        tone: 'error',
+        text:
+          err instanceof Error
+            ? err.message
+            : 'Failed to upload video deliverable.',
+      });
+    } finally {
+      setUploadingDirectVideo(false);
+      setUploadDirectProgress(null);
+    }
+  };
+
   return (
     <DeliveryOperationalPage view="creative">
       <StyledDeliveryCard>
@@ -1117,9 +1192,67 @@ export const DeliveryHookStudioPage = () => {
 
       {!deliverableId ? (
         <StyledPanelCard>
-          <StyledSectionTitle>
-            Choose a Video Deliverable to Create Hook Variations
-          </StyledSectionTitle>
+          <StyledDeliveryRow
+            style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}
+          >
+            <StyledSectionTitle style={{ margin: 0 }}>
+              Choose or Upload a Video to Create Hook Variations
+            </StyledSectionTitle>
+            <StyledDeliveryRow style={{ gap: 8, flexWrap: 'wrap' }}>
+              {availableClients.length > 0 && (
+                <select
+                  value={uploadCompanyId}
+                  onChange={(e) => setUploadCompanyId(e.target.value)}
+                  disabled={uploadingDirectVideo}
+                  style={{
+                    background: themeCssVariables.background.primary,
+                    border: `1px solid ${themeCssVariables.border.color.medium}`,
+                    borderRadius: 6,
+                    color: themeCssVariables.font.color.primary,
+                    fontSize: 12,
+                    padding: '6px 10px',
+                  }}
+                >
+                  {availableClients.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <label
+                style={{
+                  alignItems: 'center',
+                  background: themeCssVariables.font.color.primary,
+                  borderRadius: 6,
+                  color: themeCssVariables.font.color.inverted,
+                  cursor:
+                    uploadingDirectVideo || !uploadCompanyId
+                      ? 'not-allowed'
+                      : 'pointer',
+                  display: 'inline-flex',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  opacity: uploadingDirectVideo || !uploadCompanyId ? 0.5 : 1,
+                  padding: '6px 12px',
+                }}
+              >
+                {uploadingDirectVideo
+                  ? uploadDirectProgress || 'Uploading…'
+                  : '+ Upload Video'}
+                <input
+                  type="file"
+                  accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm"
+                  disabled={uploadingDirectVideo || !uploadCompanyId}
+                  style={{ display: 'none' }}
+                  onChange={(e) => {
+                    void handleDirectVideoUpload(e.target.files?.[0] ?? null);
+                    e.target.value = '';
+                  }}
+                />
+              </label>
+            </StyledDeliveryRow>
+          </StyledDeliveryRow>
           {deliverablesListError ? (
             <StyledNotice tone="error">
               Could not load video deliverables:{' '}
@@ -1129,9 +1262,9 @@ export const DeliveryHookStudioPage = () => {
             <div>Loading uploaded videos…</div>
           ) : videoDeliverables.length === 0 ? (
             <StyledNotice tone="info">
-              No video deliverables uploaded yet. Upload a master video in the
-              Deliverable Hub first, then open it here to build text-hook
-              variations.
+              No video deliverables uploaded yet. Use{' '}
+              <strong>+ Upload Video</strong> above (or upload in the
+              Deliverable Hub) to start building text-hook variations right away.
             </StyledNotice>
           ) : (
             <StyledVideoPickerGrid>

@@ -98,6 +98,13 @@ export type StudioHookDefaultSetting = {
   durationSec: number;
   updatedAt: string;
 };
+export type StudioGeminiConfigSetting = {
+  encryptedApiKey: string | null;
+  keyLast4: string | null;
+  verifiedAt: string | null;
+  lastError: string | null;
+  updatedAt: string;
+};
 export type DeliveryOperations = {
   serviceCatalog?: string[];
   clientRoster?: {
@@ -107,6 +114,7 @@ export type DeliveryOperations = {
   clientFees?: Record<string, ClientFeeSetting>;
   clientTags?: Record<string, string[]>;
   studioHookDefaults?: Record<string, StudioHookDefaultSetting>;
+  studioGeminiConfig?: StudioGeminiConfigSetting;
   founderEscalationRouting?: {
     mode: 'RULES';
     revision: number;

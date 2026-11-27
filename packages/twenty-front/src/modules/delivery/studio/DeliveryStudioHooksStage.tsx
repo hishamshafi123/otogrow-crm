@@ -1,6 +1,7 @@
 /* oxlint-disable twenty/no-hardcoded-colors */
 import { useMutation, useQuery } from '@apollo/client/react';
 import { styled } from '@linaria/react';
+import { useStore } from 'jotai';
 import { useEffect, useMemo, useState } from 'react';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
 import {
@@ -19,6 +20,59 @@ import {
   type StudioPresetDTO,
   studioMediaUrl,
 } from '@/delivery/studio/delivery-studio.types';
+import { uploadStudioMultipart } from '@/delivery/studio/studio-upload';
+
+const StyledStageWrapper = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+`;
+
+const StyledSourceBar = styled.div`
+  align-items: center;
+  background: ${themeCssVariables.background.secondary};
+  border: 1px solid ${themeCssVariables.border.color.light};
+  border-radius: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: space-between;
+  padding: 12px 16px;
+`;
+
+const StyledSourceSelect = styled.select`
+  background: ${themeCssVariables.background.primary};
+  border: 1px solid ${themeCssVariables.border.color.medium};
+  border-radius: 8px;
+  color: ${themeCssVariables.font.color.primary};
+  flex: 1;
+  font-size: 13px;
+  max-width: 440px;
+  min-width: 220px;
+  padding: 7px 10px;
+`;
+
+const StyledUploadLabel = styled.label<{ disabled?: boolean }>`
+  align-items: center;
+  background: ${themeCssVariables.font.color.primary};
+  border-radius: 8px;
+  color: ${themeCssVariables.font.color.inverted};
+  cursor: ${({ disabled }) => (disabled ? 'not-allowed' : 'pointer')};
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 600;
+  gap: 6px;
+  opacity: ${({ disabled }) => (disabled ? 0.5 : 1)};
+  padding: 7px 13px;
+
+  &:hover {
+    opacity: ${({ disabled }) => (disabled ? 0.5 : 0.9)};
+  }
+
+  input {
+    display: none;
+  }
+`;
 
 const StyledStageGrid = styled.div`
   align-items: start;
@@ -465,9 +519,46 @@ const hexToRgba = (hex: string, alpha: number): string => {
   return `rgba(${r}, ${g}, ${b}, ${Math.max(0, Math.min(1, alpha))})`;
 };
 
+const probeBrowserVideoMeta = (
+  file: File,
+): Promise<{ durationSec?: number; width?: number; height?: number }> =>
+  new Promise((resolve) => {
+    const objectUrl = URL.createObjectURL(file);
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+    const done = (meta: {
+      durationSec?: number;
+      width?: number;
+      height?: number;
+    }) => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(meta);
+    };
+    const timeout = window.setTimeout(() => done({}), 4000);
+    video.onloadedmetadata = () => {
+      window.clearTimeout(timeout);
+      done({
+        durationSec:
+          Number.isFinite(video.duration) && video.duration > 0
+            ? Math.round(video.duration * 100) / 100
+            : undefined,
+        width: video.videoWidth > 0 ? video.videoWidth : undefined,
+        height: video.videoHeight > 0 ? video.videoHeight : undefined,
+      });
+    };
+    video.onerror = () => {
+      window.clearTimeout(timeout);
+      done({});
+    };
+    video.src = objectUrl;
+  });
+
 type DeliveryStudioHooksStageProps = {
   companyId: string | null;
+  projectId?: string | null;
   selectedVideo: StudioAssetDTO | null;
+  videos?: StudioAssetDTO[];
+  onSelectVideo?: (video: StudioAssetDTO) => void;
   hookPresets: StudioPresetDTO[];
   hookDefault: StudioHookDefaultSettingDTO | null;
   hasClientHookDefault: boolean;
@@ -476,12 +567,16 @@ type DeliveryStudioHooksStageProps = {
 
 export const DeliveryStudioHooksStage = ({
   companyId,
+  projectId,
   selectedVideo,
+  videos = [],
+  onSelectVideo,
   hookPresets,
   hookDefault,
   hasClientHookDefault,
   onRefreshWorkspace,
 }: DeliveryStudioHooksStageProps) => {
+  const store = useStore();
   const [hooks, setHooks] = useState<HookDraftItem[]>([]);
   const [previewHookId, setPreviewHookId] = useState<string | null>(null);
   const [customHookInput, setCustomHookInput] = useState('');
@@ -505,6 +600,10 @@ export const DeliveryStudioHooksStage = ({
   const [busySuggest, setBusySuggest] = useState(false);
   const [busySave, setBusySave] = useState(false);
   const [busySaveDefault, setBusySaveDefault] = useState(false);
+  const [uploadingVideos, setUploadingVideos] = useState(false);
+  const [uploadProgressText, setUploadProgressText] = useState<string | null>(
+    null,
+  );
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -646,12 +745,157 @@ export const DeliveryStudioHooksStage = ({
       ? selectedVideo.metadata.productName
       : '';
 
+  const handleUploadVideos = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    if (!companyId) {
+      setError('Select a client in the top bar before uploading a video.');
+      return;
+    }
+    setError(null);
+    setFeedback(null);
+    setUploadingVideos(true);
+    const list = Array.from(files);
+    let lastUploaded: StudioAssetDTO | null = null;
+    try {
+      for (let idx = 0; idx < list.length; idx += 1) {
+        const file = list[idx];
+        setUploadProgressText(
+          `Uploading ${idx + 1}/${list.length}: ${file.name} (0%)`,
+        );
+        const meta = await probeBrowserVideoMeta(file);
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('companyId', companyId);
+        if (projectId) formData.append('projectId', projectId);
+        formData.append('title', file.name.replace(/\.[^.]+$/, ''));
+        if (meta.durationSec) {
+          formData.append('durationSec', String(meta.durationSec));
+        }
+        if (meta.width) formData.append('width', String(meta.width));
+        if (meta.height) formData.append('height', String(meta.height));
+
+        const uploaded = await uploadStudioMultipart<StudioAssetDTO>({
+          store,
+          endpointPath: '/portal/delivery-studio/videos/upload',
+          formData,
+          onProgress: (pct) => {
+            setUploadProgressText(
+              `Uploading ${idx + 1}/${list.length}: ${file.name} (${pct}%)`,
+            );
+          },
+        });
+        if (uploaded) {
+          lastUploaded = uploaded;
+        }
+      }
+      await onRefreshWorkspace();
+      if (lastUploaded && onSelectVideo) {
+        onSelectVideo(lastUploaded);
+      }
+      setFeedback(
+        list.length === 1
+          ? `Uploaded "${lastUploaded?.title || list[0].name}" — ready for text hooks & variations.`
+          : `Uploaded ${list.length} videos — ready for text hooks & variations.`,
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Failed to upload video for hook variations.',
+      );
+    } finally {
+      setUploadingVideos(false);
+      setUploadProgressText(null);
+    }
+  };
+
+  const renderSourceBar = () => (
+    <StyledSourceBar>
+      <div
+        style={{
+          alignItems: 'center',
+          display: 'flex',
+          flex: 1,
+          flexWrap: 'wrap',
+          gap: 10,
+          minWidth: 240,
+        }}
+      >
+        <strong style={{ fontSize: 13 }}>Source Video</strong>
+        {videos.length > 0 ? (
+          <StyledSourceSelect
+            value={selectedVideo?.id ?? ''}
+            onChange={(e) => {
+              const found = videos.find((v) => v.id === e.target.value);
+              if (found && onSelectVideo) onSelectVideo(found);
+            }}
+          >
+            {videos.map((v) => {
+              const sourceTag =
+                v.providerUsed === 'upload' ? 'Uploaded' : 'AI';
+              const dur = v.mediaMeta?.durationSec
+                ? ` · ${Math.round(v.mediaMeta.durationSec)}s`
+                : '';
+              return (
+                <option key={v.id} value={v.id}>
+                  [{sourceTag}] {v.title}
+                  {dur}
+                </option>
+              );
+            })}
+          </StyledSourceSelect>
+        ) : (
+          <span
+            style={{
+              color: themeCssVariables.font.color.tertiary,
+              fontSize: 12,
+            }}
+          >
+            Upload your own MP4/MOV/WebM video or generate one in Step 2.
+          </span>
+        )}
+      </div>
+
+      <StyledUploadLabel disabled={!companyId || uploadingVideos}>
+        {uploadingVideos
+          ? uploadProgressText || 'Uploading…'
+          : '+ Upload Video(s)'}
+        <input
+          type="file"
+          accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm"
+          multiple
+          disabled={!companyId || uploadingVideos}
+          onChange={(e) => {
+            void handleUploadVideos(e.target.files);
+            e.target.value = '';
+          }}
+        />
+      </StyledUploadLabel>
+    </StyledSourceBar>
+  );
+
   if (!selectedVideo) {
     return (
-      <StyledEmptyCard>
-        Approve a generated AI video from Step 2 to add optional text hooks and
-        save to Google Drive.
-      </StyledEmptyCard>
+      <StyledStageWrapper>
+        {renderSourceBar()}
+        {error && (
+          <StyledStatusBanner
+            style={{
+              borderColor: themeCssVariables.color.red,
+              color: themeCssVariables.color.red11,
+            }}
+          >
+            {error}
+          </StyledStatusBanner>
+        )}
+        {feedback && <StyledStatusBanner>{feedback}</StyledStatusBanner>}
+        <StyledEmptyCard>
+          Upload an MP4, MOV, or WebM video using{' '}
+          <strong>+ Upload Video(s)</strong> above, or approve an AI video from
+          Step 2 to create text hook variations and save directly to Google
+          Drive.
+        </StyledEmptyCard>
+      </StyledStageWrapper>
     );
   }
 
@@ -860,7 +1104,9 @@ export const DeliveryStudioHooksStage = ({
   const previewFontPx = Math.max(12, Math.round(visualStyle.fontSizePct * 3.8));
 
   return (
-    <StyledStageGrid>
+    <StyledStageWrapper>
+      {renderSourceBar()}
+      <StyledStageGrid>
       <StyledPreviewColumn>
         <StyledVideoFrame
           style={{ cursor: styleOpen ? 'crosshair' : 'default' }}
@@ -1271,6 +1517,7 @@ export const DeliveryStudioHooksStage = ({
           )}
         </StyledPanel>
       </StyledRightColumn>
-    </StyledStageGrid>
+      </StyledStageGrid>
+    </StyledStageWrapper>
   );
 };

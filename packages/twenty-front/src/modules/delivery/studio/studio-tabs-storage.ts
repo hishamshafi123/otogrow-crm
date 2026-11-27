@@ -41,6 +41,7 @@ export type StudioTabDraft = {
   imageAspectRatio: string;
   imageCandidateCount: number;
   // Video Generation settings
+  useCharacterSheet: boolean;
   videoPresetId: string | null;
   videoMasterPrompt: string;
   videoEnvironmentOverride: string;
@@ -106,6 +107,7 @@ export const createEmptyStudioTab = (
   imageResolution: '2K',
   imageAspectRatio: '3:4',
   imageCandidateCount: 1,
+  useCharacterSheet: true,
   videoPresetId: null,
   videoMasterPrompt: '',
   videoEnvironmentOverride: '',

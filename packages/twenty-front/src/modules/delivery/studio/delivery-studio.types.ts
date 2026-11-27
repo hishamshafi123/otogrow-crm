@@ -79,6 +79,12 @@ export type StudioProviderConfigDTO = {
   kieEnabled: boolean;
   kieVerifiedAt: string | null;
   kieLastError: string | null;
+  geminiConfigured?: boolean;
+  geminiKeyLast4?: string | null;
+  geminiModelId?: string | null;
+  geminiSource?: 'STUDIO_KEY' | 'ADMIN_CONFIG' | 'ENV' | null;
+  geminiVerifiedAt?: string | null;
+  geminiLastError?: string | null;
   defaultRoutingMode: StudioRoutingMode;
   defaultImageModel: string;
   defaultVideoModel: string;

@@ -57,7 +57,8 @@ export class DeliveryStudioResolver {
 
   @Mutation(() => GraphQLJSON)
   testDeliveryStudioProviderKey(
-    @Args('provider', { type: () => String }) provider: StudioProviderId,
+    @Args('provider', { type: () => String })
+    provider: StudioProviderId | 'gemini',
     @Args('apiKey', { type: () => String, nullable: true })
     apiKey?: string | null,
   ) {

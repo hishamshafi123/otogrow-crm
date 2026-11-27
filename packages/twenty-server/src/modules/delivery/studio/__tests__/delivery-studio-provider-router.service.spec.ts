@@ -801,5 +801,26 @@ describe('AI Studio Catalog, Policy & Provider Router (Loop 1)', () => {
       expect(prompt).toContain('keep the back of the garment plain and blank');
       expect(prompt).toContain('Do not show the original garment design');
     });
+
+    it('builds a direct product-swap prompt without mentioning a Character Sheet when characterToken is null', () => {
+      const prompt = buildStructuredFallbackVideoPrompt({
+        usesAtMentionTokens: true,
+        characterToken: null,
+        productTokens: [
+          { token: '@image1', label: 'front flatlay' },
+          { token: '@image2', label: 'back graphic' },
+        ],
+        videoToken: '@video1',
+        productName: 'Belfort Heavyweight Hoodie',
+      });
+
+      expect(prompt).not.toMatch(/character sheet/i);
+      expect(prompt).toContain('@image1 is the front flatlay');
+      expect(prompt).toContain('@image2 is the back graphic');
+      expect(prompt).toContain('@video1 is the reference video');
+      expect(prompt).toContain('Keep the person, framing, and natural motion from @video1');
+      expect(prompt).toContain('Keep the exact environment, background, camera lighting, and color grade from @video1');
+      expect(prompt).not.toContain('No back print is shown');
+    });
   });
 });

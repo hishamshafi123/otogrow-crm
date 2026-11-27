@@ -1666,20 +1666,25 @@ export const DeliveryAiStudioPage = () => {
     setBanner(null);
   };
 
+  const effectiveCharSheet = activeTab.useCharacterSheet
+    ? selectedCharSheet
+    : null;
+
   const selectedVideoGarment = useMemo(() => {
-    const kitId = selectedCharSheet?.productKitId ?? selectedGarment?.id ?? null;
+    const kitId =
+      effectiveCharSheet?.productKitId ?? selectedGarment?.id ?? null;
     if (!kitId) return null;
     return garments.find((g) => g.id === kitId) ?? null;
-  }, [garments, selectedCharSheet?.productKitId, selectedGarment?.id]);
+  }, [garments, effectiveCharSheet?.productKitId, selectedGarment?.id]);
 
   const selectedVideoProductAssets = useMemo(() => {
     if (!selectedVideoGarment) return [];
-    const charMeta = (selectedCharSheet?.metadata ?? {}) as Record<
+    const charMeta = (effectiveCharSheet?.metadata ?? {}) as Record<
       string,
       unknown
     >;
     const savedIds =
-      selectedCharSheet?.productKitId === selectedVideoGarment.id &&
+      effectiveCharSheet?.productKitId === selectedVideoGarment.id &&
       Array.isArray(charMeta.productAssetIds)
         ? charMeta.productAssetIds.filter(
             (v): v is string => typeof v === 'string',
@@ -1700,7 +1705,7 @@ export const DeliveryAiStudioPage = () => {
     return selectedVideoGarment.assets;
   }, [
     selectedVideoGarment,
-    selectedCharSheet,
+    effectiveCharSheet,
     selectedGarment,
     includedAssetIdSet,
   ]);
@@ -1708,13 +1713,15 @@ export const DeliveryAiStudioPage = () => {
   const videoPromptInputKey = useMemo(
     () =>
       [
-        selectedCharSheet?.id ?? '',
+        activeTab.useCharacterSheet ? 'char' : 'direct',
+        effectiveCharSheet?.id ?? '',
         selectedVideoProductAssets.map((a) => a.id).join(','),
         selectedRefVideo?.id ?? '',
         activeTab.videoModelKey,
       ].join('|'),
     [
-      selectedCharSheet?.id,
+      activeTab.useCharacterSheet,
+      effectiveCharSheet?.id,
       selectedVideoProductAssets,
       selectedRefVideo?.id,
       activeTab.videoModelKey,
@@ -1732,10 +1739,13 @@ export const DeliveryAiStudioPage = () => {
           input: {
             companyId: activeTab.companyId,
             referenceVideoId: selectedRefVideo.id,
-            characterAssetId: selectedCharSheet?.id ?? null,
+            characterAssetId: effectiveCharSheet?.id ?? null,
             productKitId: selectedVideoGarment?.id ?? null,
             productAssetIds:
               videoProductAssetIds.length > 0 ? videoProductAssetIds : undefined,
+            environmentPresetId: !effectiveCharSheet
+              ? activeTab.selectedEnvironmentPresetId ?? null
+              : undefined,
             modelKey: activeTab.videoModelKey,
             environmentOverride:
               activeTab.videoEnvironmentOverride.trim() || undefined,
@@ -1792,10 +1802,13 @@ export const DeliveryAiStudioPage = () => {
             companyId: activeTab.companyId,
             projectId: activeTab.projectId,
             referenceVideoId: selectedRefVideo.id,
-            characterAssetId: selectedCharSheet?.id ?? null,
+            characterAssetId: effectiveCharSheet?.id ?? null,
             productKitId: selectedVideoGarment?.id ?? null,
             productAssetIds:
               videoProductAssetIds.length > 0 ? videoProductAssetIds : undefined,
+            environmentPresetId: !effectiveCharSheet
+              ? activeTab.selectedEnvironmentPresetId ?? null
+              : undefined,
             presetId: activeTab.videoPresetId ?? undefined,
             modelKeys,
             routingMode: activeTab.routingMode,
@@ -1816,7 +1829,9 @@ export const DeliveryAiStudioPage = () => {
         text:
           activeTab.autoPromptWithGemini && !activeTab.videoMasterPrompt.trim()
             ? 'Gemini analyzed your inputs & queued AI Video generation…'
-            : 'Generating AI Video in the locked environment…',
+            : effectiveCharSheet
+              ? 'Generating AI Video in the locked environment…'
+              : 'Generating AI Video directly from Product Photos + Reference Video…',
       });
       await workspaceQuery.refetch();
     } catch (err) {
@@ -2026,15 +2041,15 @@ export const DeliveryAiStudioPage = () => {
     const maxImages = model?.capabilities.maxReferenceImages ?? 9;
 
     const images: StudioApiInputImageRefDTO[] = [];
-    if (selectedCharSheet) {
+    if (effectiveCharSheet) {
       images.push({
         index: 1,
         token: `${imgPrefix}1`,
         role: 'CHARACTER_SHEET',
-        label: selectedCharSheet.title || 'Character Sheet',
-        fileName: `character-${selectedCharSheet.id}.png`,
-        mimeType: selectedCharSheet.mimeType,
-        mediaPath: selectedCharSheet.mediaPath,
+        label: effectiveCharSheet.title || 'Character Sheet',
+        fileName: `character-${effectiveCharSheet.id}.png`,
+        mimeType: effectiveCharSheet.mimeType,
+        mediaPath: effectiveCharSheet.mediaPath,
         stagedUrl: null,
       });
     }
@@ -2075,7 +2090,7 @@ export const DeliveryAiStudioPage = () => {
       videoPresets.find((p) => p.isDefault) ??
       videoPresets[0] ??
       null;
-    const charMeta = (selectedCharSheet?.metadata ?? {}) as Record<
+    const charMeta = (effectiveCharSheet?.metadata ?? {}) as Record<
       string,
       unknown
     >;
@@ -2085,15 +2100,24 @@ export const DeliveryAiStudioPage = () => {
       charMeta.environmentPrompt.trim()
         ? charMeta.environmentPrompt.trim()
         : selectedEnvironment?.masterPrompt ||
-          `the exact environment and lighting shown in the Character Sheet (${imgPrefix}1)`);
+          (effectiveCharSheet
+            ? `the exact environment and lighting shown in the Character Sheet (${imgPrefix}1)`
+            : `the exact environment and lighting shown in the reference video (${vidPrefix}1)`));
     const productName =
       selectedVideoGarment?.name ||
-      selectedCharSheet?.title ||
+      effectiveCharSheet?.title ||
       'featured garment';
+    const productRefs = images.filter((i) => i.role === 'PRODUCT');
+    const prodRefList =
+      productRefs.length > 0
+        ? productRefs.map((i) => i.token).join(' and ')
+        : `${imgPrefix}1`;
     const rawTemplate =
       activeTab.videoMasterPrompt.trim() ||
-      selectedVideoPreset?.masterPrompt ||
-      `Recreate ${vidPrefix}1 shot for shot, keeping exact camera motion, pacing, and subject actions. Replace the subject and outfit with the model from ${imgPrefix}1 wearing the exact ${productName}. Keep the scene in ${envPrompt}.`;
+      (effectiveCharSheet
+        ? selectedVideoPreset?.masterPrompt ||
+          `Recreate ${vidPrefix}1 shot for shot, keeping exact camera motion, pacing, and subject actions. Replace the subject and outfit with the model from ${imgPrefix}1 wearing the exact ${productName}. Keep the scene in ${envPrompt}.`
+        : `Recreate ${vidPrefix}1 shot for shot, keeping the same person, camera motion, pacing, and subject actions. Replace the featured garment/product in ${vidPrefix}1 with the exact ${productName} shown in ${prodRefList}. Keep the scene in ${envPrompt}.`);
     const previewBase = rawTemplate
       .replace(/\{\{\s*product_name\s*\}\}/g, productName)
       .replace(/\{\{\s*environment\s*\}\}/g, envPrompt)
@@ -2105,12 +2129,11 @@ export const DeliveryAiStudioPage = () => {
       .trim();
 
     const refParts: string[] = [];
-    if (selectedCharSheet) {
+    if (effectiveCharSheet) {
       refParts.push(
         `${imgPrefix}1 is the Character Sheet (locked model identity, outfit fit, and environment)`,
       );
     }
-    const productRefs = images.filter((i) => i.role === 'PRODUCT');
     if (productRefs.length > 0) {
       refParts.push(
         `${productRefs.map((i) => i.token).join(', ')} ${productRefs.length === 1 ? 'is the exact product photo' : 'are exact product photos'} of "${productName}" (match every front/back graphic, logo, neckline, and fabric detail)`,
@@ -2150,7 +2173,7 @@ export const DeliveryAiStudioPage = () => {
     activeTab.videoEnvironmentOverride,
     activeTab.videoCustomNotes,
     activeTab.routingMode,
-    selectedCharSheet,
+    effectiveCharSheet,
     selectedVideoProductAssets,
     selectedRefVideo,
     videoPresets,
@@ -2828,51 +2851,279 @@ export const DeliveryAiStudioPage = () => {
               <StyledBuilderStack>
                 <StyledSlotCard>
                   <StyledSlotHeader>
-                    <h4>Loaded from Character Sheet</h4>
-                    <StyledSubtleBtn
-                      type="button"
-                      onClick={() =>
-                        patchActiveTab({ stage: 'CHARACTER_SHEET' })
-                      }
-                    >
-                      Change
-                    </StyledSubtleBtn>
+                    <h4>Character Sheet (Optional)</h4>
+                    <div style={{ alignItems: 'center', display: 'flex', gap: 6 }}>
+                      <StyledTogglePill
+                        type="button"
+                        data-on={activeTab.useCharacterSheet ? 'true' : 'false'}
+                        aria-pressed={activeTab.useCharacterSheet}
+                        onClick={() =>
+                          patchActiveTab({
+                            useCharacterSheet: !activeTab.useCharacterSheet,
+                          })
+                        }
+                      >
+                        <StyledToggleDot
+                          data-on={
+                            activeTab.useCharacterSheet ? 'true' : 'false'
+                          }
+                        />
+                        {activeTab.useCharacterSheet ? 'ON' : 'Skipped'}
+                      </StyledTogglePill>
+                      {activeTab.useCharacterSheet && (
+                        <StyledSubtleBtn
+                          type="button"
+                          onClick={() =>
+                            patchActiveTab({ stage: 'CHARACTER_SHEET' })
+                          }
+                        >
+                          Change
+                        </StyledSubtleBtn>
+                      )}
+                    </div>
                   </StyledSlotHeader>
 
-                  {selectedCharSheet ? (
-                    <div
-                      style={{
-                        alignItems: 'center',
-                        display: 'flex',
-                        gap: 12,
-                      }}
-                    >
-                      <StyledPickerThumb style={{ height: 64, width: 50 }}>
-                        <img
-                          src={studioMediaUrl(selectedCharSheet.mediaPath)}
-                          alt={selectedCharSheet.title}
-                        />
-                      </StyledPickerThumb>
-                      <StyledPickerMeta>
-                        <strong>{selectedCharSheet.title}</strong>
-                        <span>
-                          {selectedVideoGarment
-                            ? `${selectedVideoGarment.name} · ${selectedVideoProductAssets.length} garment image${selectedVideoProductAssets.length === 1 ? '' : 's'}`
-                            : 'Character Sheet ready'}
-                        </span>
-                      </StyledPickerMeta>
-                    </div>
-                  ) : (
-                    <span style={{ fontSize: 12, opacity: 0.7 }}>
-                      Generate or choose a Character Sheet in Step 1 first.
-                    </span>
-                  )}
+                  {activeTab.useCharacterSheet ? (
+                    effectiveCharSheet ? (
+                      <>
+                        <div
+                          style={{
+                            alignItems: 'center',
+                            display: 'flex',
+                            gap: 12,
+                          }}
+                        >
+                          <StyledPickerThumb style={{ height: 64, width: 50 }}>
+                            <img
+                              src={studioMediaUrl(effectiveCharSheet.mediaPath)}
+                              alt={effectiveCharSheet.title}
+                            />
+                          </StyledPickerThumb>
+                          <StyledPickerMeta>
+                            <strong>{effectiveCharSheet.title}</strong>
+                            <span>
+                              {selectedVideoGarment
+                                ? `${selectedVideoGarment.name} · ${selectedVideoProductAssets.length} product photo${selectedVideoProductAssets.length === 1 ? '' : 's'}`
+                                : 'Character Sheet ready'}
+                            </span>
+                          </StyledPickerMeta>
+                        </div>
 
-                  <StyledLockedEnvPill>
-                    <span>🔒 {lockedEnvironmentName}</span>
-                    <small>Same environment</small>
-                  </StyledLockedEnvPill>
+                        <StyledLockedEnvPill>
+                          <span>🔒 {lockedEnvironmentName}</span>
+                          <small>Same environment</small>
+                        </StyledLockedEnvPill>
+                      </>
+                    ) : (
+                      <div
+                        style={{
+                          alignItems: 'center',
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          gap: 8,
+                          justifyContent: 'space-between',
+                        }}
+                      >
+                        <span style={{ fontSize: 12, opacity: 0.72 }}>
+                          No Character Sheet selected yet — pick one in Step 1, or
+                          skip and use Product Photos + Reference Video directly.
+                        </span>
+                        <StyledSubtleBtn
+                          type="button"
+                          onClick={() =>
+                            patchActiveTab({ useCharacterSheet: false })
+                          }
+                        >
+                          Skip Character Sheet →
+                        </StyledSubtleBtn>
+                      </div>
+                    )
+                  ) : (
+                    <>
+                      <StyledPromptHint>
+                        Skipped — generates directly from your{' '}
+                        <strong>Product Photos + Reference Video</strong>{' '}
+                        (keeps the person &amp; motion from your Reference
+                        Video).
+                      </StyledPromptHint>
+                      <StyledPickerTrigger
+                        type="button"
+                        onClick={() => setLibraryModal('ENVIRONMENT')}
+                      >
+                        <StyledPickerThumb>
+                          {selectedEnvironment?.thumbnailPath ? (
+                            <img
+                              src={studioMediaUrl(
+                                selectedEnvironment.thumbnailPath,
+                              )}
+                              alt={selectedEnvironment.name}
+                            />
+                          ) : (
+                            '🌄'
+                          )}
+                        </StyledPickerThumb>
+                        <StyledPickerMeta>
+                          <strong>
+                            {selectedEnvironment
+                              ? `Environment: ${selectedEnvironment.name}`
+                              : "Keep Reference Video's environment"}
+                          </strong>
+                          <span>
+                            {selectedEnvironment
+                              ? 'Overriding background setting'
+                              : 'Optional — click to pick a custom environment'}
+                          </span>
+                        </StyledPickerMeta>
+                        <StyledChangeLabel>
+                          {selectedEnvironment ? 'Change →' : 'Optional →'}
+                        </StyledChangeLabel>
+                      </StyledPickerTrigger>
+                      {selectedEnvironment && (
+                        <StyledSubtleBtn
+                          type="button"
+                          onClick={() =>
+                            patchActiveTab({
+                              selectedEnvironmentPresetId: null,
+                            })
+                          }
+                        >
+                          Reset to Reference Video environment
+                        </StyledSubtleBtn>
+                      )}
+                    </>
+                  )}
                 </StyledSlotCard>
+
+                {!effectiveCharSheet && (
+                  <StyledSlotCard>
+                    <StyledSlotHeader>
+                      <h4>Product Photos</h4>
+                      <span>
+                        {selectedVideoProductAssets.length} selected for API
+                      </span>
+                    </StyledSlotHeader>
+
+                    <StyledUrlForm onSubmit={handleFetchProductUrl}>
+                      <input
+                        type="url"
+                        value={productUrlInput}
+                        onChange={(e) => setProductUrlInput(e.target.value)}
+                        placeholder="Paste product URL to auto-import images…"
+                        disabled={importingUrl}
+                      />
+                      <button
+                        type="submit"
+                        disabled={importingUrl || !productUrlInput.trim()}
+                      >
+                        {importingUrl ? 'Fetching…' : 'Fetch'}
+                      </button>
+                    </StyledUrlForm>
+
+                    <StyledClothControls>
+                      {garments.length > 0 ? (
+                        <select
+                          value={selectedGarment?.id ?? ''}
+                          onChange={(e) => {
+                            const g = garments.find(
+                              (item) => item.id === e.target.value,
+                            );
+                            patchActiveTab({
+                              selectedProductKitId: e.target.value || null,
+                              selectedProductAssetIds:
+                                g?.assets.map((a) => a.id) ?? [],
+                            });
+                          }}
+                        >
+                          {garments.map((g) => (
+                            <option key={g.id} value={g.id}>
+                              {g.name} ({g.assets.length})
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span style={{ fontSize: 12, opacity: 0.65 }}>
+                          No product kit yet
+                        </span>
+                      )}
+
+                      <StyledUploadLabel data-disabled={uploadingPhoto}>
+                        {uploadingPhoto ? 'Uploading…' : '+ Upload'}
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp"
+                          multiple
+                          disabled={uploadingPhoto}
+                          onChange={(e) => {
+                            const list = Array.from(e.target.files ?? []);
+                            if (list.length > 0) {
+                              void handleManualPhotoUpload(list);
+                            }
+                            e.target.value = '';
+                          }}
+                        />
+                      </StyledUploadLabel>
+                    </StyledClothControls>
+
+                    {selectedGarment && selectedGarment.assets.length > 0 && (
+                      <StyledNumberedGrid>
+                        {selectedGarment.assets.map((item, idx) => {
+                          const included = includedAssetIdSet.has(item.id);
+                          return (
+                            <StyledClothThumb
+                              key={item.id}
+                              data-included={included}
+                            >
+                              <StyledImageNumBadge>
+                                Image {idx + 1}
+                              </StyledImageNumBadge>
+                              <img
+                                src={studioMediaUrl(item.imagePath)}
+                                alt={`Image ${idx + 1}`}
+                                title="Click to include/exclude this photo"
+                                onClick={() =>
+                                  handleToggleGarmentAsset(item.id)
+                                }
+                              />
+                              <StyledThumbActions>
+                                <button
+                                  type="button"
+                                  disabled={idx === 0}
+                                  title="Move left"
+                                  onClick={() =>
+                                    void handleMoveGarmentAsset(idx, -1)
+                                  }
+                                >
+                                  ←
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={
+                                    idx === selectedGarment.assets.length - 1
+                                  }
+                                  title="Move right"
+                                  onClick={() =>
+                                    void handleMoveGarmentAsset(idx, 1)
+                                  }
+                                >
+                                  →
+                                </button>
+                                <button
+                                  type="button"
+                                  title="Remove image"
+                                  onClick={() =>
+                                    void handleRemoveGarmentAsset(item.id)
+                                  }
+                                >
+                                  ×
+                                </button>
+                              </StyledThumbActions>
+                            </StyledClothThumb>
+                          );
+                        })}
+                      </StyledNumberedGrid>
+                    )}
+                  </StyledSlotCard>
+                )}
 
                 <StyledSlotCard>
                   <StyledSlotHeader>
@@ -2914,45 +3165,68 @@ export const DeliveryAiStudioPage = () => {
                 <StyledSlotCard>
                   <StyledSlotHeader>
                     <h4>Auto-Prompt (Gemini)</h4>
-                    <StyledTogglePill
-                      type="button"
-                      data-on={activeTab.autoPromptWithGemini ? 'true' : 'false'}
-                      aria-pressed={activeTab.autoPromptWithGemini}
-                      onClick={() => {
-                        const next = !activeTab.autoPromptWithGemini;
-                        if (!next && activeTab.geminiPromptMeta) {
-                          patchActiveTab({
-                            autoPromptWithGemini: false,
-                            videoMasterPrompt: '',
-                            geminiPromptMeta: null,
-                          });
-                        } else {
-                          patchActiveTab({ autoPromptWithGemini: next });
-                        }
-                      }}
-                    >
-                      <StyledToggleDot
+                    <div style={{ alignItems: 'center', display: 'flex', gap: 6 }}>
+                      {workspace?.providerConfig?.geminiConfigured ? (
+                        <span
+                          style={{
+                            color: themeCssVariables.color.green11,
+                            fontSize: 11,
+                            fontWeight: 600,
+                          }}
+                          title={`Active via ${workspace.providerConfig.geminiSource ?? 'API key'}`}
+                        >
+                          ● Gemini live
+                        </span>
+                      ) : (
+                        <StyledSubtleBtn
+                          type="button"
+                          onClick={() => setProviderModalOpen(true)}
+                          title="Add your Google Gemini API key so Analyze Images & Video uses live multimodal Gemini"
+                        >
+                          ○ Add Gemini key →
+                        </StyledSubtleBtn>
+                      )}
+                      <StyledTogglePill
+                        type="button"
                         data-on={
                           activeTab.autoPromptWithGemini ? 'true' : 'false'
                         }
-                      />
-                      {activeTab.autoPromptWithGemini ? 'ON' : 'OFF'}
-                    </StyledTogglePill>
+                        aria-pressed={activeTab.autoPromptWithGemini}
+                        onClick={() => {
+                          const next = !activeTab.autoPromptWithGemini;
+                          if (!next && activeTab.geminiPromptMeta) {
+                            patchActiveTab({
+                              autoPromptWithGemini: false,
+                              videoMasterPrompt: '',
+                              geminiPromptMeta: null,
+                            });
+                          } else {
+                            patchActiveTab({ autoPromptWithGemini: next });
+                          }
+                        }}
+                      >
+                        <StyledToggleDot
+                          data-on={
+                            activeTab.autoPromptWithGemini ? 'true' : 'false'
+                          }
+                        />
+                        {activeTab.autoPromptWithGemini ? 'ON' : 'OFF'}
+                      </StyledTogglePill>
+                    </div>
                   </StyledSlotHeader>
 
                   {activeTab.autoPromptWithGemini ? (
                     <>
                       <StyledPromptHint>
-                        Gemini watches your Character Sheet, Product Images &amp;
-                        Reference Video and writes a tailored recreation prompt
-                        with strict anti-leakage rules. Runs automatically on
-                        Generate, or preview &amp; edit first.
+                        {effectiveCharSheet
+                          ? 'Gemini watches your Reference Video + inspects your Character Sheet & Product Photos to write a tailored shot-by-shot prompt with strict anti-leakage rules.'
+                          : 'Gemini watches your Reference Video + inspects your Product Photos to write a direct product-swap prompt keeping the reference person & motion.'}
                       </StyledPromptHint>
                       {activeTab.geminiPromptMeta && (
                         <StyledPromptHint>
                           {activeTab.geminiPromptMeta.key !==
                           videoPromptInputKey
-                            ? 'Inputs changed since last analysis — click Re-analyze or Clear to regenerate.'
+                            ? 'Inputs changed since last analysis — click Re-analyze or Reset to regenerate.'
                             : activeTab.geminiPromptMeta.source === 'GEMINI'
                               ? `Prompt ready (${activeTab.geminiPromptMeta.modelId ?? 'Gemini'})`
                               : activeTab.geminiPromptMeta.summary}
@@ -3050,7 +3324,9 @@ export const DeliveryAiStudioPage = () => {
                     busyGenerate ||
                     analyzingPrompt ||
                     !selectedRefVideo ||
-                    !selectedCharSheet
+                    (!effectiveCharSheet &&
+                      selectedVideoProductAssets.length === 0 &&
+                      !activeTab.videoMasterPrompt.trim())
                   }
                   onClick={() => void handleGenerateVideo()}
                 >
@@ -3063,7 +3339,9 @@ export const DeliveryAiStudioPage = () => {
                 </StyledPrimaryCta>
                 <StyledCostCaption>{videoCostCaption}</StyledCostCaption>
 
-                {(selectedCharSheet || selectedRefVideo) && (
+                {(effectiveCharSheet ||
+                  selectedVideoProductAssets.length > 0 ||
+                  selectedRefVideo) && (
                   <DeliveryStudioApiInputInspector
                     snapshot={plannedVideoApiSnapshot}
                     buttonLabel="Inspect API Input (Preview)"
@@ -3311,7 +3589,12 @@ export const DeliveryAiStudioPage = () => {
             /* ================= STEP 3: TEXT HOOKS & DRIVE ================= */
             <DeliveryStudioHooksStage
               companyId={activeTab.companyId}
+              projectId={activeTab.projectId}
               selectedVideo={selectedVideo}
+              videos={generatedVideos}
+              onSelectVideo={(vid) =>
+                patchActiveTab({ selectedVideoAssetId: vid.id })
+              }
               hookPresets={hookPresets}
               hookDefault={workspace?.hookDefault ?? null}
               hasClientHookDefault={Boolean(workspace?.hasClientHookDefault)}

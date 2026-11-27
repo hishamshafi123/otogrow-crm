@@ -150,6 +150,81 @@ export class DeliveryStudioFilesController {
     }
   }
 
+  @Post('videos/upload')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      dest: STUDIO_UPLOAD_TMP,
+      limits: {
+        fileSize: STUDIO_MAX_VIDEO_UPLOAD_BYTES,
+        files: 1,
+        fields: 8,
+      },
+    }),
+  )
+  async uploadStudioVideo(
+    @UploadedFile() file: StudioUploadedFile | undefined,
+    @Body() body: Record<string, string | undefined>,
+  ) {
+    if (!file) {
+      throw new BadRequestException(
+        'Attach a video file (MP4, MOV, or WebM).',
+      );
+    }
+    try {
+      const detected = (await detectFileMime(file.path)) ?? file.mimetype;
+      if (!STUDIO_ALLOWED_VIDEO_MIMES.has(detected)) {
+        throw new BadRequestException(
+          `Unsupported video format "${detected}". Upload MP4, MOV, or WebM.`,
+        );
+      }
+
+      const companyId = body.companyId?.trim() || '';
+      if (!companyId) {
+        throw new BadRequestException(
+          'Select a client before uploading a video.',
+        );
+      }
+
+      const parsedClientDuration = Number(body.durationSec);
+      const parsedClientWidth = Number(body.width);
+      const parsedClientHeight = Number(body.height);
+
+      return await this.studio.uploadStudioVideoAsset(
+        getWorkspaceAuthContext(),
+        {
+          companyId,
+          projectId: body.projectId?.trim() || null,
+          title:
+            body.title?.trim() || file.originalname.replace(/\.[^.]+$/, ''),
+          tempFilePath: file.path,
+          originalFileName: file.originalname,
+          mimeType: detected,
+          sizeBytes: file.size,
+          clientDurationSec:
+            Number.isFinite(parsedClientDuration) &&
+            parsedClientDuration > 0 &&
+            parsedClientDuration <= 600
+              ? Math.round(parsedClientDuration * 100) / 100
+              : undefined,
+          clientWidth:
+            Number.isFinite(parsedClientWidth) &&
+            parsedClientWidth > 0 &&
+            parsedClientWidth <= 10000
+              ? Math.round(parsedClientWidth)
+              : undefined,
+          clientHeight:
+            Number.isFinite(parsedClientHeight) &&
+            parsedClientHeight > 0 &&
+            parsedClientHeight <= 10000
+              ? Math.round(parsedClientHeight)
+              : undefined,
+        },
+      );
+    } finally {
+      await fs.rm(file.path, { force: true }).catch(() => undefined);
+    }
+  }
+
   @Post('product-kits/:productKitId/assets/upload')
   @UseInterceptors(
     FileInterceptor('file', {

@@ -203,6 +203,7 @@ export const DeliveryStudioProviderModal = ({
   const [activeTab, setActiveTab] = useState<'keys' | 'agent'>('keys');
   const [wavespeedKey, setWavespeedKey] = useState('');
   const [kieKey, setKieKey] = useState('');
+  const [geminiKey, setGeminiKey] = useState('');
   const [wavespeedEnabled, setWavespeedEnabled] = useState(
     config.wavespeedEnabled,
   );
@@ -264,6 +265,7 @@ export const DeliveryStudioProviderModal = ({
               ? { wavespeedApiKey: wavespeedKey.trim() }
               : {}),
             ...(kieKey.trim() ? { kieApiKey: kieKey.trim() } : {}),
+            ...(geminiKey.trim() ? { geminiApiKey: geminiKey.trim() } : {}),
             wavespeedEnabled,
             kieEnabled,
             defaultRoutingMode: routingMode,
@@ -275,6 +277,7 @@ export const DeliveryStudioProviderModal = ({
       });
       setWavespeedKey('');
       setKieKey('');
+      setGeminiKey('');
       setStatusMessage(
         'Saved encrypted API keys & failover routing settings.',
       );
@@ -286,7 +289,7 @@ export const DeliveryStudioProviderModal = ({
     }
   };
 
-  const handleClearKey = async (provider: StudioProviderId) => {
+  const handleClearKey = async (provider: StudioProviderId | 'gemini') => {
     setErrorMessage('');
     setStatusMessage('');
     try {
@@ -295,11 +298,19 @@ export const DeliveryStudioProviderModal = ({
           input:
             provider === 'wavespeed'
               ? { clearWavespeedKey: true }
-              : { clearKieKey: true },
+              : provider === 'kie'
+                ? { clearKieKey: true }
+                : { clearGeminiKey: true },
         },
       });
       setStatusMessage(
-        `Removed stored ${provider === 'wavespeed' ? 'WaveSpeedAI' : 'Kie.ai'} API key.`,
+        `Removed stored ${
+          provider === 'wavespeed'
+            ? 'WaveSpeedAI'
+            : provider === 'kie'
+              ? 'Kie.ai'
+              : 'Google Gemini'
+        } API key.`,
       );
       onSaved();
     } catch (err) {
@@ -309,26 +320,30 @@ export const DeliveryStudioProviderModal = ({
     }
   };
 
-  const handleTest = async (provider: StudioProviderId) => {
+  const handleTest = async (provider: StudioProviderId | 'gemini') => {
     setErrorMessage('');
     setStatusMessage('');
     try {
       const apiKey =
         provider === 'wavespeed'
           ? wavespeedKey.trim() || null
-          : kieKey.trim() || null;
+          : provider === 'kie'
+            ? kieKey.trim() || null
+            : geminiKey.trim() || null;
       const res = await testKey({
         variables: { provider, apiKey },
       });
       const result = res.data?.testDeliveryStudioProviderKey;
+      const label =
+        provider === 'wavespeed'
+          ? 'WaveSpeedAI'
+          : provider === 'kie'
+            ? 'Kie.ai'
+            : 'Google Gemini';
       if (result?.ok) {
-        setStatusMessage(
-          `${provider === 'wavespeed' ? 'WaveSpeedAI' : 'Kie.ai'}: ${result.message}`,
-        );
+        setStatusMessage(`${label}: ${result.message}`);
       } else {
-        setErrorMessage(
-          `${provider === 'wavespeed' ? 'WaveSpeedAI' : 'Kie.ai'}: ${result?.message ?? 'Key check failed.'}`,
-        );
+        setErrorMessage(`${label}: ${result?.message ?? 'Key check failed.'}`);
       }
       onSaved();
     } catch (err) {
@@ -514,6 +529,86 @@ export const DeliveryStudioProviderModal = ({
                 {config.kieLastError && (
                   <span style={{ fontSize: 12, color: themeCssVariables.color.red11 }}>
                     Last error: {config.kieLastError}
+                  </span>
+                )}
+              </StyledCard>
+
+              <StyledCard>
+                <StyledRow>
+                  <div>
+                    <strong>Google Gemini (Auto-Prompt &amp; Video Analysis)</strong>{' '}
+                    <StyledPill tone="muted">
+                      {config.geminiModelId || 'gemini-2.5-flash'}
+                    </StyledPill>
+                  </div>
+                  <StyledPill tone={config.geminiConfigured ? 'ok' : 'warn'}>
+                    {config.geminiConfigured
+                      ? config.geminiKeyLast4
+                        ? `Configured (••••${config.geminiKeyLast4})`
+                        : config.geminiSource === 'ADMIN_CONFIG'
+                          ? 'Active via Admin Panel'
+                          : 'Active via Env'
+                      : 'Not configured'}
+                  </StyledPill>
+                </StyledRow>
+                <span
+                  style={{
+                    fontSize: 12,
+                    color: themeCssVariables.font.color.tertiary,
+                  }}
+                >
+                  Watches your full Reference Video + inspects every Product Photo
+                  &amp; Character Sheet to write a shot-by-shot video prompt.
+                </span>
+                <StyledRow>
+                  <StyledField>
+                    Google Gemini API Key
+                    <input
+                      type="password"
+                      disabled={!canManage}
+                      placeholder={
+                        config.geminiKeyLast4
+                          ? `Enter new key to replace ••••${config.geminiKeyLast4}`
+                          : 'Paste Google AI Studio key (AIza…)...'
+                      }
+                      value={geminiKey}
+                      onChange={(e) => setGeminiKey(e.target.value)}
+                    />
+                  </StyledField>
+                </StyledRow>
+                <StyledRow>
+                  <span
+                    style={{
+                      fontSize: 12,
+                      color: themeCssVariables.font.color.tertiary,
+                    }}
+                  >
+                    {config.geminiVerifiedAt
+                      ? 'Verified & ready for Analyze Images & Video'
+                      : 'Optional override (otherwise uses GOOGLE_API_KEY from Admin / .env)'}
+                  </span>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <StyledDeliveryButton
+                      type="button"
+                      disabled={testing}
+                      onClick={() => void handleTest('gemini')}
+                    >
+                      Test Connection
+                    </StyledDeliveryButton>
+                    {canManage && config.geminiKeyLast4 && (
+                      <StyledDeliveryButton
+                        type="button"
+                        disabled={saving}
+                        onClick={() => void handleClearKey('gemini')}
+                      >
+                        Clear Key
+                      </StyledDeliveryButton>
+                    )}
+                  </div>
+                </StyledRow>
+                {config.geminiLastError && (
+                  <span style={{ fontSize: 12, color: themeCssVariables.color.red11 }}>
+                    Last error: {config.geminiLastError}
                   </span>
                 )}
               </StyledCard>

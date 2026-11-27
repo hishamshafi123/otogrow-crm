@@ -27,6 +27,8 @@ export const saveProviderConfigSchema = z
     kieApiKey: z.string().trim().max(400).nullable().optional(),
     clearKieKey: z.boolean().optional(),
     kieEnabled: z.boolean().optional(),
+    geminiApiKey: z.string().trim().max(400).nullable().optional(),
+    clearGeminiKey: z.boolean().optional(),
     defaultRoutingMode: z
       .enum(['AUTO_FAILOVER', 'WAVESPEED_ONLY', 'KIE_ONLY'])
       .optional(),
