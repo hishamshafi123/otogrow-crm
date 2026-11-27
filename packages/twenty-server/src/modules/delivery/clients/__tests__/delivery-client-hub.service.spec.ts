@@ -469,5 +469,61 @@ describe('DeliveryClientHubService', () => {
         ?.finance?.fee,
     ).toBeNull();
   });
+
+  it('persists client tags via setTags, records activity, and returns tags in hub snapshot', async () => {
+    const belfortId = randomUUID();
+    const { service, auth, activityInserts } = buildService({
+      operationsState: {
+        ...newDeliveryOperations(),
+        clientRoster: {
+          includedIds: [belfortId],
+          excludedIds: [],
+        },
+      },
+      companiesById: {
+        [belfortId]: {
+          id: belfortId,
+          name: 'Belfort',
+          domainName: 'belfort.example',
+          updatedAt: '2026-04-01T00:00:00.000Z',
+          sourceToken: 'tok-belfort',
+        },
+      },
+    });
+
+    await service.updateRoster(auth, {
+      action: 'setTags',
+      companyId: belfortId,
+      tags: ['Clothing Brand'],
+    });
+
+    expect(activityInserts).toHaveLength(1);
+    expect(activityInserts[0]).toMatchObject({
+      category: 'CLIENT',
+      action: 'CLIENT_ROSTER_UPDATED',
+      changes: [
+        {
+          field: 'clientTags',
+          before: null,
+          after: 'Clothing Brand',
+        },
+      ],
+    });
+
+    const hub = await service.hub(auth);
+    const belfort = hub.clients.find((client) => client.id === belfortId);
+    expect(belfort?.tags).toEqual(['Clothing Brand']);
+
+    await service.updateRoster(auth, {
+      action: 'setTags',
+      companyId: belfortId,
+      tags: [],
+    });
+
+    const clearedHub = await service.hub(auth);
+    expect(
+      clearedHub.clients.find((client) => client.id === belfortId)?.tags,
+    ).toEqual([]);
+  });
 });
 

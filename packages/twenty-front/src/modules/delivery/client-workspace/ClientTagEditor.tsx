@@ -1,7 +1,16 @@
 import { styled } from '@linaria/react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
 import { CLIENT_TAG_PRESETS } from '@/delivery/client-workspace/client-hub.types';
+
+const isClothingTag = (tag: string): boolean => {
+  const normalized = tag.trim().toLowerCase();
+  return (
+    normalized === 'clothing brand' ||
+    normalized === 'clothing' ||
+    normalized === 'apparel'
+  );
+};
 
 const StyledTagBar = styled.div`
   align-items: center;
@@ -10,6 +19,10 @@ const StyledTagBar = styled.div`
   gap: 6px;
   margin-top: 6px;
   position: relative;
+
+  &[data-compact='true'] {
+    margin-top: 0;
+  }
 `;
 
 const StyledTagChip = styled.span`
@@ -79,7 +92,7 @@ const StyledTagPopover = styled.div`
   padding: 12px;
   position: absolute;
   top: calc(100% + 6px);
-  z-index: 40;
+  z-index: 60;
 `;
 
 const StyledPopoverTitle = styled.div`
@@ -142,29 +155,84 @@ const StyledCustomRow = styled.form`
   }
 `;
 
+const StyledTagError = styled.div`
+  color: ${themeCssVariables.color.red11};
+  font-size: 11px;
+  line-height: 1.3;
+`;
+
 type ClientTagEditorProps = {
   tags: string[];
   disabled?: boolean;
+  compact?: boolean;
   onChange: (nextTags: string[]) => Promise<boolean> | void;
 };
 
 export const ClientTagEditor = ({
   tags,
   disabled,
+  compact,
   onChange,
 }: ClientTagEditorProps) => {
   const [open, setOpen] = useState(false);
   const [customInput, setCustomInput] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [errorText, setErrorText] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handlePointerDown = (event: MouseEvent) => {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node)
+      ) {
+        setOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [open]);
+
+  const isBusy = Boolean(disabled || saving);
 
   const hasTag = (label: string) =>
     tags.some((t) => t.toLowerCase() === label.toLowerCase());
+
+  const commitTags = async (next: string[]) => {
+    setErrorText(null);
+    setSaving(true);
+    try {
+      const result = await onChange(next);
+      if (result === false) {
+        setErrorText('Could not save tags. Please try again.');
+      }
+    } catch (error) {
+      setErrorText(
+        error instanceof Error
+          ? error.message
+          : 'Could not save tags. Please try again.',
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const toggleTag = async (label: string) => {
     const exists = hasTag(label);
     const next = exists
       ? tags.filter((t) => t.toLowerCase() !== label.toLowerCase())
       : [...tags, label];
-    await onChange(next);
+    await commitTags(next);
   };
 
   const handleAddCustom = async (e: React.FormEvent) => {
@@ -172,22 +240,23 @@ export const ClientTagEditor = ({
     const cleaned = customInput.trim();
     if (!cleaned) return;
     if (!hasTag(cleaned)) {
-      await onChange([...tags, cleaned]);
+      await commitTags([...tags, cleaned]);
     }
     setCustomInput('');
   };
 
   return (
-    <StyledTagBar>
+    <StyledTagBar
+      ref={containerRef}
+      data-compact={compact ? 'true' : undefined}
+      onClick={(e) => e.stopPropagation()}
+    >
       {tags.map((tag) => (
-        <StyledTagChip
-          key={tag}
-          data-clothing={tag.toLowerCase() === 'clothing brand'}
-        >
+        <StyledTagChip key={tag} data-clothing={isClothingTag(tag)}>
           <span>{tag}</span>
           <StyledRemoveTagButton
             type="button"
-            disabled={disabled}
+            disabled={isBusy}
             aria-label={`Remove ${tag} tag`}
             onClick={() => void toggleTag(tag)}
           >
@@ -198,14 +267,17 @@ export const ClientTagEditor = ({
 
       <StyledAddTagButton
         type="button"
-        disabled={disabled}
-        onClick={() => setOpen((prev) => !prev)}
+        disabled={isBusy}
+        onClick={() => {
+          setErrorText(null);
+          setOpen((prev) => !prev);
+        }}
       >
-        + Tag
+        {saving ? 'Saving…' : '+ Tag'}
       </StyledAddTagButton>
 
       {open && (
-        <StyledTagPopover>
+        <StyledTagPopover role="dialog" aria-label="Client tags">
           <StyledPopoverTitle>
             <span>Client tags</span>
             <StyledRemoveTagButton
@@ -223,7 +295,7 @@ export const ClientTagEditor = ({
                 key={preset}
                 type="button"
                 data-active={hasTag(preset)}
-                disabled={disabled}
+                disabled={isBusy}
                 onClick={() => void toggleTag(preset)}
               >
                 {hasTag(preset) ? `✓ ${preset}` : preset}
@@ -237,15 +309,18 @@ export const ClientTagEditor = ({
               placeholder="Custom tag…"
               value={customInput}
               onChange={(e) => setCustomInput(e.target.value)}
-              disabled={disabled}
+              disabled={isBusy}
               maxLength={40}
             />
-            <button type="submit" disabled={disabled || !customInput.trim()}>
+            <button type="submit" disabled={isBusy || !customInput.trim()}>
               Add
             </button>
           </StyledCustomRow>
+
+          {errorText && <StyledTagError role="alert">{errorText}</StyledTagError>}
         </StyledTagPopover>
       )}
     </StyledTagBar>
   );
 };
+

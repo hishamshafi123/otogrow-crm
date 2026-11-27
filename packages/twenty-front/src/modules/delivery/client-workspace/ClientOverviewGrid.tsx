@@ -16,6 +16,7 @@ import {
   formatYearMonthLabel,
 } from '@/delivery/client-workspace/client-hub-format';
 import { clientWorkspaceDestination } from '@/delivery/client-workspace/client-workspace-navigation';
+import { ClientTagEditor } from '@/delivery/client-workspace/ClientTagEditor';
 import {
   StyledCleanupBanner,
   StyledClientAvatar,
@@ -64,6 +65,10 @@ type ClientOverviewGridProps = {
   onRemoveClients: (
     clients: Pick<ClientHubItem, 'id' | 'name'>[],
   ) => Promise<boolean>;
+  onUpdateClientTags?: (
+    companyId: string,
+    nextTags: string[],
+  ) => Promise<boolean>;
 };
 
 export const ClientOverviewGrid = ({
@@ -71,6 +76,7 @@ export const ClientOverviewGrid = ({
   updatingRoster,
   onOpenPicker,
   onRemoveClients,
+  onUpdateClientTags,
 }: ClientOverviewGridProps) => {
   const { t } = useLingui();
   const [filter, setFilter] = useState<PortfolioFilter>('all');
@@ -100,6 +106,9 @@ export const ClientOverviewGrid = ({
       return (
         client.name.toLocaleLowerCase().includes(normalized) ||
         (client.domainName ?? '').toLocaleLowerCase().includes(normalized) ||
+        (client.tags ?? []).some((tag) =>
+          tag.toLocaleLowerCase().includes(normalized),
+        ) ||
         client.services.some((service) =>
           service.toLocaleLowerCase().includes(normalized),
         )
@@ -672,25 +681,43 @@ export const ClientOverviewGrid = ({
                   </StyledNextDeliverable>
                 )}
 
-                {((client.tags?.length ?? 0) > 0 ||
+                {!cleanupMode && onUpdateClientTags && (
+                  <ClientTagEditor
+                    compact
+                    tags={client.tags ?? []}
+                    disabled={updatingRoster}
+                    onChange={(nextTags) =>
+                      onUpdateClientTags(client.id, nextTags)
+                    }
+                  />
+                )}
+
+                {((cleanupMode || !onUpdateClientTags) &&
+                (client.tags?.length ?? 0) > 0 ||
                   client.services.length > 0 ||
                   client.tasksSummary.blockedCount > 0 ||
                   client.portal.pendingSubmissionsCount > 0 ||
                   (client.finance?.overdueReceivablesCount ?? 0) > 0 ||
                   Boolean(client.finance?.currentMonthMrr)) && (
                   <StyledClientTagRow>
-                    {(client.tags ?? []).map((tag) => (
-                      <StyledClientTag
-                        key={`tag-${tag}`}
-                        data-tone={
-                          tag.toLowerCase() === 'clothing brand'
-                            ? 'iris'
-                            : undefined
-                        }
-                      >
-                        {tag}
-                      </StyledClientTag>
-                    ))}
+                    {(cleanupMode || !onUpdateClientTags) &&
+                      (client.tags ?? []).map((tag) => {
+                        const normalizedTag = tag.trim().toLowerCase();
+                        return (
+                          <StyledClientTag
+                            key={`tag-${tag}`}
+                            data-tone={
+                              normalizedTag === 'clothing brand' ||
+                              normalizedTag === 'clothing' ||
+                              normalizedTag === 'apparel'
+                                ? 'iris'
+                                : undefined
+                            }
+                          >
+                            {tag}
+                          </StyledClientTag>
+                        );
+                      })}
                     {client.services.slice(0, 3).map((service) => (
                       <StyledClientTag key={service}>{service}</StyledClientTag>
                     ))}

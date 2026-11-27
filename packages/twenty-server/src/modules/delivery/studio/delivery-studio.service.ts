@@ -825,9 +825,14 @@ export class DeliveryStudioService {
     const clients = designatedCompanies
       .map((c) => {
         const tags = normalizeClientTags(clientTagsMap[c.id]);
-        const isClothingBrand = tags.some(
-          (t) => t.toLowerCase() === 'clothing brand',
-        );
+        const isClothingBrand = tags.some((t) => {
+          const normalized = t.trim().toLowerCase();
+          return (
+            normalized === 'clothing brand' ||
+            normalized === 'clothing' ||
+            normalized === 'apparel'
+          );
+        });
         return {
           id: c.id,
           name: c.name,

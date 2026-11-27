@@ -2,7 +2,7 @@ import { useMutation, useQuery } from '@apollo/client/react';
 import { styled } from '@linaria/react';
 import { useStore } from 'jotai';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
 import { DeliveryOperationalPage } from '@/delivery/operations-pages/DeliveryOperationalPage';
 import {
@@ -714,6 +714,161 @@ const StyledBatchRowCard = styled.div`
   }
 `;
 
+const StyledClientPicker = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin: 12px auto 0;
+  max-width: 780px;
+  width: 100%;
+`;
+
+const StyledClientPickerHeader = styled.div`
+  align-items: flex-end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  justify-content: space-between;
+
+  h2 {
+    color: ${themeCssVariables.font.color.primary};
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0;
+  }
+
+  p {
+    color: ${themeCssVariables.font.color.secondary};
+    font-size: 13px;
+    margin: 4px 0 0;
+  }
+
+  a {
+    color: ${themeCssVariables.color.blue};
+    font-size: 12px;
+    font-weight: 500;
+    text-decoration: none;
+  }
+
+  a:hover {
+    text-decoration: underline;
+  }
+`;
+
+const StyledClientPickerSearch = styled.input`
+  background: ${themeCssVariables.background.secondary};
+  border: 1px solid ${themeCssVariables.border.color.medium};
+  border-radius: 10px;
+  color: ${themeCssVariables.font.color.primary};
+  font-size: 13px;
+  padding: 9px 12px;
+  width: 100%;
+`;
+
+const StyledClientPickerGrid = styled.div`
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+`;
+
+const StyledClientPickerCard = styled.button`
+  align-items: flex-start;
+  background: ${themeCssVariables.background.secondary};
+  border: 1px solid ${themeCssVariables.border.color.medium};
+  border-radius: 12px;
+  color: ${themeCssVariables.font.color.primary};
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  text-align: left;
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    transform 140ms ease;
+
+  &:hover {
+    background: ${themeCssVariables.background.primary};
+    border-color: ${themeCssVariables.color.blue};
+    transform: translateY(-1px);
+  }
+`;
+
+const StyledClientPickerCardTop = styled.div`
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  width: 100%;
+`;
+
+const StyledClientPickerAvatar = styled.div`
+  align-items: center;
+  background: ${themeCssVariables.background.tertiary};
+  border: 1px solid ${themeCssVariables.border.color.medium};
+  border-radius: 9px;
+  color: ${themeCssVariables.font.color.primary};
+  display: flex;
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 700;
+  height: 34px;
+  justify-content: center;
+  width: 34px;
+`;
+
+const StyledClientPickerName = styled.div`
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+
+  strong {
+    font-size: 13px;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  small {
+    color: ${themeCssVariables.font.color.tertiary};
+    font-size: 11px;
+  }
+`;
+
+const StyledClientPickerTags = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+`;
+
+const StyledClientPickerTag = styled.span`
+  background: ${themeCssVariables.background.tertiary};
+  border: 1px solid ${themeCssVariables.border.color.light};
+  border-radius: 999px;
+  color: ${themeCssVariables.font.color.secondary};
+  font-size: 10px;
+  font-weight: 500;
+  padding: 2px 8px;
+
+  &[data-clothing='true'] {
+    background: ${themeCssVariables.color.transparent.blue2};
+    border-color: ${themeCssVariables.color.blue5};
+    color: ${themeCssVariables.color.blue};
+  }
+`;
+
+const isClothingTagLabel = (tag: string): boolean => {
+  const normalized = tag.trim().toLowerCase();
+  return (
+    normalized === 'clothing brand' ||
+    normalized === 'clothing' ||
+    normalized === 'apparel'
+  );
+};
+
 const initials = (name: string) =>
   name
     .split(/\s+/)
@@ -727,6 +882,8 @@ export const DeliveryAiStudioPage = () => {
   const [tabsState, setTabsState] = useState<StudioTabsState>(() =>
     loadStudioTabsState(),
   );
+  const [pickerTabIds, setPickerTabIds] = useState<Set<string>>(() => new Set());
+  const [clientPickerSearch, setClientPickerSearch] = useState('');
 
   // Overlays & modals
   const [libraryModal, setLibraryModal] = useState<StudioLibraryMode | null>(
@@ -800,21 +957,45 @@ export const DeliveryAiStudioPage = () => {
 
   const workspace = workspaceQuery.data?.deliveryStudioWorkspace;
 
-  // Auto-select first Delivery Client if current tab has none (or if saved tab pointed to a removed client)
+  // Keep active tab synced with Delivery Clients roster without overriding new client-picker tabs
   useEffect(() => {
     if (!workspace) return;
     if (workspace.clients.length === 0) return;
+
+    if (!activeTab.companyId) {
+      // Only auto-pick the first client on initial cold boot (single tab not opened via "+")
+      if (tabsState.tabs.length === 1 && !pickerTabIds.has(activeTab.id)) {
+        const first = workspace.clients[0];
+        patchActiveTab({
+          companyId: first.id,
+          projectId: null,
+          label: first.name,
+        });
+      }
+      return;
+    }
+
     const validClient = workspace.clients.find(
       (c) => c.id === activeTab.companyId,
     );
     if (!validClient) {
-      const first = workspace.clients[0];
-      patchActiveTab({
-        companyId: first.id,
-        projectId: null,
-        label: first.name,
+      // Saved tab pointed to a client removed from Clients section -> let user pick cleanly
+      setPickerTabIds((prev) => {
+        if (prev.has(activeTab.id)) return prev;
+        const next = new Set(prev);
+        next.add(activeTab.id);
+        return next;
       });
-    } else if (activeTab.label === 'New Studio Tab' || activeTab.label === 'Client Studio') {
+      patchActiveTab({
+        companyId: null,
+        projectId: null,
+        label: 'New Tab',
+      });
+    } else if (
+      activeTab.label === 'New Studio Tab' ||
+      activeTab.label === 'Client Studio' ||
+      activeTab.label === 'New Tab'
+    ) {
       patchActiveTab({
         label: formatStudioTabLabel(
           workspace.clients,
@@ -823,7 +1004,16 @@ export const DeliveryAiStudioPage = () => {
         ),
       });
     }
-  }, [workspace, activeTab.companyId, activeTab.projectId, activeTab.label, patchActiveTab]);
+  }, [
+    workspace,
+    activeTab.id,
+    activeTab.companyId,
+    activeTab.projectId,
+    activeTab.label,
+    tabsState.tabs.length,
+    pickerTabIds,
+    patchActiveTab,
+  ]);
 
   // Poll automatically when any job is active
   const activeJobs = useMemo(
@@ -871,10 +1061,15 @@ export const DeliveryAiStudioPage = () => {
   );
 
   // Derived data
-  const clients = workspace?.clients ?? [];
+  const clients = useMemo(
+    () => workspace?.clients ?? [],
+    [workspace?.clients],
+  );
   const selectedClient = clients.find((c) => c.id === activeTab.companyId);
   const isClothingBrandClient = Boolean(
-    workspace?.selectedClientIsClothingBrand ?? selectedClient?.isClothingBrand,
+    activeTab.companyId &&
+      (selectedClient?.isClothingBrand ??
+        workspace?.selectedClientIsClothingBrand),
   );
   const effectiveLayout: 'CLOTHING' | 'GENERAL' =
     activeTab.layoutModeOverride === 'AUTO'
@@ -882,6 +1077,26 @@ export const DeliveryAiStudioPage = () => {
         ? 'CLOTHING'
         : 'GENERAL'
       : activeTab.layoutModeOverride;
+
+  const openClientIds = useMemo(
+    () =>
+      new Set(
+        tabsState.tabs
+          .filter((tab) => tab.id !== activeTab.id && Boolean(tab.companyId))
+          .map((tab) => tab.companyId as string),
+      ),
+    [tabsState.tabs, activeTab.id],
+  );
+
+  const filteredPickerClients = useMemo(() => {
+    const q = clientPickerSearch.trim().toLowerCase();
+    if (!q) return clients;
+    return clients.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        (c.tags ?? []).some((tag) => tag.toLowerCase().includes(q)),
+    );
+  }, [clients, clientPickerSearch]);
 
   const presets = useMemo(() => workspace?.presets ?? [], [workspace?.presets]);
   const avatarPresets = useMemo(
@@ -1002,7 +1217,15 @@ export const DeliveryAiStudioPage = () => {
 
   // Handlers
   const handleSelectClient = (companyId: string) => {
+    if (!companyId) return;
     const client = clients.find((c) => c.id === companyId);
+    setPickerTabIds((prev) => {
+      if (!prev.has(activeTab.id)) return prev;
+      const next = new Set(prev);
+      next.delete(activeTab.id);
+      return next;
+    });
+    setClientPickerSearch('');
     patchActiveTab({
       companyId,
       projectId: null,
@@ -1392,6 +1615,12 @@ export const DeliveryAiStudioPage = () => {
                     aria-label="Close tab"
                     onClick={(e) => {
                       e.stopPropagation();
+                      setPickerTabIds((prev) => {
+                        if (!prev.has(tab.id)) return prev;
+                        const next = new Set(prev);
+                        next.delete(tab.id);
+                        return next;
+                      });
                       setTabsState((prev) => closeStudioTab(prev, tab.id));
                     }}
                   >
@@ -1404,7 +1633,13 @@ export const DeliveryAiStudioPage = () => {
               type="button"
               title="Open another client tab"
               onClick={() => {
-                const next = createEmptyStudioTab();
+                const next = createEmptyStudioTab({ label: 'New Tab' });
+                setPickerTabIds((prev) => {
+                  const updated = new Set(prev);
+                  updated.add(next.id);
+                  return updated;
+                });
+                setClientPickerSearch('');
                 setTabsState((prev) => ({
                   activeTabId: next.id,
                   tabs: [...prev.tabs, next],
@@ -1424,11 +1659,18 @@ export const DeliveryAiStudioPage = () => {
               {clients.length === 0 ? (
                 <option value="">No Delivery Clients yet</option>
               ) : (
-                clients.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))
+                <>
+                  {!activeTab.companyId && (
+                    <option value="" disabled>
+                      Select a client…
+                    </option>
+                  )}
+                  {clients.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </>
               )}
             </StyledClientSelect>
 
@@ -1456,19 +1698,21 @@ export const DeliveryAiStudioPage = () => {
         </StyledTopBar>
 
         {/* Clean 3-step Stepper */}
-        <StyledStepperBar>
-          {stepItems.map((step) => (
-            <StyledStepButton
-              key={step.key}
-              type="button"
-              data-active={activeTab.stage === step.key}
-              onClick={() => patchActiveTab({ stage: step.key })}
-            >
-              <StyledStepNum>{step.num}</StyledStepNum>
-              {step.label}
-            </StyledStepButton>
-          ))}
-        </StyledStepperBar>
+        {activeTab.companyId && (
+          <StyledStepperBar>
+            {stepItems.map((step) => (
+              <StyledStepButton
+                key={step.key}
+                type="button"
+                data-active={activeTab.stage === step.key}
+                onClick={() => patchActiveTab({ stage: step.key })}
+              >
+                <StyledStepNum>{step.num}</StyledStepNum>
+                {step.label}
+              </StyledStepButton>
+            ))}
+          </StyledStepperBar>
+        )}
 
         {/* Main Canvas */}
         <StyledCanvas>
@@ -1481,10 +1725,90 @@ export const DeliveryAiStudioPage = () => {
           )}
 
           {!activeTab.companyId ? (
-            <StyledEmptyState>
-              Add a client in the Delivery Clients section to start creating
-              Character Sheets and AI Videos.
-            </StyledEmptyState>
+            clients.length === 0 ? (
+              <StyledEmptyState>
+                {workspaceQuery.loading ? (
+                  'Loading your clients…'
+                ) : (
+                  <>
+                    Add a client in the{' '}
+                    <Link to="/delivery?view=clients">Clients section</Link> to
+                    start creating Character Sheets and AI Videos.
+                  </>
+                )}
+              </StyledEmptyState>
+            ) : (
+              <StyledClientPicker>
+                <StyledClientPickerHeader>
+                  <div>
+                    <h2>Select a client for this tab</h2>
+                    <p>
+                      Choose any active client from your Clients section to open
+                      their AI Studio workspace.
+                    </p>
+                  </div>
+                  <Link to="/delivery?view=clients">Manage clients →</Link>
+                </StyledClientPickerHeader>
+
+                {clients.length > 4 && (
+                  <StyledClientPickerSearch
+                    type="search"
+                    placeholder="Search clients or tags (e.g. Belfort, Clothing Brand)…"
+                    value={clientPickerSearch}
+                    onChange={(e) => setClientPickerSearch(e.target.value)}
+                    autoFocus
+                  />
+                )}
+
+                {filteredPickerClients.length === 0 ? (
+                  <StyledEmptyState>
+                    No clients match “{clientPickerSearch}”.
+                  </StyledEmptyState>
+                ) : (
+                  <StyledClientPickerGrid>
+                    {filteredPickerClients.map((client) => {
+                      const tags = client.tags ?? [];
+                      const isAlreadyOpen = openClientIds.has(client.id);
+                      return (
+                        <StyledClientPickerCard
+                          key={client.id}
+                          type="button"
+                          onClick={() => handleSelectClient(client.id)}
+                        >
+                          <StyledClientPickerCardTop>
+                            <StyledClientPickerAvatar>
+                              {initials(client.name) || 'C'}
+                            </StyledClientPickerAvatar>
+                            <StyledClientPickerName>
+                              <strong>{client.name}</strong>
+                              <small>
+                                {client.projects.length === 1
+                                  ? '1 project'
+                                  : `${client.projects.length} projects`}
+                                {isAlreadyOpen ? ' · Open in another tab' : ''}
+                              </small>
+                            </StyledClientPickerName>
+                          </StyledClientPickerCardTop>
+
+                          {tags.length > 0 && (
+                            <StyledClientPickerTags>
+                              {tags.map((tag) => (
+                                <StyledClientPickerTag
+                                  key={tag}
+                                  data-clothing={isClothingTagLabel(tag)}
+                                >
+                                  {tag}
+                                </StyledClientPickerTag>
+                              ))}
+                            </StyledClientPickerTags>
+                          )}
+                        </StyledClientPickerCard>
+                      );
+                    })}
+                  </StyledClientPickerGrid>
+                )}
+              </StyledClientPicker>
+            )
           ) : activeTab.stage === 'CHARACTER_SHEET' ? (
             /* ================= STEP 1: CHARACTER SHEET ================= */
             <StyledTwoCol>

@@ -430,8 +430,9 @@ export const StyledClientCard = styled.article`
   flex-direction: column;
   gap: 14px;
   min-width: 0;
-  overflow: hidden;
+  overflow: visible;
   padding: 18px 20px;
+  position: relative;
   transition:
     background-color 160ms ease,
     border-color 160ms ease,
@@ -444,6 +445,10 @@ export const StyledClientCard = styled.article`
       inset 0 1px 0 ${themeCssVariables.color.transparent.gray2},
       0 18px 34px -20px ${themeCssVariables.boxShadow.color};
     transform: translateY(-2px);
+  }
+
+  &:focus-within {
+    z-index: 10;
   }
 
   &[data-attention='true'] {

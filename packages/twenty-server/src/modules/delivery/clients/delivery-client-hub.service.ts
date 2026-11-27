@@ -453,7 +453,10 @@ export class DeliveryClientHubService {
         } else {
           delete tagMap[command.companyId];
         }
-        record.state.clientTags = tagMap;
+        record.state = {
+          ...record.state,
+          clientTags: tagMap,
+        };
       } else {
         next = applyClientRosterUpdate(before, command);
         record.state.clientRoster = next;

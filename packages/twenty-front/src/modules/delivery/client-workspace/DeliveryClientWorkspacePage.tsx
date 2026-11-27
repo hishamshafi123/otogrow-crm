@@ -304,6 +304,13 @@ const ClientWorkspaceDirectory = () => {
                     setPickerOpen(true);
                   }}
                   onRemoveClients={handleRemoveClients}
+                  onUpdateClientTags={(companyId, nextTags) =>
+                    hub.updateRoster({
+                      action: 'setTags',
+                      companyId,
+                      tags: nextTags,
+                    })
+                  }
                 />
               )}
             </>
