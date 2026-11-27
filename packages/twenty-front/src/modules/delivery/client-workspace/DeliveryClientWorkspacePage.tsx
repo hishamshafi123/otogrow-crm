@@ -16,6 +16,7 @@ import { ClientOverviewGrid } from '@/delivery/client-workspace/ClientOverviewGr
 import { ClientSelectedOverview } from '@/delivery/client-workspace/ClientSelectedOverview';
 import { ClientPortalSection } from '@/delivery/client-workspace/ClientPortalSection';
 import { ClientRosterPickerModal } from '@/delivery/client-workspace/ClientRosterPickerModal';
+import { ClientTagEditor } from '@/delivery/client-workspace/ClientTagEditor';
 import { type ClientHubItem } from '@/delivery/client-workspace/client-hub.types';
 import {
   clientInitials,
@@ -394,6 +395,19 @@ const ClientWorkspaceDirectory = () => {
                           }`
                         : t`Client workspace`}
                     </p>
+                    {selectedHubClient && (
+                      <ClientTagEditor
+                        tags={selectedHubClient.tags ?? []}
+                        disabled={hub.updating}
+                        onChange={(nextTags) =>
+                          hub.updateRoster({
+                            action: 'setTags',
+                            companyId: company.id,
+                            tags: nextTags,
+                          })
+                        }
+                      />
+                    )}
                   </StyledClientHeroMeta>
                 </StyledClientHeroIdentity>
 

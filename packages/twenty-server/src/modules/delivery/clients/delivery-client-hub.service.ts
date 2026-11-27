@@ -28,6 +28,7 @@ import {
   applyClientRosterUpdate,
   buildClientHubSnapshot,
   normalizeClientRoster,
+  normalizeClientTags,
   parseClientRosterUpdate,
   resolveEffectiveClientCompanyIds,
   type ClientHubFinanceV2InvoiceSource,
@@ -96,6 +97,7 @@ export class DeliveryClientHubService {
         const businessRecords = operations?.state.business?.records ?? [];
         const roster = normalizeClientRoster(operations?.state.clientRoster);
         const clientFees = operations?.state.clientFees ?? {};
+        const clientTags = operations?.state.clientTags ?? {};
 
         const effectiveClientIds = resolveEffectiveClientCompanyIds(
           roster,
@@ -227,6 +229,7 @@ export class DeliveryClientHubService {
           companies: designatedCompanies,
           roster,
           clientFees,
+          clientTags,
           projects: projects.map((project) => ({
             id: project.id,
             name: project.name,
@@ -382,7 +385,7 @@ export class DeliveryClientHubService {
         ? command.companyIds
         : command.action === 'set'
           ? command.addIds
-          : command.action === 'setFee'
+          : command.action === 'setFee' || command.action === 'setTags'
             ? [command.companyId]
             : [];
     if (idsToVerify.length) {
@@ -418,6 +421,10 @@ export class DeliveryClientHubService {
       const previousFeeLabel = previousFee
         ? `${previousFee.currency} ${previousFee.amount / 100} (${previousFee.cadence})`
         : null;
+      const previousTags =
+        command.action === 'setTags'
+          ? normalizeClientTags(record.state.clientTags?.[command.companyId])
+          : [];
 
       if (command.action === 'setFee' || command.action === 'clearFee') {
         if (!canManageFinance(actor)) {
@@ -438,6 +445,15 @@ export class DeliveryClientHubService {
           delete fees[command.companyId];
         }
         record.state.clientFees = fees;
+      } else if (command.action === 'setTags') {
+        const nextTags = normalizeClientTags(command.tags);
+        const tagMap = { ...(record.state.clientTags ?? {}) };
+        if (nextTags.length > 0) {
+          tagMap[command.companyId] = nextTags;
+        } else {
+          delete tagMap[command.companyId];
+        }
+        record.state.clientTags = tagMap;
       } else {
         next = applyClientRosterUpdate(before, command);
         record.state.clientRoster = next;
@@ -490,6 +506,25 @@ export class DeliveryClientHubService {
                     after: null,
                   },
                 ],
+        });
+      } else if (command.action === 'setTags') {
+        const nextTags = normalizeClientTags(command.tags);
+        await recordOtogrowActivity(manager, {
+          workspaceId: workspace.id,
+          actorId: identity.memberId,
+          category: 'CLIENT',
+          action: 'CLIENT_ROSTER_UPDATED',
+          outcome: 'RECORDED',
+          summary: 'Updated client tags.',
+          sourceType: 'settings',
+          sourceId: command.companyId,
+          changes: [
+            {
+              field: 'clientTags',
+              before: previousTags.join(', ') || null,
+              after: nextTags.join(', ') || null,
+            },
+          ],
         });
       } else {
         await recordOtogrowActivity(manager, {

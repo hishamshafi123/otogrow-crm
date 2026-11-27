@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from '@apollo/client/react';
 import { styled } from '@linaria/react';
 import { useStore } from 'jotai';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
 import { DeliveryOperationalPage } from '@/delivery/operations-pages/DeliveryOperationalPage';
@@ -10,23 +10,30 @@ import {
   GENERATE_DELIVERY_STUDIO_CHARACTER_SHEET,
   GENERATE_DELIVERY_STUDIO_VIDEO,
   GET_DELIVERY_STUDIO_WORKSPACE,
+  IMPORT_DELIVERY_STUDIO_PRODUCT_FROM_URL,
   REMOVE_DELIVERY_STUDIO_PRODUCT_KIT_ASSET,
   SET_DELIVERY_STUDIO_ASSET_APPROVED,
+  UPDATE_DELIVERY_STUDIO_PRODUCT_ASSETS,
   UPSERT_DELIVERY_STUDIO_PRODUCT_KIT,
 } from '@/delivery/studio/delivery-studio.graphql';
 import {
   estimateModelCostUsd,
   formatUsdEstimate,
-  type StudioPresetKind,
-  type StudioRoutingMode,
+  type StudioAssetDTO,
+  type StudioProductKitDTO,
   type StudioStageKey,
   type StudioWorkspacePayload,
   studioMediaUrl,
 } from '@/delivery/studio/delivery-studio.types';
 import { DeliveryStudioHooksStage } from '@/delivery/studio/DeliveryStudioHooksStage';
+import {
+  DeliveryStudioLibraryModal,
+  type StudioLibraryMode,
+} from '@/delivery/studio/DeliveryStudioLibraryModal';
 import { DeliveryStudioPresetModal } from '@/delivery/studio/DeliveryStudioPresetModal';
 import { DeliveryStudioProviderModal } from '@/delivery/studio/DeliveryStudioProviderModal';
 import { DeliveryStudioQueueDock } from '@/delivery/studio/DeliveryStudioQueueDock';
+import { DeliveryStudioSettingsDrawer } from '@/delivery/studio/DeliveryStudioSettingsDrawer';
 import {
   closeStudioTab,
   createEmptyStudioTab,
@@ -38,294 +45,685 @@ import {
   type StudioTabsState,
 } from '@/delivery/studio/studio-tabs-storage';
 import { uploadStudioMultipart } from '@/delivery/studio/studio-upload';
-import { StyledDeliveryButton } from '@/delivery/deliveryStyles';
 
 const StyledShell = styled.div`
   background: ${themeCssVariables.background.primary};
-  border: 1px solid ${themeCssVariables.border.color.medium};
-  border-radius: ${themeCssVariables.border.radius.md};
+  border: 1px solid ${themeCssVariables.border.color.light};
+  border-radius: 14px;
   display: flex;
   flex-direction: column;
-  min-height: calc(100vh - 150px);
+  min-height: calc(100vh - 148px);
   overflow: hidden;
 `;
 
-const StyledTabStrip = styled.div`
+const StyledTopBar = styled.div`
   align-items: center;
   background: ${themeCssVariables.background.secondary};
-  border-bottom: 1px solid ${themeCssVariables.border.color.medium};
-  display: flex;
-  gap: 6px;
-  justify-content: space-between;
-  padding: 8px 12px;
-`;
-
-const StyledTabList = styled.div`
-  align-items: center;
-  display: flex;
-  flex: 1;
-  gap: 6px;
-  overflow-x: auto;
-`;
-
-const StyledTabPill = styled.div<{ active: boolean }>`
-  align-items: center;
-  background: ${({ active }) =>
-    active ? themeCssVariables.background.primary : 'transparent'};
-  border: 1px solid
-    ${({ active }) =>
-      active
-        ? themeCssVariables.border.color.strong
-        : themeCssVariables.border.color.light};
-  border-radius: ${themeCssVariables.border.radius.sm};
-  color: ${({ active }) =>
-    active
-      ? themeCssVariables.font.color.primary
-      : themeCssVariables.font.color.secondary};
-  cursor: pointer;
-  display: inline-flex;
-  font-size: 12px;
-  font-weight: ${({ active }) => (active ? 600 : 500)};
-  gap: 8px;
-  padding: 6px 10px;
-  white-space: nowrap;
-
-  button {
-    background: transparent;
-    border: none;
-    color: inherit;
-    cursor: pointer;
-    font-size: 13px;
-    line-height: 1;
-    opacity: 0.6;
-    padding: 0 2px;
-  }
-
-  button:hover {
-    opacity: 1;
-  }
-`;
-
-const StyledStageBar = styled.div`
-  align-items: center;
-  background: ${themeCssVariables.background.primary};
   border-bottom: 1px solid ${themeCssVariables.border.color.light};
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 10px;
   justify-content: space-between;
+  padding: 8px 14px;
+`;
+
+const StyledTabsRow = styled.div`
+  align-items: center;
+  display: flex;
+  flex: 1;
+  gap: 6px;
+  min-width: 0;
+  overflow-x: auto;
+`;
+
+const StyledTabPill = styled.div`
+  align-items: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: ${themeCssVariables.font.color.secondary};
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 500;
+  gap: 6px;
+  max-width: 210px;
+  padding: 5px 10px;
+  white-space: nowrap;
+
+  &[data-active='true'] {
+    background: ${themeCssVariables.background.primary};
+    border-color: ${themeCssVariables.border.color.medium};
+    color: ${themeCssVariables.font.color.primary};
+    font-weight: 600;
+  }
+
+  span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+`;
+
+const StyledTabClose = styled.button`
+  background: transparent;
+  border: none;
+  color: ${themeCssVariables.font.color.tertiary};
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 0 2px;
+
+  &:hover {
+    color: ${themeCssVariables.font.color.primary};
+  }
+`;
+
+const StyledIconButton = styled.button`
+  align-items: center;
+  background: ${themeCssVariables.background.primary};
+  border: 1px solid ${themeCssVariables.border.color.medium};
+  border-radius: 8px;
+  color: ${themeCssVariables.font.color.primary};
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 500;
+  gap: 5px;
+  height: 30px;
+  justify-content: center;
+  padding: 0 10px;
+
+  &:hover {
+    border-color: ${themeCssVariables.font.color.primary};
+  }
+
+  &[data-pulse='true'] {
+    border-color: ${themeCssVariables.color.blue};
+    color: ${themeCssVariables.color.blue};
+  }
+`;
+
+const StyledTopRight = styled.div`
+  align-items: center;
+  display: flex;
+  gap: 8px;
+`;
+
+const StyledClientSelect = styled.select`
+  background: ${themeCssVariables.background.primary};
+  border: 1px solid ${themeCssVariables.border.color.medium};
+  border-radius: 8px;
+  color: ${themeCssVariables.font.color.primary};
+  font-size: 12px;
+  font-weight: 500;
+  height: 30px;
+  max-width: 220px;
+  padding: 0 10px;
+`;
+
+const StyledClothingBadge = styled.span`
+  background: ${themeCssVariables.color.transparent.blue2};
+  border: 1px solid ${themeCssVariables.color.blue5};
+  border-radius: 999px;
+  color: ${themeCssVariables.color.blue};
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  white-space: nowrap;
+`;
+
+const StyledStepperBar = styled.div`
+  align-items: center;
+  border-bottom: 1px solid ${themeCssVariables.border.color.light};
+  display: flex;
+  gap: 6px;
+  justify-content: center;
   padding: 10px 16px;
 `;
 
-const StyledStepBtn = styled.button<{ active: boolean }>`
-  background: ${({ active }) =>
-    active
-      ? themeCssVariables.color.iris9
-      : themeCssVariables.background.secondary};
-  border: 1px solid
-    ${({ active }) =>
-      active
-        ? themeCssVariables.color.iris9
-        : themeCssVariables.border.color.medium};
+const StyledStepButton = styled.button`
+  align-items: center;
+  background: transparent;
+  border: 1px solid transparent;
   border-radius: 999px;
-  color: ${({ active }) =>
-    active
-      ? themeCssVariables.font.color.inverted
-      : themeCssVariables.font.color.primary};
+  color: ${themeCssVariables.font.color.secondary};
   cursor: pointer;
-  font-size: 12px;
-  font-weight: 600;
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 500;
+  gap: 7px;
   padding: 6px 14px;
-`;
+  transition: background 120ms ease, color 120ms ease;
 
-const StyledWorkspaceGrid = styled.div<{ showInspector: boolean }>`
-  display: grid;
-  flex: 1;
-  grid-template-columns: ${({ showInspector }) =>
-    showInspector ? '270px 1fr 290px' : '270px 1fr'};
-  min-height: 540px;
-
-  @media (max-width: 1240px) {
-    grid-template-columns: 240px 1fr;
+  &:hover {
+    color: ${themeCssVariables.font.color.primary};
   }
 
-  @media (max-width: 900px) {
+  &[data-active='true'] {
+    background: ${themeCssVariables.font.color.primary};
+    color: ${themeCssVariables.font.color.inverted};
+    font-weight: 600;
+  }
+`;
+
+const StyledStepNum = styled.span`
+  font-size: 11px;
+  opacity: 0.75;
+`;
+
+const StyledCanvas = styled.div`
+  flex: 1;
+  margin: 0 auto;
+  max-width: 1240px;
+  padding: 22px 24px 32px;
+  width: 100%;
+`;
+
+const StyledTwoCol = styled.div`
+  align-items: start;
+  display: grid;
+  gap: 24px;
+  grid-template-columns: minmax(340px, 430px) minmax(0, 1fr);
+
+  @media (max-width: 980px) {
     grid-template-columns: 1fr;
   }
 `;
 
-const StyledLeftRail = styled.aside`
-  background: ${themeCssVariables.background.secondary};
-  border-right: 1px solid ${themeCssVariables.border.color.light};
+const StyledBuilderStack = styled.div`
   display: flex;
   flex-direction: column;
   gap: 14px;
-  overflow-y: auto;
-  padding: 14px;
 `;
 
-const StyledCenterStage = styled.main`
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  overflow-y: auto;
-  padding: 16px;
-`;
-
-const StyledRightInspector = styled.aside`
+const StyledSlotCard = styled.div`
   background: ${themeCssVariables.background.secondary};
-  border-left: 1px solid ${themeCssVariables.border.color.light};
+  border: 1px solid ${themeCssVariables.border.color.light};
+  border-radius: 12px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  overflow-y: auto;
+  gap: 10px;
   padding: 14px;
 `;
 
-const StyledSectionCard = styled.div`
+const StyledSlotHeader = styled.div`
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+
+  h4 {
+    color: ${themeCssVariables.font.color.primary};
+    font-size: 13px;
+    font-weight: 600;
+    margin: 0;
+  }
+
+  span {
+    color: ${themeCssVariables.font.color.tertiary};
+    font-size: 11px;
+  }
+`;
+
+const StyledUrlForm = styled.form`
+  display: flex;
+  gap: 6px;
+
+  input {
+    background: ${themeCssVariables.background.primary};
+    border: 1px solid ${themeCssVariables.border.color.medium};
+    border-radius: 8px;
+    color: ${themeCssVariables.font.color.primary};
+    flex: 1;
+    font-size: 12px;
+    min-width: 0;
+    padding: 8px 10px;
+  }
+
+  button {
+    background: ${themeCssVariables.font.color.primary};
+    border: none;
+    border-radius: 8px;
+    color: ${themeCssVariables.font.color.inverted};
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 0 13px;
+    white-space: nowrap;
+
+    &:disabled {
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
+  }
+`;
+
+const StyledClothControls = styled.div`
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+
+  select {
+    background: ${themeCssVariables.background.primary};
+    border: 1px solid ${themeCssVariables.border.color.medium};
+    border-radius: 7px;
+    color: ${themeCssVariables.font.color.primary};
+    flex: 1;
+    font-size: 12px;
+    min-width: 0;
+    padding: 6px 8px;
+  }
+`;
+
+const StyledSubtleBtn = styled.button`
   background: ${themeCssVariables.background.primary};
   border: 1px solid ${themeCssVariables.border.color.medium};
-  border-radius: ${themeCssVariables.border.radius.md};
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 12px;
-`;
-
-const StyledField = styled.label`
-  color: ${themeCssVariables.font.color.secondary};
-  display: flex;
-  flex-direction: column;
+  border-radius: 7px;
+  color: ${themeCssVariables.font.color.primary};
+  cursor: pointer;
   font-size: 12px;
   font-weight: 500;
-  gap: 4px;
+  padding: 6px 10px;
+  white-space: nowrap;
 
-  input,
-  select,
-  textarea {
-    background: ${themeCssVariables.background.secondary};
-    border: 1px solid ${themeCssVariables.border.color.medium};
-    border-radius: ${themeCssVariables.border.radius.sm};
-    color: ${themeCssVariables.font.color.primary};
-    font-family: inherit;
-    font-size: 13px;
-    padding: 7px 9px;
+  &:hover:not(:disabled) {
+    border-color: ${themeCssVariables.font.color.primary};
   }
 
-  textarea {
-    min-height: 82px;
-    resize: vertical;
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
   }
 `;
 
-const StyledMediaGrid = styled.div`
+const StyledNumberedGrid = styled.div`
   display: grid;
-  gap: 10px;
-  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
 `;
 
-const StyledAssetTile = styled.div<{ selected?: boolean }>`
-  background: ${themeCssVariables.background.secondary};
-  border: 2px solid
-    ${({ selected }) =>
-      selected
-        ? themeCssVariables.color.blue
-        : themeCssVariables.border.color.light};
-  border-radius: ${themeCssVariables.border.radius.sm};
-  cursor: pointer;
+const StyledClothThumb = styled.div`
+  background: ${themeCssVariables.background.primary};
+  border: 1.5px solid ${themeCssVariables.border.color.light};
+  border-radius: 9px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
   overflow: hidden;
-  padding: 8px;
+  position: relative;
 
-  img,
-  video {
-    aspect-ratio: 3 / 4;
-    background: ${themeCssVariables.background.invertedPrimary};
-    border-radius: 6px;
+  &[data-included='true'] {
+    border-color: ${themeCssVariables.color.blue};
+  }
+
+  &[data-included='false'] {
+    opacity: 0.45;
+  }
+
+  img {
+    aspect-ratio: 1 / 1;
+    cursor: pointer;
+    display: block;
     object-fit: cover;
     width: 100%;
   }
 `;
 
-const StyledChip = styled.button<{ active?: boolean }>`
-  background: ${({ active }) =>
-    active
-      ? themeCssVariables.color.transparent.iris3
-      : themeCssVariables.background.tertiary};
-  border: 1px solid
-    ${({ active }) =>
-      active
-        ? themeCssVariables.color.blue
-        : themeCssVariables.border.color.medium};
-  border-radius: 999px;
-  color: ${({ active }) =>
-    active
-      ? themeCssVariables.color.iris11
-      : themeCssVariables.font.color.secondary};
+const StyledImageNumBadge = styled.span`
+  background: ${themeCssVariables.background.transparent.strong};
+  border-radius: 5px;
+  color: ${themeCssVariables.font.color.inverted};
+  font-size: 10px;
+  font-weight: 600;
+  left: 5px;
+  padding: 2px 6px;
+  position: absolute;
+  top: 5px;
+`;
+
+const StyledThumbActions = styled.div`
+  align-items: center;
+  background: ${themeCssVariables.background.secondary};
+  border-top: 1px solid ${themeCssVariables.border.color.light};
+  display: flex;
+  justify-content: space-between;
+  padding: 3px 4px;
+
+  button {
+    background: transparent;
+    border: none;
+    color: ${themeCssVariables.font.color.secondary};
+    cursor: pointer;
+    font-size: 11px;
+    padding: 1px 4px;
+
+    &:hover:not(:disabled) {
+      color: ${themeCssVariables.font.color.primary};
+    }
+
+    &:disabled {
+      opacity: 0.3;
+    }
+  }
+`;
+
+const StyledPickerTrigger = styled.button`
+  align-items: center;
+  background: ${themeCssVariables.background.primary};
+  border: 1px solid ${themeCssVariables.border.color.medium};
+  border-radius: 10px;
+  color: inherit;
   cursor: pointer;
+  display: flex;
+  gap: 12px;
+  padding: 10px;
+  text-align: left;
+  transition: border-color 120ms ease;
+  width: 100%;
+
+  &:hover {
+    border-color: ${themeCssVariables.font.color.primary};
+  }
+`;
+
+const StyledPickerThumb = styled.div`
+  align-items: center;
+  background: ${themeCssVariables.background.tertiary};
+  border-radius: 8px;
+  color: ${themeCssVariables.font.color.secondary};
+  display: flex;
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 600;
+  height: 46px;
+  justify-content: center;
+  overflow: hidden;
+  width: 46px;
+
+  img,
+  video {
+    height: 100%;
+    object-fit: cover;
+    width: 100%;
+  }
+`;
+
+const StyledPickerMeta = styled.div`
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+
+  strong {
+    color: ${themeCssVariables.font.color.primary};
+    font-size: 13px;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  span {
+    color: ${themeCssVariables.font.color.secondary};
+    font-size: 11px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+`;
+
+const StyledChangeLabel = styled.span`
+  color: ${themeCssVariables.font.color.tertiary};
   font-size: 11px;
   font-weight: 500;
-  padding: 4px 9px;
 `;
 
-const StyledStatusDot = styled.span<{ ok: boolean }>`
-  background: ${({ ok }) =>
-    ok ? themeCssVariables.color.green9 : themeCssVariables.color.amber9};
+const StyledPrimaryCta = styled.button`
+  align-items: center;
+  background: ${themeCssVariables.font.color.primary};
+  border: none;
+  border-radius: 10px;
+  color: ${themeCssVariables.font.color.inverted};
+  cursor: pointer;
+  display: flex;
+  font-size: 13px;
+  font-weight: 600;
+  gap: 8px;
+  justify-content: center;
+  padding: 12px 18px;
+  width: 100%;
+
+  &:hover:not(:disabled) {
+    opacity: 0.92;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+`;
+
+const StyledGalleryColumn = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+`;
+
+const StyledGalleryHeader = styled.div`
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+
+  h3 {
+    color: ${themeCssVariables.font.color.primary};
+    font-size: 14px;
+    font-weight: 600;
+    margin: 0;
+  }
+
+  span {
+    color: ${themeCssVariables.font.color.tertiary};
+    font-size: 12px;
+  }
+`;
+
+const StyledAssetGrid = styled.div`
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+`;
+
+const StyledAssetCard = styled.div`
+  background: ${themeCssVariables.background.secondary};
+  border: 1.5px solid ${themeCssVariables.border.color.light};
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+
+  &[data-selected='true'] {
+    border-color: ${themeCssVariables.color.blue};
+  }
+`;
+
+const StyledAssetMedia = styled.div`
+  aspect-ratio: 3 / 4;
+  background: ${themeCssVariables.background.tertiary};
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+
+  &[data-video='true'] {
+    aspect-ratio: 9 / 16;
+  }
+
+  img,
+  video {
+    display: block;
+    height: 100%;
+    object-fit: cover;
+    width: 100%;
+  }
+`;
+
+const StyledAssetFooter = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+
+  strong {
+    color: ${themeCssVariables.font.color.primary};
+    font-size: 12px;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+`;
+
+const StyledMetaChips = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+`;
+
+const StyledMiniChip = styled.span`
+  background: ${themeCssVariables.background.primary};
+  border: 1px solid ${themeCssVariables.border.color.light};
   border-radius: 999px;
-  display: inline-block;
-  height: 8px;
-  width: 8px;
+  color: ${themeCssVariables.font.color.secondary};
+  font-size: 10px;
+  padding: 2px 7px;
 `;
 
-const ANGLE_SHORTCUTS: { label: string; angles: string[] }[] = [
-  { label: 'Single Hero', angles: ['Front Full-Body'] },
-  { label: '2-Angle', angles: ['Front Full-Body', 'Back Full-Body'] },
-  {
-    label: '4-Angle',
-    angles: [
-      'Front Full-Body',
-      'Back Full-Body',
-      'Left 3/4 Profile',
-      'Garment Detail Close-Up',
-    ],
-  },
-];
+const StyledLockedEnvPill = styled.div`
+  align-items: center;
+  background: ${themeCssVariables.background.primary};
+  border: 1px solid ${themeCssVariables.border.color.medium};
+  border-radius: 8px;
+  color: ${themeCssVariables.font.color.primary};
+  display: flex;
+  font-size: 12px;
+  gap: 8px;
+  justify-content: space-between;
+  padding: 8px 10px;
+
+  small {
+    color: ${themeCssVariables.font.color.tertiary};
+    font-size: 11px;
+  }
+`;
+
+const StyledProgressCard = styled.div`
+  background: ${themeCssVariables.background.secondary};
+  border: 1px solid ${themeCssVariables.border.color.medium};
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+`;
+
+const StyledProgressTrack = styled.div`
+  background: ${themeCssVariables.background.tertiary};
+  border-radius: 999px;
+  height: 5px;
+  overflow: hidden;
+  width: 100%;
+`;
+
+const StyledProgressFill = styled.div`
+  background: ${themeCssVariables.color.blue};
+  height: 100%;
+  transition: width 240ms ease;
+`;
+
+const StyledEmptyState = styled.div`
+  background: ${themeCssVariables.background.secondary};
+  border: 1px dashed ${themeCssVariables.border.color.medium};
+  border-radius: 12px;
+  color: ${themeCssVariables.font.color.secondary};
+  font-size: 13px;
+  padding: 44px 20px;
+  text-align: center;
+`;
+
+const StyledMessage = styled.div`
+  border-radius: 8px;
+  font-size: 12px;
+  padding: 9px 12px;
+
+  &[data-tone='error'] {
+    background: ${themeCssVariables.color.transparent.red2};
+    color: ${themeCssVariables.color.red};
+  }
+
+  &[data-tone='info'] {
+    background: ${themeCssVariables.color.transparent.blue2};
+    color: ${themeCssVariables.color.blue};
+  }
+`;
+
+const StyledBatchRowCard = styled.div`
+  align-items: center;
+  background: ${themeCssVariables.background.primary};
+  border: 1px solid ${themeCssVariables.border.color.light};
+  border-radius: 9px;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1.2fr 1fr 1fr auto;
+  padding: 10px;
+
+  select,
+  input {
+    background: ${themeCssVariables.background.secondary};
+    border: 1px solid ${themeCssVariables.border.color.medium};
+    border-radius: 6px;
+    color: ${themeCssVariables.font.color.primary};
+    font-size: 12px;
+    padding: 6px 8px;
+  }
+`;
+
+const initials = (name: string) =>
+  name
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? '')
+    .join('');
 
 export const DeliveryAiStudioPage = () => {
-  return (
-    <DeliveryOperationalPage view="studio">
-      <DeliveryAiStudioInner />
-    </DeliveryOperationalPage>
-  );
-};
-
-const DeliveryAiStudioInner = () => {
   const store = useStore();
   const [searchParams, setSearchParams] = useSearchParams();
-
   const [tabsState, setTabsState] = useState<StudioTabsState>(() =>
     loadStudioTabsState(),
   );
+
+  // Overlays & modals
+  const [libraryModal, setLibraryModal] = useState<StudioLibraryMode | null>(
+    null,
+  );
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [providerModalOpen, setProviderModalOpen] = useState(false);
-  const [presetModalKind, setPresetModalKind] =
-    useState<StudioPresetKind | null>(null);
-  const [newAngleText, setNewAngleText] = useState('');
-  const [newKitName, setNewKitName] = useState('');
-  const [newKitNotes, setNewKitNotes] = useState('');
-  const [uploadKitId, setUploadKitId] = useState<string | null>(null);
-  const [uploadKitRole, setUploadKitRole] = useState('FRONT');
-  const [uploadPercent, setUploadPercent] = useState<number | null>(null);
-  const [toast, setToast] = useState<{
-    tone: 'ok' | 'err';
+  const [presetModalOpen, setPresetModalOpen] = useState(false);
+  const [queueOpen, setQueueOpen] = useState(false);
+
+  // Product URL import & manual upload state
+  const [productUrlInput, setProductUrlInput] = useState('');
+  const [importingUrl, setImportingUrl] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
+  const [busyGenerate, setBusyGenerate] = useState(false);
+  const [banner, setBanner] = useState<{
+    tone: 'error' | 'info';
     text: string;
   } | null>(null);
 
-  // oxlint-disable-next-line twenty/no-state-useref -- Hidden native file input element trigger.
-  const refVideoInputRef = useRef<HTMLInputElement | null>(null);
-  // oxlint-disable-next-line twenty/no-state-useref -- Hidden native file input element trigger.
-  const productImgInputRef = useRef<HTMLInputElement | null>(null);
+  useEffect(() => {
+    saveStudioTabsState(tabsState);
+  }, [tabsState]);
 
   const activeTab = useMemo(
     () =>
@@ -334,31 +732,33 @@ const DeliveryAiStudioInner = () => {
     [tabsState],
   );
 
-  // Persist tab bar across reloads
-  useEffect(() => {
-    saveStudioTabsState(tabsState);
-  }, [tabsState]);
+  const patchActiveTab = useCallback((patch: Partial<StudioTabDraft>) => {
+    setTabsState((prev) => ({
+      ...prev,
+      tabs: prev.tabs.map((t) =>
+        t.id === prev.activeTabId ? { ...t, ...patch } : t,
+      ),
+    }));
+  }, []);
 
-  // Handle deep links (?view=studio&companyId=...&projectId=...&stage=...)
+  // Deep-link support (?companyId=...&projectId=...)
   useEffect(() => {
-    const deepCompanyId = searchParams.get('companyId');
-    const deepProjectId = searchParams.get('projectId');
+    const deepCompany = searchParams.get('companyId');
+    const deepProject = searchParams.get('projectId');
     const deepStage = searchParams.get('stage') as StudioStageKey | null;
-    if (!deepCompanyId) return;
-
+    if (!deepCompany) return;
     setTabsState((prev) =>
       focusOrCreateClientTab(prev, {
-        companyId: deepCompanyId,
-        projectId: deepProjectId,
-        ...(deepStage ? { stage: deepStage } : {}),
+        companyId: deepCompany,
+        projectId: deepProject,
+        stage: deepStage ?? undefined,
       }),
     );
-
-    const cleaned = new URLSearchParams(searchParams);
-    cleaned.delete('companyId');
-    cleaned.delete('projectId');
-    cleaned.delete('stage');
-    setSearchParams(cleaned, { replace: true });
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('companyId');
+    nextParams.delete('projectId');
+    nextParams.delete('stage');
+    setSearchParams(nextParams, { replace: true });
   }, [searchParams, setSearchParams]);
 
   const workspaceQuery = useQuery<{
@@ -368,324 +768,440 @@ const DeliveryAiStudioInner = () => {
       companyId: activeTab.companyId,
       projectId: activeTab.projectId,
     },
-    fetchPolicy: 'network-only',
+    fetchPolicy: 'cache-and-network',
   });
 
-  const ws = workspaceQuery.data?.deliveryStudioWorkspace;
-  const hasRunningJobs = Boolean(
-    ws?.jobs?.some((j) =>
-      ['QUEUED', 'STAGING', 'PROCESSING', 'DOWNLOADING'].includes(j.status),
-    ),
-  );
+  const workspace = workspaceQuery.data?.deliveryStudioWorkspace;
 
+  // Auto-select first Delivery Client if current tab has none (or if saved tab pointed to a removed client)
   useEffect(() => {
-    if (!hasRunningJobs) return;
+    if (!workspace) return;
+    if (workspace.clients.length === 0) return;
+    const validClient = workspace.clients.find(
+      (c) => c.id === activeTab.companyId,
+    );
+    if (!validClient) {
+      const first = workspace.clients[0];
+      patchActiveTab({
+        companyId: first.id,
+        projectId: null,
+        label: first.name,
+      });
+    } else if (activeTab.label === 'New Studio Tab' || activeTab.label === 'Client Studio') {
+      patchActiveTab({
+        label: formatStudioTabLabel(
+          workspace.clients,
+          activeTab.companyId,
+          activeTab.projectId,
+        ),
+      });
+    }
+  }, [workspace, activeTab.companyId, activeTab.projectId, activeTab.label, patchActiveTab]);
+
+  // Poll automatically when any job is active
+  const activeJobs = useMemo(
+    () =>
+      (workspace?.jobs ?? []).filter((j) =>
+        ['QUEUED', 'STAGING', 'PROCESSING', 'DOWNLOADING'].includes(j.status),
+      ),
+    [workspace?.jobs],
+  );
+  useEffect(() => {
+    if (activeJobs.length === 0) return;
     const timer = window.setInterval(() => {
       void workspaceQuery.refetch();
     }, 3500);
     return () => window.clearInterval(timer);
-  }, [hasRunningJobs, workspaceQuery]);
+  }, [activeJobs.length, workspaceQuery]);
 
-  // Sync friendly tab labels once client/project list arrives
-  useEffect(() => {
-    if (!ws?.clients?.length) return;
-    setTabsState((prev) => {
-      let changed = false;
-      const nextTabs = prev.tabs.map((tab) => {
-        if (!tab.companyId) return tab;
-        const computed = formatStudioTabLabel(
-          ws.clients,
-          tab.companyId,
-          tab.projectId,
-        );
-        if (computed !== tab.label) {
-          changed = true;
-          return { ...tab, label: computed };
-        }
-        return tab;
-      });
-      return changed ? { ...prev, tabs: nextTabs } : prev;
-    });
-  }, [ws?.clients]);
+  // Mutations
+  const [importFromUrlMutation] = useMutation<{
+    importDeliveryStudioProductFromUrl: {
+      productKit: StudioProductKitDTO;
+      importedCount: number;
+    };
+  }>(IMPORT_DELIVERY_STUDIO_PRODUCT_FROM_URL);
 
-  const updateActiveTab = useCallback(
-    (patch: Partial<StudioTabDraft>) => {
-      setTabsState((prev) => ({
-        ...prev,
-        tabs: prev.tabs.map((tab) =>
-          tab.id === prev.activeTabId ? { ...tab, ...patch } : tab,
-        ),
-      }));
-    },
-    [],
+  const [upsertProductMutation] = useMutation<{
+    upsertDeliveryStudioProductKit: StudioProductKitDTO;
+  }>(UPSERT_DELIVERY_STUDIO_PRODUCT_KIT);
+
+  const [updateProductAssetsMutation] = useMutation(
+    UPDATE_DELIVERY_STUDIO_PRODUCT_ASSETS,
   );
-
-  const [upsertProductKit, { loading: creatingKit }] = useMutation(
-    UPSERT_DELIVERY_STUDIO_PRODUCT_KIT,
-  );
-  const [removeKitAsset] = useMutation(
+  const [removeProductAssetMutation] = useMutation(
     REMOVE_DELIVERY_STUDIO_PRODUCT_KIT_ASSET,
   );
-  const [generateCharSheet, { loading: queueingChar }] = useMutation(
+  const [generateCharSheetMutation] = useMutation(
     GENERATE_DELIVERY_STUDIO_CHARACTER_SHEET,
   );
-  const [generateVideo, { loading: queueingVideo }] = useMutation(
-    GENERATE_DELIVERY_STUDIO_VIDEO,
-  );
-  const [batchGenerateVideos, { loading: queueingBatch }] = useMutation(
+  const [generateVideoMutation] = useMutation(GENERATE_DELIVERY_STUDIO_VIDEO);
+  const [batchVideosMutation] = useMutation(
     BATCH_GENERATE_DELIVERY_STUDIO_VIDEOS,
   );
-  const [setAssetApproved] = useMutation(SET_DELIVERY_STUDIO_ASSET_APPROVED);
-
-  const notify = (tone: 'ok' | 'err', text: string) => {
-    setToast({ tone, text });
-    window.setTimeout(() => setToast(null), 5000);
-  };
-
-  const clients = ws?.clients ?? [];
-  const activeClient = clients.find((c) => c.id === activeTab.companyId);
-  const catalog = ws?.catalog ?? [];
-  const imageModels = catalog.filter((m) => m.kind === 'IMAGE');
-  const videoModels = catalog.filter((m) => m.kind === 'VIDEO');
-  const presets = ws?.presets ?? [];
-  const charPresets = presets.filter((p) => p.kind === 'CHARACTER_SHEET');
-  const videoPresets = presets.filter((p) => p.kind === 'VIDEO_GENERATION');
-  const hookPresets = presets.filter((p) => p.kind === 'TEXT_HOOK');
-  const productKits = ws?.productKits ?? [];
-  const refVideos = ws?.referenceVideos ?? [];
-  const characterSheets = ws?.characterSheets ?? [];
-  const generatedVideos = ws?.generatedVideos ?? [];
-
-  const keysHealthy = Boolean(
-    ws?.providerConfig.wavespeedConfigured || ws?.providerConfig.kieConfigured,
+  const [approveAssetMutation] = useMutation(
+    SET_DELIVERY_STUDIO_ASSET_APPROVED,
   );
 
-  const selectedImageModel = imageModels.find(
-    (m) => m.key === activeTab.imageModelKey,
+  // Derived data
+  const clients = workspace?.clients ?? [];
+  const selectedClient = clients.find((c) => c.id === activeTab.companyId);
+  const isClothingBrandClient = Boolean(
+    workspace?.selectedClientIsClothingBrand ?? selectedClient?.isClothingBrand,
   );
-  const selectedVideoModel = videoModels.find(
-    (m) => m.key === activeTab.videoModelKey,
+  const effectiveLayout: 'CLOTHING' | 'GENERAL' =
+    activeTab.layoutModeOverride === 'AUTO'
+      ? isClothingBrandClient
+        ? 'CLOTHING'
+        : 'CLOTHING'
+      : activeTab.layoutModeOverride;
+
+  const presets = useMemo(() => workspace?.presets ?? [], [workspace?.presets]);
+  const avatarPresets = useMemo(
+    () => presets.filter((p) => p.kind === 'CASTING_PERSONA'),
+    [presets],
   );
-  const compareVideoModel = videoModels.find(
-    (m) => m.key === activeTab.compareModelKey,
+  const environmentPresets = useMemo(
+    () => presets.filter((p) => p.kind === 'ENVIRONMENT'),
+    [presets],
+  );
+  const characterPresets = useMemo(
+    () => presets.filter((p) => p.kind === 'CHARACTER_SHEET'),
+    [presets],
+  );
+  const videoPresets = useMemo(
+    () => presets.filter((p) => p.kind === 'VIDEO_GENERATION'),
+    [presets],
+  );
+  const hookPresets = useMemo(
+    () => presets.filter((p) => p.kind === 'TEXT_HOOK'),
+    [presets],
   );
 
-  const stageCostEstimateUsd = useMemo(() => {
-    if (activeTab.stage === 'CHARACTER_SHEET') {
-      const count =
-        activeTab.characterAngleLayout === 'SEPARATE_FRAMES'
-          ? Math.max(1, activeTab.characterAngles.length)
-          : Math.max(1, activeTab.imageCandidateCount);
-      return estimateModelCostUsd(selectedImageModel, {
-        resolution: activeTab.imageResolution,
-        count,
-      });
+  const imageModels = useMemo(
+    () => (workspace?.catalog ?? []).filter((m) => m.kind === 'IMAGE'),
+    [workspace?.catalog],
+  );
+  const videoModels = useMemo(
+    () => (workspace?.catalog ?? []).filter((m) => m.kind === 'VIDEO'),
+    [workspace?.catalog],
+  );
+
+  const garments = useMemo(
+    () => workspace?.productKits ?? [],
+    [workspace?.productKits],
+  );
+  const selectedGarment = useMemo(
+    () =>
+      garments.find((g) => g.id === activeTab.selectedProductKitId) ??
+      garments[0] ??
+      null,
+    [garments, activeTab.selectedProductKitId],
+  );
+
+  // Keep included image IDs synced when switching garments
+  const includedAssetIdSet = useMemo(() => {
+    if (!selectedGarment) return new Set<string>();
+    const validIds = selectedGarment.assets.map((a) => a.id);
+    if (activeTab.selectedProductAssetIds.length === 0) {
+      return new Set(validIds);
     }
-    if (activeTab.stage === 'VIDEO_GENERATION') {
-      const primary = estimateModelCostUsd(selectedVideoModel, {
-        resolution: activeTab.videoResolution,
-        durationSec: activeTab.videoDurationSec,
-      });
-      const secondary = activeTab.compareMode
-        ? estimateModelCostUsd(compareVideoModel, {
-            resolution: activeTab.videoResolution,
-            durationSec: activeTab.videoDurationSec,
-          })
-        : 0;
-      return primary + secondary;
-    }
-    if (activeTab.stage === 'BATCH_MATRIX') {
-      return estimateModelCostUsd(selectedVideoModel, {
-        resolution: activeTab.videoResolution,
-        durationSec: activeTab.videoDurationSec,
-        count: Math.max(1, activeTab.batchRows.length),
-      });
-    }
-    return 0;
-  }, [activeTab, selectedImageModel, selectedVideoModel, compareVideoModel]);
+    const intersection = activeTab.selectedProductAssetIds.filter((id) =>
+      validIds.includes(id),
+    );
+    return new Set(intersection.length > 0 ? intersection : validIds);
+  }, [selectedGarment, activeTab.selectedProductAssetIds]);
 
+  const selectedAvatar = useMemo(
+    () =>
+      avatarPresets.find((p) => p.id === activeTab.selectedAvatarPresetId) ??
+      null,
+    [avatarPresets, activeTab.selectedAvatarPresetId],
+  );
+
+  const selectedEnvironment = useMemo(
+    () =>
+      environmentPresets.find(
+        (p) => p.id === activeTab.selectedEnvironmentPresetId,
+      ) ?? null,
+    [environmentPresets, activeTab.selectedEnvironmentPresetId],
+  );
+
+  const referenceVideos = useMemo(
+    () => workspace?.referenceVideos ?? [],
+    [workspace?.referenceVideos],
+  );
+  const selectedRefVideo = useMemo(
+    () =>
+      referenceVideos.find((v) => v.id === activeTab.selectedReferenceVideoId) ??
+      null,
+    [referenceVideos, activeTab.selectedReferenceVideoId],
+  );
+
+  const characterSheets = useMemo(
+    () => workspace?.characterSheets ?? [],
+    [workspace?.characterSheets],
+  );
+  const selectedCharSheet = useMemo(
+    () =>
+      characterSheets.find((c) => c.id === activeTab.selectedCharacterAssetId) ??
+      characterSheets[0] ??
+      null,
+    [characterSheets, activeTab.selectedCharacterAssetId],
+  );
+
+  const generatedVideos = useMemo(
+    () => workspace?.generatedVideos ?? [],
+    [workspace?.generatedVideos],
+  );
+  const selectedVideo = useMemo(
+    () =>
+      generatedVideos.find((v) => v.id === activeTab.selectedVideoAssetId) ??
+      generatedVideos.find((v) => v.approved) ??
+      generatedVideos[0] ??
+      null,
+    [generatedVideos, activeTab.selectedVideoAssetId],
+  );
+
+  // Environment inherited from the selected Character Sheet for Step 2
+  const lockedEnvironmentName = useMemo(() => {
+    const meta = selectedCharSheet?.metadata ?? {};
+    if (typeof meta.environmentName === 'string' && meta.environmentName) {
+      return meta.environmentName;
+    }
+    if (selectedEnvironment) return selectedEnvironment.name;
+    return 'Matches Character Sheet';
+  }, [selectedCharSheet, selectedEnvironment]);
+
+  // Handlers
   const handleSelectClient = (companyId: string) => {
-    const cleanCompany = companyId || null;
-    const client = clients.find((c) => c.id === cleanCompany);
-    const defaultProject = client?.projects[0]?.id ?? null;
-    updateActiveTab({
-      companyId: cleanCompany,
-      projectId: defaultProject,
-      label: formatStudioTabLabel(clients, cleanCompany, defaultProject),
+    const client = clients.find((c) => c.id === companyId);
+    patchActiveTab({
+      companyId,
+      projectId: null,
+      label: client?.name ?? 'Client Studio',
       selectedProductKitId: null,
+      selectedProductAssetIds: [],
       selectedCharacterAssetId: null,
       selectedVideoAssetId: null,
     });
+    setBanner(null);
   };
 
-  const handleSelectProject = (projectId: string) => {
-    const cleanProject = projectId || null;
-    updateActiveTab({
-      projectId: cleanProject,
-      label: formatStudioTabLabel(clients, activeTab.companyId, cleanProject),
-    });
-  };
-
-  const handleCreateProductKit = async () => {
-    if (!activeTab.companyId) {
-      notify('err', 'Select a client in this tab first.');
-      return;
-    }
-    if (!newKitName.trim()) return;
+  const handleFetchProductUrl = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeTab.companyId || !productUrlInput.trim()) return;
+    setBanner(null);
+    setImportingUrl(true);
     try {
-      const res = await upsertProductKit({
+      const res = await importFromUrlMutation({
         variables: {
           input: {
             companyId: activeTab.companyId,
             projectId: activeTab.projectId,
-            name: newKitName.trim(),
-            notes: newKitNotes.trim(),
+            url: productUrlInput.trim(),
+            maxImages: 8,
           },
         },
       });
-      const created = (res.data as { upsertDeliveryStudioProductKit?: { id: string } })
-        ?.upsertDeliveryStudioProductKit;
-      setNewKitName('');
-      setNewKitNotes('');
-      if (created?.id) {
-        updateActiveTab({ selectedProductKitId: created.id });
+      const imported = res.data?.importDeliveryStudioProductFromUrl;
+      if (imported?.productKit) {
+        patchActiveTab({
+          selectedProductKitId: imported.productKit.id,
+          selectedProductAssetIds: imported.productKit.assets.map((a) => a.id),
+        });
+        setProductUrlInput('');
+        setBanner({
+          tone: 'info',
+          text: `Imported ${imported.importedCount} numbered product image${imported.importedCount === 1 ? '' : 's'} from link.`,
+        });
+        await workspaceQuery.refetch();
+      }
+    } catch (err) {
+      setBanner({
+        tone: 'error',
+        text:
+          err instanceof Error
+            ? err.message
+            : 'Could not extract images from that link. Try uploading photos directly.',
+      });
+    } finally {
+      setImportingUrl(false);
+    }
+  };
+
+  const handleManualPhotoUpload = async (file: File) => {
+    if (!activeTab.companyId) return;
+    setBanner(null);
+    setUploadingPhoto(true);
+    try {
+      let targetKitId: string | undefined = selectedGarment?.id;
+      if (!targetKitId) {
+        const created = await upsertProductMutation({
+          variables: {
+            input: {
+              companyId: activeTab.companyId,
+              projectId: activeTab.projectId,
+              name: file.name.replace(/\.[^.]+$/, '') || 'Garment',
+            },
+          },
+        });
+        targetKitId = created.data?.upsertDeliveryStudioProductKit?.id;
+      }
+      if (!targetKitId) throw new Error('Could not prepare garment folder.');
+      const nextIndex = (selectedGarment?.assets.length ?? 0) + 1;
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('role', nextIndex === 1 ? 'FRONT' : 'DETAIL');
+      formData.append('label', `Image ${nextIndex}`);
+      const updated = await uploadStudioMultipart<StudioProductKitDTO>({
+        store,
+        endpointPath: `/portal/delivery-studio/product-kits/${targetKitId}/assets/upload`,
+        formData,
+      });
+      if (updated?.id) {
+        patchActiveTab({
+          selectedProductKitId: updated.id,
+          selectedProductAssetIds: updated.assets.map((a) => a.id),
+        });
       }
       await workspaceQuery.refetch();
-      notify('ok', 'Product kit created. Upload garment/product photos next!');
     } catch (err) {
-      notify(
-        'err',
-        err instanceof Error ? err.message : 'Could not create product kit.',
-      );
-    }
-  };
-
-  const handleUploadRefVideo = async (file: File) => {
-    try {
-      setUploadPercent(5);
-      const fd = new FormData();
-      fd.append('file', file);
-      if (activeTab.companyId) fd.append('companyId', activeTab.companyId);
-      if (activeTab.projectId) fd.append('projectId', activeTab.projectId);
-      fd.append('title', file.name.replace(/\.[^.]+$/, ''));
-
-      const created = await uploadStudioMultipart<{ id: string }>({
-        store,
-        endpointPath: '/portal/delivery-studio/reference-videos/upload',
-        formData: fd,
-        onProgress: setUploadPercent,
+      setBanner({
+        tone: 'error',
+        text: err instanceof Error ? err.message : 'Photo upload failed.',
       });
-      setUploadPercent(null);
-      if (created?.id) {
-        updateActiveTab({ selectedReferenceVideoId: created.id });
-      }
-      await workspaceQuery.refetch();
-      notify('ok', `Uploaded reference video "${file.name}".`);
-    } catch (err) {
-      setUploadPercent(null);
-      notify('err', err instanceof Error ? err.message : 'Upload failed.');
+    } finally {
+      setUploadingPhoto(false);
     }
   };
 
-  const handleUploadProductPhoto = async (file: File) => {
-    if (!uploadKitId) return;
-    try {
-      setUploadPercent(5);
-      const fd = new FormData();
-      fd.append('file', file);
-      fd.append('role', uploadKitRole);
-      fd.append('label', uploadKitRole);
-      await uploadStudioMultipart({
-        store,
-        endpointPath: `/portal/delivery-studio/product-kits/${uploadKitId}/assets/upload`,
-        formData: fd,
-        onProgress: setUploadPercent,
-      });
-      setUploadPercent(null);
-      await workspaceQuery.refetch();
-      notify('ok', `Added ${uploadKitRole} photo to product kit.`);
-    } catch (err) {
-      setUploadPercent(null);
-      notify('err', err instanceof Error ? err.message : 'Photo upload failed.');
-    }
+  const handleMoveGarmentAsset = async (index: number, delta: -1 | 1) => {
+    if (!selectedGarment) return;
+    const nextIdx = index + delta;
+    if (nextIdx < 0 || nextIdx >= selectedGarment.assets.length) return;
+    const nextList = [...selectedGarment.assets];
+    const [moved] = nextList.splice(index, 1);
+    nextList.splice(nextIdx, 0, moved);
+    await updateProductAssetsMutation({
+      variables: {
+        input: {
+          productKitId: selectedGarment.id,
+          assets: nextList.map((a, idx) => ({
+            id: a.id,
+            label: `Image ${idx + 1}`,
+          })),
+        },
+      },
+    });
+    await workspaceQuery.refetch();
   };
 
-  const handleRunCharacterSheet = async () => {
-    if (!activeTab.companyId) {
-      notify('err', 'Choose a client in the left rail first.');
-      return;
-    }
-    if (!keysHealthy) {
-      setProviderModalOpen(true);
-      notify('err', 'Add a WaveSpeedAI or Kie.ai API key first.');
-      return;
-    }
+  const handleRemoveGarmentAsset = async (assetId: string) => {
+    if (!selectedGarment) return;
+    await removeProductAssetMutation({
+      variables: { productKitId: selectedGarment.id, assetId },
+    });
+    patchActiveTab({
+      selectedProductAssetIds: activeTab.selectedProductAssetIds.filter(
+        (id) => id !== assetId,
+      ),
+    });
+    await workspaceQuery.refetch();
+  };
+
+  const handleToggleGarmentAsset = (assetId: string) => {
+    if (!selectedGarment) return;
+    const current = Array.from(includedAssetIdSet);
+    const exists = current.includes(assetId);
+    const next = exists
+      ? current.filter((id) => id !== assetId)
+      : [...current, assetId];
+    if (next.length === 0) return; // keep at least 1 image selected
+    patchActiveTab({ selectedProductAssetIds: next });
+  };
+
+  const handleGenerateCharacterSheet = async () => {
+    if (!activeTab.companyId) return;
+    setBanner(null);
+    setBusyGenerate(true);
     try {
-      await generateCharSheet({
+      const selectedIds = Array.from(includedAssetIdSet);
+      await generateCharSheetMutation({
         variables: {
           input: {
             companyId: activeTab.companyId,
             projectId: activeTab.projectId,
-            productKitId: activeTab.selectedProductKitId,
-            presetId: activeTab.characterPresetId,
+            productKitId: selectedGarment?.id ?? null,
+            productAssetIds: selectedIds.length > 0 ? selectedIds : undefined,
+            presetId: activeTab.characterPresetId ?? undefined,
+            castingPresetId: selectedAvatar?.id ?? undefined,
+            environmentPresetId: selectedEnvironment?.id ?? undefined,
             modelKey: activeTab.imageModelKey,
             routingMode: activeTab.routingMode,
-            masterPrompt: activeTab.characterMasterPrompt.trim() || undefined,
             angles: activeTab.characterAngles,
             angleLayout: activeTab.characterAngleLayout,
-            talentDescription: activeTab.characterTalent.trim() || undefined,
-            environmentOverride:
-              activeTab.characterEnvironment.trim() || undefined,
-            customNotes: activeTab.characterCustomNotes.trim() || undefined,
             aspectRatio: activeTab.imageAspectRatio,
             resolution: activeTab.imageResolution,
             candidateCount: activeTab.imageCandidateCount,
+            customNotes: activeTab.characterCustomNotes || undefined,
           },
         },
       });
+      setBanner({
+        tone: 'info',
+        text: 'Generating Character Sheet… it will appear on the right as soon as ready.',
+      });
       await workspaceQuery.refetch();
-      notify('ok', 'Character sheet queued! Watch progress in the Global Queue below.');
     } catch (err) {
-      notify(
-        'err',
-        err instanceof Error ? err.message : 'Failed to queue character sheet.',
-      );
+      setBanner({
+        tone: 'error',
+        text:
+          err instanceof Error
+            ? err.message
+            : 'Could not start Character Sheet generation.',
+      });
+    } finally {
+      setBusyGenerate(false);
     }
   };
 
-  const handleRunVideo = async () => {
-    if (!activeTab.companyId) {
-      notify('err', 'Choose a client in the left rail first.');
-      return;
-    }
-    if (!activeTab.selectedReferenceVideoId) {
-      notify('err', 'Select or upload a Reference Video in the left rail.');
-      return;
-    }
-    if (!keysHealthy) {
-      setProviderModalOpen(true);
-      notify('err', 'Add a WaveSpeedAI or Kie.ai API key first.');
-      return;
-    }
-    const modelKeys = activeTab.compareMode
-      ? Array.from(new Set([activeTab.videoModelKey, activeTab.compareModelKey]))
-      : [activeTab.videoModelKey];
+  const handleUseCharacterSheetForVideo = (sheet: StudioAssetDTO) => {
+    const meta = sheet.metadata ?? {};
+    const envPresetId =
+      typeof meta.environmentPresetId === 'string'
+        ? meta.environmentPresetId
+        : activeTab.selectedEnvironmentPresetId;
+    patchActiveTab({
+      selectedCharacterAssetId: sheet.id,
+      selectedProductKitId: sheet.productKitId ?? activeTab.selectedProductKitId,
+      selectedEnvironmentPresetId: envPresetId ?? null,
+      stage: 'VIDEO_GENERATION',
+    });
+    setBanner(null);
+  };
+
+  const handleGenerateVideo = async () => {
+    if (!activeTab.companyId || !selectedRefVideo) return;
+    setBanner(null);
+    setBusyGenerate(true);
     try {
-      await generateVideo({
+      const modelKeys =
+        activeTab.compareMode && activeTab.compareModelKey !== activeTab.videoModelKey
+          ? [activeTab.videoModelKey, activeTab.compareModelKey]
+          : [activeTab.videoModelKey];
+      await generateVideoMutation({
         variables: {
           input: {
             companyId: activeTab.companyId,
             projectId: activeTab.projectId,
-            referenceVideoId: activeTab.selectedReferenceVideoId,
-            characterAssetId: activeTab.selectedCharacterAssetId,
-            productKitId: activeTab.selectedProductKitId,
-            presetId: activeTab.videoPresetId,
+            referenceVideoId: selectedRefVideo.id,
+            characterAssetId: selectedCharSheet?.id ?? null,
+            productKitId:
+              selectedCharSheet?.productKitId ?? selectedGarment?.id ?? null,
+            presetId: activeTab.videoPresetId ?? undefined,
             modelKeys,
             routingMode: activeTab.routingMode,
-            masterPrompt: activeTab.videoMasterPrompt.trim() || undefined,
-            environmentOverride:
-              activeTab.videoEnvironmentOverride.trim() || undefined,
-            customNotes: activeTab.videoCustomNotes.trim() || undefined,
             aspectRatio: activeTab.videoAspectRatio,
             resolution: activeTab.videoResolution,
             durationSec: activeTab.videoDurationSec,
@@ -693,1436 +1209,935 @@ const DeliveryAiStudioInner = () => {
           },
         },
       });
+      setBanner({
+        tone: 'info',
+        text: 'Generating AI Video in the locked environment…',
+      });
       await workspaceQuery.refetch();
-      notify(
-        'ok',
-        modelKeys.length > 1
-          ? `Compare Mode queued (${modelKeys.join(' vs ')})!`
-          : 'AI Video queued with WaveSpeed → Kie.ai failover!',
-      );
     } catch (err) {
-      notify(
-        'err',
-        err instanceof Error ? err.message : 'Failed to queue AI video.',
-      );
+      setBanner({
+        tone: 'error',
+        text:
+          err instanceof Error
+            ? err.message
+            : 'Could not start AI Video generation.',
+      });
+    } finally {
+      setBusyGenerate(false);
+    }
+  };
+
+  const handleApproveVideoAndContinue = async (video: StudioAssetDTO) => {
+    setBanner(null);
+    try {
+      if (!video.approved) {
+        await approveAssetMutation({
+          variables: { assetId: video.id, approved: true },
+        });
+      }
+      patchActiveTab({
+        selectedVideoAssetId: video.id,
+        stage: 'TEXT_HOOKS',
+      });
+      await workspaceQuery.refetch();
+    } catch (err) {
+      setBanner({
+        tone: 'error',
+        text: err instanceof Error ? err.message : 'Failed to approve video.',
+      });
     }
   };
 
   const handleRunBatch = async () => {
-    if (!activeTab.companyId || activeTab.batchRows.length === 0) {
-      notify('err', 'Add at least one batch row first.');
-      return;
-    }
-    const validRows = activeTab.batchRows.filter((r) => r.referenceVideoId);
-    if (validRows.length === 0) {
-      notify('err', 'Each batch row needs a Reference Video.');
-      return;
-    }
+    if (!activeTab.companyId || activeTab.batchRows.length === 0) return;
+    setBanner(null);
+    setBusyGenerate(true);
     try {
-      await batchGenerateVideos({
+      const validItems = activeTab.batchRows
+        .filter((r) => r.referenceVideoId)
+        .map((r) => ({
+          title: r.title || undefined,
+          referenceVideoId: r.referenceVideoId,
+          characterAssetId: r.characterAssetId || null,
+          productKitId: r.productKitId || null,
+        }));
+      if (validItems.length === 0) {
+        throw new Error('Pick a reference video for at least one batch row.');
+      }
+      await batchVideosMutation({
         variables: {
           input: {
             companyId: activeTab.companyId,
             projectId: activeTab.projectId,
             modelKey: activeTab.videoModelKey,
             routingMode: activeTab.routingMode,
-            presetId: activeTab.videoPresetId,
-            masterPrompt: activeTab.videoMasterPrompt.trim() || undefined,
-            aspectRatio: activeTab.videoAspectRatio,
             resolution: activeTab.videoResolution,
             durationSec: activeTab.videoDurationSec,
             generateAudio: activeTab.generateAudio,
-            items: validRows.map((row) => ({
-              title: row.title || undefined,
-              referenceVideoId: row.referenceVideoId,
-              characterAssetId: row.characterAssetId || null,
-              productKitId: row.productKitId || null,
-              environmentOverride: row.environmentOverride || undefined,
-            })),
+            items: validItems,
           },
         },
       });
+      setBanner({
+        tone: 'info',
+        text: `Queued ${validItems.length} batch video${validItems.length === 1 ? '' : 's'}.`,
+      });
       await workspaceQuery.refetch();
-      notify('ok', `Queued batch of ${validRows.length} AI videos!`);
     } catch (err) {
-      notify(
-        'err',
-        err instanceof Error ? err.message : 'Failed to queue batch.',
-      );
+      setBanner({
+        tone: 'error',
+        text: err instanceof Error ? err.message : 'Batch generation failed.',
+      });
+    } finally {
+      setBusyGenerate(false);
     }
   };
 
-  const handleToggleApprove = async (assetId: string, approved: boolean) => {
-    await setAssetApproved({ variables: { assetId, approved } });
-    if (approved) {
-      updateActiveTab({ selectedCharacterAssetId: assetId });
-    }
-    await workspaceQuery.refetch();
-  };
+  const currentImageModel = imageModels.find(
+    (m) => m.key === activeTab.imageModelKey,
+  );
+  const currentVideoModel = videoModels.find(
+    (m) => m.key === activeTab.videoModelKey,
+  );
+  const sheetCost = formatUsdEstimate(
+    estimateModelCostUsd(currentImageModel, {
+      resolution: activeTab.imageResolution,
+      count: activeTab.imageCandidateCount,
+    }),
+  );
+  const videoCost = formatUsdEstimate(
+    estimateModelCostUsd(currentVideoModel, {
+      resolution: activeTab.videoResolution,
+      durationSec: activeTab.videoDurationSec,
+    }),
+  );
+
+  const activeCharJobs = activeJobs.filter(
+    (j) =>
+      j.jobKind === 'CHARACTER_SHEET' && j.companyId === activeTab.companyId,
+  );
+  const activeVideoJobs = activeJobs.filter(
+    (j) =>
+      j.jobKind === 'VIDEO_GENERATION' && j.companyId === activeTab.companyId,
+  );
+
+  const stepItems: Array<{ key: StudioStageKey; num: string; label: string }> =
+    effectiveLayout === 'GENERAL'
+      ? [
+          { key: 'CHARACTER_SHEET', num: '1', label: 'Character Sheet' },
+          { key: 'VIDEO_GENERATION', num: '2', label: 'AI Video' },
+          { key: 'BATCH_MATRIX', num: '3', label: 'Batch' },
+          { key: 'TEXT_HOOKS', num: '4', label: 'Text Hooks & Drive' },
+        ]
+      : [
+          { key: 'CHARACTER_SHEET', num: '1', label: 'Character Sheet' },
+          { key: 'VIDEO_GENERATION', num: '2', label: 'AI Video' },
+          { key: 'TEXT_HOOKS', num: '3', label: 'Text Hooks & Drive' },
+        ];
 
   return (
-    <StyledShell>
-      {/* Hidden native file inputs */}
-      <input
-        ref={refVideoInputRef}
-        type="file"
-        accept="video/mp4,video/quicktime,video/webm"
-        style={{ display: 'none' }}
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) void handleUploadRefVideo(f);
-          e.target.value = '';
-        }}
-      />
-      <input
-        ref={productImgInputRef}
-        type="file"
-        accept="image/png,image/jpeg,image/webp"
-        style={{ display: 'none' }}
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) void handleUploadProductPhoto(f);
-          e.target.value = '';
-        }}
-      />
-
-      {/* 1. Chrome/Figma-style Persistent Multi-Client Tab Bar */}
-      <StyledTabStrip>
-        <StyledTabList>
-          {tabsState.tabs.map((tab) => (
-            <StyledTabPill
-              key={tab.id}
-              active={tab.id === tabsState.activeTabId}
-              onClick={() =>
-                setTabsState((prev) => ({ ...prev, activeTabId: tab.id }))
-              }
-            >
-              <span>{tab.label}</span>
-              <button
-                type="button"
-                aria-label="Close tab"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setTabsState((prev) => closeStudioTab(prev, tab.id));
-                }}
+    <DeliveryOperationalPage view="studio">
+      <StyledShell>
+        {/* Slim, ultra-clean Top Bar */}
+        <StyledTopBar>
+          <StyledTabsRow>
+            {tabsState.tabs.map((tab) => (
+              <StyledTabPill
+                key={tab.id}
+                data-active={tab.id === activeTab.id}
+                onClick={() =>
+                  setTabsState((prev) => ({ ...prev, activeTabId: tab.id }))
+                }
               >
-                ×
-              </button>
-            </StyledTabPill>
-          ))}
-          <StyledDeliveryButton
-            type="button"
-            onClick={() =>
-              setTabsState((prev) => {
-                const next = createEmptyStudioTab();
-                return { activeTabId: next.id, tabs: [...prev.tabs, next] };
-              })
-            }
-          >
-            + Tab
-          </StyledDeliveryButton>
-        </StyledTabList>
-
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <StyledDeliveryButton
-            type="button"
-            onClick={() => setPresetModalKind('CHARACTER_SHEET')}
-          >
-            ✦ Master Prompts
-          </StyledDeliveryButton>
-          <StyledDeliveryButton
-            type="button"
-            onClick={() => setProviderModalOpen(true)}
-          >
-            <StyledStatusDot ok={keysHealthy} /> Providers &amp; Keys
-          </StyledDeliveryButton>
-        </div>
-      </StyledTabStrip>
-
-      {/* 2. Simple 4-Step Pipeline Navigation */}
-      <StyledStageBar>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {(
-            [
-              ['CHARACTER_SHEET', '1. Character Sheet'],
-              ['VIDEO_GENERATION', '2. AI Video'],
-              ['BATCH_MATRIX', '3. Batch Matrix'],
-              ['TEXT_HOOKS', '4. Text Hooks & Drive'],
-            ] as [StudioStageKey, string][]
-          ).map(([key, label]) => (
-            <StyledStepBtn
-              key={key}
+                <span>{tab.label}</span>
+                {tabsState.tabs.length > 1 && (
+                  <StyledTabClose
+                    type="button"
+                    aria-label="Close tab"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setTabsState((prev) => closeStudioTab(prev, tab.id));
+                    }}
+                  >
+                    ×
+                  </StyledTabClose>
+                )}
+              </StyledTabPill>
+            ))}
+            <StyledIconButton
               type="button"
-              active={activeTab.stage === key}
-              onClick={() => updateActiveTab({ stage: key })}
-            >
-              {label}
-            </StyledStepBtn>
-          ))}
-        </div>
-
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: 12 }}>
-          {uploadPercent !== null && (
-            <span
-              style={{
-                color: themeCssVariables.color.iris11,
-                fontWeight: 600,
+              title="Open another client tab"
+              onClick={() => {
+                const next = createEmptyStudioTab();
+                setTabsState((prev) => ({
+                  activeTabId: next.id,
+                  tabs: [...prev.tabs, next],
+                }));
               }}
             >
-              Uploading… {uploadPercent}%
-            </span>
-          )}
-          {toast && (
-            <span
-              style={{
-                color:
-                  toast.tone === 'ok'
-                    ? themeCssVariables.color.green11
-                    : themeCssVariables.color.red11,
-                fontWeight: 600,
-              }}
-            >
-              {toast.text}
-            </span>
-          )}
-        </div>
-      </StyledStageBar>
+              +
+            </StyledIconButton>
+          </StyledTabsRow>
 
-      {/* 3. Main 3-Pane Studio Workspace */}
-      <StyledWorkspaceGrid showInspector={activeTab.stage !== 'TEXT_HOOKS'}>
-        {/* LEFT ASSET RAIL */}
-        <StyledLeftRail>
-          <StyledSectionCard>
-            <strong style={{ fontSize: 12 }}>Active Tab Scope</strong>
-            <StyledField>
-              Client
-              <select
-                value={activeTab.companyId ?? ''}
-                onChange={(e) => handleSelectClient(e.target.value)}
-              >
-                <option value="">Select client…</option>
-                {clients.map((c) => (
+          <StyledTopRight>
+            <StyledClientSelect
+              aria-label="Select Delivery Client"
+              value={activeTab.companyId ?? ''}
+              onChange={(e) => handleSelectClient(e.target.value)}
+            >
+              {clients.length === 0 ? (
+                <option value="">No Delivery Clients yet</option>
+              ) : (
+                clients.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
                   </option>
-                ))}
-              </select>
-            </StyledField>
-            {activeClient && activeClient.projects.length > 0 && (
-              <StyledField>
-                Brand / Project
-                <select
-                  value={activeTab.projectId ?? ''}
-                  onChange={(e) => handleSelectProject(e.target.value)}
-                >
-                  <option value="">All Projects</option>
-                  {activeClient.projects.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-              </StyledField>
+                ))
+              )}
+            </StyledClientSelect>
+
+            {isClothingBrandClient && (
+              <StyledClothingBadge>Clothing Brand</StyledClothingBadge>
             )}
-          </StyledSectionCard>
 
-          {/* Product Kits */}
-          <StyledSectionCard>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}
+            <StyledIconButton
+              type="button"
+              data-pulse={activeJobs.length > 0}
+              onClick={() => setQueueOpen((prev) => !prev)}
             >
-              <strong style={{ fontSize: 12 }}>
-                Product Kits ({productKits.length})
-              </strong>
-            </div>
+              Queue{activeJobs.length > 0 ? ` (${activeJobs.length})` : ''}
+            </StyledIconButton>
 
-            {productKits.map((kit) => {
-              const selected = activeTab.selectedProductKitId === kit.id;
-              return (
-                <div
-                  key={kit.id}
-                  onClick={() =>
-                    updateActiveTab({ selectedProductKitId: kit.id })
-                  }
-                  style={{
-                    border: selected
-                      ? `2px solid ${themeCssVariables.color.blue}`
-                      : `1px solid ${themeCssVariables.border.color.medium}`,
-                    borderRadius: 8,
-                    padding: 8,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 6,
-                  }}
-                >
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      fontSize: 12,
-                    }}
-                  >
-                    <strong>{kit.name}</strong>
-                    <span style={{ opacity: 0.65 }}>
-                      {kit.assets.length} img
+            <StyledIconButton
+              type="button"
+              title="Studio settings, models, presets & API keys"
+              aria-label="Studio settings"
+              onClick={() => setSettingsOpen(true)}
+            >
+              ⚙
+            </StyledIconButton>
+          </StyledTopRight>
+        </StyledTopBar>
+
+        {/* Clean 3-step Stepper */}
+        <StyledStepperBar>
+          {stepItems.map((step) => (
+            <StyledStepButton
+              key={step.key}
+              type="button"
+              data-active={activeTab.stage === step.key}
+              onClick={() => patchActiveTab({ stage: step.key })}
+            >
+              <StyledStepNum>{step.num}</StyledStepNum>
+              {step.label}
+            </StyledStepButton>
+          ))}
+        </StyledStepperBar>
+
+        {/* Main Canvas */}
+        <StyledCanvas>
+          {banner && (
+            <div style={{ marginBottom: 16 }}>
+              <StyledMessage data-tone={banner.tone}>
+                {banner.text}
+              </StyledMessage>
+            </div>
+          )}
+
+          {!activeTab.companyId ? (
+            <StyledEmptyState>
+              Add a client in the Delivery Clients section to start creating
+              Character Sheets and AI Videos.
+            </StyledEmptyState>
+          ) : activeTab.stage === 'CHARACTER_SHEET' ? (
+            /* ================= STEP 1: CHARACTER SHEET ================= */
+            <StyledTwoCol>
+              <StyledBuilderStack>
+                {/* Slot 1: Cloth */}
+                <StyledSlotCard>
+                  <StyledSlotHeader>
+                    <h4>1 · Cloth</h4>
+                    <span>
+                      {selectedGarment
+                        ? `${includedAssetIdSet.size} of ${selectedGarment.assets.length} images active`
+                        : 'Paste link or upload'}
                     </span>
-                  </div>
-                  {kit.assets.length > 0 && (
-                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                      {kit.assets.map((asset) => (
-                        <div key={asset.id} style={{ position: 'relative' }}>
-                          <img
-                            src={studioMediaUrl(asset.imagePath)}
-                            alt={asset.label}
-                            style={{
-                              width: 42,
-                              height: 42,
-                              objectFit: 'cover',
-                              borderRadius: 4,
-                            }}
-                          />
-                          <button
-                            type="button"
-                            title="Remove photo"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              void removeKitAsset({
-                                variables: {
-                                  productKitId: kit.id,
-                                  assetId: asset.id,
-                                },
-                              }).then(() => workspaceQuery.refetch());
-                            }}
-                            style={{
-                              position: 'absolute',
-                              top: -4,
-                              right: -4,
-                              width: 16,
-                              height: 16,
-                              borderRadius: 99,
-                              border: 'none',
-                              background:
-                                themeCssVariables.background.invertedPrimary,
-                              color: themeCssVariables.font.color.inverted,
-                              fontSize: 10,
-                              cursor: 'pointer',
-                            }}
-                          >
-                            ×
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  <div style={{ display: 'flex', gap: 4 }}>
-                    <select
-                      value={uploadKitRole}
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={(e) => setUploadKitRole(e.target.value)}
-                      style={{ fontSize: 11, padding: '2px 4px', flex: 1 }}
-                    >
-                      <option value="FRONT">Front</option>
-                      <option value="BACK">Back</option>
-                      <option value="DETAIL">Detail</option>
-                      <option value="PACKAGING">Packaging</option>
-                    </select>
-                    <StyledDeliveryButton
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setUploadKitId(kit.id);
-                        productImgInputRef.current?.click();
-                      }}
-                    >
-                      + Photo
-                    </StyledDeliveryButton>
-                  </div>
-                </div>
-              );
-            })}
+                  </StyledSlotHeader>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-              <input
-                style={{ fontSize: 12, padding: '6px 8px' }}
-                placeholder="New product kit (e.g. Hokuro Jacket)"
-                value={newKitName}
-                onChange={(e) => setNewKitName(e.target.value)}
-              />
-              <input
-                style={{ fontSize: 12, padding: '6px 8px' }}
-                placeholder="Fabric / fit / logo notes (optional)"
-                value={newKitNotes}
-                onChange={(e) => setNewKitNotes(e.target.value)}
-              />
-              <StyledDeliveryButton
-                type="button"
-                disabled={creatingKit || !newKitName.trim()}
-                onClick={() => void handleCreateProductKit()}
-              >
-                + Create Product Kit
-              </StyledDeliveryButton>
-            </div>
-          </StyledSectionCard>
+                  <StyledUrlForm onSubmit={(e) => void handleFetchProductUrl(e)}>
+                    <input
+                      type="url"
+                      placeholder="Paste product URL to auto-extract images…"
+                      value={productUrlInput}
+                      onChange={(e) => setProductUrlInput(e.target.value)}
+                      disabled={importingUrl}
+                    />
+                    <button
+                      type="submit"
+                      disabled={importingUrl || !productUrlInput.trim()}
+                    >
+                      {importingUrl ? 'Fetching…' : 'Fetch'}
+                    </button>
+                  </StyledUrlForm>
 
-          {/* Reference Videos */}
-          <StyledSectionCard>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}
-            >
-              <strong style={{ fontSize: 12 }}>
-                Reference Videos ({refVideos.length})
-              </strong>
-              <StyledDeliveryButton
-                type="button"
-                onClick={() => refVideoInputRef.current?.click()}
-              >
-                + Upload
-              </StyledDeliveryButton>
-            </div>
-            {refVideos.length === 0 && (
-              <span style={{ fontSize: 11, opacity: 0.7 }}>
-                Upload winning reference reels (MP4/MOV/WebM) to transfer camera
-                movement &amp; motion.
-              </span>
-            )}
-            {refVideos.slice(0, 12).map((rv) => {
-              const selected = activeTab.selectedReferenceVideoId === rv.id;
-              return (
-                <div
-                  key={rv.id}
-                  onClick={() =>
-                    updateActiveTab({ selectedReferenceVideoId: rv.id })
-                  }
-                  style={{
-                    display: 'flex',
-                    gap: 8,
-                    alignItems: 'center',
-                    padding: 6,
-                    borderRadius: 6,
-                    cursor: 'pointer',
-                    border: selected
-                      ? `2px solid ${themeCssVariables.color.blue}`
-                      : `1px solid ${themeCssVariables.border.color.medium}`,
-                  }}
-                >
-                  {rv.thumbnailPath ? (
-                    <img
-                      src={studioMediaUrl(rv.thumbnailPath)}
-                      alt={rv.title}
+                  <StyledClothControls>
+                    {garments.length > 0 ? (
+                      <select
+                        value={selectedGarment?.id ?? ''}
+                        onChange={(e) => {
+                          const g = garments.find(
+                            (item) => item.id === e.target.value,
+                          );
+                          patchActiveTab({
+                            selectedProductKitId: e.target.value || null,
+                            selectedProductAssetIds:
+                              g?.assets.map((a) => a.id) ?? [],
+                          });
+                        }}
+                      >
+                        {garments.map((g) => (
+                          <option key={g.id} value={g.id}>
+                            {g.name} ({g.assets.length})
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span
+                        style={{
+                          fontSize: 12,
+                          opacity: 0.65,
+                        }}
+                      >
+                        No garment loaded yet
+                      </span>
+                    )}
+
+                    <label
                       style={{
-                        width: 36,
-                        height: 48,
-                        objectFit: 'cover',
-                        borderRadius: 4,
-                      }}
-                    />
-                  ) : (
-                    <div
-                      style={{
-                        width: 36,
-                        height: 48,
-                        borderRadius: 4,
-                        background: themeCssVariables.background.tertiary,
-                      }}
-                    />
-                  )}
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <div
-                      style={{
+                        border: '1px solid var(--t-border-color-medium, currentColor)',
+                        borderRadius: 7,
+                        cursor: uploadingPhoto ? 'not-allowed' : 'pointer',
+                        display: 'inline-flex',
                         fontSize: 12,
-                        fontWeight: 600,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
+                        fontWeight: 500,
+                        opacity: uploadingPhoto ? 0.5 : 1,
+                        padding: '6px 10px',
                         whiteSpace: 'nowrap',
                       }}
                     >
-                      {rv.title}
-                    </div>
-                    <div style={{ fontSize: 10, opacity: 0.7 }}>
-                      {rv.mediaMeta?.durationSec
-                        ? `${rv.mediaMeta.durationSec.toFixed(1)}s`
-                        : 'Video'}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </StyledSectionCard>
-        </StyledLeftRail>
+                      {uploadingPhoto ? 'Uploading…' : '+ Upload'}
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        disabled={uploadingPhoto}
+                        style={{ display: 'none' }}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) void handleManualPhotoUpload(file);
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
+                  </StyledClothControls>
 
-        {/* CENTER CREATIVE STAGE */}
-        <StyledCenterStage>
-          {activeTab.stage === 'CHARACTER_SHEET' && (
-            <>
-              <StyledSectionCard>
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    flexWrap: 'wrap',
-                    gap: 8,
-                  }}
-                >
-                  <div>
-                    <strong>Step 1 · Dynamic Character Sheet Studio</strong>
-                    <div style={{ fontSize: 12, opacity: 0.7 }}>
-                      Make 2-angle, 4-angle, single-hero, or custom layouts using
-                      your saved Master Prompt presets.
-                    </div>
-                  </div>
-                  <StyledDeliveryButton
-                    type="button"
-                    onClick={() => setPresetModalKind('CHARACTER_SHEET')}
-                  >
-                    + Edit / Save Presets
-                  </StyledDeliveryButton>
-                </div>
-
-                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                  <StyledField style={{ flex: 1, minWidth: 200 }}>
-                    Master Prompt Preset
-                    <select
-                      value={activeTab.characterPresetId ?? ''}
-                      onChange={(e) => {
-                        const found = charPresets.find(
-                          (p) => p.id === e.target.value,
+                  {selectedGarment && selectedGarment.assets.length > 0 && (
+                    <StyledNumberedGrid>
+                      {selectedGarment.assets.map((item, idx) => {
+                        const included = includedAssetIdSet.has(item.id);
+                        return (
+                          <StyledClothThumb
+                            key={item.id}
+                            data-included={included}
+                          >
+                            <StyledImageNumBadge>
+                              Image {idx + 1}
+                            </StyledImageNumBadge>
+                            <img
+                              src={studioMediaUrl(item.imagePath)}
+                              alt={`Image ${idx + 1}`}
+                              title="Click to include/exclude this image"
+                              onClick={() => handleToggleGarmentAsset(item.id)}
+                            />
+                            <StyledThumbActions>
+                              <button
+                                type="button"
+                                disabled={idx === 0}
+                                title="Move left"
+                                onClick={() =>
+                                  void handleMoveGarmentAsset(idx, -1)
+                                }
+                              >
+                                ←
+                              </button>
+                              <button
+                                type="button"
+                                disabled={
+                                  idx === selectedGarment.assets.length - 1
+                                }
+                                title="Move right"
+                                onClick={() =>
+                                  void handleMoveGarmentAsset(idx, 1)
+                                }
+                              >
+                                →
+                              </button>
+                              <button
+                                type="button"
+                                title="Remove image"
+                                onClick={() =>
+                                  void handleRemoveGarmentAsset(item.id)
+                                }
+                              >
+                                ×
+                              </button>
+                            </StyledThumbActions>
+                          </StyledClothThumb>
                         );
-                        updateActiveTab({
-                          characterPresetId: e.target.value || null,
-                          ...(found
-                            ? {
-                                characterMasterPrompt: found.masterPrompt,
-                                characterAngles:
-                                  found.configJson?.angles ??
-                                  activeTab.characterAngles,
-                                characterAngleLayout:
-                                  found.configJson?.angleLayout ?? 'GRID_SHEET',
-                              }
-                            : {}),
-                        });
-                      }}
-                    >
-                      <option value="">Default / Custom</option>
-                      {charPresets.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name}
-                        </option>
-                      ))}
-                    </select>
-                  </StyledField>
+                      })}
+                    </StyledNumberedGrid>
+                  )}
+                </StyledSlotCard>
 
-                  <StyledField style={{ flex: 1, minWidth: 180 }}>
-                    Layout Mode
-                    <select
-                      value={activeTab.characterAngleLayout}
-                      onChange={(e) =>
-                        updateActiveTab({
-                          characterAngleLayout: e.target.value as
-                            | 'GRID_SHEET'
-                            | 'SEPARATE_FRAMES'
-                            | 'SINGLE_HERO',
-                        })
-                      }
-                    >
-                      <option value="GRID_SHEET">
-                        Combined Multi-Angle Sheet (1 image)
-                      </option>
-                      <option value="SEPARATE_FRAMES">
-                        Separate Frame per Angle (N images)
-                      </option>
-                      <option value="SINGLE_HERO">Single Hero Frame</option>
-                    </select>
-                  </StyledField>
-                </div>
-
-                {/* Dynamic Angles Picker */}
-                <div>
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      marginBottom: 6,
-                    }}
+                {/* Slot 2: Avatar */}
+                <StyledSlotCard>
+                  <StyledSlotHeader>
+                    <h4>2 · Avatar</h4>
+                    <span>Shared agency library</span>
+                  </StyledSlotHeader>
+                  <StyledPickerTrigger
+                    type="button"
+                    onClick={() => setLibraryModal('AVATAR')}
                   >
-                    <span style={{ fontSize: 12, fontWeight: 500 }}>
-                      Angles ({activeTab.characterAngles.length})
-                    </span>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      {ANGLE_SHORTCUTS.map((sc) => (
-                        <StyledChip
-                          key={sc.label}
-                          type="button"
-                          onClick={() =>
-                            updateActiveTab({ characterAngles: sc.angles })
-                          }
-                        >
-                          {sc.label}
-                        </StyledChip>
-                      ))}
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                    {activeTab.characterAngles.map((ang, i) => (
-                      <StyledChip
-                        key={`${ang}-${i}`}
-                        type="button"
-                        active
-                        onClick={() =>
-                          activeTab.characterAngles.length > 1 &&
-                          updateActiveTab({
-                            characterAngles: activeTab.characterAngles.filter(
-                              (_, idx) => idx !== i,
-                            ),
-                          })
-                        }
-                      >
-                        {ang} ×
-                      </StyledChip>
-                    ))}
-                  </div>
-                  <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-                    <input
-                      style={{ flex: 1, padding: '6px 9px', fontSize: 12 }}
-                      placeholder="Add any custom angle (e.g. Overhead Detail, Side Profile...)"
-                      value={newAngleText}
-                      onChange={(e) => setNewAngleText(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && newAngleText.trim()) {
-                          e.preventDefault();
-                          updateActiveTab({
-                            characterAngles: [
-                              ...activeTab.characterAngles,
-                              newAngleText.trim(),
-                            ],
-                          });
-                          setNewAngleText('');
-                        }
-                      }}
-                    />
-                    <StyledDeliveryButton
-                      type="button"
-                      onClick={() => {
-                        if (!newAngleText.trim()) return;
-                        updateActiveTab({
-                          characterAngles: [
-                            ...activeTab.characterAngles,
-                            newAngleText.trim(),
-                          ],
-                        });
-                        setNewAngleText('');
-                      }}
-                    >
-                      + Angle
-                    </StyledDeliveryButton>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                  <StyledField style={{ flex: 1, minWidth: 200 }}>
-                    Talent / Model Description
-                    <input
-                      placeholder="e.g. Editorial Japanese male model, 24, relaxed streetwear posture"
-                      value={activeTab.characterTalent}
-                      onChange={(e) =>
-                        updateActiveTab({ characterTalent: e.target.value })
-                      }
-                    />
-                  </StyledField>
-                  <StyledField style={{ flex: 1, minWidth: 200 }}>
-                    Studio / Background Direction
-                    <input
-                      placeholder="e.g. Clean neutral warm-grey cyclorama, soft diffused lighting"
-                      value={activeTab.characterEnvironment}
-                      onChange={(e) =>
-                        updateActiveTab({
-                          characterEnvironment: e.target.value,
-                        })
-                      }
-                    />
-                  </StyledField>
-                </div>
-
-                <StyledField>
-                  Master Prompt Override (optional — leave blank to use preset)
-                  <textarea
-                    placeholder="Customize prompt or use {{product_name}}, {{angles}}, {{talent}}, {{brand_notes}}..."
-                    value={activeTab.characterMasterPrompt}
-                    onChange={(e) =>
-                      updateActiveTab({ characterMasterPrompt: e.target.value })
-                    }
-                  />
-                </StyledField>
-              </StyledSectionCard>
-
-              {/* Character Sheets Gallery */}
-              <StyledSectionCard>
-                <strong>
-                  Generated Character Sheets ({characterSheets.length})
-                </strong>
-                {characterSheets.length === 0 ? (
-                  <span style={{ fontSize: 12, opacity: 0.7 }}>
-                    Your generated character sheets will appear here. Click
-                    &ldquo;Approve &amp; Lock&rdquo; to carry one straight into
-                    AI Video generation.
-                  </span>
-                ) : (
-                  <StyledMediaGrid>
-                    {characterSheets.map((sheet) => (
-                      <StyledAssetTile
-                        key={sheet.id}
-                        selected={
-                          activeTab.selectedCharacterAssetId === sheet.id
-                        }
-                        onClick={() =>
-                          updateActiveTab({
-                            selectedCharacterAssetId: sheet.id,
-                          })
-                        }
-                      >
+                    <StyledPickerThumb>
+                      {selectedAvatar?.thumbnailPath ? (
                         <img
-                          src={studioMediaUrl(sheet.mediaPath)}
-                          alt={sheet.title}
+                          src={studioMediaUrl(selectedAvatar.thumbnailPath)}
+                          alt={selectedAvatar.name}
                         />
-                        <div style={{ fontSize: 12, fontWeight: 600 }}>
-                          {sheet.title}
-                        </div>
-                        <div style={{ fontSize: 10, opacity: 0.7 }}>
-                          {sheet.modelKey} · {sheet.providerUsed}
-                        </div>
-                        <div style={{ display: 'flex', gap: 6 }}>
-                          <StyledDeliveryButton
-                            type="button"
-                            data-primary={sheet.approved ? 'true' : undefined}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              void handleToggleApprove(
-                                sheet.id,
-                                !sheet.approved,
-                              );
-                            }}
-                          >
-                            {sheet.approved ? '✓ Locked' : 'Approve'}
-                          </StyledDeliveryButton>
-                          <StyledDeliveryButton
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              updateActiveTab({
-                                selectedCharacterAssetId: sheet.id,
-                                stage: 'VIDEO_GENERATION',
-                              });
-                            }}
-                          >
-                            Use in Video →
-                          </StyledDeliveryButton>
-                        </div>
-                      </StyledAssetTile>
-                    ))}
-                  </StyledMediaGrid>
-                )}
-              </StyledSectionCard>
-            </>
-          )}
+                      ) : selectedAvatar ? (
+                        initials(selectedAvatar.name)
+                      ) : (
+                        '+'
+                      )}
+                    </StyledPickerThumb>
+                    <StyledPickerMeta>
+                      <strong>
+                        {selectedAvatar?.name ?? 'Choose an Avatar'}
+                      </strong>
+                      <span>
+                        {selectedAvatar?.description ||
+                          'Pick from saved models or add a new avatar'}
+                      </span>
+                    </StyledPickerMeta>
+                    <StyledChangeLabel>Browse →</StyledChangeLabel>
+                  </StyledPickerTrigger>
+                </StyledSlotCard>
 
-          {activeTab.stage === 'VIDEO_GENERATION' && (
-            <>
-              <StyledSectionCard>
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    flexWrap: 'wrap',
-                    gap: 8,
-                  }}
-                >
-                  <div>
-                    <strong>Step 2 · AI Video Production &amp; Compare Mode</strong>
-                    <div style={{ fontSize: 12, opacity: 0.7 }}>
-                      Combine your Reference Video + Locked Character Sheet. Keep
-                      the original scene or swap the environment dynamically.
-                    </div>
-                  </div>
-                  <StyledDeliveryButton
+                {/* Slot 3: Environment */}
+                <StyledSlotCard>
+                  <StyledSlotHeader>
+                    <h4>3 · Environment</h4>
+                    <span>Carried into AI Video</span>
+                  </StyledSlotHeader>
+                  <StyledPickerTrigger
                     type="button"
-                    onClick={() => setPresetModalKind('VIDEO_GENERATION')}
+                    onClick={() => setLibraryModal('ENVIRONMENT')}
                   >
-                    + Video Presets
-                  </StyledDeliveryButton>
-                </div>
+                    <StyledPickerThumb>
+                      {selectedEnvironment?.thumbnailPath ? (
+                        <img
+                          src={studioMediaUrl(
+                            selectedEnvironment.thumbnailPath,
+                          )}
+                          alt={selectedEnvironment.name}
+                        />
+                      ) : selectedEnvironment ? (
+                        initials(selectedEnvironment.name)
+                      ) : (
+                        '+'
+                      )}
+                    </StyledPickerThumb>
+                    <StyledPickerMeta>
+                      <strong>
+                        {selectedEnvironment?.name ?? 'Choose an Environment'}
+                      </strong>
+                      <span>
+                        {selectedEnvironment?.description ||
+                          'Pick a scene — locked into Step 2 automatically'}
+                      </span>
+                    </StyledPickerMeta>
+                    <StyledChangeLabel>Browse →</StyledChangeLabel>
+                  </StyledPickerTrigger>
+                </StyledSlotCard>
 
-                {/* Locked Inputs Summary */}
-                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                  <StyledField style={{ flex: 1, minWidth: 200 }}>
-                    Locked Character Sheet (@Image 1)
-                    <select
-                      value={activeTab.selectedCharacterAssetId ?? ''}
-                      onChange={(e) =>
-                        updateActiveTab({
-                          selectedCharacterAssetId: e.target.value || null,
-                        })
-                      }
-                    >
-                      <option value="">None (Use Product Kit only)</option>
-                      {characterSheets.map((cs) => (
-                        <option key={cs.id} value={cs.id}>
-                          {cs.approved ? '★ ' : ''}
-                          {cs.title} ({cs.modelKey})
-                        </option>
-                      ))}
-                    </select>
-                  </StyledField>
-                  <StyledField style={{ flex: 1, minWidth: 200 }}>
-                    Video Master Prompt Preset
-                    <select
-                      value={activeTab.videoPresetId ?? ''}
-                      onChange={(e) => {
-                        const found = videoPresets.find(
-                          (p) => p.id === e.target.value,
-                        );
-                        updateActiveTab({
-                          videoPresetId: e.target.value || null,
-                          ...(found
-                            ? { videoMasterPrompt: found.masterPrompt }
-                            : {}),
-                        });
+                <StyledPrimaryCta
+                  type="button"
+                  disabled={busyGenerate || !selectedGarment}
+                  onClick={() => void handleGenerateCharacterSheet()}
+                >
+                  {busyGenerate
+                    ? 'Queuing…'
+                    : `Generate Character Sheet · ${sheetCost}`}
+                </StyledPrimaryCta>
+              </StyledBuilderStack>
+
+              {/* Right: Generated Character Sheets */}
+              <StyledGalleryColumn>
+                <StyledGalleryHeader>
+                  <h3>Character Sheets</h3>
+                  <span>{characterSheets.length} saved</span>
+                </StyledGalleryHeader>
+
+                {activeCharJobs.map((job) => (
+                  <StyledProgressCard key={job.id}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        fontSize: 12,
+                        fontWeight: 600,
+                        justifyContent: 'space-between',
                       }}
                     >
-                      <option value="">Auto (Match Reference / Override)</option>
-                      {videoPresets.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name}
-                        </option>
-                      ))}
-                    </select>
-                  </StyledField>
-                </div>
+                      <span>{job.title}</span>
+                      <span>
+                        {job.status} · {job.progress}%
+                      </span>
+                    </div>
+                    <StyledProgressTrack>
+                      <StyledProgressFill style={{ width: `${job.progress}%` }} />
+                    </StyledProgressTrack>
+                  </StyledProgressCard>
+                ))}
 
-                <StyledField>
-                  Environment Override (leave blank to match Reference Video
-                  environment)
-                  <input
-                    placeholder="e.g. Rainy neon Tokyo street at night, or sunlit minimalist loft..."
-                    value={activeTab.videoEnvironmentOverride}
-                    onChange={(e) =>
-                      updateActiveTab({
-                        videoEnvironmentOverride: e.target.value,
-                      })
-                    }
-                  />
-                </StyledField>
-
-                <StyledField>
-                  Director Prompt Override (optional)
-                  <textarea
-                    placeholder="Fine-tune camera energy, pacing, or garment focus..."
-                    value={activeTab.videoMasterPrompt}
-                    onChange={(e) =>
-                      updateActiveTab({ videoMasterPrompt: e.target.value })
-                    }
-                  />
-                </StyledField>
-              </StyledSectionCard>
-
-              {/* Generated Videos Gallery */}
-              <StyledSectionCard>
-                <strong>
-                  Generated AI Videos ({generatedVideos.length})
-                </strong>
-                {generatedVideos.length === 0 ? (
-                  <span style={{ fontSize: 12, opacity: 0.7 }}>
-                    Completed AI videos appear here ready to preview and send
-                    directly to Step 4 (AI Text Hooks &amp; Google Drive).
-                  </span>
+                {characterSheets.length === 0 ? (
+                  <StyledEmptyState>
+                    Pick your Cloth, Avatar, and Environment on the left to
+                    generate your first Character Sheet.
+                  </StyledEmptyState>
                 ) : (
-                  <StyledMediaGrid>
-                    {generatedVideos.map((vid) => (
-                      <StyledAssetTile
-                        key={vid.id}
-                        selected={activeTab.selectedVideoAssetId === vid.id}
-                        onClick={() =>
-                          updateActiveTab({ selectedVideoAssetId: vid.id })
-                        }
-                      >
-                        <video
-                          controls
-                          playsInline
-                          preload="metadata"
-                          src={studioMediaUrl(vid.mediaPath)}
-                        />
-                        <div style={{ fontSize: 12, fontWeight: 600 }}>
-                          {vid.title}
-                        </div>
-                        <div style={{ fontSize: 10, opacity: 0.7 }}>
-                          {vid.modelKey} · via {vid.providerUsed}
-                        </div>
-                        <StyledDeliveryButton
-                          type="button"
-                          data-primary="true"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            updateActiveTab({
-                              selectedVideoAssetId: vid.id,
-                              stage: 'TEXT_HOOKS',
-                            });
-                          }}
+                  <StyledAssetGrid>
+                    {characterSheets.map((sheet) => {
+                      const meta = sheet.metadata ?? {};
+                      const envName =
+                        typeof meta.environmentName === 'string'
+                          ? meta.environmentName
+                          : null;
+                      const avatarName =
+                        typeof meta.avatarName === 'string'
+                          ? meta.avatarName
+                          : null;
+                      return (
+                        <StyledAssetCard
+                          key={sheet.id}
+                          data-selected={sheet.id === selectedCharSheet?.id}
                         >
-                          ✦ Text Hooks &amp; Drive →
-                        </StyledDeliveryButton>
-                      </StyledAssetTile>
-                    ))}
-                  </StyledMediaGrid>
+                          <StyledAssetMedia>
+                            <img
+                              src={studioMediaUrl(sheet.mediaPath)}
+                              alt={sheet.title}
+                            />
+                          </StyledAssetMedia>
+                          <StyledAssetFooter>
+                            <strong>{sheet.title}</strong>
+                            {(avatarName || envName) && (
+                              <StyledMetaChips>
+                                {avatarName && (
+                                  <StyledMiniChip>{avatarName}</StyledMiniChip>
+                                )}
+                                {envName && (
+                                  <StyledMiniChip>{envName}</StyledMiniChip>
+                                )}
+                              </StyledMetaChips>
+                            )}
+                            <StyledPrimaryCta
+                              type="button"
+                              style={{ padding: '8px 12px', fontSize: 12 }}
+                              onClick={() =>
+                                handleUseCharacterSheetForVideo(sheet)
+                              }
+                            >
+                              Use for Video →
+                            </StyledPrimaryCta>
+                          </StyledAssetFooter>
+                        </StyledAssetCard>
+                      );
+                    })}
+                  </StyledAssetGrid>
                 )}
-              </StyledSectionCard>
-            </>
-          )}
+              </StyledGalleryColumn>
+            </StyledTwoCol>
+          ) : activeTab.stage === 'VIDEO_GENERATION' ? (
+            /* ================= STEP 2: AI VIDEO ================= */
+            <StyledTwoCol>
+              <StyledBuilderStack>
+                <StyledSlotCard>
+                  <StyledSlotHeader>
+                    <h4>Loaded from Character Sheet</h4>
+                    <StyledSubtleBtn
+                      type="button"
+                      onClick={() =>
+                        patchActiveTab({ stage: 'CHARACTER_SHEET' })
+                      }
+                    >
+                      Change
+                    </StyledSubtleBtn>
+                  </StyledSlotHeader>
 
-          {activeTab.stage === 'BATCH_MATRIX' && (
-            <StyledSectionCard>
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  flexWrap: 'wrap',
-                  gap: 8,
-                }}
-              >
-                <div>
-                  <strong>Step 3 · High-Volume Batch Video Matrix</strong>
-                  <div style={{ fontSize: 12, opacity: 0.7 }}>
-                    Queue up to 60 videos in parallel with automatic WaveSpeed →
-                    Kie.ai failover.
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <StyledDeliveryButton
+                  {selectedCharSheet ? (
+                    <div
+                      style={{
+                        alignItems: 'center',
+                        display: 'flex',
+                        gap: 12,
+                      }}
+                    >
+                      <StyledPickerThumb style={{ height: 64, width: 50 }}>
+                        <img
+                          src={studioMediaUrl(selectedCharSheet.mediaPath)}
+                          alt={selectedCharSheet.title}
+                        />
+                      </StyledPickerThumb>
+                      <StyledPickerMeta>
+                        <strong>{selectedCharSheet.title}</strong>
+                        <span>
+                          {selectedGarment
+                            ? `${selectedGarment.name} · ${selectedGarment.assets.length} garment image${selectedGarment.assets.length === 1 ? '' : 's'}`
+                            : 'Character Sheet ready'}
+                        </span>
+                      </StyledPickerMeta>
+                    </div>
+                  ) : (
+                    <span style={{ fontSize: 12, opacity: 0.7 }}>
+                      Generate or choose a Character Sheet in Step 1 first.
+                    </span>
+                  )}
+
+                  <StyledLockedEnvPill>
+                    <span>🔒 {lockedEnvironmentName}</span>
+                    <small>Same environment</small>
+                  </StyledLockedEnvPill>
+                </StyledSlotCard>
+
+                <StyledSlotCard>
+                  <StyledSlotHeader>
+                    <h4>Reference Video</h4>
+                    <span>Motion &amp; camera guide</span>
+                  </StyledSlotHeader>
+                  <StyledPickerTrigger
                     type="button"
-                    onClick={() => {
-                      const rowId = `row-${Date.now().toString(36)}`;
-                      updateActiveTab({
+                    onClick={() => setLibraryModal('REFERENCE_VIDEO')}
+                  >
+                    <StyledPickerThumb>
+                      {selectedRefVideo?.thumbnailPath ? (
+                        <img
+                          src={studioMediaUrl(selectedRefVideo.thumbnailPath)}
+                          alt={selectedRefVideo.title}
+                        />
+                      ) : selectedRefVideo ? (
+                        '▶'
+                      ) : (
+                        '+'
+                      )}
+                    </StyledPickerThumb>
+                    <StyledPickerMeta>
+                      <strong>
+                        {selectedRefVideo?.title ?? 'Choose Reference Video'}
+                      </strong>
+                      <span>
+                        {selectedRefVideo
+                          ? `${Math.round(selectedRefVideo.mediaMeta?.durationSec ?? 8)}s · ${selectedRefVideo.notes || selectedRefVideo.originalFileName}`
+                          : 'Pick from Reference Video Library or upload new'}
+                      </span>
+                    </StyledPickerMeta>
+                    <StyledChangeLabel>Library →</StyledChangeLabel>
+                  </StyledPickerTrigger>
+                </StyledSlotCard>
+
+                <StyledPrimaryCta
+                  type="button"
+                  disabled={
+                    busyGenerate || !selectedRefVideo || !selectedCharSheet
+                  }
+                  onClick={() => void handleGenerateVideo()}
+                >
+                  {busyGenerate
+                    ? 'Queuing…'
+                    : `Generate AI Video · ${videoCost}`}
+                </StyledPrimaryCta>
+              </StyledBuilderStack>
+
+              {/* Right: Generated AI Videos */}
+              <StyledGalleryColumn>
+                <StyledGalleryHeader>
+                  <h3>Generated AI Videos</h3>
+                  <span>{generatedVideos.length} videos</span>
+                </StyledGalleryHeader>
+
+                {activeVideoJobs.map((job) => (
+                  <StyledProgressCard key={job.id}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        fontSize: 12,
+                        fontWeight: 600,
+                        justifyContent: 'space-between',
+                      }}
+                    >
+                      <span>{job.title}</span>
+                      <span>
+                        {job.status} · {job.progress}%
+                      </span>
+                    </div>
+                    <StyledProgressTrack>
+                      <StyledProgressFill style={{ width: `${job.progress}%` }} />
+                    </StyledProgressTrack>
+                  </StyledProgressCard>
+                ))}
+
+                {generatedVideos.length === 0 ? (
+                  <StyledEmptyState>
+                    Pick a Reference Video on the left and click Generate AI
+                    Video.
+                  </StyledEmptyState>
+                ) : (
+                  <StyledAssetGrid>
+                    {generatedVideos.map((vid) => (
+                      <StyledAssetCard
+                        key={vid.id}
+                        data-selected={vid.id === selectedVideo?.id}
+                      >
+                        <StyledAssetMedia data-video="true">
+                          <video
+                            src={studioMediaUrl(vid.mediaPath)}
+                            poster={studioMediaUrl(vid.thumbnailPath)}
+                            controls
+                            playsInline
+                          />
+                        </StyledAssetMedia>
+                        <StyledAssetFooter>
+                          <strong>{vid.title}</strong>
+                          <StyledPrimaryCta
+                            type="button"
+                            style={{ padding: '8px 12px', fontSize: 12 }}
+                            onClick={() =>
+                              void handleApproveVideoAndContinue(vid)
+                            }
+                          >
+                            {vid.approved
+                              ? 'Open Text Hooks & Drive →'
+                              : 'Approve & Continue →'}
+                          </StyledPrimaryCta>
+                        </StyledAssetFooter>
+                      </StyledAssetCard>
+                    ))}
+                  </StyledAssetGrid>
+                )}
+              </StyledGalleryColumn>
+            </StyledTwoCol>
+          ) : activeTab.stage === 'BATCH_MATRIX' ? (
+            /* ================= OPTIONAL BATCH (GENERAL MODE) ================= */
+            <StyledBuilderStack>
+              <StyledSlotCard>
+                <StyledSlotHeader>
+                  <h4>Batch Video Matrix</h4>
+                  <StyledSubtleBtn
+                    type="button"
+                    onClick={() =>
+                      patchActiveTab({
                         batchRows: [
                           ...activeTab.batchRows,
                           {
-                            id: rowId,
-                            title: `Batch Video ${activeTab.batchRows.length + 1}`,
-                            referenceVideoId:
-                              activeTab.selectedReferenceVideoId ??
-                              refVideos[0]?.id ??
-                              '',
-                            characterAssetId:
-                              activeTab.selectedCharacterAssetId ?? '',
-                            productKitId: activeTab.selectedProductKitId ?? '',
+                            id: `row-${Date.now()}`,
+                            title: `Cut ${activeTab.batchRows.length + 1}`,
+                            referenceVideoId: selectedRefVideo?.id ?? '',
+                            characterAssetId: selectedCharSheet?.id ?? '',
+                            productKitId: selectedGarment?.id ?? '',
                             environmentOverride: '',
                           },
                         ],
-                      });
-                    }}
+                      })
+                    }
                   >
-                    + Add Row
-                  </StyledDeliveryButton>
-                  <StyledDeliveryButton
-                    type="button"
-                    onClick={() => {
-                      const approved = characterSheets.filter((c) => c.approved);
-                      const source =
-                        approved.length > 0 ? approved : characterSheets;
-                      const refId =
-                        activeTab.selectedReferenceVideoId ??
-                        refVideos[0]?.id ??
-                        '';
-                      updateActiveTab({
-                        batchRows: source.map((cs, idx) => ({
-                          id: `auto-${cs.id}-${idx}`,
-                          title: `${cs.title} Batch`,
-                          referenceVideoId: refId,
-                          characterAssetId: cs.id,
-                          productKitId: cs.productKitId ?? '',
-                          environmentOverride: '',
-                        })),
-                      });
-                    }}
-                  >
-                    Auto-Fill from Character Sheets
-                  </StyledDeliveryButton>
-                </div>
-              </div>
+                    + Add video row
+                  </StyledSubtleBtn>
+                </StyledSlotHeader>
 
-              {activeTab.batchRows.length === 0 ? (
-                <span style={{ fontSize: 12, opacity: 0.7 }}>
-                  Click &ldquo;+ Add Row&rdquo; or &ldquo;Auto-Fill from
-                  Character Sheets&rdquo; to build your batch run.
-                </span>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {activeTab.batchRows.map((row) => (
-                    <div
-                      key={row.id}
-                      style={{
-                        display: 'grid',
-                        gridTemplateColumns: '1.2fr 1fr 1fr 1.2fr auto',
-                        gap: 6,
-                        alignItems: 'center',
-                      }}
-                    >
-                      <input
-                        style={{ fontSize: 12, padding: '6px 8px' }}
-                        value={row.title}
-                        placeholder="Title"
-                        onChange={(e) =>
-                          updateActiveTab({
-                            batchRows: activeTab.batchRows.map((r) =>
-                              r.id === row.id
-                                ? { ...r, title: e.target.value }
-                                : r,
-                            ),
-                          })
-                        }
-                      />
-                      <select
-                        style={{ fontSize: 12, padding: '6px 8px' }}
-                        value={row.referenceVideoId}
-                        onChange={(e) =>
-                          updateActiveTab({
-                            batchRows: activeTab.batchRows.map((r) =>
-                              r.id === row.id
-                                ? { ...r, referenceVideoId: e.target.value }
-                                : r,
-                            ),
-                          })
-                        }
-                      >
-                        <option value="">Ref Video…</option>
-                        {refVideos.map((rv) => (
-                          <option key={rv.id} value={rv.id}>
-                            {rv.title}
-                          </option>
-                        ))}
-                      </select>
-                      <select
-                        style={{ fontSize: 12, padding: '6px 8px' }}
-                        value={row.characterAssetId}
-                        onChange={(e) =>
-                          updateActiveTab({
-                            batchRows: activeTab.batchRows.map((r) =>
-                              r.id === row.id
-                                ? { ...r, characterAssetId: e.target.value }
-                                : r,
-                            ),
-                          })
-                        }
-                      >
-                        <option value="">Character Sheet…</option>
-                        {characterSheets.map((cs) => (
-                          <option key={cs.id} value={cs.id}>
-                            {cs.title}
-                          </option>
-                        ))}
-                      </select>
-                      <input
-                        style={{ fontSize: 12, padding: '6px 8px' }}
-                        value={row.environmentOverride}
-                        placeholder="Environment override (optional)"
-                        onChange={(e) =>
-                          updateActiveTab({
-                            batchRows: activeTab.batchRows.map((r) =>
-                              r.id === row.id
-                                ? { ...r, environmentOverride: e.target.value }
-                                : r,
-                            ),
-                          })
-                        }
-                      />
-                      <StyledDeliveryButton
-                        type="button"
-                        onClick={() =>
-                          updateActiveTab({
-                            batchRows: activeTab.batchRows.filter(
-                              (r) => r.id !== row.id,
-                            ),
-                          })
-                        }
-                      >
-                        ×
-                      </StyledDeliveryButton>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </StyledSectionCard>
-          )}
-
-          {activeTab.stage === 'TEXT_HOOKS' && (
-            <DeliveryStudioHooksStage
-              generatedVideos={generatedVideos}
-              selectedVideoAssetId={activeTab.selectedVideoAssetId}
-              hookPresets={hookPresets}
-              onSelectVideo={(id) =>
-                updateActiveTab({ selectedVideoAssetId: id })
-              }
-              onOpenPresetModal={() => setPresetModalKind('TEXT_HOOK')}
-              onWorkspaceRefresh={() => void workspaceQuery.refetch()}
-            />
-          )}
-        </StyledCenterStage>
-
-        {/* RIGHT SETTINGS & RUN INSPECTOR */}
-        {activeTab.stage !== 'TEXT_HOOKS' && (
-          <StyledRightInspector>
-            <StyledSectionCard>
-              <strong style={{ fontSize: 12 }}>Model &amp; Failover</strong>
-
-              {activeTab.stage === 'CHARACTER_SHEET' ? (
-                <>
-                  <StyledField>
-                    Image Model
-                    <select
-                      value={activeTab.imageModelKey}
-                      onChange={(e) => {
-                        const m = imageModels.find(
-                          (item) => item.key === e.target.value,
-                        );
-                        updateActiveTab({
-                          imageModelKey: e.target.value,
-                          ...(m
-                            ? { imageResolution: m.capabilities.defaultResolution }
-                            : {}),
-                        });
-                      }}
-                    >
-                      {imageModels.map((m) => (
-                        <option key={m.key} value={m.key}>
-                          {m.label} ({m.vendor})
-                        </option>
-                      ))}
-                    </select>
-                  </StyledField>
-                  {selectedImageModel && (
-                    <span style={{ fontSize: 11, opacity: 0.72 }}>
-                      {selectedImageModel.summary}
-                    </span>
-                  )}
-                  <StyledField>
-                    Resolution
-                    <select
-                      value={activeTab.imageResolution}
-                      onChange={(e) =>
-                        updateActiveTab({ imageResolution: e.target.value })
-                      }
-                    >
-                      {(
-                        selectedImageModel?.capabilities.supportsResolutions ?? [
-                          '1K',
-                          '2K',
-                          '4K',
-                        ]
-                      ).map((r) => (
-                        <option key={r} value={r}>
-                          {r}
-                        </option>
-                      ))}
-                    </select>
-                  </StyledField>
-                  <StyledField>
-                    Aspect Ratio
-                    <select
-                      value={activeTab.imageAspectRatio}
-                      onChange={(e) =>
-                        updateActiveTab({ imageAspectRatio: e.target.value })
-                      }
-                    >
-                      {(
-                        selectedImageModel?.capabilities.supportsAspectRatios ?? [
-                          '3:4',
-                          '9:16',
-                          '1:1',
-                          '4:5',
-                        ]
-                      ).map((ar) => (
-                        <option key={ar} value={ar}>
-                          {ar}
-                        </option>
-                      ))}
-                    </select>
-                  </StyledField>
-                  {activeTab.characterAngleLayout !== 'SEPARATE_FRAMES' && (
-                    <StyledField>
-                      Takes / Candidates
-                      <select
-                        value={activeTab.imageCandidateCount}
-                        onChange={(e) =>
-                          updateActiveTab({
-                            imageCandidateCount: Number(e.target.value) || 1,
-                          })
-                        }
-                      >
-                        <option value={1}>1 Take</option>
-                        <option value={2}>2 Takes</option>
-                        <option value={3}>3 Takes</option>
-                        <option value={4}>4 Takes</option>
-                      </select>
-                    </StyledField>
-                  )}
-                </>
-              ) : (
-                <>
-                  <StyledField>
-                    Video Model
-                    <select
-                      value={activeTab.videoModelKey}
-                      onChange={(e) => {
-                        const m = videoModels.find(
-                          (item) => item.key === e.target.value,
-                        );
-                        updateActiveTab({
-                          videoModelKey: e.target.value,
-                          ...(m
-                            ? { videoResolution: m.capabilities.defaultResolution }
-                            : {}),
-                        });
-                      }}
-                    >
-                      {videoModels.map((m) => (
-                        <option key={m.key} value={m.key}>
-                          {m.label} ({m.vendor})
-                        </option>
-                      ))}
-                    </select>
-                  </StyledField>
-                  {selectedVideoModel && (
-                    <span style={{ fontSize: 11, opacity: 0.72 }}>
-                      {selectedVideoModel.summary}
-                    </span>
-                  )}
-
-                  {activeTab.stage === 'VIDEO_GENERATION' && (
-                    <>
-                      <label style={{ fontSize: 12, display: 'flex', gap: 6 }}>
-                        <input
-                          type="checkbox"
-                          checked={activeTab.compareMode}
-                          onChange={(e) =>
-                            updateActiveTab({ compareMode: e.target.checked })
-                          }
-                        />
-                        Compare Mode (run 2 models side-by-side)
-                      </label>
-                      {activeTab.compareMode && (
-                        <StyledField>
-                          Compare Against
-                          <select
-                            value={activeTab.compareModelKey}
-                            onChange={(e) =>
-                              updateActiveTab({
-                                compareModelKey: e.target.value,
-                              })
-                            }
-                          >
-                            {videoModels.map((m) => (
-                              <option key={m.key} value={m.key}>
-                                {m.label} ({m.vendor})
-                              </option>
-                            ))}
-                          </select>
-                        </StyledField>
-                      )}
-                    </>
-                  )}
-
-                  <StyledField>
-                    Resolution
-                    <select
-                      value={activeTab.videoResolution}
-                      onChange={(e) =>
-                        updateActiveTab({ videoResolution: e.target.value })
-                      }
-                    >
-                      {(
-                        selectedVideoModel?.capabilities.supportsResolutions ?? [
-                          '480p',
-                          '720p',
-                          '1080p',
-                        ]
-                      ).map((r) => (
-                        <option key={r} value={r}>
-                          {r}
-                        </option>
-                      ))}
-                    </select>
-                  </StyledField>
-                  <StyledField>
-                    Aspect Ratio
-                    <select
-                      value={activeTab.videoAspectRatio}
-                      onChange={(e) =>
-                        updateActiveTab({ videoAspectRatio: e.target.value })
-                      }
-                    >
-                      <option value="9:16">9:16 (Reels / TikTok)</option>
-                      <option value="4:5">4:5 (Feed)</option>
-                      <option value="1:1">1:1 (Square)</option>
-                      <option value="16:9">16:9 (Landscape)</option>
-                    </select>
-                  </StyledField>
-                  <StyledField>
-                    Duration (seconds)
+                {activeTab.batchRows.map((row, idx) => (
+                  <StyledBatchRowCard key={row.id}>
                     <input
-                      type="number"
-                      min={4}
-                      max={30}
-                      value={activeTab.videoDurationSec}
+                      type="text"
+                      value={row.title}
+                      placeholder={`Video ${idx + 1}`}
                       onChange={(e) =>
-                        updateActiveTab({
-                          videoDurationSec: Math.max(
-                            4,
-                            Math.min(30, Number(e.target.value) || 8),
+                        patchActiveTab({
+                          batchRows: activeTab.batchRows.map((r) =>
+                            r.id === row.id
+                              ? { ...r, title: e.target.value }
+                              : r,
                           ),
                         })
                       }
                     />
-                  </StyledField>
-                  <label style={{ fontSize: 12, display: 'flex', gap: 6 }}>
-                    <input
-                      type="checkbox"
-                      checked={activeTab.generateAudio}
+                    <select
+                      value={row.characterAssetId}
                       onChange={(e) =>
-                        updateActiveTab({ generateAudio: e.target.checked })
+                        patchActiveTab({
+                          batchRows: activeTab.batchRows.map((r) =>
+                            r.id === row.id
+                              ? { ...r, characterAssetId: e.target.value }
+                              : r,
+                          ),
+                        })
                       }
-                    />
-                    Generate synchronized audio
-                  </label>
-                </>
-              )}
+                    >
+                      <option value="">Character Sheet…</option>
+                      {characterSheets.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.title}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      value={row.referenceVideoId}
+                      onChange={(e) =>
+                        patchActiveTab({
+                          batchRows: activeTab.batchRows.map((r) =>
+                            r.id === row.id
+                              ? { ...r, referenceVideoId: e.target.value }
+                              : r,
+                          ),
+                        })
+                      }
+                    >
+                      <option value="">Reference Video…</option>
+                      {referenceVideos.map((v) => (
+                        <option key={v.id} value={v.id}>
+                          {v.title}
+                        </option>
+                      ))}
+                    </select>
+                    <StyledSubtleBtn
+                      type="button"
+                      onClick={() =>
+                        patchActiveTab({
+                          batchRows: activeTab.batchRows.filter(
+                            (r) => r.id !== row.id,
+                          ),
+                        })
+                      }
+                    >
+                      ×
+                    </StyledSubtleBtn>
+                  </StyledBatchRowCard>
+                ))}
 
-              <StyledField>
-                Provider Failover Routing
-                <select
-                  value={activeTab.routingMode}
-                  onChange={(e) =>
-                    updateActiveTab({
-                      routingMode: e.target.value as StudioRoutingMode,
-                    })
-                  }
-                >
-                  <option value="AUTO_FAILOVER">
-                    Auto Failover (WaveSpeed → Kie.ai)
-                  </option>
-                  <option value="WAVESPEED_ONLY">WaveSpeedAI Only</option>
-                  <option value="KIE_ONLY">Kie.ai Only</option>
-                </select>
-              </StyledField>
-            </StyledSectionCard>
-
-            {/* Cost Estimator + Primary Run CTA */}
-            <StyledSectionCard>
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                }}
-              >
-                <span style={{ fontSize: 12, opacity: 0.75 }}>
-                  Estimated Cost
-                </span>
-                <strong style={{ fontSize: 16 }}>
-                  {formatUsdEstimate(stageCostEstimateUsd)}
-                </strong>
-              </div>
-
-              {activeTab.stage === 'CHARACTER_SHEET' && (
-                <StyledDeliveryButton
+                <StyledPrimaryCta
                   type="button"
-                  data-primary="true"
-                  disabled={queueingChar}
-                  onClick={() => void handleRunCharacterSheet()}
-                >
-                  {queueingChar
-                    ? 'Queueing…'
-                    : '✦ Generate Character Sheet'}
-                </StyledDeliveryButton>
-              )}
-
-              {activeTab.stage === 'VIDEO_GENERATION' && (
-                <StyledDeliveryButton
-                  type="button"
-                  data-primary="true"
-                  disabled={queueingVideo}
-                  onClick={() => void handleRunVideo()}
-                >
-                  {queueingVideo
-                    ? 'Queueing…'
-                    : activeTab.compareMode
-                      ? '✦ Generate Compare Videos'
-                      : '✦ Generate AI Video'}
-                </StyledDeliveryButton>
-              )}
-
-              {activeTab.stage === 'BATCH_MATRIX' && (
-                <StyledDeliveryButton
-                  type="button"
-                  data-primary="true"
-                  disabled={queueingBatch || activeTab.batchRows.length === 0}
+                  disabled={busyGenerate || activeTab.batchRows.length === 0}
                   onClick={() => void handleRunBatch()}
                 >
-                  {queueingBatch
-                    ? 'Queueing Batch…'
-                    : `✦ Launch Batch (${activeTab.batchRows.length})`}
-                </StyledDeliveryButton>
-              )}
-            </StyledSectionCard>
-          </StyledRightInspector>
+                  {busyGenerate
+                    ? 'Queuing batch…'
+                    : `Generate ${activeTab.batchRows.length} Videos`}
+                </StyledPrimaryCta>
+              </StyledSlotCard>
+            </StyledBuilderStack>
+          ) : (
+            /* ================= STEP 3: TEXT HOOKS & DRIVE ================= */
+            <DeliveryStudioHooksStage
+              companyId={activeTab.companyId}
+              selectedVideo={selectedVideo}
+              hookPresets={hookPresets}
+              hookDefault={workspace?.hookDefault ?? null}
+              hasClientHookDefault={Boolean(workspace?.hasClientHookDefault)}
+              onRefreshWorkspace={() => void workspaceQuery.refetch()}
+            />
+          )}
+        </StyledCanvas>
+
+        {/* Queue Dock — hidden unless toggled open or jobs are actively running */}
+        {queueOpen && (
+          <DeliveryStudioQueueDock
+            jobs={workspace?.jobs ?? []}
+            clients={clients}
+            onJumpToClient={(companyId, projectId) => {
+              setTabsState((prev) =>
+                focusOrCreateClientTab(prev, { companyId, projectId }),
+              );
+            }}
+            onRefresh={() => void workspaceQuery.refetch()}
+          />
         )}
-      </StyledWorkspaceGrid>
+      </StyledShell>
 
-      {/* 4. Global Persistent Render Queue Dock */}
-      <DeliveryStudioQueueDock
-        jobs={ws?.jobs ?? []}
-        clients={clients}
-        onJumpToClient={(companyId, projectId) =>
-          setTabsState((prev) =>
-            focusOrCreateClientTab(prev, {
-              companyId,
-              projectId,
-              label: formatStudioTabLabel(clients, companyId, projectId),
-            }),
-          )
-        }
-        onRefresh={() => void workspaceQuery.refetch()}
-      />
+      {/* Visual Library Modal (Avatars / Environments / Reference Videos) */}
+      {libraryModal && (
+        <DeliveryStudioLibraryModal
+          mode={libraryModal}
+          companyId={activeTab.companyId}
+          projectId={activeTab.projectId}
+          selectedId={
+            libraryModal === 'AVATAR'
+              ? activeTab.selectedAvatarPresetId
+              : libraryModal === 'ENVIRONMENT'
+                ? activeTab.selectedEnvironmentPresetId
+                : activeTab.selectedReferenceVideoId
+          }
+          presets={presets}
+          referenceVideos={referenceVideos}
+          onSelectPreset={(preset) => {
+            if (preset.kind === 'CASTING_PERSONA') {
+              patchActiveTab({ selectedAvatarPresetId: preset.id });
+            } else if (preset.kind === 'ENVIRONMENT') {
+              patchActiveTab({ selectedEnvironmentPresetId: preset.id });
+            }
+          }}
+          onSelectReferenceVideo={(video) => {
+            patchActiveTab({ selectedReferenceVideoId: video.id });
+          }}
+          onCreated={() => void workspaceQuery.refetch()}
+          onClose={() => setLibraryModal(null)}
+        />
+      )}
 
-      {/* Modals */}
-      {ws && (
+      {/* Slide-over Studio Settings Drawer (behind tiny ⚙ icon) */}
+      {settingsOpen && (
+        <DeliveryStudioSettingsDrawer
+          tab={activeTab}
+          isClothingBrandClient={isClothingBrandClient}
+          canManageProviders={Boolean(workspace?.canManageProviders)}
+          imageModels={imageModels}
+          videoModels={videoModels}
+          characterPresets={characterPresets}
+          videoPresets={videoPresets}
+          onPatchTab={patchActiveTab}
+          onOpenProviders={() => setProviderModalOpen(true)}
+          onOpenPresets={() => setPresetModalOpen(true)}
+          onClose={() => setSettingsOpen(false)}
+        />
+      )}
+
+      {/* Provider API Keys & Failover Modal (opened from Settings) */}
+      {workspace && (
         <DeliveryStudioProviderModal
           open={providerModalOpen}
-          canManage={ws.canManageProviders}
-          config={ws.providerConfig}
-          catalog={catalog}
+          canManage={workspace.canManageProviders}
+          config={workspace.providerConfig}
+          catalog={workspace.catalog}
           onClose={() => setProviderModalOpen(false)}
           onSaved={() => void workspaceQuery.refetch()}
         />
       )}
 
+      {/* Master Prompt Presets Modal (opened from Settings) */}
       <DeliveryStudioPresetModal
-        open={presetModalKind !== null}
+        open={presetModalOpen}
         presets={presets}
-        initialKind={presetModalKind ?? 'CHARACTER_SHEET'}
         companyId={activeTab.companyId}
         projectId={activeTab.projectId}
-        onClose={() => setPresetModalKind(null)}
+        onClose={() => setPresetModalOpen(false)}
         onSaved={() => void workspaceQuery.refetch()}
       />
-    </StyledShell>
+    </DeliveryOperationalPage>
   );
 };

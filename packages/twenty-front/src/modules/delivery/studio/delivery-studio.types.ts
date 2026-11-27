@@ -6,7 +6,8 @@ export type StudioPresetKind =
   | 'CHARACTER_SHEET'
   | 'VIDEO_GENERATION'
   | 'TEXT_HOOK'
-  | 'CASTING_PERSONA';
+  | 'CASTING_PERSONA'
+  | 'ENVIRONMENT';
 export type StudioStageKey =
   | 'CHARACTER_SHEET'
   | 'VIDEO_GENERATION'
@@ -64,6 +65,8 @@ export type StudioProviderConfigDTO = {
 export type StudioClientOption = {
   id: string;
   name: string;
+  tags?: string[];
+  isClothingBrand?: boolean;
   projects: { id: string; name: string; companyId: string | null }[];
 };
 
@@ -75,6 +78,7 @@ export type StudioPresetDTO = {
   name: string;
   description: string;
   masterPrompt: string;
+  thumbnailPath?: string | null;
   configJson: {
     angleLayout?: 'GRID_SHEET' | 'SEPARATE_FRAMES' | 'SINGLE_HERO';
     angles?: string[];
@@ -84,6 +88,8 @@ export type StudioPresetDTO = {
     defaultHookCount?: number;
     platform?: 'TIKTOK' | 'INSTAGRAM_REELS' | 'META_ADS' | 'YOUTUBE_SHORTS' | 'ALL';
     funnelStage?: 'COLD' | 'WARM' | 'RETARGETING' | 'ORGANIC';
+    visualAccent?: string;
+    category?: string;
     [key: string]: unknown;
   };
   examplesJson: string[];
@@ -213,12 +219,38 @@ export type StudioJobDTO = {
   updatedAt: string;
 };
 
+export type StudioHookDefaultSettingDTO = {
+  styleConfig: Record<string, unknown>;
+  startSec: number;
+  durationSec: number;
+  updatedAt: string;
+};
+
+export type StudioDriveFolderOptionDTO = {
+  id: string;
+  name: string;
+  webViewLink: string | null;
+};
+
+export type StudioDriveFoldersResponseDTO = {
+  connected: boolean;
+  rootFolderId: string | null;
+  rootFolderName: string | null;
+  rootFolderWebUrl?: string | null;
+  subfolders?: StudioDriveFolderOptionDTO[];
+  folders?: StudioDriveFolderOptionDTO[];
+};
+
 export type StudioWorkspacePayload = {
   canManageProviders: boolean;
   catalog: StudioModelSpecDTO[];
   hookStylePresets: Record<string, Record<string, unknown>>;
   providerConfig: StudioProviderConfigDTO;
   clients: StudioClientOption[];
+  selectedClientTags?: string[];
+  selectedClientIsClothingBrand?: boolean;
+  hookDefault?: StudioHookDefaultSettingDTO | null;
+  hasClientHookDefault?: boolean;
   presets: StudioPresetDTO[];
   referenceVideos: StudioReferenceVideoDTO[];
   productKits: StudioProductKitDTO[];

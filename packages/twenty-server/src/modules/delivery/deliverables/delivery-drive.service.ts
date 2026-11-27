@@ -764,6 +764,88 @@ export class DeliveryDriveService {
       }));
   }
 
+  async listClientSubfolders(
+    auth: WorkspaceAuthContext,
+    companyId: string,
+  ): Promise<{
+    connected: boolean;
+    rootFolderId: string | null;
+    rootFolderName: string | null;
+    rootFolderWebUrl: string | null;
+    subfolders: DriveFolderOption[];
+  }> {
+    const { workspaceId, memberId, userWorkspaceId } = this.identity(auth);
+    await this.authorizeStaff(workspaceId, memberId, userWorkspaceId);
+
+    const connection = await this.dataSource
+      .getRepository(DeliveryDriveConnectionEntity)
+      .findOne({ where: { workspaceId } });
+    if (!connection || connection.revokedAt) {
+      return {
+        connected: false,
+        rootFolderId: null,
+        rootFolderName: null,
+        rootFolderWebUrl: null,
+        subfolders: [],
+      };
+    }
+
+    const mapping = await this.dataSource
+      .getRepository(DeliveryClientDriveMappingEntity)
+      .findOne({ where: { workspaceId, companyId } });
+    if (!mapping?.rootFolderId) {
+      return {
+        connected: true,
+        rootFolderId: connection.rootFolderId ?? null,
+        rootFolderName: connection.rootFolderName ?? null,
+        rootFolderWebUrl: null,
+        subfolders: [],
+      };
+    }
+
+    try {
+      const { drive } = await this.getAuthorizedDriveClient(workspaceId);
+      const clauses = [
+        `mimeType = '${FOLDER_MIME}'`,
+        'trashed = false',
+        `'${escapeDriveQueryValue(mapping.rootFolderId)}' in parents`,
+      ];
+      const res = await drive.files.list({
+        q: clauses.join(' and '),
+        fields: 'files(id,name,webViewLink)',
+        orderBy: 'modifiedTime desc,name asc',
+        pageSize: 60,
+        supportsAllDrives: true,
+        includeItemsFromAllDrives: true,
+      });
+      const subfolders = (res.data.files ?? [])
+        .filter((f): f is { id: string; name: string; webViewLink?: string | null } =>
+          Boolean(f.id && f.name),
+        )
+        .map((f) => ({
+          id: f.id,
+          name: f.name,
+          webViewLink:
+            f.webViewLink ?? `https://drive.google.com/drive/folders/${f.id}`,
+        }));
+      return {
+        connected: true,
+        rootFolderId: mapping.rootFolderId,
+        rootFolderName: mapping.rootFolderName,
+        rootFolderWebUrl: mapping.rootFolderWebUrl,
+        subfolders,
+      };
+    } catch {
+      return {
+        connected: true,
+        rootFolderId: mapping.rootFolderId,
+        rootFolderName: mapping.rootFolderName,
+        rootFolderWebUrl: mapping.rootFolderWebUrl,
+        subfolders: [],
+      };
+    }
+  }
+
   async createFolder(
     auth: WorkspaceAuthContext,
     name: string,
@@ -1137,6 +1219,28 @@ export class DeliveryDriveService {
     mapping: DeliveryClientDriveMappingEntity,
     deliverable: DeliveryDeliverableEntity,
   ): Promise<DriveFolderOption> {
+    const explicitFolderId = deliverable.mediaMeta?.driveTargetFolderId?.trim();
+    const subfolderName = deliverable.mediaMeta?.driveSubfolderName?.trim();
+
+    if (explicitFolderId) {
+      const stillValid = await this.verifyFolderActive(drive, explicitFolderId);
+      if (stillValid) {
+        const explicitFolder: DriveFolderOption = {
+          id: explicitFolderId,
+          name: subfolderName || 'Selected Folder',
+          webViewLink: `https://drive.google.com/drive/folders/${explicitFolderId}`,
+        };
+        if (subfolderName) {
+          return this.findOrCreateChildFolder(
+            drive,
+            explicitFolder.id,
+            sanitizeFolderName(subfolderName),
+          );
+        }
+        return explicitFolder;
+      }
+    }
+
     const pattern =
       mapping.monthFolderPatternOverride || connection.monthFolderPattern;
     const expectedMonthFolderName = formatDriveMonthFolder(
@@ -1179,18 +1283,27 @@ export class DeliveryDriveService {
         .save(mapping);
     }
 
+    let targetFolder = monthFolder;
     if (connection.folderMode === 'SERVICE_SPLIT') {
       const serviceFolderName = sanitizeFolderName(
         deliverable.serviceKey || 'General',
       );
-      return this.findOrCreateChildFolder(
+      targetFolder = await this.findOrCreateChildFolder(
         drive,
         monthFolder.id,
         serviceFolderName,
       );
     }
 
-    return monthFolder;
+    if (subfolderName) {
+      return this.findOrCreateChildFolder(
+        drive,
+        targetFolder.id,
+        sanitizeFolderName(subfolderName),
+      );
+    }
+
+    return targetFolder;
   }
 
   private async uploadLocalFileToDrive(

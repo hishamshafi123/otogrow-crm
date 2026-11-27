@@ -12,7 +12,8 @@ export type StudioPresetKind =
   | 'CHARACTER_SHEET'
   | 'VIDEO_GENERATION'
   | 'TEXT_HOOK'
-  | 'CASTING_PERSONA';
+  | 'CASTING_PERSONA'
+  | 'ENVIRONMENT';
 
 export type StudioPresetConfig = {
   // Character Sheet dynamic options
@@ -34,6 +35,12 @@ export type StudioPresetConfig = {
   platform?: 'TIKTOK' | 'INSTAGRAM_REELS' | 'META_ADS' | 'YOUTUBE_SHORTS' | 'ALL';
   funnelStage?: 'COLD' | 'WARM' | 'RETARGETING' | 'ORGANIC';
   hookStylePreset?: 'TIKTOK_PILL' | 'IG_SHADOW' | 'AD_BOX' | 'EDITORIAL' | 'BRAND_KIT';
+  // Visual library metadata for Avatars (CASTING_PERSONA) & Environments (ENVIRONMENT)
+  referenceImageStorageKey?: string;
+  referenceImageMimeType?: string;
+  referenceImageSha256?: string;
+  visualAccent?: string;
+  category?: string;
   // Arbitrary future extension keys (fully dynamic)
   [key: string]: unknown;
 };

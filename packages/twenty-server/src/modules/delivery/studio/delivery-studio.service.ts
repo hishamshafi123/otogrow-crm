@@ -41,11 +41,24 @@ import {
   DEFAULT_HOOK_STYLE,
   HOOK_STYLE_PRESETS,
 } from 'src/modules/delivery/deliverables/delivery-video-hooks.policy';
-import { type DeliverableMediaMeta } from 'src/modules/delivery/deliverables/entities/delivery-deliverable.entity';
+import {
+  DeliveryDeliverableEntity,
+  type DeliverableMediaMeta,
+} from 'src/modules/delivery/deliverables/entities/delivery-deliverable.entity';
 import { type HookStyleConfig } from 'src/modules/delivery/deliverables/entities/delivery-video-hook-project.entity';
+import {
+  normalizeClientRoster,
+  normalizeClientTags,
+  resolveEffectiveClientCompanyIds,
+} from 'src/modules/delivery/clients/delivery-client-hub.policy';
+import { DeliveryOperationsEntity } from 'src/modules/delivery/entities/delivery-operations.entity';
 import { DeliveryProjectEntity } from 'src/modules/delivery/entities/delivery-project.entity';
 import { readDeliveryKnowledgeContext } from 'src/modules/delivery/knowledge/delivery-knowledge-context';
 import { DeliveryClientSetupSourceService } from 'src/modules/delivery/onboarding/delivery-client-setup-source.service';
+import {
+  newDeliveryOperations,
+  type StudioHookDefaultSetting,
+} from 'src/modules/delivery/operations/delivery-operations.types';
 import { recordOtogrowActivity } from 'src/modules/otogrow-activity/record-otogrow-activity';
 import {
   compileStudioPromptTemplate,
@@ -58,13 +71,18 @@ import {
   batchGenerateVideosSchema,
   generateCharacterSheetSchema,
   generateVideoSchema,
+  importProductFromUrlSchema,
   renderSelectedHooksForStudioAssetSchema,
   saveProviderConfigSchema,
+  saveStudioHookDefaultSchema,
+  saveStudioVideoToDriveSchema,
   signStudioMediaToken,
   suggestHooksForStudioAssetSchema,
+  updateProductAssetsSchema,
   upsertProductKitSchema,
   upsertStudioPresetSchema,
 } from 'src/modules/delivery/studio/delivery-studio.policy';
+import { scrapeProductImagesFromUrl } from 'src/modules/delivery/studio/studio-product-url-scraper';
 import {
   DeliveryStudioProviderRouterService,
   StudioProviderCallError,
@@ -201,7 +219,8 @@ export class DeliveryStudioService {
       | 'ref-thumb'
       | 'product-asset'
       | 'studio-asset'
-      | 'studio-thumb',
+      | 'studio-thumb'
+      | 'preset-thumb',
     id: string,
     subId?: string,
   ): string {
@@ -294,6 +313,9 @@ export class DeliveryStudioService {
   }
 
   private mapPreset(row: DeliveryStudioPresetEntity) {
+    const hasRefImg =
+      typeof row.configJson?.referenceImageStorageKey === 'string' &&
+      row.configJson.referenceImageStorageKey.length > 0;
     return {
       id: row.id,
       companyId: row.companyId,
@@ -306,6 +328,9 @@ export class DeliveryStudioService {
       examplesJson: row.examplesJson ?? [],
       tags: row.tagsJson ?? [],
       isDefault: row.isDefault,
+      thumbnailPath: hasRefImg
+        ? this.signedMediaPath(row.workspaceId, 'preset-thumb', row.id)
+        : null,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     };
@@ -378,10 +403,35 @@ export class DeliveryStudioService {
     memberId: string,
   ) {
     const repo = manager.getRepository(DeliveryStudioPresetEntity);
-    const existingCount = await repo.count({ where: { workspaceId } });
-    if (existingCount > 0) return;
+    const existing = await repo.find({
+      where: { workspaceId },
+      select: { id: true, kind: true, name: true },
+    });
 
-    const entities = STARTER_STUDIO_PRESETS.map((seed) =>
+    const existingKinds = new Set(existing.map((row) => row.kind));
+    const existingNamesByKind = new Set(
+      existing.map((row) => `${row.kind}::${row.name.toLowerCase()}`),
+    );
+
+    const missingSeeds = STARTER_STUDIO_PRESETS.filter((seed) => {
+      if (existing.length === 0) return true;
+      // Seed ENVIRONMENT library and starter Avatar presets for existing workspaces seamlessly
+      if (seed.kind === 'ENVIRONMENT' && !existingKinds.has('ENVIRONMENT')) {
+        return true;
+      }
+      if (
+        seed.kind === 'CASTING_PERSONA' &&
+        existing.filter((r) => r.kind === 'CASTING_PERSONA').length <= 1 &&
+        !existingNamesByKind.has(`${seed.kind}::${seed.name.toLowerCase()}`)
+      ) {
+        return true;
+      }
+      return false;
+    });
+
+    if (missingSeeds.length === 0) return;
+
+    const entities = missingSeeds.map((seed) =>
       repo.create({
         workspaceId,
         companyId: null,
@@ -393,7 +443,8 @@ export class DeliveryStudioService {
         configJson: seed.configJson,
         examplesJson: seed.examplesJson,
         tagsJson: seed.tagsJson,
-        isDefault: seed.isDefault,
+        isDefault:
+          seed.isDefault && !existingKinds.has(seed.kind),
         archived: false,
         createdById: memberId,
       }),
@@ -637,13 +688,12 @@ export class DeliveryStudioService {
         ? filter.projectId
         : null;
 
-    const clientList = await this.companies.list(auth, '');
-
-    return this.dataSource.transaction(async (manager) => {
+    const txResult = await this.dataSource.transaction(async (manager) => {
       const actor = await this.resolveActor(manager, id);
       await this.ensureStarterPresets(manager, id.workspaceId, id.memberId);
 
       const [
+        operations,
         providerConfig,
         projects,
         allPresets,
@@ -652,6 +702,9 @@ export class DeliveryStudioService {
         assets,
         globalJobs,
       ] = await Promise.all([
+        manager
+          .getRepository(DeliveryOperationsEntity)
+          .findOneBy({ workspaceId: id.workspaceId }),
         manager
           .getRepository(DeliveryStudioProviderConfigEntity)
           .findOne({ where: { workspaceId: id.workspaceId } }),
@@ -705,66 +758,119 @@ export class DeliveryStudioService {
         }),
       ]);
 
-      // Group projects by companyId so UI tabs can effortlessly switch Client + Project
-      const projectsByCompany = new Map<
-        string,
-        { id: string; name: string; companyId: string | null }[]
-      >();
-      for (const proj of projects) {
-        if (!proj.companyId) continue;
-        const list = projectsByCompany.get(proj.companyId) ?? [];
-        list.push({
-          id: proj.id,
-          name: proj.name,
-          companyId: proj.companyId,
-        });
-        projectsByCompany.set(proj.companyId, list);
-      }
-
-      const clients = clientList.companies.map((c) => ({
-        id: c.id,
-        name: c.name,
-        projects: projectsByCompany.get(c.id) ?? [],
-      }));
-
-      // Filter scoped items while keeping workspace-shared reference videos & presets accessible
-      const scopedPresets = allPresets.filter(
-        (p) =>
-          (!p.companyId || p.companyId === companyId) &&
-          (!p.projectId || !projectId || p.projectId === projectId),
-      );
-      const scopedRefVideos = refVideos.filter(
-        (rv) =>
-          !rv.companyId ||
-          !companyId ||
-          (rv.companyId === companyId &&
-            (!rv.projectId || !projectId || rv.projectId === projectId)),
-      );
-      const scopedProductKits = productKits.filter(
-        (pk) => !projectId || !pk.projectId || pk.projectId === projectId,
-      );
-      const scopedAssets = assets.filter(
-        (a) => !projectId || !a.projectId || a.projectId === projectId,
-      );
-
       return {
-        canManageProviders: actor.isAdmin || actor.isManager,
-        catalog: STUDIO_MODEL_CATALOG,
-        hookStylePresets: HOOK_STYLE_PRESETS,
-        providerConfig: this.mapProviderConfig(providerConfig),
-        clients,
-        presets: scopedPresets.map((p) => this.mapPreset(p)),
-        referenceVideos: scopedRefVideos.map((rv) => this.mapReferenceVideo(rv)),
-        productKits: scopedProductKits.map((pk) => this.mapProductKit(pk)),
-        characterSheets: scopedAssets
-          .filter((a) => a.kind === 'CHARACTER_SHEET')
-          .map((a) => this.mapAsset(a)),
-        generatedVideos: scopedAssets
-          .filter((a) => a.kind === 'GENERATED_VIDEO')
-          .map((a) => this.mapAsset(a)),
-        jobs: globalJobs.map((j) => this.mapJob(j)),
+        actor,
+        operations,
+        providerConfig,
+        projects,
+        allPresets,
+        refVideos,
+        productKits,
+        assets,
+        globalJobs,
       };
     });
+
+    const {
+      actor,
+      operations,
+      providerConfig,
+      projects,
+      allPresets,
+      refVideos,
+      productKits,
+      assets,
+      globalJobs,
+    } = txResult;
+
+    // Strictly use Delivery Clients roster (NOT all CRM companies)
+    const roster = normalizeClientRoster(operations?.state.clientRoster);
+    const engagements = operations?.state.clients?.engagements ?? [];
+    const clientTagsMap = operations?.state.clientTags ?? {};
+    const effectiveClientIds = resolveEffectiveClientCompanyIds(
+      roster,
+      projects.map((p) => p.companyId),
+      engagements.map((e) => e.companyId),
+    );
+    const lookupIds = new Set(effectiveClientIds);
+    if (companyId) lookupIds.add(companyId);
+
+    const designatedCompanies = lookupIds.size
+      ? await this.companies.listByIds(auth, [...lookupIds])
+      : [];
+
+    const projectsByCompany = new Map<
+      string,
+      { id: string; name: string; companyId: string | null }[]
+    >();
+    for (const proj of projects) {
+      if (!proj.companyId) continue;
+      const list = projectsByCompany.get(proj.companyId) ?? [];
+      list.push({
+        id: proj.id,
+        name: proj.name,
+        companyId: proj.companyId,
+      });
+      projectsByCompany.set(proj.companyId, list);
+    }
+
+    const clients = designatedCompanies
+      .map((c) => {
+        const tags = normalizeClientTags(clientTagsMap[c.id]);
+        const isClothingBrand = tags.some(
+          (t) => t.toLowerCase() === 'clothing brand',
+        );
+        return {
+          id: c.id,
+          name: c.name,
+          tags,
+          isClothingBrand,
+          projects: projectsByCompany.get(c.id) ?? [],
+        };
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    // Keep all shared + client-scoped Avatars, Environments, and Reference Videos accessible
+    // so the UI library modals can cleanly filter "All" vs "This client"
+    const scopedPresets = allPresets.filter(
+      (p) =>
+        p.kind === 'CASTING_PERSONA' ||
+        p.kind === 'ENVIRONMENT' ||
+        ((!p.companyId || p.companyId === companyId) &&
+          (!p.projectId || !projectId || p.projectId === projectId)),
+    );
+    const scopedProductKits = productKits.filter(
+      (pk) => !projectId || !pk.projectId || pk.projectId === projectId,
+    );
+    const scopedAssets = assets.filter(
+      (a) => !projectId || !a.projectId || a.projectId === projectId,
+    );
+
+    const hookDefaultsMap = operations?.state.studioHookDefaults ?? {};
+    const workspaceHookDefault: StudioHookDefaultSetting | null =
+      hookDefaultsMap.__workspace__ ?? null;
+    const clientHookDefault: StudioHookDefaultSetting | null =
+      (companyId ? hookDefaultsMap[companyId] : null) ?? null;
+
+    return {
+      canManageProviders: actor.isAdmin || actor.isManager,
+      catalog: STUDIO_MODEL_CATALOG,
+      hookStylePresets: HOOK_STYLE_PRESETS,
+      providerConfig: this.mapProviderConfig(providerConfig),
+      clients,
+      presets: scopedPresets.map((p) => this.mapPreset(p)),
+      referenceVideos: refVideos.map((rv) => this.mapReferenceVideo(rv)),
+      productKits: scopedProductKits.map((pk) => this.mapProductKit(pk)),
+      characterSheets: scopedAssets
+        .filter((a) => a.kind === 'CHARACTER_SHEET')
+        .map((a) => this.mapAsset(a)),
+      generatedVideos: scopedAssets
+        .filter((a) => a.kind === 'GENERATED_VIDEO')
+        .map((a) => this.mapAsset(a)),
+      jobs: globalJobs.map((j) => this.mapJob(j)),
+      hookDefault: clientHookDefault ?? workspaceHookDefault,
+      hasClientHookDefault: Boolean(clientHookDefault),
+    };
   }
 
   // =========================================================================
@@ -1073,6 +1179,178 @@ export class DeliveryStudioService {
     return { archived: true, id: productKitId };
   }
 
+  async setPresetReferenceImage(
+    auth: WorkspaceAuthContext,
+    input: {
+      presetId: string;
+      tempFilePath: string;
+      originalFileName: string;
+      mimeType: string;
+      sizeBytes: number;
+    },
+  ) {
+    if (!isUuidString(input.presetId)) {
+      throw new BadRequestException('Invalid preset ID.');
+    }
+    const id = this.identity(auth);
+    const bytes = await fs.readFile(input.tempFilePath);
+    const sha256 = createHash('sha256').update(bytes).digest('hex');
+    const ext = extensionForMime(input.mimeType);
+    const storageKey = `delivery-studio/${id.workspaceId}/presets/${input.presetId}/${v4()}.${ext}`;
+
+    const driver = this.storage.getCurrentDriver();
+    await driver.writeFileStream({
+      filePath: storageKey,
+      stream: Readable.from(bytes),
+      mimeType: input.mimeType,
+    });
+
+    const saved = await this.dataSource.transaction(async (manager) => {
+      await this.resolveActor(manager, id);
+      const repo = manager.getRepository(DeliveryStudioPresetEntity);
+      const preset = await repo.findOne({
+        where: { id: input.presetId, workspaceId: id.workspaceId },
+      });
+      if (!preset) throw new NotFoundException('Preset not found.');
+      preset.configJson = {
+        ...(preset.configJson ?? {}),
+        referenceImageStorageKey: storageKey,
+        referenceImageMimeType: input.mimeType,
+        referenceImageSha256: sha256,
+      };
+      return repo.save(preset);
+    });
+
+    return this.mapPreset(saved);
+  }
+
+  async importProductFromUrl(auth: WorkspaceAuthContext, rawInput: unknown) {
+    const parsed = importProductFromUrlSchema.safeParse(rawInput);
+    if (!parsed.success) {
+      throw new BadRequestException(
+        parsed.error.issues[0]?.message ?? 'Enter a valid product link.',
+      );
+    }
+    const input = parsed.data;
+    const id = this.identity(auth);
+
+    const scraped = await scrapeProductImagesFromUrl(
+      input.url,
+      input.maxImages ?? 6,
+    );
+
+    const driver = this.storage.getCurrentDriver();
+    const kitIdForPath = input.productKitId ?? v4();
+    const uploadedItems: StudioProductAssetItem[] = [];
+
+    for (let i = 0; i < scraped.images.length; i += 1) {
+      const img = scraped.images[i];
+      const itemId = v4();
+      const ext = extensionForMime(img.mimeType);
+      const sha256 = createHash('sha256').update(img.buffer).digest('hex');
+      const storageKey = `delivery-studio/${id.workspaceId}/products/${kitIdForPath}/${itemId}.${ext}`;
+      await driver.writeFileStream({
+        filePath: storageKey,
+        stream: Readable.from(img.buffer),
+        mimeType: img.mimeType,
+      });
+      uploadedItems.push({
+        id: itemId,
+        role: i === 0 ? 'FRONT' : i === 1 ? 'BACK' : 'DETAIL',
+        label: `Image ${i + 1}`,
+        storageKey,
+        originalFileName: img.fileName,
+        mimeType: img.mimeType,
+        sizeBytes: img.buffer.length,
+        sha256,
+        stagedUrls: {},
+        createdAt: new Date().toISOString(),
+      });
+    }
+
+    const saved = await this.dataSource.transaction(async (manager) => {
+      await this.resolveActor(manager, id);
+      const repo = manager.getRepository(DeliveryStudioProductKitEntity);
+      if (input.productKitId) {
+        const existing = await repo.findOne({
+          where: { id: input.productKitId, workspaceId: id.workspaceId },
+        });
+        if (!existing) throw new NotFoundException('Product not found.');
+        const existingCount = existing.assetsJson?.length ?? 0;
+        const renumbered = uploadedItems.map((item, idx) => ({
+          ...item,
+          label: `Image ${existingCount + idx + 1}`,
+        }));
+        existing.assetsJson = [...(existing.assetsJson ?? []), ...renumbered];
+        if (!existing.notes) existing.notes = scraped.sourceUrl;
+        return repo.save(existing);
+      }
+
+      const created = repo.create({
+        id: kitIdForPath,
+        workspaceId: id.workspaceId,
+        companyId: input.companyId,
+        projectId: input.projectId ?? null,
+        name: (input.name?.trim() || scraped.title).slice(0, 180),
+        sku: scraped.sourceUrl.slice(0, 80),
+        category: 'Apparel',
+        notes: scraped.sourceUrl,
+        assetsJson: uploadedItems,
+        tagsJson: ['url-import'],
+        archived: false,
+        createdById: id.memberId,
+      });
+      return repo.save(created);
+    });
+
+    return {
+      productKit: this.mapProductKit(saved),
+      importedCount: uploadedItems.length,
+      sourceUrl: scraped.sourceUrl,
+    };
+  }
+
+  async updateProductAssets(auth: WorkspaceAuthContext, rawInput: unknown) {
+    const parsed = updateProductAssetsSchema.safeParse(rawInput);
+    if (!parsed.success) {
+      throw new BadRequestException(
+        parsed.error.issues[0]?.message ?? 'Invalid product images update.',
+      );
+    }
+    const input = parsed.data;
+    const id = this.identity(auth);
+
+    const saved = await this.dataSource.transaction(async (manager) => {
+      await this.resolveActor(manager, id);
+      const repo = manager.getRepository(DeliveryStudioProductKitEntity);
+      const kit = await repo.findOne({
+        where: { id: input.productKitId, workspaceId: id.workspaceId },
+      });
+      if (!kit) throw new NotFoundException('Product not found.');
+
+      const byId = new Map((kit.assetsJson ?? []).map((a) => [a.id, a]));
+      const reordered: StudioProductAssetItem[] = [];
+      for (const spec of input.assets) {
+        const existing = byId.get(spec.id);
+        if (!existing) continue;
+        reordered.push({
+          ...existing,
+          label: spec.label?.trim() || existing.label,
+          role: spec.role?.trim().toUpperCase() || existing.role,
+        });
+        byId.delete(spec.id);
+      }
+      // Keep any remaining unmentioned assets at the end
+      for (const leftover of byId.values()) {
+        reordered.push(leftover);
+      }
+      kit.assetsJson = reordered;
+      return repo.save(kit);
+    });
+
+    return this.mapProductKit(saved);
+  }
+
   // =========================================================================
   // 5. Character Sheet & AI Video Generation Queueing (Single, Compare, Batch)
   // =========================================================================
@@ -1132,6 +1410,15 @@ export class DeliveryStudioService {
           })
         : null;
 
+      const environmentPreset = input.environmentPresetId
+        ? await manager.getRepository(DeliveryStudioPresetEntity).findOne({
+            where: {
+              id: input.environmentPresetId,
+              workspaceId: id.workspaceId,
+            },
+          })
+        : null;
+
       const brandNotes = await this.readBrandNotesSnippet(
         manager,
         id.workspaceId,
@@ -1142,7 +1429,12 @@ export class DeliveryStudioService {
         input.angles ??
         (Array.isArray(preset?.configJson?.angles)
           ? (preset?.configJson?.angles as string[])
-          : ['Front Full-Body', 'Back Full-Body']);
+          : [
+              'Full-body Front View',
+              'Full-body Back View showing back print',
+              '3/4 Side Profile',
+              'Upper Torso Close-up showing fabric & print detail',
+            ]);
 
       const angleLayout =
         input.angleLayout ??
@@ -1154,9 +1446,36 @@ export class DeliveryStudioService {
         preset?.masterPrompt ||
         STARTER_STUDIO_PRESETS[0].masterPrompt;
 
+      const resolvedEnvironmentPrompt =
+        input.environmentOverride?.trim() ||
+        environmentPreset?.masterPrompt ||
+        'Sunlit minimalist architectural loft apartment with natural window light';
+      const resolvedEnvironmentName =
+        environmentPreset?.name ||
+        (input.environmentOverride?.trim() ? 'Custom Environment' : 'Minimalist Studio');
+      const resolvedAvatarName =
+        castingPreset?.name ||
+        (input.talentDescription?.trim() ? 'Custom Avatar' : 'Default Model');
+
+      // Describe clearly numbered product images (Image 1, Image 2...) for the prompt
+      const selectedAssets = productKit
+        ? input.productAssetIds?.length
+          ? (productKit.assetsJson ?? []).filter((a) =>
+              input.productAssetIds?.includes(a.id),
+            )
+          : (productKit.assetsJson ?? [])
+        : [];
+      const numberedImagesNote = selectedAssets.length
+        ? `Garment reference photos provided: ${selectedAssets
+            .map((a, idx) => `Image ${idx + 1} (${a.label || a.role})`)
+            .join(', ')}.`
+        : '';
+
       const compiledPrompt = compileStudioPromptTemplate(masterTemplate, {
         product_name: productKit?.name || 'featured garment',
-        product_notes: productKit?.notes || '',
+        product_notes: [productKit?.notes || '', numberedImagesNote]
+          .filter(Boolean)
+          .join(' '),
         brand_notes: brandNotes,
         angles: angles.join(', '),
         angle_count: String(angles.length),
@@ -1165,7 +1484,7 @@ export class DeliveryStudioService {
           input.talentDescription?.trim() ||
           castingPreset?.masterPrompt ||
           'editorial fashion model',
-        environment: input.environmentOverride?.trim() || 'clean neutral studio',
+        environment: resolvedEnvironmentPrompt,
         custom_notes: input.customNotes?.trim() || '',
       });
 
@@ -1197,7 +1516,7 @@ export class DeliveryStudioService {
           : compiledPrompt;
         const baseTitle =
           input.title?.trim() ||
-          `${productKit?.name || 'Character'} Sheet`;
+          `${productKit?.name || 'Character'} · ${resolvedAvatarName}`;
         const title =
           effectiveCount > 1
             ? `${baseTitle} (${frameAngle || `Take ${i + 1}`})`
@@ -1218,8 +1537,14 @@ export class DeliveryStudioService {
             estimatedCostUsd: estimatedPerJob,
             inputPayloadJson: {
               productKitId: productKit?.id ?? null,
+              productName: productKit?.name ?? null,
               productAssetIds: input.productAssetIds ?? null,
               presetId: preset?.id ?? null,
+              avatarPresetId: castingPreset?.id ?? null,
+              avatarName: resolvedAvatarName,
+              environmentPresetId: environmentPreset?.id ?? null,
+              environmentName: resolvedEnvironmentName,
+              environmentPrompt: resolvedEnvironmentPrompt,
               compiledPrompt: jobPrompt,
               aspectRatio,
               resolution,
@@ -1280,9 +1605,11 @@ export class DeliveryStudioService {
           })
         : null;
 
-      const productKit = input.productKitId
+      const resolvedProductKitId =
+        input.productKitId ?? characterAsset?.productKitId ?? null;
+      const productKit = resolvedProductKitId
         ? await manager.getRepository(DeliveryStudioProductKitEntity).findOne({
-            where: { id: input.productKitId, workspaceId: id.workspaceId },
+            where: { id: resolvedProductKitId, workspaceId: id.workspaceId },
           })
         : null;
 
@@ -1291,6 +1618,44 @@ export class DeliveryStudioService {
             where: { id: input.presetId, workspaceId: id.workspaceId },
           })
         : null;
+
+      // Carry over the EXACT environment from the Character Sheet automatically
+      const charMeta = (characterAsset?.metadataJson ?? {}) as Record<
+        string,
+        unknown
+      >;
+      const inheritedEnvPresetId =
+        input.environmentPresetId ??
+        (typeof charMeta.environmentPresetId === 'string'
+          ? charMeta.environmentPresetId
+          : null);
+      const environmentPreset = inheritedEnvPresetId
+        ? await manager.getRepository(DeliveryStudioPresetEntity).findOne({
+            where: {
+              id: inheritedEnvPresetId,
+              workspaceId: id.workspaceId,
+            },
+          })
+        : null;
+
+      const inheritedEnvPrompt =
+        typeof charMeta.environmentPrompt === 'string'
+          ? charMeta.environmentPrompt
+          : null;
+      const inheritedEnvName =
+        typeof charMeta.environmentName === 'string'
+          ? charMeta.environmentName
+          : null;
+
+      const resolvedEnvironmentPrompt =
+        input.environmentOverride?.trim() ||
+        environmentPreset?.masterPrompt ||
+        inheritedEnvPrompt ||
+        '';
+      const resolvedEnvironmentName =
+        environmentPreset?.name ||
+        inheritedEnvName ||
+        (input.environmentOverride?.trim() ? 'Custom Environment' : null);
 
       const providerConfig = await manager
         .getRepository(DeliveryStudioProviderConfigEntity)
@@ -1306,7 +1671,7 @@ export class DeliveryStudioService {
         input.projectId,
       );
 
-      const defaultTemplate = input.environmentOverride?.trim()
+      const defaultTemplate = resolvedEnvironmentPrompt
         ? STARTER_STUDIO_PRESETS.find(
             (p) =>
               p.kind === 'VIDEO_GENERATION' &&
@@ -1322,7 +1687,9 @@ export class DeliveryStudioService {
           productKit?.name || characterAsset?.title || 'featured garment',
         product_notes: productKit?.notes || '',
         brand_notes: brandNotes,
-        environment: input.environmentOverride?.trim() || '',
+        environment:
+          resolvedEnvironmentPrompt ||
+          'the exact environment and lighting shown in the Character Sheet (@Image 1)',
         reference_notes: refVideo.notes || '',
         custom_notes: input.customNotes?.trim() || '',
       });
@@ -1381,10 +1748,14 @@ export class DeliveryStudioService {
               referenceVideoId: refVideo.id,
               characterAssetId: characterAsset?.id ?? null,
               productKitId: productKit?.id ?? null,
+              productName: productKit?.name ?? null,
+              environmentPresetId: environmentPreset?.id ?? inheritedEnvPresetId,
+              environmentName: resolvedEnvironmentName,
+              environmentPrompt: resolvedEnvironmentPrompt || null,
               extraReferenceAssetIds: input.extraReferenceAssetIds ?? [],
               presetId: preset?.id ?? null,
               compiledPrompt,
-              environmentOverride: input.environmentOverride?.trim() || null,
+              environmentOverride: resolvedEnvironmentPrompt || null,
               aspectRatio,
               resolution,
               durationSec,
@@ -1585,7 +1956,12 @@ export class DeliveryStudioService {
   private async ensureDeliverableForStudioVideo(
     auth: WorkspaceAuthContext,
     assetId: string,
-    options?: { serviceKey?: string; monthKey?: string },
+    options?: {
+      serviceKey?: string;
+      monthKey?: string;
+      driveTargetFolderId?: string | null;
+      driveSubfolderName?: string | null;
+    },
   ): Promise<{ asset: DeliveryStudioAssetEntity; deliverableId: string }> {
     const id = this.identity(auth);
     const asset = await this.dataSource
@@ -1600,7 +1976,43 @@ export class DeliveryStudioService {
       );
     }
 
+    const metaProductName =
+      typeof asset.metadataJson?.productName === 'string'
+        ? asset.metadataJson.productName.trim()
+        : '';
+    const resolvedSubfolderName =
+      options?.driveSubfolderName !== undefined
+        ? options.driveSubfolderName?.trim() || undefined
+        : metaProductName || undefined;
+    const resolvedTargetFolderId =
+      options?.driveTargetFolderId !== undefined
+        ? options.driveTargetFolderId?.trim() || undefined
+        : undefined;
+
     if (asset.deliverableId) {
+      if (
+        options?.driveTargetFolderId !== undefined ||
+        options?.driveSubfolderName !== undefined
+      ) {
+        const delivRepo = this.dataSource.getRepository(
+          DeliveryDeliverableEntity,
+        );
+        const existingDeliv = await delivRepo.findOne({
+          where: { id: asset.deliverableId, workspaceId: id.workspaceId },
+        });
+        if (existingDeliv) {
+          existingDeliv.mediaMeta = {
+            ...(existingDeliv.mediaMeta ?? {}),
+            ...(options?.driveTargetFolderId !== undefined
+              ? { driveTargetFolderId: resolvedTargetFolderId }
+              : {}),
+            ...(options?.driveSubfolderName !== undefined
+              ? { driveSubfolderName: resolvedSubfolderName }
+              : {}),
+          };
+          await delivRepo.save(existingDeliv);
+        }
+      }
       return { asset, deliverableId: asset.deliverableId };
     }
 
@@ -1625,7 +2037,15 @@ export class DeliveryStudioService {
         thumbnailKey: asset.thumbnailKey,
         mimeType: asset.mimeType,
         sizeBytes: Number(asset.sizeBytes ?? 0),
-        mediaMeta: asset.mediaMeta ?? {},
+        mediaMeta: {
+          ...(asset.mediaMeta ?? {}),
+          ...(resolvedTargetFolderId
+            ? { driveTargetFolderId: resolvedTargetFolderId }
+            : {}),
+          ...(resolvedSubfolderName
+            ? { driveSubfolderName: resolvedSubfolderName }
+            : {}),
+        },
         publishImmediately: false,
       },
     );
@@ -1635,6 +2055,111 @@ export class DeliveryStudioService {
     await this.dataSource.getRepository(DeliveryStudioAssetEntity).save(asset);
 
     return { asset, deliverableId: created.id };
+  }
+
+  async getClientDriveFolders(auth: WorkspaceAuthContext, companyId: string) {
+    if (!isUuidString(companyId)) {
+      throw new BadRequestException('Invalid client company ID.');
+    }
+    if (!this.driveService) {
+      return {
+        connected: false,
+        rootFolderId: null,
+        rootFolderName: null,
+        folders: [] as Array<{
+          id: string;
+          name: string;
+          webViewLink: string | null;
+        }>,
+      };
+    }
+    return this.driveService.listClientSubfolders(auth, companyId);
+  }
+
+  async saveHookDefault(auth: WorkspaceAuthContext, rawInput: unknown) {
+    const parsed = saveStudioHookDefaultSchema.safeParse(rawInput);
+    if (!parsed.success) {
+      throw new BadRequestException(
+        parsed.error.issues[0]?.message ?? 'Invalid hook default settings.',
+      );
+    }
+    const input = parsed.data;
+    const id = this.identity(auth);
+    const key = input.companyId ?? 'default';
+
+    const setting: StudioHookDefaultSetting = {
+      styleConfig: input.styleConfig ?? {},
+      startSec: input.startSec ?? 0,
+      durationSec: input.durationSec ?? 3.5,
+      updatedAt: new Date().toISOString(),
+    };
+
+    await this.dataSource.transaction(async (manager) => {
+      await this.resolveActor(manager, id);
+      const opsRepo = manager.getRepository(DeliveryOperationsEntity);
+      let ops = await opsRepo.findOne({
+        where: { workspaceId: id.workspaceId },
+      });
+      if (!ops) {
+        ops = opsRepo.create({
+          workspaceId: id.workspaceId,
+          state: newDeliveryOperations(),
+        });
+      }
+      const nextState = {
+        ...newDeliveryOperations(),
+        ...(ops.state ?? {}),
+        studioHookDefaults: {
+          ...(ops.state?.studioHookDefaults ?? {}),
+          [key]: setting,
+        },
+      };
+      ops.state = nextState;
+      await opsRepo.save(ops);
+    });
+
+    return {
+      key,
+      hookDefault: setting,
+    };
+  }
+
+  async saveVideoToDrive(auth: WorkspaceAuthContext, rawInput: unknown) {
+    const parsed = saveStudioVideoToDriveSchema.safeParse(rawInput);
+    if (!parsed.success) {
+      throw new BadRequestException(
+        parsed.error.issues[0]?.message ?? 'Invalid Drive save request.',
+      );
+    }
+    const input = parsed.data;
+    const { asset, deliverableId } = await this.ensureDeliverableForStudioVideo(
+      auth,
+      input.assetId,
+      {
+        serviceKey: input.serviceKey,
+        monthKey: input.monthKey,
+        driveTargetFolderId: input.driveTargetFolderId ?? null,
+        driveSubfolderName: input.driveSubfolderName ?? undefined,
+      },
+    );
+
+    if (!asset.approved) {
+      asset.approved = true;
+      await this.dataSource.getRepository(DeliveryStudioAssetEntity).save(asset);
+    }
+
+    let queuedDriveSync = false;
+    if (this.driveService) {
+      queuedDriveSync = await this.driveService
+        .enqueueDeliverableSyncIfConnected(asset.workspaceId, deliverableId)
+        .catch(() => false);
+    }
+
+    return {
+      asset: this.mapAsset(asset),
+      deliverableId,
+      queuedDriveSync,
+    };
   }
 
   async suggestHooksForVideo(
@@ -1745,6 +2270,10 @@ export class DeliveryStudioService {
     const { asset, deliverableId } = await this.ensureDeliverableForStudioVideo(
       auth,
       input.assetId,
+      {
+        driveTargetFolderId: input.driveTargetFolderId ?? undefined,
+        driveSubfolderName: input.driveSubfolderName ?? undefined,
+      },
     );
 
     const presetStyle = input.stylePreset
@@ -1776,6 +2305,18 @@ export class DeliveryStudioService {
         endSec,
       };
     });
+
+    if (input.saveAsClientDefault) {
+      const firstVar = variations[0];
+      await this.saveHookDefault(auth, {
+        companyId: asset.companyId,
+        styleConfig: defaultStyleConfig as Record<string, unknown>,
+        startSec: firstVar ? firstVar.startSec : 0,
+        durationSec: firstVar
+          ? Math.max(0.5, Number((firstVar.endSec - firstVar.startSec).toFixed(2)))
+          : 3.5,
+      }).catch(() => undefined);
+    }
 
     // Save exact N selected variations (e.g., 3, 4, or N!)
     const savedProject = await this.videoHooks.saveProject(auth, {
@@ -1946,6 +2487,45 @@ export class DeliveryStudioService {
                   .getRepository(DeliveryStudioProductKitEntity)
                   .save(kit);
               },
+            });
+          }
+        }
+      }
+
+      // 2b) Attach uploaded Avatar & Environment preset reference photos (when present)
+      const presetIdsToStage: Array<{
+        id: string;
+        prefix: string;
+      }> = [];
+      if (typeof payload.avatarPresetId === 'string' && !characterAssetId) {
+        presetIdsToStage.push({ id: payload.avatarPresetId, prefix: 'avatar' });
+      }
+      if (typeof payload.environmentPresetId === 'string' && !characterAssetId) {
+        presetIdsToStage.push({
+          id: payload.environmentPresetId,
+          prefix: 'environment',
+        });
+      }
+      if (presetIdsToStage.length > 0) {
+        const presetRepo = this.dataSource.getRepository(
+          DeliveryStudioPresetEntity,
+        );
+        for (const specRef of presetIdsToStage) {
+          const refPreset = await presetRepo.findOne({
+            where: { id: specRef.id, workspaceId },
+          });
+          const refKey = refPreset?.configJson?.referenceImageStorageKey;
+          const refMime = refPreset?.configJson?.referenceImageMimeType;
+          const refSha = refPreset?.configJson?.referenceImageSha256;
+          if (refPreset && refKey && refMime && refSha) {
+            referenceImages.push({
+              sha256: refSha,
+              fileName: `${specRef.prefix}-${refPreset.id}.${extensionForMime(refMime)}`,
+              mimeType: refMime,
+              kind: 'IMAGE',
+              readBytes: async () =>
+                readStreamToBuffer(await driver.readFile({ filePath: refKey })),
+              onStagedUrl: async () => undefined,
             });
           }
         }
@@ -2134,6 +2714,12 @@ export class DeliveryStudioService {
               aspectRatio: payload.aspectRatio ?? null,
               resolution: payload.resolution ?? null,
               environmentOverride: payload.environmentOverride ?? null,
+              avatarPresetId: payload.avatarPresetId ?? null,
+              avatarName: payload.avatarName ?? null,
+              environmentPresetId: payload.environmentPresetId ?? null,
+              environmentName: payload.environmentName ?? null,
+              environmentPrompt: payload.environmentPrompt ?? null,
+              productName: payload.productName ?? null,
             },
             archived: false,
             createdById: job.createdById,
@@ -2215,11 +2801,25 @@ export class DeliveryStudioService {
       | 'ref-thumb'
       | 'product-asset'
       | 'studio-asset'
-      | 'studio-thumb',
+      | 'studio-thumb'
+      | 'preset-thumb',
     id: string,
     subId?: string,
   ): Promise<{ storageKey: string; mimeType: string; sizeBytes: number } | null> {
     if (!isUuidString(id)) return null;
+
+    if (kind === 'preset-thumb') {
+      const preset = await this.dataSource
+        .getRepository(DeliveryStudioPresetEntity)
+        .findOne({ where: { id, workspaceId } });
+      const key = preset?.configJson?.referenceImageStorageKey;
+      if (!key) return null;
+      return {
+        storageKey: key,
+        mimeType: preset?.configJson?.referenceImageMimeType || 'image/jpeg',
+        sizeBytes: 0,
+      };
+    }
 
     if (kind === 'ref-video' || kind === 'ref-thumb') {
       const row = await this.dataSource

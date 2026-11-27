@@ -211,6 +211,9 @@ describe('DeliveryStudioService', () => {
     };
     const companies = {
       list: jest.fn().mockResolvedValue({ companies: [] }),
+      listByIds: jest.fn().mockResolvedValue([
+        { id: COMPANY_ID, name: 'Hokuro Apparel', domain: 'hokuro.com' },
+      ]),
     };
     const encryption = {
       encryptVersioned: jest.fn((plain: string) => `enc:v2:${plain}`),
@@ -282,6 +285,14 @@ describe('DeliveryStudioService', () => {
     };
     const driveService = {
       enqueueDeliverableSyncIfConnected: jest.fn().mockResolvedValue(true),
+      listClientSubfolders: jest.fn().mockResolvedValue({
+        connected: true,
+        rootFolderId: 'drive-root-1',
+        rootFolderName: 'Hokuro Apparel',
+        folders: [
+          { id: 'drive-sub-1', name: 'Winter Drop', webViewLink: null },
+        ],
+      }),
     };
 
     const service = new DeliveryStudioService(
@@ -528,5 +539,73 @@ describe('DeliveryStudioService', () => {
         (e) => e.path === '/portal/delivery-studio/agent/videos/:assetId/hooks/render-and-sync',
       ),
     ).toBe(true);
+  });
+
+  it('carries the exact Character Sheet environment into AI Video generation automatically', async () => {
+    const { service, repos } = buildHarness();
+    const assetRepo = repos.get(DeliveryStudioAssetEntity)!;
+    const charAsset = assetRepo.store.find(
+      (a) => (a as Record<string, unknown>).id === CHAR_ASSET_ID,
+    ) as Record<string, unknown>;
+    charAsset.metadataJson = {
+      environmentName: 'Golden Hour Tokyo Street',
+      environmentPrompt: 'Golden hour Tokyo street with warm sunlight and clean shadows',
+    };
+
+    const res = await service.queueVideoGeneration(makeAuth(), {
+      companyId: COMPANY_ID,
+      projectId: PROJECT_ID,
+      referenceVideoId: REF_VIDEO_ID,
+      characterAssetId: CHAR_ASSET_ID,
+      productKitId: KIT_ID,
+      modelKeys: ['seedance-2.5'],
+    });
+
+    const jobRepo = repos.get(DeliveryStudioJobEntity)!;
+    const queuedJob = jobRepo.store[0] as Record<string, unknown>;
+    const payload = queuedJob.inputPayloadJson as Record<string, unknown>;
+    expect(res.jobs).toHaveLength(1);
+    expect(payload.environmentName).toBe('Golden Hour Tokyo Street');
+    expect(String(payload.compiledPrompt)).toContain(
+      'Golden hour Tokyo street with warm sunlight and clean shadows',
+    );
+  });
+
+  it('supports 0-hook direct Save to Drive with custom folder targeting and per-client hook defaults', async () => {
+    const { service, deliverables, driveService } = buildHarness();
+
+    const saved = await service.saveVideoToDrive(makeAuth(), {
+      assetId: VID_ASSET_ID,
+      driveTargetFolderId: 'drive-sub-1',
+      driveSubfolderName: 'Winter Drop',
+    });
+
+    expect(saved.deliverableId).toBe(DELIVERABLE_ID);
+    expect(saved.queuedDriveSync).toBe(true);
+    expect(deliverables.createUploadedDeliverable).toHaveBeenCalledWith(
+      expect.anything(),
+      MEMBER_ID,
+      USER_WS_ID,
+      expect.objectContaining({
+        mediaMeta: expect.objectContaining({
+          driveTargetFolderId: 'drive-sub-1',
+          driveSubfolderName: 'Winter Drop',
+        }),
+      }),
+    );
+    expect(driveService.enqueueDeliverableSyncIfConnected).toHaveBeenCalledWith(
+      WORKSPACE_ID,
+      DELIVERABLE_ID,
+    );
+
+    const hookDef = await service.saveHookDefault(makeAuth(), {
+      companyId: COMPANY_ID,
+      styleConfig: { fontSizePct: 4.5, yPct: 24 },
+      startSec: 0.2,
+      durationSec: 3.2,
+    });
+    expect(hookDef.key).toBe(COMPANY_ID);
+    expect(hookDef.hookDefault.startSec).toBe(0.2);
+    expect(hookDef.hookDefault.durationSec).toBe(3.2);
   });
 });

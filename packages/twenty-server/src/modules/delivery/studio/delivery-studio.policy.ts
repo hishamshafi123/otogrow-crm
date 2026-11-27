@@ -52,6 +52,7 @@ export const upsertStudioPresetSchema = z
       'VIDEO_GENERATION',
       'TEXT_HOOK',
       'CASTING_PERSONA',
+      'ENVIRONMENT',
     ]),
     name: z.string().trim().min(1).max(160),
     description: z.string().trim().max(600).optional(),
@@ -76,6 +77,35 @@ export const upsertProductKitSchema = z
   })
   .strict();
 
+export const importProductFromUrlSchema = z
+  .object({
+    companyId: z.string().uuid(),
+    projectId: z.string().uuid().nullable().optional(),
+    productKitId: z.string().uuid().nullable().optional(),
+    url: z.string().trim().min(4).max(1500),
+    name: z.string().trim().max(180).optional(),
+    maxImages: z.number().int().min(1).max(8).optional(),
+  })
+  .strict();
+
+export const updateProductAssetsSchema = z
+  .object({
+    productKitId: z.string().uuid(),
+    assets: z
+      .array(
+        z
+          .object({
+            id: z.string().uuid(),
+            label: z.string().trim().min(1).max(80).optional(),
+            role: z.string().trim().min(1).max(40).optional(),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(24),
+  })
+  .strict();
+
 export const generateCharacterSheetSchema = z
   .object({
     companyId: z.string().uuid(),
@@ -84,6 +114,7 @@ export const generateCharacterSheetSchema = z
     productAssetIds: z.array(z.string().uuid()).max(16).optional(),
     presetId: z.string().uuid().nullable().optional(),
     castingPresetId: z.string().uuid().nullable().optional(),
+    environmentPresetId: z.string().uuid().nullable().optional(),
     title: z.string().trim().min(1).max(200).optional(),
     modelKey: z
       .string()
@@ -113,6 +144,7 @@ export const generateVideoSchema = z
     referenceVideoId: z.string().uuid(),
     characterAssetId: z.string().uuid().nullable().optional(),
     productKitId: z.string().uuid().nullable().optional(),
+    environmentPresetId: z.string().uuid().nullable().optional(),
     extraReferenceAssetIds: z.array(z.string().uuid()).max(8).optional(),
     presetId: z.string().uuid().nullable().optional(),
     title: z.string().trim().min(1).max(200).optional(),
@@ -216,14 +248,43 @@ export const renderSelectedHooksForStudioAssetSchema = z
       )
       .min(1)
       .max(12),
+    driveTargetFolderId: z.string().trim().max(200).nullable().optional(),
+    driveSubfolderName: z.string().trim().max(120).nullable().optional(),
+    saveAsClientDefault: z.boolean().optional(),
     publishToClientPortal: z.boolean().optional(),
     syncToDrive: z.boolean().optional(),
   })
   .strict();
 
+export const saveStudioVideoToDriveSchema = z
+  .object({
+    assetId: z.string().uuid(),
+    driveTargetFolderId: z.string().trim().max(200).nullable().optional(),
+    driveSubfolderName: z.string().trim().max(120).nullable().optional(),
+    serviceKey: z.string().trim().min(1).max(100).optional(),
+    monthKey: z.string().regex(/^\d{4}-\d{2}$/).optional(),
+    publishToClientPortal: z.boolean().optional(),
+  })
+  .strict();
+
+export const saveStudioHookDefaultSchema = z
+  .object({
+    companyId: z.string().uuid().nullable().optional(),
+    styleConfig: z.record(z.string(), z.unknown()),
+    startSec: z.number().min(0).max(60).default(0),
+    durationSec: z.number().min(0.5).max(30).default(3.5),
+  })
+  .strict();
+
 export type StudioMediaTokenPayload = {
   w: string; // workspaceId
-  t: 'ref-video' | 'ref-thumb' | 'product-asset' | 'studio-asset' | 'studio-thumb';
+  t:
+    | 'ref-video'
+    | 'ref-thumb'
+    | 'product-asset'
+    | 'studio-asset'
+    | 'studio-thumb'
+    | 'preset-thumb';
   id: string;
   subId?: string;
   exp: number;

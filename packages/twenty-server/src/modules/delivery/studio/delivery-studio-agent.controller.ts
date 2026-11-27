@@ -52,6 +52,19 @@ export class DeliveryStudioAgentController {
     return this.studio.upsertProductKit(getWorkspaceAuthContext(), body);
   }
 
+  @Post('products/import-url')
+  importProductFromUrl(@Body() body: unknown) {
+    return this.studio.importProductFromUrl(getWorkspaceAuthContext(), body);
+  }
+
+  @Get('clients/:companyId/drive-folders')
+  getClientDriveFolders(@Param('companyId') companyId: string) {
+    return this.studio.getClientDriveFolders(
+      getWorkspaceAuthContext(),
+      companyId,
+    );
+  }
+
   @Post('character-sheets/generate')
   generateCharacterSheet(@Body() body: unknown) {
     return this.studio.queueCharacterSheetGeneration(
@@ -100,6 +113,17 @@ export class DeliveryStudioAgentController {
       assetId,
       body?.approved ?? true,
     );
+  }
+
+  @Post('videos/:assetId/save-to-drive')
+  saveVideoToDrive(
+    @Param('assetId') assetId: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.studio.saveVideoToDrive(getWorkspaceAuthContext(), {
+      ...(body ?? {}),
+      assetId,
+    });
   }
 
   @Post('videos/:assetId/hooks/suggest')

@@ -159,6 +159,46 @@ export class DeliveryStudioFilesController {
       await fs.rm(file.path, { force: true }).catch(() => undefined);
     }
   }
+
+  @Post('presets/:presetId/image/upload')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      dest: STUDIO_UPLOAD_TMP,
+      limits: {
+        fileSize: STUDIO_MAX_IMAGE_UPLOAD_BYTES,
+        files: 1,
+        fields: 4,
+      },
+    }),
+  )
+  async uploadPresetReferenceImage(
+    @Param('presetId') presetId: string,
+    @UploadedFile() file: StudioUploadedFile | undefined,
+  ) {
+    if (!file) {
+      throw new BadRequestException('Attach an image (PNG, JPG, or WebP).');
+    }
+    try {
+      const detected = (await detectFileMime(file.path)) ?? file.mimetype;
+      if (!STUDIO_ALLOWED_IMAGE_MIMES.has(detected)) {
+        throw new BadRequestException(
+          `Unsupported image format "${detected}". Upload PNG, JPG, or WebP.`,
+        );
+      }
+      return await this.studio.setPresetReferenceImage(
+        getWorkspaceAuthContext(),
+        {
+          presetId,
+          tempFilePath: file.path,
+          originalFileName: file.originalname,
+          mimeType: detected,
+          sizeBytes: file.size,
+        },
+      );
+    } finally {
+      await fs.rm(file.path, { force: true }).catch(() => undefined);
+    }
+  }
 }
 
 @Controller('delivery-studio/media')

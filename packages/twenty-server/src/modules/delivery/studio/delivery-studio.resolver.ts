@@ -181,6 +181,30 @@ export class DeliveryStudioResolver {
     return this.studio.archiveAsset(getWorkspaceAuthContext(), assetId);
   }
 
+  @Query(() => GraphQLJSON)
+  deliveryStudioClientDriveFolders(
+    @Args('companyId', { type: () => String }) companyId: string,
+  ) {
+    return this.studio.getClientDriveFolders(
+      getWorkspaceAuthContext(),
+      companyId,
+    );
+  }
+
+  @Mutation(() => GraphQLJSON)
+  importDeliveryStudioProductFromUrl(
+    @Args('input', { type: () => GraphQLJSON }) input: unknown,
+  ) {
+    return this.studio.importProductFromUrl(getWorkspaceAuthContext(), input);
+  }
+
+  @Mutation(() => GraphQLJSON)
+  updateDeliveryStudioProductAssets(
+    @Args('input', { type: () => GraphQLJSON }) input: unknown,
+  ) {
+    return this.studio.updateProductAssets(getWorkspaceAuthContext(), input);
+  }
+
   @Mutation(() => GraphQLJSON)
   suggestDeliveryStudioVideoHooks(
     @Args('input', { type: () => GraphQLJSON }) input: unknown,
@@ -196,5 +220,19 @@ export class DeliveryStudioResolver {
       getWorkspaceAuthContext(),
       input,
     );
+  }
+
+  @Mutation(() => GraphQLJSON)
+  saveDeliveryStudioVideoToDrive(
+    @Args('input', { type: () => GraphQLJSON }) input: unknown,
+  ) {
+    return this.studio.saveVideoToDrive(getWorkspaceAuthContext(), input);
+  }
+
+  @Mutation(() => GraphQLJSON)
+  saveDeliveryStudioHookDefault(
+    @Args('input', { type: () => GraphQLJSON }) input: unknown,
+  ) {
+    return this.studio.saveHookDefault(getWorkspaceAuthContext(), input);
   }
 }

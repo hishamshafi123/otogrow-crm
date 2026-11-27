@@ -177,6 +177,15 @@ export type ClientHubServicePlan = {
   openSharesCount: number;
 };
 
+export const CLIENT_TAG_PRESETS = [
+  'Clothing Brand',
+  'E-commerce',
+  'Beauty & Skincare',
+  'Food & Beverage',
+  'SaaS',
+  'Local Business',
+] as const;
+
 export type ClientHubItem = {
   id: string;
   name: string;
@@ -185,6 +194,7 @@ export type ClientHubItem = {
   isExplicitClient: boolean;
   hasDeliveryWork: boolean;
   needsAttention: boolean;
+  tags?: string[];
   projects: ClientHubProject[];
   services: string[];
   billingModes: string[];
@@ -267,4 +277,5 @@ export type ClientRosterUpdateInput =
       cadence: ClientFeeCadence;
       notes?: string;
     }
-  | { action: 'clearFee'; companyId: string };
+  | { action: 'clearFee'; companyId: string }
+  | { action: 'setTags'; companyId: string; tags: string[] };

@@ -487,9 +487,9 @@ export const STARTER_STUDIO_PRESETS: readonly StarterStudioPresetSeed[] = [
     kind: 'CHARACTER_SHEET',
     name: '4-Angle Apparel Turnaround Sheet',
     description:
-      'Clean 2x2 studio turnaround (Front, Back, 3/4 Profile, Chest/Print Close-up) preserving exact garment graphics, drape, and fit.',
+      'Clean 2x2 turnaround (Front, Back, 3/4 Profile, Detail Close-up) showing the chosen Avatar wearing the Cloth inside the chosen Environment.',
     masterPrompt:
-      'Create a crisp, photorealistic {{angle_count}}-panel fashion character turnaround sheet ({{angles}}) on a clean neutral studio backdrop. The model ({{talent}}) is wearing the exact {{product_name}} shown in the reference images. Preserve every graphic, logo placement, typography, seam, wash texture, and boxy oversized drape with 100% accuracy. {{product_notes}} {{brand_notes}} Natural editorial lighting, consistent face and body proportions across all panels, zero distortion. {{custom_notes}}',
+      'Create a crisp, photorealistic {{angle_count}}-panel fashion character turnaround sheet ({{angles}}) set inside this environment: {{environment}}. The model ({{talent}}) is wearing the exact {{product_name}} shown in the reference garment images (Image 1, Image 2, etc.). Preserve every graphic, logo placement, typography, seam, wash texture, and boxy drape with 100% accuracy. {{product_notes}} {{brand_notes}} Consistent face, body proportions, lighting, and environment across every panel, zero distortion, no text labels. {{custom_notes}}',
     configJson: {
       angleCount: 4,
       angleLayout: 'GRID_SHEET',
@@ -502,7 +502,7 @@ export const STARTER_STUDIO_PRESETS: readonly StarterStudioPresetSeed[] = [
       modelKey: 'nano-banana-2.1',
       aspectRatio: '3:4',
       resolution: '2K',
-      candidateCount: 2,
+      candidateCount: 1,
     },
     examplesJson: [],
     tagsJson: ['apparel', '4-angle', 'turnaround'],
@@ -514,7 +514,7 @@ export const STARTER_STUDIO_PRESETS: readonly StarterStudioPresetSeed[] = [
     description:
       'Side-by-side Front & Back full-body sheet — ideal for rapid T-shirt / hoodie batches.',
     masterPrompt:
-      'Create a clean 2-panel side-by-side fashion model reference sheet ({{angles}}) on a neutral light gray studio background. The model ({{talent}}) wears the exact {{product_name}} from the reference photos. Maintain exact front and back graphic alignment, neckline, sleeve fit, and fabric weight. {{product_notes}} {{brand_notes}} Sharp focus, natural skin texture, zero extra text overlays. {{custom_notes}}',
+      'Create a clean 2-panel side-by-side fashion model reference sheet ({{angles}}) set in {{environment}}. The model ({{talent}}) wears the exact {{product_name}} from the reference photos. Maintain exact front and back graphic alignment, neckline, sleeve fit, and fabric weight. {{product_notes}} {{brand_notes}} Sharp focus, natural skin texture, zero extra text overlays. {{custom_notes}}',
     configJson: {
       angleCount: 2,
       angleLayout: 'GRID_SHEET',
@@ -522,7 +522,7 @@ export const STARTER_STUDIO_PRESETS: readonly StarterStudioPresetSeed[] = [
       modelKey: 'gpt-image-2.6-sunburst',
       aspectRatio: '4:3',
       resolution: '1K',
-      candidateCount: 2,
+      candidateCount: 1,
     },
     examplesJson: [],
     tagsJson: ['apparel', '2-angle', 'fast'],
@@ -542,7 +542,7 @@ export const STARTER_STUDIO_PRESETS: readonly StarterStudioPresetSeed[] = [
       modelKey: 'nano-banana-2.1',
       aspectRatio: '9:16',
       resolution: '2K',
-      candidateCount: 2,
+      candidateCount: 1,
     },
     examplesJson: [],
     tagsJson: ['hero', '1-angle', 'editorial'],
@@ -550,11 +550,30 @@ export const STARTER_STUDIO_PRESETS: readonly StarterStudioPresetSeed[] = [
   },
   {
     kind: 'VIDEO_GENERATION',
-    name: 'Reference-Video Apparel Swap (Keep Reference Setting)',
+    name: 'Reference-Video Apparel Swap (Keep Character Sheet Environment)',
     description:
-      'Replaces the subject & outfit in @Video 1 with the locked Character Sheet (@Image 1) & garment refs while preserving exact camera shots, cuts, pacing, and actions.',
+      'Remakes @Video 1 with the exact subject, garment, and environment from your Character Sheet (@Image 1).',
     masterPrompt:
-      'Recreate the exact camera angles, shot transitions, editing rhythm, pacing, lighting continuity, and subject actions from @Video 1. Replace the main subject and outfit with the model and exact {{product_name}} shown in @Image 1 (using additional reference images for exact front/back print and fabric fidelity). Keep the original setting and movement natural and seamless, with realistic cloth physics and zero logo morphing. {{brand_notes}} {{custom_notes}}',
+      'Recreate the exact camera angles, shot transitions, editing rhythm, pacing, and subject actions from @Video 1. Replace the main subject and outfit with the model and exact {{product_name}} shown in @Image 1 (using the additional product images for exact front/back print and fabric fidelity). Keep the entire scene in the exact same environment and lighting as the Character Sheet: {{environment}}. Realistic cloth physics, consistent identity, zero logo morphing. {{brand_notes}} {{custom_notes}}',
+    configJson: {
+      modelKey: 'seedance-2.5',
+      aspectRatio: '9:16',
+      resolution: '720p',
+      durationSec: 8,
+      generateAudio: true,
+      preserveReferenceSetting: false,
+    },
+    examplesJson: [],
+    tagsJson: ['apparel-swap', 'environment-override', 'reference-to-video'],
+    isDefault: true,
+  },
+  {
+    kind: 'VIDEO_GENERATION',
+    name: 'Reference-Video Apparel Swap (Keep Reference Video Setting)',
+    description:
+      'Replaces the subject & outfit in @Video 1 while keeping the original reference video background.',
+    masterPrompt:
+      'Recreate the exact camera angles, shot transitions, editing rhythm, pacing, lighting continuity, and subject actions from @Video 1. Replace the main subject and outfit with the model and exact {{product_name}} shown in @Image 1 (using additional reference images for exact front/back print and fabric fidelity). Keep the original reference video setting and movement natural and seamless, with realistic cloth physics and zero logo morphing. {{brand_notes}} {{custom_notes}}',
     configJson: {
       modelKey: 'seedance-2.5',
       aspectRatio: '9:16',
@@ -564,28 +583,7 @@ export const STARTER_STUDIO_PRESETS: readonly StarterStudioPresetSeed[] = [
       preserveReferenceSetting: true,
     },
     examplesJson: [],
-    tagsJson: ['apparel-swap', 'reference-to-video'],
-    isDefault: true,
-  },
-  {
-    kind: 'VIDEO_GENERATION',
-    name: 'Reference-Video Apparel Swap (Custom Environment)',
-    description:
-      'Keeps the exact shots, cuts, and actions of @Video 1 while transporting the character & garment into a custom environment.',
-    masterPrompt:
-      'Preserve the exact shot composition, camera movement, jump cuts, timing, and subject performance from @Video 1. Replace the subject with the character wearing the exact {{product_name}} from @Image 1. Transport the entire scene into this environment: {{environment}}. Match lighting and shadows naturally onto the fabric and skin while keeping prints and garment silhouette 100% locked. {{brand_notes}} {{custom_notes}}',
-    configJson: {
-      modelKey: 'magi-2',
-      aspectRatio: '9:16',
-      resolution: '1080p',
-      durationSec: 8,
-      generateAudio: true,
-      preserveReferenceSetting: false,
-      defaultEnvironment:
-        'Minimal sunlit urban concrete street at golden hour with soft natural shadows',
-    },
-    examplesJson: [],
-    tagsJson: ['apparel-swap', 'environment-override'],
+    tagsJson: ['apparel-swap', 'reference-setting'],
     isDefault: false,
   },
   {
@@ -610,16 +608,127 @@ export const STARTER_STUDIO_PRESETS: readonly StarterStudioPresetSeed[] = [
     tagsJson: ['apparel', 'hooks', 'tiktok', 'reels'],
     isDefault: true,
   },
+  // ===================== STARTER AVATARS (CASTING_PERSONA) =====================
   {
     kind: 'CASTING_PERSONA',
-    name: 'Modern Streetwear Model (Neutral Editorial)',
-    description:
-      'Clean, realistic streetwear casting persona with relaxed posture and natural skin texture.',
+    name: 'Streetwear Male · Early 20s',
+    description: 'Relaxed confident streetwear model with natural skin texture and clean modern styling.',
     masterPrompt:
-      'Young adult streetwear model (early 20s), relaxed confident posture, natural unretouched skin texture, clean modern hairstyle, minimal accessories, authentic lookbook presence.',
-    configJson: {},
+      'Young adult male streetwear model (early 20s), athletic lean build, relaxed confident posture, natural unretouched skin texture, modern textured short hair, subtle silver chain, authentic lookbook presence.',
+    configJson: { category: 'Men', visualAccent: 'slate' },
     examplesJson: [],
-    tagsJson: ['casting', 'streetwear'],
+    tagsJson: ['avatar', 'men', 'streetwear'],
     isDefault: true,
+  },
+  {
+    kind: 'CASTING_PERSONA',
+    name: 'Editorial Female · Minimalist',
+    description: 'Clean fashion-editorial female model with effortless high-fashion silhouette.',
+    masterPrompt:
+      'Young adult female fashion editorial model (mid 20s), effortless confident posture, natural glowing skin texture, sleek slicked-back hair, minimal gold earrings, high-fashion contemporary lookbook presence.',
+    configJson: { category: 'Women', visualAccent: 'iris' },
+    examplesJson: [],
+    tagsJson: ['avatar', 'women', 'editorial'],
+    isDefault: false,
+  },
+  {
+    kind: 'CASTING_PERSONA',
+    name: 'UGC Natural Creator · Female',
+    description: 'Approachable authentic TikTok/Reels creator energy — ideal for organic fit checks.',
+    masterPrompt:
+      'Relatable young female lifestyle creator (early 20s), warm approachable expression, natural wavy hair, light everyday makeup, authentic mirror-selfie and handheld social video energy.',
+    configJson: { category: 'Women', visualAccent: 'amber' },
+    examplesJson: [],
+    tagsJson: ['avatar', 'women', 'ugc'],
+    isDefault: false,
+  },
+  {
+    kind: 'CASTING_PERSONA',
+    name: 'Luxury Menswear · Late 20s',
+    description: 'Sharp tailored-casual male model suited for quiet luxury & elevated basics.',
+    masterPrompt:
+      'Male fashion model (late 20s), tall structured frame, neat short beard, calm poised expression, clean minimalist grooming, elevated quiet-luxury campaign energy.',
+    configJson: { category: 'Men', visualAccent: 'blue' },
+    examplesJson: [],
+    tagsJson: ['avatar', 'men', 'luxury'],
+    isDefault: false,
+  },
+  {
+    kind: 'CASTING_PERSONA',
+    name: 'Athletic Street · Unisex',
+    description: 'Dynamic athletic build suited for hoodies, activewear, and boxy outerwear.',
+    masterPrompt:
+      'Fit athletic young adult model (mid 20s), strong relaxed shoulders that drape heavyweight garments well, natural candid expression, clean modern sneakers and minimal styling.',
+    configJson: { category: 'Unisex', visualAccent: 'green' },
+    examplesJson: [],
+    tagsJson: ['avatar', 'athletic', 'streetwear'],
+    isDefault: false,
+  },
+  // ===================== STARTER ENVIRONMENTS (ENVIRONMENT) =====================
+  {
+    kind: 'ENVIRONMENT',
+    name: 'Sunlit Minimalist Loft',
+    description: 'Warm white plaster walls, oak flooring, soft afternoon window shadows.',
+    masterPrompt:
+      'Sunlit minimalist architectural loft apartment with warm off-white plaster walls, pale oak wood floors, subtle linen curtains, and soft golden afternoon window light casting clean diagonal shadows.',
+    configJson: { category: 'Indoor', visualAccent: 'amber' },
+    examplesJson: [],
+    tagsJson: ['environment', 'indoor', 'loft'],
+    isDefault: true,
+  },
+  {
+    kind: 'ENVIRONMENT',
+    name: 'Urban Concrete Street',
+    description: 'Raw modern city sidewalk, architectural concrete facade, crisp daylight.',
+    masterPrompt:
+      'Minimal urban architectural concrete street with clean stone steps, brushed steel storefront detail, soft overcast natural daylight, shallow depth of field, contemporary streetwear campaign mood.',
+    configJson: { category: 'Outdoor', visualAccent: 'slate' },
+    examplesJson: [],
+    tagsJson: ['environment', 'outdoor', 'streetwear'],
+    isDefault: false,
+  },
+  {
+    kind: 'ENVIRONMENT',
+    name: 'Boutique Mirror Fit-Check',
+    description: 'Designer showroom interior with full-length arched mirror & warm spotlights.',
+    masterPrompt:
+      'Minimalist luxury fashion boutique interior with travertine stone floor, curated clothing rack softly blurred in background, warm architectural recessed lighting, authentic upscale fit-check atmosphere.',
+    configJson: { category: 'Indoor', visualAccent: 'iris' },
+    examplesJson: [],
+    tagsJson: ['environment', 'indoor', 'boutique'],
+    isDefault: false,
+  },
+  {
+    kind: 'ENVIRONMENT',
+    name: 'Golden Hour Rooftop',
+    description: 'Warm sunset skyline terrace with cinematic rim light and open sky.',
+    masterPrompt:
+      'Modern minimalist city rooftop terrace at golden hour sunset, warm amber sunlight wrapping the silhouette, clean concrete parapet, softly blurred city skyline horizon, cinematic editorial contrast.',
+    configJson: { category: 'Outdoor', visualAccent: 'amber' },
+    examplesJson: [],
+    tagsJson: ['environment', 'outdoor', 'golden-hour'],
+    isDefault: false,
+  },
+  {
+    kind: 'ENVIRONMENT',
+    name: 'Clean Cyclorama Studio',
+    description: 'Crisp seamless neutral light-gray studio backdrop with softbox fashion lighting.',
+    masterPrompt:
+      'Clean professional seamless neutral light-gray photography cyclorama studio, diffused softbox fashion lighting, crisp natural ground shadow, zero clutter, pure lookbook focus on the garment.',
+    configJson: { category: 'Studio', visualAccent: 'blue' },
+    examplesJson: [],
+    tagsJson: ['environment', 'studio', 'minimal'],
+    isDefault: false,
+  },
+  {
+    kind: 'ENVIRONMENT',
+    name: 'European Cafe Corner',
+    description: 'Limestone building facade, bistro chairs, natural sunlit street vibe.',
+    masterPrompt:
+      'Sunlit European city street corner outside a minimalist cafe, warm cream limestone facade, understated bistro table subtly blurred in background, crisp morning daylight, editorial lifestyle aesthetic.',
+    configJson: { category: 'Outdoor', visualAccent: 'green' },
+    examplesJson: [],
+    tagsJson: ['environment', 'outdoor', 'lifestyle'],
+    isDefault: false,
   },
 ];

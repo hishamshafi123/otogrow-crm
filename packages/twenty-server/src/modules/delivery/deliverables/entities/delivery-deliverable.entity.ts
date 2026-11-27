@@ -40,6 +40,8 @@ export type DeliverableMediaMeta = {
   colorTransfer?: string | null;
   colorPrimaries?: string | null;
   pixFmt?: string | null;
+  driveTargetFolderId?: string | null;
+  driveSubfolderName?: string | null;
 };
 
 @Entity({ name: 'deliveryDeliverable', schema: 'core' })

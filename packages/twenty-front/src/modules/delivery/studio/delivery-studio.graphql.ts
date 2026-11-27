@@ -128,3 +128,33 @@ export const RENDER_DELIVERY_STUDIO_VIDEO_HOOKS = gql`
     renderDeliveryStudioVideoHooks(input: $input)
   }
 `;
+
+export const GET_DELIVERY_STUDIO_CLIENT_DRIVE_FOLDERS = gql`
+  query DeliveryStudioClientDriveFolders($companyId: String!) {
+    deliveryStudioClientDriveFolders(companyId: $companyId)
+  }
+`;
+
+export const IMPORT_DELIVERY_STUDIO_PRODUCT_FROM_URL = gql`
+  mutation ImportDeliveryStudioProductFromUrl($input: JSON!) {
+    importDeliveryStudioProductFromUrl(input: $input)
+  }
+`;
+
+export const UPDATE_DELIVERY_STUDIO_PRODUCT_ASSETS = gql`
+  mutation UpdateDeliveryStudioProductAssets($input: JSON!) {
+    updateDeliveryStudioProductAssets(input: $input)
+  }
+`;
+
+export const SAVE_DELIVERY_STUDIO_VIDEO_TO_DRIVE = gql`
+  mutation SaveDeliveryStudioVideoToDrive($input: JSON!) {
+    saveDeliveryStudioVideoToDrive(input: $input)
+  }
+`;
+
+export const SAVE_DELIVERY_STUDIO_HOOK_DEFAULT = gql`
+  mutation SaveDeliveryStudioHookDefault($input: JSON!) {
+    saveDeliveryStudioHookDefault(input: $input)
+  }
+`;

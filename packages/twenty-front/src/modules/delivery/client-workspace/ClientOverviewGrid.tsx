@@ -672,12 +672,25 @@ export const ClientOverviewGrid = ({
                   </StyledNextDeliverable>
                 )}
 
-                {(client.services.length > 0 ||
+                {((client.tags?.length ?? 0) > 0 ||
+                  client.services.length > 0 ||
                   client.tasksSummary.blockedCount > 0 ||
                   client.portal.pendingSubmissionsCount > 0 ||
                   (client.finance?.overdueReceivablesCount ?? 0) > 0 ||
                   Boolean(client.finance?.currentMonthMrr)) && (
                   <StyledClientTagRow>
+                    {(client.tags ?? []).map((tag) => (
+                      <StyledClientTag
+                        key={`tag-${tag}`}
+                        data-tone={
+                          tag.toLowerCase() === 'clothing brand'
+                            ? 'iris'
+                            : undefined
+                        }
+                      >
+                        {tag}
+                      </StyledClientTag>
+                    ))}
                     {client.services.slice(0, 3).map((service) => (
                       <StyledClientTag key={service}>{service}</StyledClientTag>
                     ))}

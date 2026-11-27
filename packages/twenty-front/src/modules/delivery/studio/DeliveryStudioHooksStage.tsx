@@ -1,113 +1,361 @@
+/* oxlint-disable twenty/no-hardcoded-colors */
 import { useMutation, useQuery } from '@apollo/client/react';
 import { styled } from '@linaria/react';
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
 import {
+  GET_DELIVERY_STUDIO_CLIENT_DRIVE_FOLDERS,
   GET_DELIVERY_STUDIO_HOOK_PROJECT,
   RENDER_DELIVERY_STUDIO_VIDEO_HOOKS,
+  SAVE_DELIVERY_STUDIO_HOOK_DEFAULT,
+  SAVE_DELIVERY_STUDIO_VIDEO_TO_DRIVE,
   SUGGEST_DELIVERY_STUDIO_VIDEO_HOOKS,
 } from '@/delivery/studio/delivery-studio.graphql';
 import {
   type StudioAssetDTO,
+  type StudioDriveFoldersResponseDTO,
+  type StudioHookDefaultSettingDTO,
   type StudioHookProjectDTO,
   type StudioPresetDTO,
   studioMediaUrl,
 } from '@/delivery/studio/delivery-studio.types';
-import { StyledDeliveryButton } from '@/delivery/deliveryStyles';
 
-const StyledGrid = styled.div`
+const StyledStageGrid = styled.div`
+  align-items: start;
   display: grid;
-  gap: ${themeCssVariables.spacing[4]};
-  grid-template-columns: minmax(260px, 320px) 1fr;
+  gap: 24px;
+  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
 
-  @media (max-width: 1080px) {
+  @media (max-width: 960px) {
     grid-template-columns: 1fr;
   }
 `;
 
-const StyledCard = styled.div`
-  background: ${themeCssVariables.background.secondary};
-  border: 1px solid ${themeCssVariables.border.color.medium};
-  border-radius: ${themeCssVariables.border.radius.md};
+const StyledPreviewColumn = styled.div`
   display: flex;
   flex-direction: column;
-  gap: ${themeCssVariables.spacing[3]};
-  padding: ${themeCssVariables.spacing[4]};
+  gap: 10px;
+  position: sticky;
+  top: 12px;
 `;
 
-const StyledField = styled.label`
+const StyledVideoFrame = styled.div`
+  aspect-ratio: 9 / 16;
+  background: #0b0c10;
+  border: 1px solid ${themeCssVariables.border.color.medium};
+  border-radius: 14px;
+  overflow: hidden;
+  position: relative;
+  user-select: none;
+  width: 100%;
+
+  video {
+    display: block;
+    height: 100%;
+    object-fit: cover;
+    width: 100%;
+  }
+`;
+
+const StyledOverlayAnchor = styled.div`
+  left: 0;
+  pointer-events: none;
+  position: absolute;
+  transform: translate(-50%, -50%);
+  transition: opacity 120ms ease;
+  z-index: 4;
+`;
+
+const StyledPreviewCaption = styled.div`
+  align-items: center;
+  color: ${themeCssVariables.font.color.tertiary};
+  display: flex;
+  font-size: 11px;
+  justify-content: space-between;
+  padding: 0 2px;
+`;
+
+const StyledRightColumn = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+`;
+
+const StyledPanel = styled.div`
+  background: ${themeCssVariables.background.secondary};
+  border: 1px solid ${themeCssVariables.border.color.light};
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+`;
+
+const StyledPanelHeader = styled.div`
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
+
+  h4 {
+    color: ${themeCssVariables.font.color.primary};
+    font-size: 14px;
+    font-weight: 600;
+    margin: 0;
+  }
+
+  span {
+    color: ${themeCssVariables.font.color.tertiary};
+    font-size: 12px;
+  }
+`;
+
+const StyledSubtleButton = styled.button`
+  align-items: center;
+  background: ${themeCssVariables.background.primary};
+  border: 1px solid ${themeCssVariables.border.color.medium};
+  border-radius: 8px;
+  color: ${themeCssVariables.font.color.primary};
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 500;
+  gap: 6px;
+  padding: 6px 11px;
+
+  &:hover:not(:disabled) {
+    border-color: ${themeCssVariables.font.color.primary};
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+`;
+
+const StyledPrimaryButton = styled.button`
+  align-items: center;
+  background: ${themeCssVariables.font.color.primary};
+  border: none;
+  border-radius: 10px;
+  color: ${themeCssVariables.font.color.inverted};
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 600;
+  gap: 8px;
+  justify-content: center;
+  padding: 11px 18px;
+  width: 100%;
+
+  &:hover:not(:disabled) {
+    opacity: 0.92;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+`;
+
+const StyledHookList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+`;
+
+const StyledHookRow = styled.div`
+  align-items: center;
+  background: ${themeCssVariables.background.primary};
+  border: 1px solid ${themeCssVariables.border.color.light};
+  border-radius: 9px;
+  cursor: pointer;
+  display: flex;
+  gap: 10px;
+  padding: 9px 11px;
+  transition: border-color 120ms ease;
+
+  &[data-selected='true'] {
+    background: ${themeCssVariables.color.transparent.blue2};
+    border-color: ${themeCssVariables.color.blue};
+  }
+
+  &[data-previewing='true'] {
+    box-shadow: 0 0 0 1px ${themeCssVariables.font.color.primary};
+  }
+
+  input[type='checkbox'] {
+    cursor: pointer;
+    flex-shrink: 0;
+    height: 15px;
+    width: 15px;
+  }
+
+  input[type='text'] {
+    background: transparent;
+    border: none;
+    color: ${themeCssVariables.font.color.primary};
+    flex: 1;
+    font-family: inherit;
+    font-size: 13px;
+    min-width: 0;
+    outline: none;
+  }
+`;
+
+const StyledAnglePill = styled.span`
+  background: ${themeCssVariables.background.tertiary};
+  border-radius: 999px;
+  color: ${themeCssVariables.font.color.secondary};
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 2px 7px;
+`;
+
+const StyledAddHookForm = styled.form`
+  display: flex;
+  gap: 8px;
+
+  input {
+    background: ${themeCssVariables.background.primary};
+    border: 1px solid ${themeCssVariables.border.color.medium};
+    border-radius: 8px;
+    color: ${themeCssVariables.font.color.primary};
+    flex: 1;
+    font-size: 12px;
+    padding: 8px 10px;
+  }
+`;
+
+const StyledToggleHeader = styled.button`
+  align-items: center;
+  background: transparent;
+  border: none;
+  color: ${themeCssVariables.font.color.primary};
+  cursor: pointer;
+  display: flex;
+  font-size: 13px;
+  font-weight: 600;
+  justify-content: space-between;
+  padding: 0;
+  width: 100%;
+
+  small {
+    color: ${themeCssVariables.font.color.tertiary};
+    font-size: 11px;
+    font-weight: 400;
+  }
+`;
+
+const StyledStyleGrid = styled.div`
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+`;
+
+const StyledMiniField = styled.label`
   color: ${themeCssVariables.font.color.secondary};
   display: flex;
   flex-direction: column;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
-  gap: 5px;
+  gap: 4px;
 
   input,
-  select,
-  textarea {
+  select {
     background: ${themeCssVariables.background.primary};
     border: 1px solid ${themeCssVariables.border.color.medium};
-    border-radius: ${themeCssVariables.border.radius.sm};
+    border-radius: 6px;
     color: ${themeCssVariables.font.color.primary};
-    font-family: inherit;
-    font-size: 13px;
-    padding: 8px 10px;
-  }
-
-  textarea {
-    min-height: 76px;
-    resize: vertical;
+    font-size: 12px;
+    padding: 6px 8px;
   }
 `;
 
-const StyledHookOption = styled.div<{ selected: boolean }>`
-  background: ${({ selected }) =>
-    selected
-      ? themeCssVariables.color.transparent.iris2
-      : themeCssVariables.background.primary};
-  border: 1px solid
-    ${({ selected }) =>
-      selected
-        ? themeCssVariables.color.blue
-        : themeCssVariables.border.color.medium};
-  border-radius: ${themeCssVariables.border.radius.sm};
+const StyledPresetRow = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+`;
+
+const StyledPresetChip = styled.button`
+  background: ${themeCssVariables.background.primary};
+  border: 1px solid ${themeCssVariables.border.color.medium};
+  border-radius: 999px;
+  color: ${themeCssVariables.font.color.secondary};
   cursor: pointer;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 10px;
+
+  &[data-active='true'] {
+    background: ${themeCssVariables.font.color.primary};
+    border-color: ${themeCssVariables.font.color.primary};
+    color: ${themeCssVariables.font.color.inverted};
+  }
+`;
+
+const StyledDriveRow = styled.div`
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+
+  select,
+  input {
+    background: ${themeCssVariables.background.primary};
+    border: 1px solid ${themeCssVariables.border.color.medium};
+    border-radius: 8px;
+    color: ${themeCssVariables.font.color.primary};
+    flex: 1;
+    font-size: 12px;
+    min-width: 160px;
+    padding: 7px 10px;
+  }
+`;
+
+const StyledStatusBanner = styled.div`
+  background: ${themeCssVariables.background.primary};
+  border: 1px solid ${themeCssVariables.border.color.medium};
+  border-radius: 10px;
+  color: ${themeCssVariables.font.color.primary};
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 10px 12px;
+  gap: 6px;
+  padding: 12px;
+
+  a {
+    color: ${themeCssVariables.color.blue};
+    font-size: 12px;
+    font-weight: 500;
+    text-decoration: none;
+  }
 `;
 
-const StyledBadge = styled.span<{ tone?: 'ok' | 'info' | 'warn' }>`
-  background: ${({ tone }) =>
-    tone === 'ok'
-      ? themeCssVariables.color.transparent.green3
-      : tone === 'warn'
-        ? themeCssVariables.color.transparent.amber3
-        : themeCssVariables.color.transparent.iris3};
-  border-radius: 999px;
-  color: ${({ tone }) =>
-    tone === 'ok'
-      ? themeCssVariables.color.green11
-      : tone === 'warn'
-        ? themeCssVariables.color.amber11
-        : themeCssVariables.color.iris11};
-  font-size: 11px;
-  font-weight: 600;
-  padding: 2px 8px;
+const StyledErrorText = styled.div`
+  color: ${themeCssVariables.color.red};
+  font-size: 12px;
 `;
 
-const STYLE_PRESET_OPTIONS = [
-  { key: 'TIKTOK_PILL', label: 'TikTok Pill (Clean White Box)' },
-  { key: 'MINIMAL_BOLD', label: 'Minimal Bold (Outline)' },
-  { key: 'NEON_STREET', label: 'Neon Streetwear' },
-  { key: 'EDITORIAL_SERIF', label: 'Editorial Luxury' },
-  { key: 'HIGH_CONTRAST_YELLOW', label: 'High-Contrast Yellow' },
-];
+const StyledSuccessText = styled.div`
+  color: ${themeCssVariables.color.green};
+  font-size: 12px;
+  font-weight: 500;
+`;
 
-type SelectedHookDraft = {
+const StyledEmptyCard = styled.div`
+  background: ${themeCssVariables.background.secondary};
+  border: 1px dashed ${themeCssVariables.border.color.medium};
+  border-radius: 12px;
+  color: ${themeCssVariables.font.color.secondary};
+  font-size: 13px;
+  padding: 40px 20px;
+  text-align: center;
+`;
+
+type HookDraftItem = {
   id: string;
   hookText: string;
   angleTag: string;
@@ -115,629 +363,897 @@ type SelectedHookDraft = {
   selected: boolean;
 };
 
+type OverlayVisualStyle = {
+  presetKey: 'TIKTOK_PILL' | 'MINIMAL_CLEAN' | 'BOLD_OUTLINE' | 'SUBTLE_BOX';
+  fontFamily: string;
+  fontSizePct: number;
+  textColor: string;
+  backgroundColor: string;
+  backgroundOpacity: number;
+  xPct: number;
+  yPct: number;
+  maxWidthPct: number;
+  borderRadiusPx: number;
+  strokeWidthPx: number;
+  strokeColor: string;
+};
+
+const STYLE_PRESET_MAP: Record<
+  OverlayVisualStyle['presetKey'],
+  { label: string; style: Partial<OverlayVisualStyle> }
+> = {
+  TIKTOK_PILL: {
+    label: 'TikTok Pill',
+    style: {
+      textColor: '#111111',
+      backgroundColor: '#FFFFFF',
+      backgroundOpacity: 0.96,
+      borderRadiusPx: 14,
+      strokeWidthPx: 0,
+    },
+  },
+  MINIMAL_CLEAN: {
+    label: 'Minimal Clean',
+    style: {
+      textColor: '#FFFFFF',
+      backgroundColor: '#000000',
+      backgroundOpacity: 0,
+      borderRadiusPx: 0,
+      strokeWidthPx: 0,
+    },
+  },
+  BOLD_OUTLINE: {
+    label: 'Bold Outline',
+    style: {
+      textColor: '#FFFFFF',
+      backgroundColor: '#000000',
+      backgroundOpacity: 0,
+      borderRadiusPx: 0,
+      strokeWidthPx: 3,
+      strokeColor: '#000000',
+    },
+  },
+  SUBTLE_BOX: {
+    label: 'Subtle Dark',
+    style: {
+      textColor: '#FFFFFF',
+      backgroundColor: '#000000',
+      backgroundOpacity: 0.58,
+      borderRadiusPx: 12,
+      strokeWidthPx: 0,
+    },
+  },
+};
+
+const DEFAULT_VISUAL_STYLE: OverlayVisualStyle = {
+  presetKey: 'TIKTOK_PILL',
+  fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
+  fontSizePct: 4.4,
+  textColor: '#111111',
+  backgroundColor: '#FFFFFF',
+  backgroundOpacity: 0.96,
+  xPct: 50,
+  yPct: 24,
+  maxWidthPct: 82,
+  borderRadiusPx: 14,
+  strokeWidthPx: 0,
+  strokeColor: '#000000',
+};
+
+const hexToRgba = (hex: string, alpha: number): string => {
+  const clean = hex.replace('#', '');
+  const full =
+    clean.length === 3
+      ? clean
+          .split('')
+          .map((c) => c + c)
+          .join('')
+      : clean.padEnd(6, '0').slice(0, 6);
+  const r = parseInt(full.slice(0, 2), 16) || 0;
+  const g = parseInt(full.slice(2, 4), 16) || 0;
+  const b = parseInt(full.slice(4, 6), 16) || 0;
+  return `rgba(${r}, ${g}, ${b}, ${Math.max(0, Math.min(1, alpha))})`;
+};
+
 type DeliveryStudioHooksStageProps = {
-  generatedVideos: StudioAssetDTO[];
-  selectedVideoAssetId: string | null;
+  companyId: string | null;
+  selectedVideo: StudioAssetDTO | null;
   hookPresets: StudioPresetDTO[];
-  onSelectVideo: (assetId: string) => void;
-  onOpenPresetModal: () => void;
-  onWorkspaceRefresh: () => void;
+  hookDefault: StudioHookDefaultSettingDTO | null;
+  hasClientHookDefault: boolean;
+  onRefreshWorkspace: () => Promise<void> | void;
 };
 
 export const DeliveryStudioHooksStage = ({
-  generatedVideos,
-  selectedVideoAssetId,
+  companyId,
+  selectedVideo,
   hookPresets,
-  onSelectVideo,
-  onOpenPresetModal,
-  onWorkspaceRefresh,
+  hookDefault,
+  hasClientHookDefault,
+  onRefreshWorkspace,
 }: DeliveryStudioHooksStageProps) => {
-  const activeVideo =
-    generatedVideos.find((v) => v.id === selectedVideoAssetId) ??
-    generatedVideos[0] ??
-    null;
-
-  const [hookPresetId, setHookPresetId] = useState<string>(
-    hookPresets[0]?.id ?? '',
-  );
-  const [masterPrompt, setMasterPrompt] = useState<string>(
-    hookPresets[0]?.masterPrompt ?? '',
-  );
-  const [examplesText, setExamplesText] = useState<string>(
-    (hookPresets[0]?.examplesJson ?? []).join('\n'),
-  );
-  const [platform, setPlatform] = useState<
-    'ALL' | 'TIKTOK' | 'INSTAGRAM_REELS' | 'META_ADS' | 'YOUTUBE_SHORTS'
-  >('TIKTOK');
-  const [funnelStage, setFunnelStage] = useState<
-    'COLD' | 'WARM' | 'RETARGETING' | 'ORGANIC'
-  >('COLD');
-  const [suggestionCount, setSuggestionCount] = useState(8);
-  const [stylePreset, setStylePreset] = useState('TIKTOK_PILL');
-  const [syncToDrive, setSyncToDrive] = useState(true);
-  const [hookDrafts, setHookDrafts] = useState<SelectedHookDraft[]>([]);
+  const [hooks, setHooks] = useState<HookDraftItem[]>([]);
+  const [previewHookId, setPreviewHookId] = useState<string | null>(null);
   const [customHookInput, setCustomHookInput] = useState('');
-  const [statusMessage, setStatusMessage] = useState('');
-  const [errorMessage, setErrorMessage] = useState('');
+  const [styleOpen, setStyleOpen] = useState(false);
+  const [draggingOverlay, setDraggingOverlay] = useState(false);
+
+  const [visualStyle, setVisualStyle] =
+    useState<OverlayVisualStyle>(DEFAULT_VISUAL_STYLE);
+  const [startSec, setStartSec] = useState(0);
+  const [durationSec, setDurationSec] = useState(3.5);
+  const [currentVideoTime, setCurrentVideoTime] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  // Drive folder selection
+  const [driveMode, setDriveMode] = useState<'AUTO' | 'EXISTING' | 'CUSTOM'>(
+    'AUTO',
+  );
+  const [selectedDriveFolderId, setSelectedDriveFolderId] = useState('');
+  const [customSubfolderName, setCustomSubfolderName] = useState('');
+
+  const [busySuggest, setBusySuggest] = useState(false);
+  const [busySave, setBusySave] = useState(false);
+  const [busySaveDefault, setBusySaveDefault] = useState(false);
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // Apply client/workspace default style when switching clients
+  useEffect(() => {
+    if (!hookDefault) return;
+    const cfg = hookDefault.styleConfig ?? {};
+    setVisualStyle((prev) => ({
+      ...prev,
+      fontSizePct:
+        typeof cfg.fontSizePct === 'number' ? cfg.fontSizePct : prev.fontSizePct,
+      textColor:
+        typeof cfg.textColor === 'string' ? cfg.textColor : prev.textColor,
+      backgroundColor:
+        typeof cfg.backgroundColor === 'string'
+          ? cfg.backgroundColor
+          : prev.backgroundColor,
+      backgroundOpacity:
+        typeof cfg.backgroundOpacity === 'number'
+          ? cfg.backgroundOpacity
+          : prev.backgroundOpacity,
+      xPct: typeof cfg.xPct === 'number' ? cfg.xPct : prev.xPct,
+      yPct: typeof cfg.yPct === 'number' ? cfg.yPct : prev.yPct,
+      maxWidthPct:
+        typeof cfg.maxWidthPct === 'number' ? cfg.maxWidthPct : prev.maxWidthPct,
+      borderRadiusPx:
+        typeof cfg.borderRadiusPx === 'number'
+          ? cfg.borderRadiusPx
+          : prev.borderRadiusPx,
+      strokeWidthPx:
+        typeof cfg.strokeWidthPx === 'number'
+          ? cfg.strokeWidthPx
+          : prev.strokeWidthPx,
+    }));
+    if (typeof hookDefault.startSec === 'number') {
+      setStartSec(hookDefault.startSec);
+    }
+    if (typeof hookDefault.durationSec === 'number') {
+      setDurationSec(hookDefault.durationSec);
+    }
+  }, [hookDefault]);
 
   const hookProjectQuery = useQuery<{
     deliveryStudioHookProject: StudioHookProjectDTO | null;
   }>(GET_DELIVERY_STUDIO_HOOK_PROJECT, {
-    variables: { assetId: activeVideo?.id ?? '' },
-    skip: !activeVideo?.id,
+    variables: { assetId: selectedVideo?.id ?? '' },
+    skip: !selectedVideo?.id,
     fetchPolicy: 'network-only',
-    pollInterval: 5000,
   });
 
-  const [suggestHooks, { loading: suggesting }] = useMutation<{
-    suggestDeliveryStudioVideoHooks: {
-      deliverableId: string;
-      hookProject: StudioHookProjectDTO;
-    };
+  const driveFoldersQuery = useQuery<{
+    deliveryStudioClientDriveFolders: StudioDriveFoldersResponseDTO;
+  }>(GET_DELIVERY_STUDIO_CLIENT_DRIVE_FOLDERS, {
+    variables: { companyId: companyId ?? '' },
+    skip: !companyId,
+    fetchPolicy: 'cache-and-network',
+  });
+
+  const [suggestHooksMutation] = useMutation<{
+    suggestDeliveryStudioVideoHooks: { hookProject: StudioHookProjectDTO };
   }>(SUGGEST_DELIVERY_STUDIO_VIDEO_HOOKS);
 
-  const [renderHooks, { loading: rendering }] = useMutation<{
-    renderDeliveryStudioVideoHooks: {
-      deliverableId: string;
-      hookProject: StudioHookProjectDTO;
-    };
+  const [renderHooksMutation] = useMutation<{
+    renderDeliveryStudioVideoHooks: { hookProject: StudioHookProjectDTO };
   }>(RENDER_DELIVERY_STUDIO_VIDEO_HOOKS);
 
+  const [saveVideoToDriveMutation] = useMutation<{
+    saveDeliveryStudioVideoToDrive: {
+      deliverableId: string;
+      queuedDriveSync: boolean;
+    };
+  }>(SAVE_DELIVERY_STUDIO_VIDEO_TO_DRIVE);
+
+  const [saveHookDefaultMutation] = useMutation(
+    SAVE_DELIVERY_STUDIO_HOOK_DEFAULT,
+  );
+
   const hookProject = hookProjectQuery.data?.deliveryStudioHookProject ?? null;
+  const driveInfo = driveFoldersQuery.data?.deliveryStudioClientDriveFolders;
+  const driveSubfolders = driveInfo?.subfolders ?? driveInfo?.folders ?? [];
 
+  // Hydrate suggestions from existing hook project
   useEffect(() => {
-    if (!hookProject?.aiSuggestions?.length) return;
-    setHookDrafts((prev) => {
-      if (prev.length > 0) return prev;
-      return hookProject.aiSuggestions.map((item, idx) => ({
-        id: `sug-${idx}`,
-        hookText: item.hookText,
-        angleTag: item.angleTag ?? '',
-        rationale: item.rationale ?? '',
-        selected: idx < 4,
-      }));
-    });
-  }, [hookProject?.aiSuggestions]);
-
-  const handleApplyHookPreset = (id: string) => {
-    setHookPresetId(id);
-    const found = hookPresets.find((p) => p.id === id);
-    if (found) {
-      setMasterPrompt(found.masterPrompt || '');
-      setExamplesText((found.examplesJson ?? []).join('\n'));
-      if (found.configJson?.platform) setPlatform(found.configJson.platform);
-      if (found.configJson?.funnelStage) {
-        setFunnelStage(found.configJson.funnelStage);
-      }
+    if (!hookProject) {
+      setHooks([]);
+      setPreviewHookId(null);
+      return;
     }
-  };
+    const existingSuggestions = hookProject.aiSuggestions ?? [];
+    if (existingSuggestions.length > 0 && hooks.length === 0) {
+      const mapped: HookDraftItem[] = existingSuggestions.map((s, idx) => ({
+        id: `sug-${idx}-${s.hookText.slice(0, 12)}`,
+        hookText: s.hookText,
+        angleTag: s.angleTag ?? '',
+        rationale: s.rationale ?? '',
+        selected: false,
+      }));
+      setHooks(mapped);
+      setPreviewHookId(mapped[0]?.id ?? null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hookProject?.id]);
 
-  const handleAssessAndSuggest = async () => {
-    if (!activeVideo) return;
-    setErrorMessage('');
-    setStatusMessage('');
+  // Poll while rendering variations
+  const isRendering = Boolean(
+    hookProject?.variations.some((v) =>
+      ['QUEUED', 'RENDERING'].includes(v.renderStatus),
+    ),
+  );
+  useEffect(() => {
+    if (!isRendering) return;
+    const timer = window.setInterval(() => {
+      void hookProjectQuery.refetch();
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, [isRendering, hookProjectQuery]);
+
+  const selectedHooks = useMemo(
+    () => hooks.filter((h) => h.selected && h.hookText.trim().length > 0),
+    [hooks],
+  );
+
+  const activePreviewHook = useMemo(() => {
+    const byId = hooks.find((h) => h.id === previewHookId);
+    if (byId) return byId;
+    if (selectedHooks.length > 0) return selectedHooks[0];
+    return hooks[0] ?? null;
+  }, [hooks, previewHookId, selectedHooks]);
+
+  const productNameFromMeta =
+    typeof selectedVideo?.metadata?.productName === 'string'
+      ? selectedVideo.metadata.productName
+      : '';
+
+  if (!selectedVideo) {
+    return (
+      <StyledEmptyCard>
+        Approve a generated AI video from Step 2 to add optional text hooks and
+        save to Google Drive.
+      </StyledEmptyCard>
+    );
+  }
+
+  const handleSuggestHooks = async () => {
+    setError(null);
+    setFeedback(null);
+    setBusySuggest(true);
     try {
-      const exampleHooks = examplesText
-        .split('\n')
-        .map((line) => line.trim())
-        .filter(Boolean);
-      const res = await suggestHooks({
+      const defaultPreset = hookPresets[0];
+      const res = await suggestHooksMutation({
         variables: {
           input: {
-            assetId: activeVideo.id,
-            hookPresetId: hookPresetId || null,
-            masterPrompt: masterPrompt.trim() || undefined,
-            exampleHooks,
-            platform,
-            funnelStage,
-            suggestionCount,
+            assetId: selectedVideo.id,
+            hookPresetId: defaultPreset?.id ?? undefined,
+            suggestionCount: 6,
           },
         },
       });
-      const proj = res.data?.suggestDeliveryStudioVideoHooks?.hookProject;
-      if (proj?.aiSuggestions?.length) {
-        setHookDrafts(
-          proj.aiSuggestions.map((item, idx) => ({
-            id: `sug-${Date.now()}-${idx}`,
-            hookText: item.hookText,
-            angleTag: item.angleTag ?? '',
-            rationale: item.rationale ?? '',
-            selected: idx < 4,
-          })),
-        );
-      }
-      setStatusMessage(
-        'Video assessed with Brand Knowledge & examples. Pick any N hooks below!',
-      );
+      const suggestions =
+        res.data?.suggestDeliveryStudioVideoHooks?.hookProject?.aiSuggestions ??
+        [];
+      const mapped: HookDraftItem[] = suggestions.map((s, idx) => ({
+        id: `ai-${Date.now()}-${idx}`,
+        hookText: s.hookText,
+        angleTag: s.angleTag ?? '',
+        rationale: s.rationale ?? '',
+        selected: idx < 3,
+      }));
+      setHooks(mapped);
+      setPreviewHookId(mapped[0]?.id ?? null);
       void hookProjectQuery.refetch();
-      onWorkspaceRefresh();
     } catch (err) {
-      setErrorMessage(
-        err instanceof Error ? err.message : 'Failed to suggest hooks.',
+      setError(
+        err instanceof Error ? err.message : 'Failed to suggest text hooks.',
       );
+    } finally {
+      setBusySuggest(false);
     }
   };
 
-  const handleAddCustomHook = () => {
-    const clean = customHookInput.trim();
-    if (!clean) return;
-    setHookDrafts((prev) => [
-      ...prev,
-      {
-        id: `custom-${Date.now()}`,
-        hookText: clean,
-        angleTag: 'Custom',
-        rationale: 'Added manually',
-        selected: true,
-      },
-    ]);
+  const handleAddCustomHook = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleaned = customHookInput.trim();
+    if (!cleaned) return;
+    const item: HookDraftItem = {
+      id: `custom-${Date.now()}`,
+      hookText: cleaned,
+      angleTag: 'Custom',
+      rationale: '',
+      selected: true,
+    };
+    setHooks((prev) => [...prev, item]);
+    setPreviewHookId(item.id);
     setCustomHookInput('');
   };
 
-  const selectedHooks = hookDrafts.filter(
-    (h) => h.selected && h.hookText.trim().length > 0,
-  );
+  const applyStylePreset = (presetKey: OverlayVisualStyle['presetKey']) => {
+    const preset = STYLE_PRESET_MAP[presetKey];
+    setVisualStyle((prev) => ({
+      ...prev,
+      presetKey,
+      ...preset.style,
+    }));
+  };
 
-  const handleRenderN = async () => {
-    if (!activeVideo || selectedHooks.length === 0) return;
-    setErrorMessage('');
-    setStatusMessage('');
+  const buildStylePayload = () => ({
+    fontFamily: visualStyle.fontFamily,
+    fontSizePct: visualStyle.fontSizePct,
+    textColor: visualStyle.textColor,
+    backgroundColor: visualStyle.backgroundColor,
+    backgroundOpacity: visualStyle.backgroundOpacity,
+    xPct: visualStyle.xPct,
+    yPct: visualStyle.yPct,
+    maxWidthPct: visualStyle.maxWidthPct,
+    borderRadiusPx: visualStyle.borderRadiusPx,
+    strokeWidthPx: visualStyle.strokeWidthPx,
+    strokeColor: visualStyle.strokeColor,
+  });
+
+  const handleSaveClientDefault = async () => {
+    setError(null);
+    setFeedback(null);
+    setBusySaveDefault(true);
     try {
-      await renderHooks({
+      await saveHookDefaultMutation({
         variables: {
           input: {
-            assetId: activeVideo.id,
-            stylePreset,
-            syncToDrive,
+            companyId: companyId ?? null,
+            styleConfig: buildStylePayload(),
+            startSec,
+            durationSec,
+          },
+        },
+      });
+      setFeedback('Saved as client default for future videos.');
+      await onRefreshWorkspace();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Failed to save client default.',
+      );
+    } finally {
+      setBusySaveDefault(false);
+    }
+  };
+
+  const resolveDriveRoutingInput = () => {
+    if (driveMode === 'EXISTING' && selectedDriveFolderId) {
+      return {
+        driveTargetFolderId: selectedDriveFolderId,
+        driveSubfolderName: null,
+      };
+    }
+    if (driveMode === 'CUSTOM' && customSubfolderName.trim()) {
+      return {
+        driveTargetFolderId: null,
+        driveSubfolderName: customSubfolderName.trim(),
+      };
+    }
+    return {
+      driveTargetFolderId: null,
+      driveSubfolderName: productNameFromMeta || null,
+    };
+  };
+
+  const handleSaveOrRender = async () => {
+    setError(null);
+    setFeedback(null);
+    setBusySave(true);
+    const driveRouting = resolveDriveRoutingInput();
+
+    try {
+      if (selectedHooks.length === 0) {
+        // 0 hooks selected -> save clean approved raw video straight to Drive
+        const res = await saveVideoToDriveMutation({
+          variables: {
+            input: {
+              assetId: selectedVideo.id,
+              ...driveRouting,
+            },
+          },
+        });
+        const synced = res.data?.saveDeliveryStudioVideoToDrive?.queuedDriveSync;
+        setFeedback(
+          synced
+            ? 'Approved video queued for Google Drive sync.'
+            : 'Video saved to Deliverables (connect Google Drive to auto-sync).',
+        );
+        await onRefreshWorkspace();
+        return;
+      }
+
+      // N hooks selected -> render N variations via FFmpeg & sync all to Drive
+      await renderHooksMutation({
+        variables: {
+          input: {
+            assetId: selectedVideo.id,
+            stylePreset: visualStyle.presetKey,
+            styleConfig: buildStylePayload(),
+            syncToDrive: true,
+            ...driveRouting,
             hooks: selectedHooks.map((h) => ({
               hookText: h.hookText.trim(),
               angleTag: h.angleTag,
               rationale: h.rationale,
+              startSec,
+              endSec: Number((startSec + durationSec).toFixed(2)),
             })),
           },
         },
       });
-      setStatusMessage(
-        `Queued ${selectedHooks.length} text-hook variation${selectedHooks.length === 1 ? '' : 's'} for FFmpeg rendering${syncToDrive ? ' + Google Drive sync' : ''}!`,
+      setFeedback(
+        `Rendering ${selectedHooks.length} variation${selectedHooks.length === 1 ? '' : 's'} & syncing to Google Drive…`,
       );
-      void hookProjectQuery.refetch();
-      onWorkspaceRefresh();
+      await hookProjectQuery.refetch();
+      await onRefreshWorkspace();
     } catch (err) {
-      setErrorMessage(
-        err instanceof Error ? err.message : 'Failed to render hook variations.',
+      setError(
+        err instanceof Error ? err.message : 'Failed to save video to Drive.',
       );
+    } finally {
+      setBusySave(false);
     }
   };
 
-  if (!activeVideo) {
-    return (
-      <StyledCard>
-        <strong>No generated AI videos in this tab yet</strong>
-        <p style={{ margin: 0, fontSize: 13, opacity: 0.75 }}>
-          Generate an AI video in Step 2 or Step 3 first. Once ready, it
-          appears here automatically for Gemini video assessment, dynamic N
-          text-hook variations, and 1-click Google Drive sync.
-        </p>
-      </StyledCard>
+  const updateOverlayPositionFromPointer = (
+    rect: DOMRect,
+    clientX: number,
+    clientY: number,
+  ) => {
+    if (rect.width <= 0 || rect.height <= 0) return;
+    const xPct = Math.round(
+      Math.max(15, Math.min(85, ((clientX - rect.left) / rect.width) * 100)),
     );
-  }
+    const yPct = Math.round(
+      Math.max(12, Math.min(88, ((clientY - rect.top) / rect.height) * 100)),
+    );
+    setVisualStyle((prev) => ({ ...prev, xPct, yPct }));
+  };
+
+  const showOverlayNow =
+    Boolean(activePreviewHook?.hookText.trim()) &&
+    (!isPlaying ||
+      (currentVideoTime >= startSec &&
+        currentVideoTime <= startSec + durationSec));
+
+  const previewFontPx = Math.max(12, Math.round(visualStyle.fontSizePct * 3.8));
 
   return (
-    <StyledGrid>
-      {/* Left column: Video preview + assessment summary */}
-      <StyledCard>
-        <StyledField>
-          Active Generated AI Video
-          <select
-            value={activeVideo.id}
-            onChange={(e) => {
-              setHookDrafts([]);
-              onSelectVideo(e.target.value);
-            }}
-          >
-            {generatedVideos.map((v) => (
-              <option key={v.id} value={v.id}>
-                {v.title} ({v.modelKey})
-              </option>
-            ))}
-          </select>
-        </StyledField>
-
-        <video
-          key={activeVideo.id}
-          controls
-          playsInline
-          src={studioMediaUrl(activeVideo.mediaPath)}
-          style={{
-            width: '100%',
-            maxHeight: 380,
-            borderRadius: 8,
-            background: themeCssVariables.background.invertedPrimary,
+    <StyledStageGrid>
+      <StyledPreviewColumn>
+        <StyledVideoFrame
+          style={{ cursor: styleOpen ? 'crosshair' : 'default' }}
+          onPointerDown={(e) => {
+            if (!styleOpen) return;
+            setDraggingOverlay(true);
+            updateOverlayPositionFromPointer(
+              e.currentTarget.getBoundingClientRect(),
+              e.clientX,
+              e.clientY,
+            );
           }}
-        />
+          onPointerMove={(e) => {
+            if (!draggingOverlay) return;
+            updateOverlayPositionFromPointer(
+              e.currentTarget.getBoundingClientRect(),
+              e.clientX,
+              e.clientY,
+            );
+          }}
+          onPointerUp={() => setDraggingOverlay(false)}
+          onPointerLeave={() => setDraggingOverlay(false)}
+        >
+          <video
+            src={studioMediaUrl(selectedVideo.mediaPath)}
+            poster={studioMediaUrl(selectedVideo.thumbnailPath)}
+            controls
+            playsInline
+            onPlay={() => setIsPlaying(true)}
+            onPause={() => setIsPlaying(false)}
+            onTimeUpdate={(e) =>
+              setCurrentVideoTime(e.currentTarget.currentTime)
+            }
+          />
 
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-          <StyledBadge tone="info">{activeVideo.modelKey}</StyledBadge>
-          <StyledBadge tone="ok">via {activeVideo.providerUsed}</StyledBadge>
-          {activeVideo.deliverableId && (
-            <Link
-              to={`/delivery?view=hook-studio&deliverable=${activeVideo.deliverableId}`}
-              style={{ fontSize: 12, fontWeight: 600 }}
+          {showOverlayNow && activePreviewHook && (
+            <StyledOverlayAnchor
+              style={{
+                left: `${visualStyle.xPct}%`,
+                top: `${visualStyle.yPct}%`,
+                maxWidth: `${visualStyle.maxWidthPct}%`,
+              }}
             >
-              Open Full Visual Canvas →
-            </Link>
-          )}
-        </div>
-
-        {hookProject?.videoAnalysis?.summary && (
-          <div
-            style={{
-              background: themeCssVariables.color.transparent.iris2,
-              borderRadius: 8,
-              padding: 10,
-              fontSize: 12,
-              lineHeight: 1.45,
-            }}
-          >
-            <strong>Gemini Video Assessment:</strong>
-            <div style={{ marginTop: 4 }}>
-              {hookProject.videoAnalysis.summary}
-            </div>
-          </div>
-        )}
-      </StyledCard>
-
-      {/* Right column: Master Prompt + Examples -> Dynamic N-Hook Selector -> Render & Drive */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <StyledCard>
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-            }}
-          >
-            <strong>1. Video Assessment &amp; Hook Master Prompt</strong>
-            <StyledDeliveryButton type="button" onClick={onOpenPresetModal}>
-              + Manage Hook Presets
-            </StyledDeliveryButton>
-          </div>
-
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <StyledField style={{ flex: 2, minWidth: 180 }}>
-              Saved Hook Preset
-              <select
-                value={hookPresetId}
-                onChange={(e) => handleApplyHookPreset(e.target.value)}
-              >
-                <option value="">Custom (Ad-hoc)</option>
-                {hookPresets.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-            </StyledField>
-            <StyledField style={{ flex: 1, minWidth: 120 }}>
-              Platform
-              <select
-                value={platform}
-                onChange={(e) =>
-                  setPlatform(
-                    e.target.value as
-                      | 'ALL'
-                      | 'TIKTOK'
-                      | 'INSTAGRAM_REELS'
-                      | 'META_ADS'
-                      | 'YOUTUBE_SHORTS',
-                  )
-                }
-              >
-                <option value="TIKTOK">TikTok</option>
-                <option value="INSTAGRAM_REELS">Instagram Reels</option>
-                <option value="META_ADS">Meta Ads</option>
-                <option value="YOUTUBE_SHORTS">YouTube Shorts</option>
-                <option value="ALL">All</option>
-              </select>
-            </StyledField>
-            <StyledField style={{ flex: 1, minWidth: 120 }}>
-              Funnel
-              <select
-                value={funnelStage}
-                onChange={(e) =>
-                  setFunnelStage(
-                    e.target.value as
-                      | 'COLD'
-                      | 'WARM'
-                      | 'RETARGETING'
-                      | 'ORGANIC',
-                  )
-                }
-              >
-                <option value="COLD">Cold</option>
-                <option value="WARM">Warm</option>
-                <option value="RETARGETING">Retargeting</option>
-                <option value="ORGANIC">Organic</option>
-              </select>
-            </StyledField>
-            <StyledField style={{ width: 96 }}>
-              Suggestions
-              <input
-                type="number"
-                min={2}
-                max={12}
-                value={suggestionCount}
-                onChange={(e) =>
-                  setSuggestionCount(
-                    Math.max(2, Math.min(12, Number(e.target.value) || 8)),
-                  )
-                }
-              />
-            </StyledField>
-          </div>
-
-          <StyledField>
-            Hook Master Prompt (combined automatically with Video Assessment +
-            Brand Knowledge)
-            <textarea
-              placeholder="Tell Gemini your exact copywriting style, length, and angle rules..."
-              value={masterPrompt}
-              onChange={(e) => setMasterPrompt(e.target.value)}
-            />
-          </StyledField>
-
-          <StyledField>
-            Fed-in Example Hooks (one per line)
-            <textarea
-              placeholder="Paste winning hooks from this brand or reference ads..."
-              value={examplesText}
-              onChange={(e) => setExamplesText(e.target.value)}
-            />
-          </StyledField>
-
-          <div>
-            <StyledDeliveryButton
-              type="button"
-              data-primary="true"
-              disabled={suggesting}
-              onClick={() => void handleAssessAndSuggest()}
-            >
-              {suggesting
-                ? 'Assessing Video & Writing Hooks…'
-                : '✦ Assess Video & Suggest Text Hooks'}
-            </StyledDeliveryButton>
-          </div>
-        </StyledCard>
-
-        <StyledCard>
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              flexWrap: 'wrap',
-              gap: 8,
-            }}
-          >
-            <strong>
-              2. Pick Your Dynamic Hooks ({selectedHooks.length} selected →
-              renders {selectedHooks.length} video
-              {selectedHooks.length === 1 ? '' : 's'})
-            </strong>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <StyledDeliveryButton
-                type="button"
-                onClick={() =>
-                  setHookDrafts((prev) =>
-                    prev.map((h, i) => ({ ...h, selected: i < 3 })),
-                  )
-                }
-              >
-                Top 3
-              </StyledDeliveryButton>
-              <StyledDeliveryButton
-                type="button"
-                onClick={() =>
-                  setHookDrafts((prev) =>
-                    prev.map((h, i) => ({ ...h, selected: i < 4 })),
-                  )
-                }
-              >
-                Top 4
-              </StyledDeliveryButton>
-              <StyledDeliveryButton
-                type="button"
-                onClick={() =>
-                  setHookDrafts((prev) =>
-                    prev.map((h) => ({ ...h, selected: true })),
-                  )
-                }
-              >
-                Select All
-              </StyledDeliveryButton>
-            </div>
-          </div>
-
-          {hookDrafts.length === 0 ? (
-            <span style={{ fontSize: 12, opacity: 0.7 }}>
-              Click &ldquo;Assess Video &amp; Suggest Text Hooks&rdquo; above,
-              or add your own custom hooks below.
-            </span>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {hookDrafts.map((item) => (
-                <StyledHookOption
-                  key={item.id}
-                  selected={item.selected}
-                  onClick={() =>
-                    setHookDrafts((prev) =>
-                      prev.map((h) =>
-                        h.id === item.id ? { ...h, selected: !h.selected } : h,
-                      ),
-                    )
-                  }
-                >
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={item.selected}
-                      onChange={() => undefined}
-                    />
-                    <input
-                      value={item.hookText}
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={(e) =>
-                        setHookDrafts((prev) =>
-                          prev.map((h) =>
-                            h.id === item.id
-                              ? { ...h, hookText: e.target.value }
-                              : h,
-                          ),
+              <div
+                style={{
+                  background:
+                    visualStyle.backgroundOpacity > 0.01
+                      ? hexToRgba(
+                          visualStyle.backgroundColor,
+                          visualStyle.backgroundOpacity,
                         )
-                      }
-                      style={{
-                        flex: 1,
-                        fontWeight: 600,
-                        fontSize: 13,
-                        background: 'transparent',
-                        border: 'none',
-                        color: 'inherit',
-                      }}
-                    />
-                    {item.angleTag && (
-                      <StyledBadge tone="info">{item.angleTag}</StyledBadge>
-                    )}
-                  </div>
-                  {item.rationale && (
-                    <span style={{ fontSize: 11, opacity: 0.7, paddingLeft: 22 }}>
-                      {item.rationale}
-                    </span>
-                  )}
-                </StyledHookOption>
-              ))}
+                      : 'transparent',
+                  borderRadius: `${visualStyle.borderRadiusPx}px`,
+                  color: visualStyle.textColor,
+                  fontFamily: visualStyle.fontFamily,
+                  fontSize: `${previewFontPx}px`,
+                  fontWeight: 700,
+                  lineHeight: 1.24,
+                  padding:
+                    visualStyle.backgroundOpacity > 0.01
+                      ? '7px 12px'
+                      : '2px 4px',
+                  textAlign: 'center',
+                  textShadow:
+                    visualStyle.strokeWidthPx > 0
+                      ? `0 0 2px ${visualStyle.strokeColor}, 0 2px 6px rgba(0,0,0,0.75)`
+                      : visualStyle.backgroundOpacity <= 0.01
+                        ? '0 2px 8px rgba(0,0,0,0.75)'
+                        : 'none',
+                  wordBreak: 'break-word',
+                }}
+              >
+                {activePreviewHook.hookText}
+              </div>
+            </StyledOverlayAnchor>
+          )}
+        </StyledVideoFrame>
+
+        <StyledPreviewCaption>
+          <span>{selectedVideo.title}</span>
+          <span>
+            {styleOpen
+              ? 'Click video to reposition'
+              : activePreviewHook
+                ? `Previewing hook · ${startSec}s–${(startSec + durationSec).toFixed(1)}s`
+                : 'Clean video (no hook)'}
+          </span>
+        </StyledPreviewCaption>
+      </StyledPreviewColumn>
+
+      <StyledRightColumn>
+        <StyledPanel>
+          <StyledPanelHeader>
+            <div>
+              <h4>Text Hooks</h4>
+              <span>
+                Select 0 to save raw video, or check hooks to render variations
+              </span>
             </div>
+            <StyledSubtleButton
+              type="button"
+              disabled={busySuggest}
+              onClick={() => void handleSuggestHooks()}
+            >
+              {busySuggest ? 'Analyzing video…' : '✦ Suggest with AI'}
+            </StyledSubtleButton>
+          </StyledPanelHeader>
+
+          {hooks.length > 0 && (
+            <StyledHookList>
+              {hooks.map((item) => (
+                <StyledHookRow
+                  key={item.id}
+                  data-selected={item.selected}
+                  data-previewing={activePreviewHook?.id === item.id}
+                  onClick={() => setPreviewHookId(item.id)}
+                >
+                  <input
+                    type="checkbox"
+                    checked={item.selected}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setHooks((prev) =>
+                        prev.map((h) =>
+                          h.id === item.id ? { ...h, selected: checked } : h,
+                        ),
+                      );
+                      setPreviewHookId(item.id);
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                  <input
+                    type="text"
+                    value={item.hookText}
+                    onChange={(e) => {
+                      const text = e.target.value;
+                      setHooks((prev) =>
+                        prev.map((h) =>
+                          h.id === item.id ? { ...h, hookText: text } : h,
+                        ),
+                      );
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPreviewHookId(item.id);
+                    }}
+                  />
+                  {item.angleTag && (
+                    <StyledAnglePill>{item.angleTag}</StyledAnglePill>
+                  )}
+                </StyledHookRow>
+              ))}
+            </StyledHookList>
           )}
 
-          <div style={{ display: 'flex', gap: 8 }}>
+          <StyledAddHookForm onSubmit={handleAddCustomHook}>
             <input
-              style={{ flex: 1, padding: '8px 10px', fontSize: 13 }}
-              placeholder="Add custom text hook..."
+              type="text"
+              placeholder="Write a custom text hook and press Enter…"
               value={customHookInput}
               onChange={(e) => setCustomHookInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  handleAddCustomHook();
+            />
+            <StyledSubtleButton
+              type="submit"
+              disabled={!customHookInput.trim()}
+            >
+              + Add
+            </StyledSubtleButton>
+          </StyledAddHookForm>
+        </StyledPanel>
+
+        <StyledPanel>
+          <StyledToggleHeader
+            type="button"
+            onClick={() => setStyleOpen((prev) => !prev)}
+          >
+            <span>
+              Style &amp; timing ⚙{' '}
+              {hasClientHookDefault && <small>· Client default</small>}
+            </span>
+            <small>{styleOpen ? 'Hide' : 'Customize'}</small>
+          </StyledToggleHeader>
+
+          {styleOpen && (
+            <>
+              <StyledPresetRow>
+                {(
+                  Object.keys(
+                    STYLE_PRESET_MAP,
+                  ) as OverlayVisualStyle['presetKey'][]
+                ).map((key) => (
+                  <StyledPresetChip
+                    key={key}
+                    type="button"
+                    data-active={visualStyle.presetKey === key}
+                    onClick={() => applyStylePreset(key)}
+                  >
+                    {STYLE_PRESET_MAP[key].label}
+                  </StyledPresetChip>
+                ))}
+              </StyledPresetRow>
+
+              <StyledStyleGrid>
+                <StyledMiniField>
+                  Font size ({visualStyle.fontSizePct.toFixed(1)}%)
+                  <input
+                    type="range"
+                    min={2.8}
+                    max={6.8}
+                    step={0.2}
+                    value={visualStyle.fontSizePct}
+                    onChange={(e) =>
+                      setVisualStyle((prev) => ({
+                        ...prev,
+                        fontSizePct: Number(e.target.value),
+                      }))
+                    }
+                  />
+                </StyledMiniField>
+                <StyledMiniField>
+                  Vertical position ({visualStyle.yPct}%)
+                  <input
+                    type="range"
+                    min={12}
+                    max={85}
+                    step={1}
+                    value={visualStyle.yPct}
+                    onChange={(e) =>
+                      setVisualStyle((prev) => ({
+                        ...prev,
+                        yPct: Number(e.target.value),
+                      }))
+                    }
+                  />
+                </StyledMiniField>
+                <StyledMiniField>
+                  Start time (sec)
+                  <input
+                    type="number"
+                    min={0}
+                    max={30}
+                    step={0.1}
+                    value={startSec}
+                    onChange={(e) =>
+                      setStartSec(Math.max(0, Number(e.target.value) || 0))
+                    }
+                  />
+                </StyledMiniField>
+                <StyledMiniField>
+                  Duration (sec)
+                  <input
+                    type="number"
+                    min={0.5}
+                    max={20}
+                    step={0.1}
+                    value={durationSec}
+                    onChange={(e) =>
+                      setDurationSec(
+                        Math.max(0.5, Number(e.target.value) || 3.5),
+                      )
+                    }
+                  />
+                </StyledMiniField>
+                <StyledMiniField>
+                  Text color
+                  <input
+                    type="color"
+                    value={visualStyle.textColor}
+                    onChange={(e) =>
+                      setVisualStyle((prev) => ({
+                        ...prev,
+                        textColor: e.target.value,
+                      }))
+                    }
+                  />
+                </StyledMiniField>
+                <StyledMiniField>
+                  Background color
+                  <input
+                    type="color"
+                    value={visualStyle.backgroundColor}
+                    onChange={(e) =>
+                      setVisualStyle((prev) => ({
+                        ...prev,
+                        backgroundColor: e.target.value,
+                      }))
+                    }
+                  />
+                </StyledMiniField>
+              </StyledStyleGrid>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <StyledSubtleButton
+                  type="button"
+                  disabled={busySaveDefault}
+                  onClick={() => void handleSaveClientDefault()}
+                >
+                  {busySaveDefault ? 'Saving…' : 'Save as client default'}
+                </StyledSubtleButton>
+              </div>
+            </>
+          )}
+        </StyledPanel>
+
+        <StyledPanel>
+          <StyledPanelHeader>
+            <h4>Google Drive Folder</h4>
+            <span>
+              {driveInfo?.connected
+                ? driveInfo.rootFolderName
+                  ? `Connected · ${driveInfo.rootFolderName}`
+                  : 'Connected'
+                : 'Connect Drive in Deliverables to auto-sync'}
+            </span>
+          </StyledPanelHeader>
+
+          <StyledDriveRow>
+            <select
+              value={
+                driveMode === 'AUTO'
+                  ? 'AUTO'
+                  : driveMode === 'CUSTOM'
+                    ? 'CUSTOM'
+                    : selectedDriveFolderId
+              }
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val === 'AUTO') {
+                  setDriveMode('AUTO');
+                  setSelectedDriveFolderId('');
+                } else if (val === 'CUSTOM') {
+                  setDriveMode('CUSTOM');
+                  setSelectedDriveFolderId('');
+                } else {
+                  setDriveMode('EXISTING');
+                  setSelectedDriveFolderId(val);
                 }
               }}
-            />
-            <StyledDeliveryButton type="button" onClick={handleAddCustomHook}>
-              + Add Hook
-            </StyledDeliveryButton>
-          </div>
-
-          <div
-            style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: 12,
-              alignItems: 'flex-end',
-              justifyContent: 'space-between',
-              paddingTop: 8,
-              borderTop: `1px solid ${themeCssVariables.border.color.light}`,
-            }}
-          >
-            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-              <StyledField>
-                Text Overlay Style
-                <select
-                  value={stylePreset}
-                  onChange={(e) => setStylePreset(e.target.value)}
-                >
-                  {STYLE_PRESET_OPTIONS.map((opt) => (
-                    <option key={opt.key} value={opt.key}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              </StyledField>
-              <label style={{ fontSize: 12, display: 'flex', gap: 6, marginTop: 18 }}>
-                <input
-                  type="checkbox"
-                  checked={syncToDrive}
-                  onChange={(e) => setSyncToDrive(e.target.checked)}
-                />
-                Auto-sync to Google Drive
-              </label>
-            </div>
-
-            <StyledDeliveryButton
-              type="button"
-              data-primary="true"
-              disabled={rendering || selectedHooks.length === 0}
-              onClick={() => void handleRenderN()}
             >
-              {rendering
-                ? 'Queueing FFmpeg Renders…'
-                : `Render ${selectedHooks.length} Variation${selectedHooks.length === 1 ? '' : 's'} & Sync to Drive`}
-            </StyledDeliveryButton>
-          </div>
+              <option value="AUTO">
+                Auto ({productNameFromMeta || 'AI Video'})
+              </option>
+              {driveSubfolders.map((folder) => (
+                <option key={folder.id} value={folder.id}>
+                  📁 {folder.name}
+                </option>
+              ))}
+              <option value="CUSTOM">+ New subfolder…</option>
+            </select>
 
-          {statusMessage && <StyledBadge tone="ok">{statusMessage}</StyledBadge>}
-          {errorMessage && <StyledBadge tone="warn">{errorMessage}</StyledBadge>}
+            {driveMode === 'CUSTOM' && (
+              <input
+                type="text"
+                placeholder="Subfolder name (e.g. Winter Drop)"
+                value={customSubfolderName}
+                onChange={(e) => setCustomSubfolderName(e.target.value)}
+              />
+            )}
+          </StyledDriveRow>
 
-          {(hookProject?.variations?.length ?? 0) > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <strong style={{ fontSize: 12 }}>
-                Rendered Variations &amp; Google Drive Status
-              </strong>
-              {hookProject?.variations.map((v) => (
+          <StyledPrimaryButton
+            type="button"
+            disabled={busySave}
+            onClick={() => void handleSaveOrRender()}
+          >
+            {busySave
+              ? 'Processing…'
+              : selectedHooks.length === 0
+                ? 'Save Video to Drive'
+                : `Render ${selectedHooks.length} Variation${selectedHooks.length === 1 ? '' : 's'} & Save to Drive`}
+          </StyledPrimaryButton>
+
+          {error && <StyledErrorText>{error}</StyledErrorText>}
+          {feedback && <StyledSuccessText>{feedback}</StyledSuccessText>}
+
+          {hookProject && hookProject.variations.length > 0 && (
+            <StyledStatusBanner>
+              {hookProject.variations.map((v) => (
                 <div
                   key={v.id}
                   style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
                     alignItems: 'center',
+                    display: 'flex',
                     fontSize: 12,
-                    padding: '6px 10px',
-                    borderRadius: 6,
-                    background: themeCssVariables.background.tertiary,
+                    gap: 8,
+                    justifyContent: 'space-between',
                   }}
                 >
                   <span>
-                    <strong>V{v.variationNumber}:</strong> {v.hookText}
+                    #{v.variationNumber} · {v.hookText.slice(0, 44)}
                   </span>
-                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                    <StyledBadge
-                      tone={v.renderStatus === 'COMPLETED' ? 'ok' : 'info'}
-                    >
-                      {v.renderStatus}
-                    </StyledBadge>
+                  <span>
                     {v.driveWebUrl ? (
                       <a
                         href={v.driveWebUrl}
                         target="_blank"
                         rel="noreferrer"
-                        style={{ fontWeight: 600 }}
                       >
-                        Drive ↗
+                        Open in Drive ↗
                       </a>
                     ) : (
-                      <span style={{ opacity: 0.65 }}>{v.driveSyncStatus}</span>
+                      v.renderStatus
                     )}
-                  </div>
+                  </span>
                 </div>
               ))}
-            </div>
+            </StyledStatusBanner>
           )}
-        </StyledCard>
-      </div>
-    </StyledGrid>
+        </StyledPanel>
+      </StyledRightColumn>
+    </StyledStageGrid>
   );
 };

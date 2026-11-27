@@ -92,6 +92,12 @@ export type ClientFeeSetting = {
   notes: string;
   updatedAt: string;
 };
+export type StudioHookDefaultSetting = {
+  styleConfig: Record<string, unknown>;
+  startSec: number;
+  durationSec: number;
+  updatedAt: string;
+};
 export type DeliveryOperations = {
   serviceCatalog?: string[];
   clientRoster?: {
@@ -99,6 +105,8 @@ export type DeliveryOperations = {
     excludedIds: string[];
   };
   clientFees?: Record<string, ClientFeeSetting>;
+  clientTags?: Record<string, string[]>;
+  studioHookDefaults?: Record<string, StudioHookDefaultSetting>;
   founderEscalationRouting?: {
     mode: 'RULES';
     revision: number;

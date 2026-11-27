@@ -21,9 +21,13 @@ export type StudioTabDraft = {
   stage: StudioStageKey;
   // Shared selections
   selectedProductKitId: string | null;
+  selectedProductAssetIds: string[];
+  selectedAvatarPresetId: string | null;
+  selectedEnvironmentPresetId: string | null;
   selectedReferenceVideoId: string | null;
   selectedCharacterAssetId: string | null;
   selectedVideoAssetId: string | null;
+  layoutModeOverride: 'AUTO' | 'CLOTHING' | 'GENERAL';
   // Character Sheet settings
   characterPresetId: string | null;
   characterMasterPrompt: string;
@@ -71,12 +75,21 @@ export const createEmptyStudioTab = (
   label: 'New Studio Tab',
   stage: 'CHARACTER_SHEET',
   selectedProductKitId: null,
+  selectedProductAssetIds: [],
+  selectedAvatarPresetId: null,
+  selectedEnvironmentPresetId: null,
   selectedReferenceVideoId: null,
   selectedCharacterAssetId: null,
   selectedVideoAssetId: null,
+  layoutModeOverride: 'AUTO',
   characterPresetId: null,
   characterMasterPrompt: '',
-  characterAngles: ['Front Full-Body', 'Back Full-Body'],
+  characterAngles: [
+    'Full-body Front View',
+    'Full-body Back View showing back print',
+    '3/4 Side Profile',
+    'Upper Torso Close-up showing fabric & print detail',
+  ],
   characterAngleLayout: 'GRID_SHEET',
   characterTalent: '',
   characterEnvironment: '',

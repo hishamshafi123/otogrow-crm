@@ -175,6 +175,7 @@ const VARIABLES_BY_KIND: Record<StudioPresetKind, string[]> = {
   ],
   TEXT_HOOK: ['{{product_name}}', '{{brand_notes}}'],
   CASTING_PERSONA: ['{{brand_notes}}'],
+  ENVIRONMENT: ['{{brand_notes}}'],
 };
 
 const QUICK_ANGLE_TEMPLATES: { label: string; angles: string[] }[] = [

@@ -33,6 +33,32 @@ export type ClientRosterState = {
   excludedIds: string[];
 };
 
+export const CLIENT_TAG_PRESETS = [
+  'Clothing Brand',
+  'E-commerce',
+  'Beauty & Skincare',
+  'Food & Beverage',
+  'SaaS',
+  'Local Business',
+] as const;
+
+export const normalizeClientTags = (tags?: string[] | null): string[] => {
+  if (!Array.isArray(tags)) return [];
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const raw of tags) {
+    if (typeof raw !== 'string') continue;
+    const clean = raw.replace(/\s+/g, ' ').trim().slice(0, 40);
+    if (!clean) continue;
+    const key = clean.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(clean);
+    if (result.length >= 12) break;
+  }
+  return result;
+};
+
 export const clientRosterUpdateSchema = z.discriminatedUnion('action', [
   z
     .object({
@@ -71,6 +97,13 @@ export const clientRosterUpdateSchema = z.discriminatedUnion('action', [
       companyId: identifier,
     })
     .strict(),
+  z
+    .object({
+      action: z.literal('setTags'),
+      companyId: identifier,
+      tags: z.array(z.string().trim().min(1).max(40)).max(12),
+    })
+    .strict(),
 ]);
 
 export type ClientRosterUpdateCommand = z.infer<
@@ -89,6 +122,11 @@ export const parseClientRosterUpdate = (
     if (action === 'setFee' || action === 'clearFee') {
       throw new BadRequestException(
         'Enter a valid positive agreed fee amount, currency, and billing cadence.',
+      );
+    }
+    if (action === 'setTags') {
+      throw new BadRequestException(
+        'Provide up to 12 short client tags (1–40 characters each).',
       );
     }
     throw new BadRequestException(
@@ -169,7 +207,11 @@ export const applyClientRosterUpdate = (
   command: ClientRosterUpdateCommand,
 ): ClientRosterState => {
   const normalized = normalizeClientRoster(current);
-  if (command.action === 'setFee' || command.action === 'clearFee') {
+  if (
+    command.action === 'setFee' ||
+    command.action === 'clearFee' ||
+    command.action === 'setTags'
+  ) {
     return normalized;
   }
   const included = new Set(normalized.includedIds);
@@ -302,6 +344,7 @@ export type ClientHubItem = {
   isExplicitClient: boolean;
   hasDeliveryWork: boolean;
   needsAttention: boolean;
+  tags: string[];
   projects: {
     id: string;
     name: string;
@@ -411,6 +454,7 @@ export const buildClientHubSnapshot = ({
   companies,
   roster,
   clientFees,
+  clientTags,
   projects,
   tasks,
   engagements,
@@ -430,6 +474,7 @@ export const buildClientHubSnapshot = ({
   companies: ClientDirectoryCompany[];
   roster?: Partial<ClientRosterState> | null;
   clientFees?: Record<string, ClientFeeSetting> | null;
+  clientTags?: Record<string, string[]> | null;
   projects: ClientHubProjectSource[];
   tasks: ClientHubTaskSource[];
   engagements: ClientEngagement[];
@@ -1294,6 +1339,7 @@ export const buildClientHubSnapshot = ({
       hasDeliveryWork:
         projectSummaries.length > 0 || companyEngagements.length > 0,
       needsAttention,
+      tags: normalizeClientTags(clientTags?.[company.id]),
       projects: projectSummaries,
       services: [...serviceSet].sort(),
       billingModes: [...billingSet].sort(),
