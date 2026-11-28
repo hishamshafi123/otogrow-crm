@@ -2268,23 +2268,43 @@ export class DeliveryStudioService {
 
     const driver = this.storage.getCurrentDriver();
     const kitIdForPath = input.productKitId ?? v4();
+    const existingHashes = new Set<string>();
+    if (input.productKitId) {
+      const existingKit = await this.dataSource
+        .getRepository(DeliveryStudioProductKitEntity)
+        .findOne({
+          where: { id: input.productKitId, workspaceId: id.workspaceId },
+        });
+      if (!existingKit) throw new NotFoundException('Product not found.');
+      for (const existingAsset of existingKit.assetsJson ?? []) {
+        if (existingAsset.sha256) {
+          existingHashes.add(existingAsset.sha256);
+        }
+      }
+    }
+
     const uploadedItems: StudioProductAssetItem[] = [];
 
     for (let i = 0; i < scraped.images.length; i += 1) {
       const img = scraped.images[i];
+      const sha256 =
+        img.sha256 ?? createHash('sha256').update(img.buffer).digest('hex');
+      if (existingHashes.has(sha256)) continue;
+      existingHashes.add(sha256);
+
       const itemId = v4();
       const ext = extensionForMime(img.mimeType);
-      const sha256 = createHash('sha256').update(img.buffer).digest('hex');
       const storageKey = `delivery-studio/${id.workspaceId}/products/${kitIdForPath}/${itemId}.${ext}`;
       await driver.writeFileStream({
         filePath: storageKey,
         stream: Readable.from(img.buffer),
         mimeType: img.mimeType,
       });
+      const nextIdx = uploadedItems.length;
       uploadedItems.push({
         id: itemId,
-        role: i === 0 ? 'FRONT' : i === 1 ? 'BACK' : 'DETAIL',
-        label: `Image ${i + 1}`,
+        role: nextIdx === 0 ? 'FRONT' : nextIdx === 1 ? 'BACK' : 'DETAIL',
+        label: `Image ${nextIdx + 1}`,
         storageKey,
         originalFileName: img.fileName,
         mimeType: img.mimeType,
