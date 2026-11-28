@@ -19,6 +19,7 @@ import {
 import { themeCssVariables } from 'twenty-ui/theme-constants';
 import {
   type StudioAssetDTO,
+  type StudioGeminiModelOptionDTO,
   type StudioProductAssetDTO,
   type StudioReferenceVideoDTO,
 } from '@/delivery/studio/delivery-studio.types';
@@ -378,10 +379,98 @@ const StyledToggleRow = styled.label`
   }
 `;
 
+const StyledModelSelect = styled.select`
+  background: ${themeCssVariables.background.primary};
+  border: 1px solid ${themeCssVariables.border.color.light};
+  border-radius: 7px;
+  color: ${themeCssVariables.font.color.primary};
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 11px;
+  margin-top: 4px;
+  outline: none;
+  padding: 5px 8px;
+  width: 100%;
+
+  &:focus {
+    border-color: ${themeCssVariables.border.color.medium};
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+`;
+
+const StyledCustomModelForm = styled.form`
+  align-items: center;
+  display: flex;
+  gap: 5px;
+  margin-top: 5px;
+
+  input {
+    background: ${themeCssVariables.background.primary};
+    border: 1px solid ${themeCssVariables.border.color.light};
+    border-radius: 7px;
+    color: ${themeCssVariables.font.color.primary};
+    flex: 1;
+    font-family: inherit;
+    font-size: 11px;
+    min-width: 0;
+    outline: none;
+    padding: 5px 8px;
+
+    &:focus {
+      border-color: ${themeCssVariables.border.color.medium};
+    }
+  }
+
+  button {
+    background: ${themeCssVariables.background.invertedPrimary};
+    border: none;
+    border-radius: 7px;
+    color: ${themeCssVariables.font.color.inverted};
+    cursor: pointer;
+    flex-shrink: 0;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 5px 9px;
+
+    &:disabled {
+      cursor: not-allowed;
+      opacity: 0.45;
+    }
+  }
+`;
+
+const FALLBACK_GEMINI_MODELS: StudioGeminiModelOptionDTO[] = [
+  {
+    id: 'gemini-flash-latest',
+    label: 'Gemini Flash Latest',
+    badge: 'Auto-Latest',
+  },
+  {
+    id: 'gemini-3.1-pro-preview',
+    label: 'Gemini 3.1 Pro Preview',
+    badge: 'Pro',
+  },
+  {
+    id: 'gemini-3-flash-preview',
+    label: 'Gemini 3 Flash Preview',
+    badge: 'Fast',
+  },
+  { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', badge: 'Pro' },
+  { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', badge: 'Balanced' },
+  { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash-Lite', badge: 'Lite' },
+];
+
 export type DeliveryStudioVideoPromptPanelProps = {
   geminiConfigured: boolean;
   geminiModelId: string | null;
   geminiSource: string | null;
+  availableModels?: StudioGeminiModelOptionDTO[];
+  savingModel?: boolean;
+  onChangeModel?: (modelId: string) => void | Promise<void>;
   autoPromptWithGemini: boolean;
   onToggleAutoPrompt: (next: boolean) => void;
   prompt: string;
@@ -417,6 +506,9 @@ export const DeliveryStudioVideoPromptPanel = ({
   geminiConfigured,
   geminiModelId,
   geminiSource,
+  availableModels,
+  savingModel,
+  onChangeModel,
   autoPromptWithGemini,
   onToggleAutoPrompt,
   prompt,
@@ -437,6 +529,8 @@ export const DeliveryStudioVideoPromptPanel = ({
 }: DeliveryStudioVideoPromptPanelProps) => {
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [showSavedVideoText, setShowSavedVideoText] = useState(false);
+  const [customModelMode, setCustomModelMode] = useState(false);
+  const [customModelInput, setCustomModelInput] = useState('');
   const [editInstruction, setEditInstruction] = useState('');
   const [editToast, setEditToast] = useState<string | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -460,7 +554,12 @@ export const DeliveryStudioVideoPromptPanel = ({
   }, [popoverOpen]);
 
   const activeModelLabel =
-    promptMeta?.modelId || geminiModelId || 'gemini-2.5-flash';
+    geminiModelId || promptMeta?.modelId || 'gemini-2.5-flash';
+  const modelOptions =
+    availableModels && availableModels.length > 0
+      ? availableModels
+      : FALLBACK_GEMINI_MODELS;
+  const isKnownModel = modelOptions.some((m) => m.id === activeModelLabel);
   const hasSavedVideoAnalysis = Boolean(
     selectedRefVideo?.aiVideoAnalysis?.analysisText,
   );
@@ -482,6 +581,15 @@ export const DeliveryStudioVideoPromptPanel = ({
       setEditToast(`Updated with ${activeModelLabel}`);
       window.setTimeout(() => setEditToast(null), 3200);
     }
+  };
+
+  const handleApplyCustomModel = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const clean = customModelInput.trim();
+    if (!clean || !onChangeModel || savingModel) return;
+    await onChangeModel(clean);
+    setCustomModelMode(false);
+    setCustomModelInput('');
   };
 
   return (
@@ -670,11 +778,68 @@ export const DeliveryStudioVideoPromptPanel = ({
             />
             <StyledPopoverMeta>
               <strong>Prompting Model</strong>
-              <span>
-                {geminiConfigured
-                  ? `${activeModelLabel}${geminiSource ? ` · ${geminiSource.replace('_', ' ').toLowerCase()}` : ''}`
-                  : 'Not configured'}
-              </span>
+              {geminiConfigured && onChangeModel ? (
+                <>
+                  <StyledModelSelect
+                    aria-label="Prompting LLM model"
+                    disabled={savingModel || analyzingPrompt || refiningPrompt}
+                    value={customModelMode ? '__custom__' : activeModelLabel}
+                    onChange={(e) => {
+                      const next = e.target.value;
+                      if (next === '__custom__') {
+                        setCustomModelMode(true);
+                        setCustomModelInput(activeModelLabel);
+                      } else {
+                        setCustomModelMode(false);
+                        void onChangeModel(next);
+                      }
+                    }}
+                  >
+                    {!isKnownModel && (
+                      <option value={activeModelLabel}>
+                        {activeModelLabel} (Custom)
+                      </option>
+                    )}
+                    {modelOptions.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.label}
+                        {m.badge ? ` · ${m.badge}` : ''}
+                      </option>
+                    ))}
+                    <option value="__custom__">Custom model ID…</option>
+                  </StyledModelSelect>
+                  {customModelMode && (
+                    <StyledCustomModelForm
+                      onSubmit={(e) => void handleApplyCustomModel(e)}
+                    >
+                      <input
+                        type="text"
+                        placeholder="e.g. gemini-flash-latest"
+                        value={customModelInput}
+                        disabled={savingModel}
+                        onChange={(e) => setCustomModelInput(e.target.value)}
+                      />
+                      <button
+                        type="submit"
+                        disabled={savingModel || !customModelInput.trim()}
+                      >
+                        {savingModel ? '…' : 'Use'}
+                      </button>
+                    </StyledCustomModelForm>
+                  )}
+                  <span>
+                    {savingModel
+                      ? 'Saving model…'
+                      : `${activeModelLabel}${geminiSource ? ` · ${geminiSource.replace('_', ' ').toLowerCase()}` : ''}`}
+                  </span>
+                </>
+              ) : (
+                <span>
+                  {geminiConfigured
+                    ? `${activeModelLabel}${geminiSource ? ` · ${geminiSource.replace('_', ' ').toLowerCase()}` : ''}`
+                    : 'Not configured'}
+                </span>
+              )}
             </StyledPopoverMeta>
             <StyledPopoverBadge data-tone={geminiConfigured ? 'ok' : 'muted'}>
               {geminiConfigured ? 'Live' : 'Off'}

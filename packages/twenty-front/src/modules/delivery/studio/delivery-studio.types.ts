@@ -68,6 +68,12 @@ export type StudioModelSpecDTO = {
   };
 };
 
+export type StudioGeminiModelOptionDTO = {
+  id: string;
+  label: string;
+  badge?: string;
+};
+
 export type StudioProviderConfigDTO = {
   wavespeedConfigured: boolean;
   wavespeedKeyLast4: string | null;
@@ -82,6 +88,7 @@ export type StudioProviderConfigDTO = {
   geminiConfigured?: boolean;
   geminiKeyLast4?: string | null;
   geminiModelId?: string | null;
+  geminiAvailableModels?: StudioGeminiModelOptionDTO[];
   geminiSource?: 'STUDIO_KEY' | 'ADMIN_CONFIG' | 'ENV' | null;
   geminiVerifiedAt?: string | null;
   geminiLastError?: string | null;

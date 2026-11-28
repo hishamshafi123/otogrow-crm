@@ -217,6 +217,10 @@ export const DeliveryStudioProviderModal = ({
   const [defaultVideoModel, setDefaultVideoModel] = useState(
     config.defaultVideoModel,
   );
+  const [geminiModelId, setGeminiModelId] = useState(
+    config.geminiModelId || 'gemini-2.5-flash',
+  );
+  const [customGeminiModel, setCustomGeminiModel] = useState('');
   const [maxConcurrentJobs, setMaxConcurrentJobs] = useState(
     config.maxConcurrentJobs,
   );
@@ -231,6 +235,8 @@ export const DeliveryStudioProviderModal = ({
     setRoutingMode(config.defaultRoutingMode);
     setDefaultImageModel(config.defaultImageModel);
     setDefaultVideoModel(config.defaultVideoModel);
+    setGeminiModelId(config.geminiModelId || 'gemini-2.5-flash');
+    setCustomGeminiModel('');
     setMaxConcurrentJobs(config.maxConcurrentJobs);
     setStatusMessage('');
     setErrorMessage('');
@@ -253,10 +259,45 @@ export const DeliveryStudioProviderModal = ({
 
   const imageModels = catalog.filter((m) => m.kind === 'IMAGE');
   const videoModels = catalog.filter((m) => m.kind === 'VIDEO');
+  const geminiModels =
+    config.geminiAvailableModels && config.geminiAvailableModels.length > 0
+      ? config.geminiAvailableModels
+      : [
+          {
+            id: 'gemini-flash-latest',
+            label: 'Gemini Flash Latest',
+            badge: 'Auto-Latest',
+          },
+          {
+            id: 'gemini-3.1-pro-preview',
+            label: 'Gemini 3.1 Pro Preview',
+            badge: 'Pro',
+          },
+          {
+            id: 'gemini-3-flash-preview',
+            label: 'Gemini 3 Flash Preview',
+            badge: 'Fast',
+          },
+          { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', badge: 'Pro' },
+          {
+            id: 'gemini-2.5-flash',
+            label: 'Gemini 2.5 Flash',
+            badge: 'Balanced',
+          },
+          {
+            id: 'gemini-2.5-flash-lite',
+            label: 'Gemini 2.5 Flash-Lite',
+            badge: 'Lite',
+          },
+        ];
 
   const handleSave = async () => {
     setErrorMessage('');
     setStatusMessage('');
+    const resolvedGeminiModel =
+      geminiModelId === '__custom__'
+        ? customGeminiModel.trim()
+        : geminiModelId.trim();
     try {
       await saveConfig({
         variables: {
@@ -266,6 +307,9 @@ export const DeliveryStudioProviderModal = ({
               : {}),
             ...(kieKey.trim() ? { kieApiKey: kieKey.trim() } : {}),
             ...(geminiKey.trim() ? { geminiApiKey: geminiKey.trim() } : {}),
+            ...(resolvedGeminiModel
+              ? { geminiModelId: resolvedGeminiModel }
+              : {}),
             wavespeedEnabled,
             kieEnabled,
             defaultRoutingMode: routingMode,
@@ -279,7 +323,7 @@ export const DeliveryStudioProviderModal = ({
       setKieKey('');
       setGeminiKey('');
       setStatusMessage(
-        'Saved encrypted API keys & failover routing settings.',
+        'Saved encrypted API keys, prompting model & routing settings.',
       );
       onSaved();
     } catch (err) {
@@ -575,7 +619,61 @@ export const DeliveryStudioProviderModal = ({
                       onChange={(e) => setGeminiKey(e.target.value)}
                     />
                   </StyledField>
+                  <StyledField>
+                    Prompting &amp; Analysis Model
+                    <select
+                      disabled={!canManage}
+                      value={
+                        geminiModelId === '__custom__' ||
+                        geminiModels.some((m) => m.id === geminiModelId)
+                          ? geminiModelId
+                          : '__custom__'
+                      }
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === '__custom__') {
+                          if (geminiModelId !== '__custom__') {
+                            setCustomGeminiModel(geminiModelId);
+                          }
+                          setGeminiModelId('__custom__');
+                        } else {
+                          setGeminiModelId(val);
+                          setCustomGeminiModel('');
+                        }
+                      }}
+                    >
+                      {geminiModels.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.label}
+                          {m.badge ? ` · ${m.badge}` : ''} ({m.id})
+                        </option>
+                      ))}
+                      <option value="__custom__">Custom model ID…</option>
+                    </select>
+                  </StyledField>
                 </StyledRow>
+                {(geminiModelId === '__custom__' ||
+                  !geminiModels.some((m) => m.id === geminiModelId)) && (
+                  <StyledRow>
+                    <StyledField>
+                      Custom Gemini Model ID
+                      <input
+                        type="text"
+                        disabled={!canManage}
+                        placeholder="e.g. gemini-3.1-pro-preview or gemini-flash-latest"
+                        value={
+                          geminiModelId === '__custom__'
+                            ? customGeminiModel
+                            : geminiModelId
+                        }
+                        onChange={(e) => {
+                          setGeminiModelId('__custom__');
+                          setCustomGeminiModel(e.target.value);
+                        }}
+                      />
+                    </StyledField>
+                  </StyledRow>
+                )}
                 <StyledRow>
                   <span
                     style={{

@@ -103,6 +103,55 @@ export type StudioRefinedVideoPromptResult = {
   summary: string;
 };
 
+export type StudioGeminiModelOption = {
+  id: string;
+  label: string;
+  badge?: string;
+};
+
+export const CURATED_GEMINI_PROMPT_MODELS: StudioGeminiModelOption[] = [
+  {
+    id: 'gemini-flash-latest',
+    label: 'Gemini Flash Latest',
+    badge: 'Auto-Latest',
+  },
+  {
+    id: 'gemini-3.1-pro-preview',
+    label: 'Gemini 3.1 Pro Preview',
+    badge: 'Pro',
+  },
+  {
+    id: 'gemini-3-flash-preview',
+    label: 'Gemini 3 Flash Preview',
+    badge: 'Fast',
+  },
+  {
+    id: 'gemini-2.5-pro',
+    label: 'Gemini 2.5 Pro',
+    badge: 'Pro',
+  },
+  {
+    id: 'gemini-2.5-flash',
+    label: 'Gemini 2.5 Flash',
+    badge: 'Balanced',
+  },
+  {
+    id: 'gemini-2.5-flash-lite',
+    label: 'Gemini 2.5 Flash-Lite',
+    badge: 'Lite',
+  },
+];
+
+export const normalizeGeminiModelId = (raw?: string | null): string | null => {
+  const trimmed = raw?.trim();
+  if (!trimmed) return null;
+  const cleaned = trimmed
+    .replace(/^models\//i, '')
+    .replace(/^google\//i, '')
+    .trim();
+  return cleaned.length > 0 ? cleaned : null;
+};
+
 export type StudioGeminiStatus = {
   configured: boolean;
   modelId: string | null;
@@ -194,6 +243,10 @@ export const buildStructuredFallbackVideoPrompt = (params: {
 @Injectable()
 export class DeliveryStudioPromptAiService {
   private readonly logger = new Logger(DeliveryStudioPromptAiService.name);
+  private readonly modelListCache = new Map<
+    string,
+    { expiresAt: number; models: StudioGeminiModelOption[] }
+  >();
 
   constructor(
     private readonly modelRegistry: AiModelRegistryService,
@@ -201,40 +254,13 @@ export class DeliveryStudioPromptAiService {
     @Optional() private readonly twentyConfig?: TwentyConfigService,
   ) {}
 
-  private pickGeminiModel(overrideApiKey?: string | null): {
-    model: RegisteredAiModel['model'];
-    modelId: string;
+  private resolveGeminiApiKey(overrideApiKey?: string | null): {
+    apiKey: string;
     source: 'STUDIO_KEY' | 'ADMIN_CONFIG' | 'ENV';
   } | null {
     const cleanOverride = overrideApiKey?.trim();
-    if (cleanOverride) {
-      const google = createGoogleGenerativeAI({ apiKey: cleanOverride });
-      const modelId = 'gemini-2.5-flash';
-      return { model: google(modelId), modelId, source: 'STUDIO_KEY' };
-    }
-
-    try {
-      const models = this.modelRegistry.getAdminFilteredModels();
-      const googleModels = models.filter(
-        (m) => m.sdkPackage === '@ai-sdk/google',
-      );
-      if (googleModels.length > 0) {
-        const picked =
-          googleModels.find((m) => /gemini-2\.5-flash/i.test(m.modelId)) ??
-          googleModels.find((m) => /gemini-2\.0-flash/i.test(m.modelId)) ??
-          googleModels.find((m) => /gemini-2\.5-pro/i.test(m.modelId)) ??
-          googleModels.find((m) => /flash|pro/i.test(m.modelId)) ??
-          googleModels[0];
-        if (picked) {
-          return {
-            model: picked.model,
-            modelId: picked.modelId,
-            source: 'ADMIN_CONFIG',
-          };
-        }
-      }
-    } catch {
-      // Fall through to direct API key check
+    if (cleanOverride && cleanOverride !== '__configured__') {
+      return { apiKey: cleanOverride, source: 'STUDIO_KEY' };
     }
 
     let configGoogleKey = '';
@@ -246,9 +272,7 @@ export class DeliveryStudioPromptAiService {
       configGoogleKey = '';
     }
     if (configGoogleKey) {
-      const google = createGoogleGenerativeAI({ apiKey: configGoogleKey });
-      const modelId = 'gemini-2.5-flash';
-      return { model: google(modelId), modelId, source: 'ADMIN_CONFIG' };
+      return { apiKey: configGoogleKey, source: 'ADMIN_CONFIG' };
     }
 
     const envKey =
@@ -256,16 +280,100 @@ export class DeliveryStudioPromptAiService {
       process.env.GEMINI_API_KEY?.trim() ||
       process.env.GOOGLE_GENERATIVE_AI_API_KEY?.trim();
     if (envKey) {
-      const google = createGoogleGenerativeAI({ apiKey: envKey });
-      const modelId = 'gemini-2.5-flash';
-      return { model: google(modelId), modelId, source: 'ENV' };
+      return { apiKey: envKey, source: 'ENV' };
     }
 
     return null;
   }
 
-  getGeminiStatus(overrideApiKey?: string | null): StudioGeminiStatus {
-    const picked = this.pickGeminiModel(overrideApiKey);
+  private pickGeminiModel(
+    overrideApiKey?: string | null,
+    preferredModelId?: string | null,
+  ): {
+    model: RegisteredAiModel['model'];
+    modelId: string;
+    source: 'STUDIO_KEY' | 'ADMIN_CONFIG' | 'ENV';
+  } | null {
+    const preferred = normalizeGeminiModelId(preferredModelId);
+    const cleanOverride = overrideApiKey?.trim();
+    if (cleanOverride) {
+      const google = createGoogleGenerativeAI({ apiKey: cleanOverride });
+      const modelId = preferred ?? 'gemini-2.5-flash';
+      return { model: google(modelId), modelId, source: 'STUDIO_KEY' };
+    }
+
+    try {
+      const models = this.modelRegistry.getAdminFilteredModels();
+      const googleModels = models.filter(
+        (m) => m.sdkPackage === '@ai-sdk/google',
+      );
+      if (googleModels.length > 0) {
+        if (preferred) {
+          const exact = googleModels.find(
+            (m) => normalizeGeminiModelId(m.modelId) === preferred,
+          );
+          if (exact) {
+            return {
+              model: exact.model,
+              modelId: normalizeGeminiModelId(exact.modelId) ?? exact.modelId,
+              source: 'ADMIN_CONFIG',
+            };
+          }
+          // Fall through to direct API key check so newly-released or custom Gemini model IDs still work
+        } else {
+          const picked =
+            googleModels.find((m) => /gemini-2\.5-flash/i.test(m.modelId)) ??
+            googleModels.find((m) => /gemini-flash-latest/i.test(m.modelId)) ??
+            googleModels.find((m) => /gemini-3-flash/i.test(m.modelId)) ??
+            googleModels.find((m) => /gemini-2\.5-pro/i.test(m.modelId)) ??
+            googleModels.find((m) => /flash|pro/i.test(m.modelId)) ??
+            googleModels[0];
+          if (picked) {
+            return {
+              model: picked.model,
+              modelId: normalizeGeminiModelId(picked.modelId) ?? picked.modelId,
+              source: 'ADMIN_CONFIG',
+            };
+          }
+        }
+      }
+    } catch {
+      // Fall through to direct API key check
+    }
+
+    const resolvedKey = this.resolveGeminiApiKey(null);
+    if (resolvedKey) {
+      const google = createGoogleGenerativeAI({ apiKey: resolvedKey.apiKey });
+      const modelId = preferred ?? 'gemini-2.5-flash';
+      return { model: google(modelId), modelId, source: resolvedKey.source };
+    }
+
+    // If preferred wasn't in registry and no direct key was readable, fall back to first registry Google model
+    if (preferred) {
+      try {
+        const models = this.modelRegistry.getAdminFilteredModels();
+        const fallback = models.find((m) => m.sdkPackage === '@ai-sdk/google');
+        if (fallback) {
+          return {
+            model: fallback.model,
+            modelId:
+              normalizeGeminiModelId(fallback.modelId) ?? fallback.modelId,
+            source: 'ADMIN_CONFIG',
+          };
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    return null;
+  }
+
+  getGeminiStatus(
+    overrideApiKey?: string | null,
+    preferredModelId?: string | null,
+  ): StudioGeminiStatus {
+    const picked = this.pickGeminiModel(overrideApiKey, preferredModelId);
     if (!picked) {
       return { configured: false, modelId: null, source: null };
     }
@@ -276,13 +384,137 @@ export class DeliveryStudioPromptAiService {
     };
   }
 
+  async listAvailableGeminiModels(
+    overrideApiKey?: string | null,
+  ): Promise<StudioGeminiModelOption[]> {
+    const resolved = this.resolveGeminiApiKey(overrideApiKey);
+    const cacheKey = resolved
+      ? `${resolved.source}:${resolved.apiKey.slice(-6)}`
+      : 'no-key';
+    const cached = this.modelListCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.models;
+    }
+
+    const byId = new Map<string, StudioGeminiModelOption>();
+    for (const item of CURATED_GEMINI_PROMPT_MODELS) {
+      byId.set(item.id, item);
+    }
+
+    const isEligiblePromptModel = (id: string): boolean => {
+      if (!/^gemini-/i.test(id)) return false;
+      if (
+        /(embedding|imagen|veo|aqa|tts|audio|image|live|robotics|computer-use|deep-research|customtools|bisect|001$|exp-)/i.test(
+          id,
+        )
+      ) {
+        return false;
+      }
+      return true;
+    };
+
+    try {
+      const registryModels = this.modelRegistry.getAdminFilteredModels();
+      for (const m of registryModels) {
+        if (m.sdkPackage !== '@ai-sdk/google') continue;
+        const cleanId = normalizeGeminiModelId(m.modelId);
+        if (!cleanId || !isEligiblePromptModel(cleanId) || byId.has(cleanId)) {
+          continue;
+        }
+        byId.set(cleanId, {
+          id: cleanId,
+          label: cleanId
+            .replace(/^gemini-/i, 'Gemini ')
+            .replace(/-/g, ' ')
+            .replace(/\b\w/g, (c) => c.toUpperCase()),
+          badge: /latest/i.test(cleanId)
+            ? 'Auto-Latest'
+            : /pro/i.test(cleanId)
+              ? 'Pro'
+              : /lite/i.test(cleanId)
+                ? 'Lite'
+                : 'Fast',
+        });
+      }
+    } catch {
+      // ignore registry errors
+    }
+
+    if (resolved?.apiKey) {
+      try {
+        const res = await axios.get<{
+          models?: Array<{
+            name?: string;
+            displayName?: string;
+            supportedGenerationMethods?: string[];
+          }>;
+        }>('https://generativelanguage.googleapis.com/v1beta/models', {
+          params: { key: resolved.apiKey, pageSize: 100 },
+          timeout: 3_500,
+        });
+        for (const entry of res.data?.models ?? []) {
+          const methods = entry.supportedGenerationMethods ?? [];
+          if (!methods.includes('generateContent')) continue;
+          const cleanId = normalizeGeminiModelId(entry.name);
+          if (!cleanId || !isEligiblePromptModel(cleanId)) continue;
+          const existing = byId.get(cleanId);
+          byId.set(cleanId, {
+            id: cleanId,
+            label:
+              existing?.label ||
+              entry.displayName?.trim() ||
+              cleanId
+                .replace(/^gemini-/i, 'Gemini ')
+                .replace(/-/g, ' ')
+                .replace(/\b\w/g, (c) => c.toUpperCase()),
+            badge:
+              existing?.badge ??
+              (/latest/i.test(cleanId)
+                ? 'Auto-Latest'
+                : /pro/i.test(cleanId)
+                  ? 'Pro'
+                  : /lite/i.test(cleanId)
+                    ? 'Lite'
+                    : 'Live'),
+          });
+        }
+      } catch {
+        // Best-effort live discovery; silently fall back to curated + registry models
+      }
+    }
+
+    const scoreModel = (id: string): number => {
+      if (id === 'gemini-flash-latest') return 10_000;
+      if (id === 'gemini-pro-latest') return 9_900;
+      if (id === 'gemini-flash-lite-latest') return 9_800;
+      const versionMatch = /^gemini-(\d+)(?:\.(\d+))?/i.exec(id);
+      const major = versionMatch ? Number(versionMatch[1]) : 0;
+      const minor = versionMatch && versionMatch[2] ? Number(versionMatch[2]) : 0;
+      const tier = /pro/i.test(id) ? 30 : /lite/i.test(id) ? 10 : 20;
+      const stabilityBonus = /preview|exp/i.test(id) ? 0 : 5;
+      return major * 1000 + minor * 100 + tier + stabilityBonus;
+    };
+
+    const sorted = Array.from(byId.values()).sort(
+      (a, b) => scoreModel(b.id) - scoreModel(a.id) || a.id.localeCompare(b.id),
+    );
+
+    this.modelListCache.set(cacheKey, {
+      expiresAt: Date.now() + 15 * 60 * 1000,
+      models: sorted,
+    });
+    return sorted;
+  }
+
   async testGeminiApiKey(
     apiKey: string,
+    preferredModelId?: string | null,
   ): Promise<{ ok: boolean; message: string }> {
     const clean = apiKey.trim();
     if (!clean) {
       return { ok: false, message: 'Enter a Google Gemini API key first.' };
     }
+    const targetModel = normalizeGeminiModelId(preferredModelId) ?? 'gemini-2.5-flash';
     try {
       const res = await axios.get<{
         models?: Array<{ name?: string }>;
@@ -293,7 +525,7 @@ export class DeliveryStudioPromptAiService {
       const count = res.data?.models?.length ?? 0;
       return {
         ok: true,
-        message: `Connected to Google Gemini API (${count > 0 ? 'gemini-2.5-flash ready' : 'verified'}).`,
+        message: `Connected to Google Gemini API (${count > 0 ? `${targetModel} ready` : 'verified'}).`,
       };
     } catch (error) {
       if (axios.isAxiosError(error)) {
@@ -320,8 +552,12 @@ export class DeliveryStudioPromptAiService {
     filePath?: string;
     bytes?: Buffer;
     overrideApiKey?: string | null;
+    preferredModelId?: string | null;
   }): Promise<StudioVideoAnalysisResult | null> {
-    const gemini = this.pickGeminiModel(params.overrideApiKey);
+    const gemini = this.pickGeminiModel(
+      params.overrideApiKey,
+      params.preferredModelId,
+    );
     if (!gemini) {
       return null;
     }
@@ -558,6 +794,7 @@ export class DeliveryStudioPromptAiService {
     brandNotes?: string;
     customNotes?: string;
     overrideApiKey?: string | null;
+    preferredModelId?: string | null;
   }): Promise<StudioGeneratedVideoPromptResult> {
     const characterImage =
       params.images.find((img) => img.role === 'CHARACTER_SHEET') ?? null;
@@ -579,7 +816,10 @@ export class DeliveryStudioPromptAiService {
       customNotes: params.customNotes,
     });
 
-    const gemini = this.pickGeminiModel(params.overrideApiKey);
+    const gemini = this.pickGeminiModel(
+      params.overrideApiKey,
+      params.preferredModelId,
+    );
     if (!gemini) {
       return {
         prompt: fallbackPrompt,
@@ -953,8 +1193,12 @@ export class DeliveryStudioPromptAiService {
     editInstruction: string;
     usesAtMentionTokens: boolean;
     overrideApiKey?: string | null;
+    preferredModelId?: string | null;
   }): Promise<StudioRefinedVideoPromptResult> {
-    const gemini = this.pickGeminiModel(params.overrideApiKey);
+    const gemini = this.pickGeminiModel(
+      params.overrideApiKey,
+      params.preferredModelId,
+    );
     if (!gemini) {
       return {
         prompt: params.currentPrompt,

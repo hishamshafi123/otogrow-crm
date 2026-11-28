@@ -97,7 +97,10 @@ import {
 import { scrapeProductImagesFromUrl } from 'src/modules/delivery/studio/studio-product-url-scraper';
 import {
   buildStructuredFallbackVideoPrompt,
+  CURATED_GEMINI_PROMPT_MODELS,
   DeliveryStudioPromptAiService,
+  normalizeGeminiModelId,
+  type StudioGeminiModelOption,
   type StudioGeminiStatus,
   type StudioPromptImageInput,
 } from 'src/modules/delivery/studio/delivery-studio-prompt-ai.service';
@@ -300,6 +303,7 @@ export type StudioProviderConfigDTO = {
   geminiConfigured: boolean;
   geminiKeyLast4: string | null;
   geminiModelId: string | null;
+  geminiAvailableModels: StudioGeminiModelOption[];
   geminiSource: 'STUDIO_KEY' | 'ADMIN_CONFIG' | 'ENV' | null;
   geminiVerifiedAt: string | null;
   geminiLastError: string | null;
@@ -423,18 +427,36 @@ export class DeliveryStudioService {
     }
   }
 
+  private async listGeminiPromptModels(
+    decryptedGeminiKey?: string | null,
+  ): Promise<StudioGeminiModelOption[]> {
+    if (typeof this.promptAi?.listAvailableGeminiModels === 'function') {
+      try {
+        return await this.promptAi.listAvailableGeminiModels(decryptedGeminiKey);
+      } catch {
+        // fall back to curated list
+      }
+    }
+    return CURATED_GEMINI_PROMPT_MODELS;
+  }
+
   private mapProviderConfig(
     row: DeliveryStudioProviderConfigEntity | null,
     geminiCfg?: StudioGeminiConfigSetting | null,
     geminiStatus?: StudioGeminiStatus | null,
+    geminiAvailableModels?: StudioGeminiModelOption[] | null,
   ): StudioProviderConfigDTO {
+    const preferredModelId = normalizeGeminiModelId(geminiCfg?.modelId);
     const status =
       geminiStatus ??
       this.promptAi?.getGeminiStatus(
         geminiCfg?.encryptedApiKey ? '__configured__' : null,
+        preferredModelId,
       ) ?? {
         configured: Boolean(geminiCfg?.keyLast4),
-        modelId: geminiCfg?.keyLast4 ? 'gemini-2.5-flash' : null,
+        modelId: geminiCfg?.keyLast4
+          ? (preferredModelId ?? 'gemini-2.5-flash')
+          : preferredModelId,
         source: geminiCfg?.keyLast4 ? ('STUDIO_KEY' as const) : null,
       };
     return {
@@ -452,7 +474,11 @@ export class DeliveryStudioService {
       kieLastError: row?.kieLastError ?? null,
       geminiConfigured: status.configured,
       geminiKeyLast4: geminiCfg?.keyLast4 ?? null,
-      geminiModelId: status.modelId,
+      geminiModelId: status.modelId ?? preferredModelId,
+      geminiAvailableModels:
+        geminiAvailableModels && geminiAvailableModels.length > 0
+          ? geminiAvailableModels
+          : CURATED_GEMINI_PROMPT_MODELS,
       geminiSource: status.source,
       geminiVerifiedAt: geminiCfg?.verifiedAt ?? null,
       geminiLastError: geminiCfg?.lastError ?? null,
@@ -826,8 +852,18 @@ export class DeliveryStudioService {
       id.workspaceId,
       geminiCfg,
     );
-    const geminiStatus = this.promptAi?.getGeminiStatus(decryptedGeminiKey);
-    return this.mapProviderConfig(row, geminiCfg, geminiStatus);
+    const geminiStatus = this.promptAi?.getGeminiStatus(
+      decryptedGeminiKey,
+      geminiCfg?.modelId ?? null,
+    );
+    const geminiAvailableModels =
+      await this.listGeminiPromptModels(decryptedGeminiKey);
+    return this.mapProviderConfig(
+      row,
+      geminiCfg,
+      geminiStatus,
+      geminiAvailableModels,
+    );
   }
 
   async saveProviderConfig(
@@ -933,17 +969,29 @@ export class DeliveryStudioService {
         let nextGeminiCfg: StudioGeminiConfigSetting | null =
           ops?.state?.studioGeminiConfig ?? null;
 
-        if (input.clearGeminiKey || (input.geminiApiKey && input.geminiApiKey.trim())) {
+        const wantsGeminiUpdate =
+          Boolean(input.clearGeminiKey) ||
+          Boolean(input.geminiApiKey && input.geminiApiKey.trim()) ||
+          input.geminiModelId !== undefined;
+
+        if (wantsGeminiUpdate) {
           if (!ops) {
             ops = opsRepo.create({
               workspaceId: id.workspaceId,
               state: newDeliveryOperations(),
             });
           }
+          const existingModelId = nextGeminiCfg?.modelId ?? null;
+          const resolvedModelId =
+            input.geminiModelId !== undefined
+              ? normalizeGeminiModelId(input.geminiModelId)
+              : existingModelId;
+
           if (input.clearGeminiKey) {
             nextGeminiCfg = {
               encryptedApiKey: null,
               keyLast4: null,
+              modelId: resolvedModelId,
               verifiedAt: null,
               lastError: null,
               updatedAt: new Date().toISOString(),
@@ -956,8 +1004,18 @@ export class DeliveryStudioService {
                 { workspaceId: id.workspaceId },
               ),
               keyLast4: clean.slice(-4),
+              modelId: resolvedModelId,
               verifiedAt: null,
               lastError: null,
+              updatedAt: new Date().toISOString(),
+            };
+          } else {
+            nextGeminiCfg = {
+              encryptedApiKey: nextGeminiCfg?.encryptedApiKey ?? null,
+              keyLast4: nextGeminiCfg?.keyLast4 ?? null,
+              modelId: resolvedModelId,
+              verifiedAt: nextGeminiCfg?.verifiedAt ?? null,
+              lastError: nextGeminiCfg?.lastError ?? null,
               updatedAt: new Date().toISOString(),
             };
           }
@@ -989,8 +1047,18 @@ export class DeliveryStudioService {
       id.workspaceId,
       geminiCfg,
     );
-    const geminiStatus = this.promptAi?.getGeminiStatus(decryptedGeminiKey);
-    return this.mapProviderConfig(saved, geminiCfg, geminiStatus);
+    const geminiStatus = this.promptAi?.getGeminiStatus(
+      decryptedGeminiKey,
+      geminiCfg?.modelId ?? null,
+    );
+    const geminiAvailableModels =
+      await this.listGeminiPromptModels(decryptedGeminiKey);
+    return this.mapProviderConfig(
+      saved,
+      geminiCfg,
+      geminiStatus,
+      geminiAvailableModels,
+    );
   }
 
   async testProviderConnection(
@@ -1006,21 +1074,30 @@ export class DeliveryStudioService {
     }
 
     if (provider === 'gemini') {
-      const { keyToTest, hadStoredKey } = await this.dataSource.transaction(
-        async (manager) => {
+      const { keyToTest, hadStoredKey, preferredModelId } =
+        await this.dataSource.transaction(async (manager) => {
           await this.resolveActor(manager, id);
-          if (rawApiKey && rawApiKey.trim()) {
-            return { keyToTest: rawApiKey.trim(), hadStoredKey: false };
-          }
           const ops = await manager
             .getRepository(DeliveryOperationsEntity)
             .findOneBy({ workspaceId: id.workspaceId });
+          const savedModelId = ops?.state?.studioGeminiConfig?.modelId ?? null;
+          if (rawApiKey && rawApiKey.trim()) {
+            return {
+              keyToTest: rawApiKey.trim(),
+              hadStoredKey: false,
+              preferredModelId: savedModelId,
+            };
+          }
           const decrypted = this.readDecryptedGeminiKeyFromConfig(
             id.workspaceId,
             ops?.state?.studioGeminiConfig,
           );
           if (decrypted) {
-            return { keyToTest: decrypted, hadStoredKey: true };
+            return {
+              keyToTest: decrypted,
+              hadStoredKey: true,
+              preferredModelId: savedModelId,
+            };
           }
           const fallbackEnvKey =
             this.twentyConfig.get('GOOGLE_API_KEY')?.trim() ||
@@ -1028,9 +1105,12 @@ export class DeliveryStudioService {
             process.env.GEMINI_API_KEY?.trim() ||
             process.env.GOOGLE_GENERATIVE_AI_API_KEY?.trim() ||
             null;
-          return { keyToTest: fallbackEnvKey, hadStoredKey: false };
-        },
-      );
+          return {
+            keyToTest: fallbackEnvKey,
+            hadStoredKey: false,
+            preferredModelId: savedModelId,
+          };
+        });
 
       if (!keyToTest) {
         return {
@@ -1042,7 +1122,7 @@ export class DeliveryStudioService {
       }
 
       const check = this.promptAi
-        ? await this.promptAi.testGeminiApiKey(keyToTest)
+        ? await this.promptAi.testGeminiApiKey(keyToTest, preferredModelId)
         : { ok: false, message: 'Prompt AI service is unavailable.' };
 
       if (hadStoredKey || (rawApiKey && rawApiKey.trim())) {
@@ -1134,12 +1214,22 @@ export class DeliveryStudioService {
       id.workspaceId,
       geminiCfg,
     );
-    const geminiStatus = this.promptAi?.getGeminiStatus(decryptedGeminiKey);
+    const geminiStatus = this.promptAi?.getGeminiStatus(
+      decryptedGeminiKey,
+      geminiCfg?.modelId ?? null,
+    );
+    const geminiAvailableModels =
+      await this.listGeminiPromptModels(decryptedGeminiKey);
 
     return {
       ok: check.ok,
       message: check.message,
-      config: this.mapProviderConfig(updated, geminiCfg, geminiStatus),
+      config: this.mapProviderConfig(
+        updated,
+        geminiCfg,
+        geminiStatus,
+        geminiAvailableModels,
+      ),
     };
   }
 
@@ -1383,7 +1473,12 @@ export class DeliveryStudioService {
       id.workspaceId,
       geminiCfg,
     );
-    const geminiStatus = this.promptAi?.getGeminiStatus(decryptedGeminiKey);
+    const geminiStatus = this.promptAi?.getGeminiStatus(
+      decryptedGeminiKey,
+      geminiCfg?.modelId ?? null,
+    );
+    const geminiAvailableModels =
+      await this.listGeminiPromptModels(decryptedGeminiKey);
 
     return {
       canManageProviders: actor.isAdmin || actor.isManager,
@@ -1393,6 +1488,7 @@ export class DeliveryStudioService {
         providerConfig,
         geminiCfg,
         geminiStatus,
+        geminiAvailableModels,
       ),
       clients,
       selectedClientTags: selectedClientInfo?.tags ?? [],
@@ -2984,6 +3080,9 @@ export class DeliveryStudioService {
         id.workspaceId,
         ops?.state?.studioGeminiConfig,
       );
+      const preferredGeminiModelId =
+        normalizeGeminiModelId(input.promptModelId) ??
+        normalizeGeminiModelId(ops?.state?.studioGeminiConfig?.modelId);
 
       return {
         refVideo,
@@ -2993,6 +3092,7 @@ export class DeliveryStudioService {
         resolvedEnvironmentPrompt,
         brandNotes,
         overrideGeminiApiKey,
+        preferredGeminiModelId,
       };
     });
 
@@ -3226,6 +3326,7 @@ export class DeliveryStudioService {
             durationSec: loaded.refVideo.mediaMeta?.durationSec ?? null,
             filePath: streamedVideoPath,
             overrideApiKey: loaded.overrideGeminiApiKey,
+            preferredModelId: loaded.preferredGeminiModelId,
           });
 
           if (videoAnalyzed) {
@@ -3282,6 +3383,7 @@ export class DeliveryStudioService {
         brandNotes: loaded.brandNotes,
         customNotes: input.customNotes?.trim() || '',
         overrideApiKey: loaded.overrideGeminiApiKey,
+        preferredModelId: loaded.preferredGeminiModelId,
       });
 
       // Persist newly analyzed image descriptions back to DB so future runs never re-analyze the same images
@@ -3406,18 +3508,22 @@ export class DeliveryStudioService {
       STUDIO_MODEL_CATALOG.find((m) => m.kind === 'VIDEO')!;
     const usesAtTokens = Boolean(spec.capabilities.usesAtMentionTokens);
 
-    const overrideGeminiApiKey = await this.dataSource.transaction(
-      async (manager) => {
+    const { overrideGeminiApiKey, preferredGeminiModelId } =
+      await this.dataSource.transaction(async (manager) => {
         await this.resolveActor(manager, id);
         const ops = await manager
           .getRepository(DeliveryOperationsEntity)
           .findOneBy({ workspaceId: id.workspaceId });
-        return this.readDecryptedGeminiKeyFromConfig(
-          id.workspaceId,
-          ops?.state?.studioGeminiConfig,
-        );
-      },
-    );
+        return {
+          overrideGeminiApiKey: this.readDecryptedGeminiKeyFromConfig(
+            id.workspaceId,
+            ops?.state?.studioGeminiConfig,
+          ),
+          preferredGeminiModelId:
+            normalizeGeminiModelId(input.promptModelId) ??
+            normalizeGeminiModelId(ops?.state?.studioGeminiConfig?.modelId),
+        };
+      });
 
     if (!this.promptAi) {
       return {
@@ -3433,6 +3539,7 @@ export class DeliveryStudioService {
       editInstruction: input.editInstruction,
       usesAtMentionTokens: usesAtTokens,
       overrideApiKey: overrideGeminiApiKey,
+      preferredModelId: preferredGeminiModelId,
     });
   }
 

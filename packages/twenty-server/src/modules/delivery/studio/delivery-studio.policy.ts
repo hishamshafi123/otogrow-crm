@@ -29,6 +29,16 @@ export const saveProviderConfigSchema = z
     kieEnabled: z.boolean().optional(),
     geminiApiKey: z.string().trim().max(400).nullable().optional(),
     clearGeminiKey: z.boolean().optional(),
+    geminiModelId: z
+      .string()
+      .trim()
+      .max(120)
+      .regex(
+        /^[a-zA-Z0-9._:/-]+$/,
+        'Model ID may only contain letters, numbers, dots, dashes, slashes, and underscores.',
+      )
+      .nullable()
+      .optional(),
     defaultRoutingMode: z
       .enum(['AUTO_FAILOVER', 'WAVESPEED_ONLY', 'KIE_ONLY'])
       .optional(),
@@ -189,6 +199,13 @@ export const analyzeVideoPromptSchema = z
     customNotes: z.string().trim().max(2000).optional(),
     forceReanalyzeVideo: z.boolean().optional(),
     forceReanalyzeImages: z.boolean().optional(),
+    promptModelId: z
+      .string()
+      .trim()
+      .max(120)
+      .regex(/^[a-zA-Z0-9._:/-]+$/)
+      .nullable()
+      .optional(),
   })
   .strict();
 
@@ -200,6 +217,13 @@ export const refineVideoPromptSchema = z
     modelKey: z
       .string()
       .refine((v) => MODEL_KEYS.includes(v), 'Unsupported video model')
+      .optional(),
+    promptModelId: z
+      .string()
+      .trim()
+      .max(120)
+      .regex(/^[a-zA-Z0-9._:/-]+$/)
+      .nullable()
       .optional(),
   })
   .strict();

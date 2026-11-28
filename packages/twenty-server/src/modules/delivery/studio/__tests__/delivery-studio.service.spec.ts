@@ -1032,5 +1032,68 @@ describe('DeliveryStudioService', () => {
     expect(refined.prompt).toContain('warmer golden-hour lighting');
     expect(refined.modelId).toBe('gemini-2.5-flash');
   });
+
+  it('persists selected Gemini prompting model (including latest alias) without clobbering stored key and forwards it to prompt AI', async () => {
+    const { service, promptAi } = buildHarness();
+
+    promptAi.getGeminiStatus.mockImplementation(
+      (_key?: string | null, preferred?: string | null) => ({
+        configured: true,
+        source: 'STUDIO_KEY',
+        modelId: preferred || 'gemini-2.5-flash',
+      }),
+    );
+    const refineVideoPrompt = jest.fn().mockResolvedValue({
+      prompt: 'Refined prompt with @video1',
+      source: 'GEMINI' as const,
+      modelId: 'gemini-3.1-pro-preview',
+      summary: 'Updated.',
+    });
+    Object.assign(promptAi, { refineVideoPrompt });
+
+    // 1. Save Gemini API key + initial latest alias
+    const savedInitial = await service.saveProviderConfig(makeAuth(), {
+      geminiApiKey: 'AIzaSyTestKey1234567890abcd',
+      geminiModelId: 'gemini-flash-latest',
+    });
+    expect(savedInitial.geminiKeyLast4).toBe('abcd');
+    expect(savedInitial.geminiModelId).toBe('gemini-flash-latest');
+    expect(
+      savedInitial.geminiAvailableModels.some(
+        (m) => m.id === 'gemini-flash-latest',
+      ),
+    ).toBe(true);
+
+    // 2. Switch model only — must preserve existing encrypted API key
+    const switched = await service.saveProviderConfig(makeAuth(), {
+      geminiModelId: 'gemini-3.1-pro-preview',
+    });
+    expect(switched.geminiKeyLast4).toBe('abcd');
+    expect(switched.geminiModelId).toBe('gemini-3.1-pro-preview');
+
+    // 3. Analyze & refine calls automatically receive the saved model ID
+    await service.analyzeVideoPromptWithGemini(makeAuth(), {
+      companyId: COMPANY_ID,
+      referenceVideoId: REF_VIDEO_ID,
+      modelKey: 'seedance-2.5',
+    });
+    expect(promptAi.generateVideoPromptFromMedia).toHaveBeenCalledWith(
+      expect.objectContaining({
+        preferredModelId: 'gemini-3.1-pro-preview',
+      }),
+    );
+
+    await service.refineVideoPromptWithGemini(makeAuth(), {
+      companyId: COMPANY_ID,
+      currentPrompt: 'Original prompt text using @video1',
+      editInstruction: 'Warmer daylight',
+      modelKey: 'seedance-2.5',
+    });
+    expect(refineVideoPrompt).toHaveBeenCalledWith(
+      expect.objectContaining({
+        preferredModelId: 'gemini-3.1-pro-preview',
+      }),
+    );
+  });
 });
 

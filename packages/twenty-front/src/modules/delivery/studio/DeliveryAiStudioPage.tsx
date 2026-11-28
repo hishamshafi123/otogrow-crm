@@ -17,6 +17,7 @@ import {
   IMPORT_DELIVERY_STUDIO_PRODUCT_FROM_URL,
   REFINE_DELIVERY_STUDIO_VIDEO_PROMPT,
   REMOVE_DELIVERY_STUDIO_PRODUCT_KIT_ASSET,
+  SAVE_DELIVERY_STUDIO_PROVIDER_CONFIG,
   SET_DELIVERY_STUDIO_ASSET_APPROVED,
   UPDATE_DELIVERY_STUDIO_PRODUCT_ASSETS,
   UPSERT_DELIVERY_STUDIO_PRODUCT_KIT,
@@ -1280,6 +1281,18 @@ export const DeliveryAiStudioPage = () => {
     };
   }>(REFINE_DELIVERY_STUDIO_VIDEO_PROMPT);
 
+  const [saveProviderConfigMutation] = useMutation(
+    SAVE_DELIVERY_STUDIO_PROVIDER_CONFIG,
+  );
+  const [savingPromptModel, setSavingPromptModel] = useState(false);
+  const [localPromptModelOverride, setLocalPromptModelOverride] = useState<
+    string | null
+  >(null);
+  const effectivePromptModelId =
+    localPromptModelOverride ||
+    workspace?.providerConfig?.geminiModelId ||
+    null;
+
   // Derived data
   const clients = useMemo(
     () => workspace?.clients ?? [],
@@ -1890,6 +1903,9 @@ export const DeliveryAiStudioPage = () => {
               customNotes: activeTab.videoCustomNotes.trim() || undefined,
               forceReanalyzeVideo: opts?.forceReanalyzeVideo ?? false,
               forceReanalyzeImages: opts?.forceReanalyzeImages ?? false,
+              ...(effectivePromptModelId
+                ? { promptModelId: effectivePromptModelId }
+                : {}),
             },
           },
         });
@@ -1953,6 +1969,7 @@ export const DeliveryAiStudioPage = () => {
       selectedVideoProductAssets,
       selectedVideoGarment?.id,
       effectiveCharSheet,
+      effectivePromptModelId,
       videoPromptInputKey,
       markAutoAttemptedKey,
       analyzeVideoPromptMutation,
@@ -1999,6 +2016,35 @@ export const DeliveryAiStudioPage = () => {
     handleAnalyzeVideoPrompt,
   ]);
 
+  const handleChangePromptModel = async (nextModelId: string) => {
+    const clean = nextModelId.trim();
+    if (!clean) return;
+    setLocalPromptModelOverride(clean);
+    if (!workspace?.canManageProviders) {
+      return;
+    }
+    setSavingPromptModel(true);
+    try {
+      await saveProviderConfigMutation({
+        variables: {
+          input: { geminiModelId: clean },
+        },
+      });
+      await workspaceQuery.refetch();
+      setLocalPromptModelOverride(null);
+    } catch (err) {
+      setBanner({
+        tone: 'error',
+        text:
+          err instanceof Error
+            ? err.message
+            : 'Could not save prompting model.',
+      });
+    } finally {
+      setSavingPromptModel(false);
+    }
+  };
+
   const handleRefineVideoPrompt = async (
     editInstruction: string,
   ): Promise<boolean> => {
@@ -2017,6 +2063,9 @@ export const DeliveryAiStudioPage = () => {
             currentPrompt: activeTab.videoMasterPrompt,
             editInstruction,
             modelKey: activeTab.videoModelKey,
+            ...(effectivePromptModelId
+              ? { promptModelId: effectivePromptModelId }
+              : {}),
           },
         },
       });
@@ -3597,10 +3646,13 @@ export const DeliveryAiStudioPage = () => {
                   geminiConfigured={Boolean(
                     workspace?.providerConfig?.geminiConfigured,
                   )}
-                  geminiModelId={
-                    workspace?.providerConfig?.geminiModelId ?? null
-                  }
+                  geminiModelId={effectivePromptModelId}
                   geminiSource={workspace?.providerConfig?.geminiSource ?? null}
+                  availableModels={
+                    workspace?.providerConfig?.geminiAvailableModels
+                  }
+                  savingModel={savingPromptModel}
+                  onChangeModel={handleChangePromptModel}
                   autoPromptWithGemini={activeTab.autoPromptWithGemini}
                   onToggleAutoPrompt={(next) => {
                     if (!next && activeTab.geminiPromptMeta) {

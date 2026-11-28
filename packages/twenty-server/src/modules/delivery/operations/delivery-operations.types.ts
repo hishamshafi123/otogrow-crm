@@ -101,6 +101,7 @@ export type StudioHookDefaultSetting = {
 export type StudioGeminiConfigSetting = {
   encryptedApiKey: string | null;
   keyLast4: string | null;
+  modelId?: string | null;
   verifiedAt: string | null;
   lastError: string | null;
   updatedAt: string;
