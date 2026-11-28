@@ -21,6 +21,7 @@ import { MessageQueue } from 'src/engine/core-modules/message-queue/message-queu
 import { MessageQueueService } from 'src/engine/core-modules/message-queue/services/message-queue.service';
 import { SecretEncryptionService } from 'src/engine/core-modules/secret-encryption/secret-encryption.service';
 import { type EncryptedString } from 'src/engine/core-modules/secret-encryption/branded-strings/encrypted-string.type';
+import { type PlaintextString } from 'src/engine/core-modules/secret-encryption/branded-strings/plaintext-string.type';
 import { TwentyConfigService } from 'src/engine/core-modules/twenty-config/twenty-config.service';
 import { WorkspaceEntity } from 'src/engine/core-modules/workspace/workspace.entity';
 import { GlobalWorkspaceOrmManager } from 'src/engine/twenty-orm/global-workspace-datasource/global-workspace-orm.manager';
@@ -615,10 +616,12 @@ export class DeliveryDriveService {
         googleEmail = 'connected@google.drive';
       }
 
-      const encryptedAccessToken = this.secretEncryption.encrypt(
-        tokens.access_token,
-      ) as EncryptedString;
+      const encryptedAccessToken = this.secretEncryption.encryptVersioned(
+        tokens.access_token as PlaintextString,
+        { workspaceId: verified.w },
+      );
 
+      let missingRefreshToken = false;
       await this.dataSource.transaction(async (manager) => {
         const existing = await manager
           .getRepository(DeliveryDriveConnectionEntity)
@@ -632,18 +635,19 @@ export class DeliveryDriveService {
           existing!.googleEmail.toLowerCase() === googleEmail.toLowerCase() &&
           googleEmail !== 'connected@google.drive';
 
-        const encryptedRefreshToken = (
+        const encryptedRefreshToken: EncryptedString | undefined =
           tokens.refresh_token
-            ? this.secretEncryption.encrypt(tokens.refresh_token)
+            ? this.secretEncryption.encryptVersioned(
+                tokens.refresh_token as PlaintextString,
+                { workspaceId: verified.w },
+              )
             : isSameAccount
               ? existing?.encryptedRefreshToken
-              : undefined
-        ) as EncryptedString | undefined;
+              : undefined;
 
         if (!encryptedRefreshToken) {
-          throw new BadRequestException(
-            'Google did not return a refresh token for this account. Revoke previous consent in Google Account settings and reconnect.',
-          );
+          missingRefreshToken = true;
+          return;
         }
 
         const tokenExpiresAt = tokens.expiry_date
@@ -701,6 +705,10 @@ export class DeliveryDriveService {
           changes: [{ field: 'googleEmail', before: null, after: googleEmail }],
         });
       });
+
+      if (missingRefreshToken) {
+        return { redirectUrl: buildRedirect('error:missing_refresh_token') };
+      }
 
       return { redirectUrl: buildRedirect('connected') };
     } catch (error) {
@@ -864,11 +872,13 @@ export class DeliveryDriveService {
       );
     }
 
-    const accessToken = this.secretEncryption.decrypt(
+    const accessToken = this.secretEncryption.decryptVersionedOrThrow(
       connection.encryptedAccessToken,
+      { workspaceId },
     );
-    const refreshToken = this.secretEncryption.decrypt(
+    const refreshToken = this.secretEncryption.decryptVersionedOrThrow(
       connection.encryptedRefreshToken,
+      { workspaceId },
     );
 
     const oauth2Client = this.buildOAuthClient();
@@ -887,14 +897,25 @@ export class DeliveryDriveService {
       if (refreshed.token && refreshed.token !== accessToken) {
         const nextExpiry =
           oauth2Client.credentials.expiry_date ?? Date.now() + 3500 * 1000;
+        const nextRefreshToken = oauth2Client.credentials.refresh_token;
         await this.dataSource
           .getRepository(DeliveryDriveConnectionEntity)
           .update(
             { id: connection.id },
             {
-              encryptedAccessToken: this.secretEncryption.encrypt(
-                refreshed.token,
-              ) as EncryptedString,
+              encryptedAccessToken: this.secretEncryption.encryptVersioned(
+                refreshed.token as PlaintextString,
+                { workspaceId },
+              ),
+              ...(nextRefreshToken && nextRefreshToken !== refreshToken
+                ? {
+                    encryptedRefreshToken:
+                      this.secretEncryption.encryptVersioned(
+                        nextRefreshToken as PlaintextString,
+                        { workspaceId },
+                      ),
+                  }
+                : {}),
               tokenExpiresAt: new Date(nextExpiry),
             },
           );
