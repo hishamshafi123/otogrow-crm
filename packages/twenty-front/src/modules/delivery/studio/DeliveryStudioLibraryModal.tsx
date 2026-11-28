@@ -365,16 +365,83 @@ const StyledGlyph = styled.div`
   opacity: 0.85;
 `;
 
-const StyledDurationPill = styled.span`
-  background: ${themeCssVariables.background.transparent.strong};
-  border-radius: 6px;
-  bottom: 6px;
-  color: ${themeCssVariables.font.color.inverted};
-  font-size: 10px;
-  font-weight: 600;
-  padding: 2px 6px;
+const StyledVideoOverlayTop = styled.div`
+  align-items: center;
+  display: flex;
+  gap: 5px;
   position: absolute;
   right: 6px;
+  top: 6px;
+  z-index: 3;
+`;
+
+const StyledMiniPlayButton = styled.button`
+  align-items: center;
+  backdrop-filter: blur(4px);
+  background: ${themeCssVariables.background.primary};
+  border: 1px solid ${themeCssVariables.border.color.medium};
+  border-radius: 999px;
+  color: ${themeCssVariables.font.color.primary};
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 10px;
+  font-weight: 700;
+  height: 24px;
+  justify-content: center;
+  min-width: 24px;
+  opacity: 0.92;
+  padding: 0 7px;
+  transition: opacity 120ms ease, transform 120ms ease;
+
+  &:hover {
+    border-color: ${themeCssVariables.font.color.primary};
+    opacity: 1;
+    transform: scale(1.04);
+  }
+`;
+
+const StyledVideoBottomOverlay = styled.div`
+  align-items: center;
+  bottom: 6px;
+  display: flex;
+  gap: 6px;
+  justify-content: space-between;
+  left: 6px;
+  pointer-events: none;
+  position: absolute;
+  right: 6px;
+  z-index: 2;
+`;
+
+const StyledUsagePill = styled.span`
+  backdrop-filter: blur(4px);
+  background: ${themeCssVariables.background.primary};
+  border: 1px solid ${themeCssVariables.border.color.medium};
+  border-radius: 6px;
+  color: ${themeCssVariables.font.color.secondary};
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.2;
+  opacity: 0.92;
+  padding: 2px 6px;
+
+  &[data-used='true'] {
+    color: ${themeCssVariables.font.color.primary};
+  }
+`;
+
+const StyledDurationPill = styled.span`
+  backdrop-filter: blur(4px);
+  background: ${themeCssVariables.background.primary};
+  border: 1px solid ${themeCssVariables.border.color.medium};
+  border-radius: 6px;
+  color: ${themeCssVariables.font.color.primary};
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.2;
+  margin-left: auto;
+  opacity: 0.92;
+  padding: 2px 6px;
 `;
 
 const StyledCardMeta = styled.div`
@@ -464,6 +531,8 @@ export const DeliveryStudioLibraryModal = ({
   const [creating, setCreating] = useState(false);
   const [busy, setBusy] = useState(false);
   const [pendingTrimFile, setPendingTrimFile] = useState<File | null>(null);
+  const [playingVideoId, setPlayingVideoId] = useState<string | null>(null);
+  const [videoMuted, setVideoMuted] = useState(true);
   const [uploadingPresetId, setUploadingPresetId] = useState<string | null>(
     null,
   );
@@ -861,53 +930,120 @@ export const DeliveryStudioLibraryModal = ({
             </StyledEmpty>
           ) : (
             <StyledGrid>
-              {filteredVideos.map((vid) => (
-                <StyledCard
-                  key={vid.id}
-                  role="button"
-                  tabIndex={0}
-                  data-selected={vid.id === selectedId}
-                  onClick={() => {
-                    onSelectReferenceVideo(vid);
-                    onClose();
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
+              {filteredVideos.map((vid) => {
+                const isPlayingCard = playingVideoId === vid.id;
+                const totalUses = vid.usageCount ?? 0;
+                const clientUses = vid.clientUsageCount ?? 0;
+                const usageLabel =
+                  totalUses > 0 ? `Used ${totalUses}×` : '0× used';
+                const usageTooltip =
+                  companyId && totalUses > 0
+                    ? `Used ${totalUses} time${totalUses === 1 ? '' : 's'} total (${clientUses}× for this client)`
+                    : `Used ${totalUses} time${totalUses === 1 ? '' : 's'} to generate AI videos`;
+
+                return (
+                  <StyledCard
+                    key={vid.id}
+                    role="button"
+                    tabIndex={0}
+                    data-selected={vid.id === selectedId}
+                    onClick={() => {
                       onSelectReferenceVideo(vid);
                       onClose();
-                    }
-                  }}
-                >
-                  <StyledVideoBox>
-                    {vid.thumbnailPath ? (
-                      <img
-                        src={studioMediaUrl(vid.thumbnailPath)}
-                        alt={vid.title}
-                      />
-                    ) : (
-                      <video
-                        src={studioMediaUrl(vid.streamPath)}
-                        muted
-                        playsInline
-                        preload="metadata"
-                      />
-                    )}
-                    {vid.mediaMeta?.durationSec && (
-                      <StyledDurationPill>
-                        {Math.round(vid.mediaMeta.durationSec)}s
-                      </StyledDurationPill>
-                    )}
-                  </StyledVideoBox>
-                  <StyledCardMeta>
-                    <strong>{vid.title}</strong>
-                    <span>{vid.notes || vid.originalFileName}</span>
-                    <StyledScopeTag>
-                      {vid.companyId ? 'Client' : 'Shared agency'}
-                    </StyledScopeTag>
-                  </StyledCardMeta>
-                </StyledCard>
-              ))}
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        onSelectReferenceVideo(vid);
+                        onClose();
+                      }
+                    }}
+                  >
+                    <StyledVideoBox>
+                      {isPlayingCard ? (
+                        <video
+                          key={`play-${vid.id}`}
+                          src={studioMediaUrl(vid.streamPath)}
+                          autoPlay
+                          loop
+                          muted={videoMuted}
+                          playsInline
+                        />
+                      ) : vid.thumbnailPath ? (
+                        <img
+                          src={studioMediaUrl(vid.thumbnailPath)}
+                          alt={vid.title}
+                        />
+                      ) : (
+                        <video
+                          src={studioMediaUrl(vid.streamPath)}
+                          muted
+                          playsInline
+                          preload="metadata"
+                        />
+                      )}
+
+                      <StyledVideoOverlayTop
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {isPlayingCard && (
+                          <StyledMiniPlayButton
+                            type="button"
+                            title={videoMuted ? 'Unmute preview' : 'Mute preview'}
+                            aria-label={
+                              videoMuted ? 'Unmute preview' : 'Mute preview'
+                            }
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setVideoMuted((prev) => !prev);
+                            }}
+                          >
+                            {videoMuted ? '🔇' : '🔊'}
+                          </StyledMiniPlayButton>
+                        )}
+                        <StyledMiniPlayButton
+                          type="button"
+                          title={
+                            isPlayingCard ? 'Pause preview' : 'Play preview'
+                          }
+                          aria-label={
+                            isPlayingCard ? 'Pause preview' : 'Play preview'
+                          }
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPlayingVideoId((prev) =>
+                              prev === vid.id ? null : vid.id,
+                            );
+                          }}
+                        >
+                          {isPlayingCard ? '❚❚' : '▶'}
+                        </StyledMiniPlayButton>
+                      </StyledVideoOverlayTop>
+
+                      <StyledVideoBottomOverlay>
+                        <StyledUsagePill
+                          data-used={totalUses > 0}
+                          title={usageTooltip}
+                        >
+                          {usageLabel}
+                        </StyledUsagePill>
+                        {vid.mediaMeta?.durationSec && (
+                          <StyledDurationPill>
+                            {Math.round(vid.mediaMeta.durationSec)}s
+                          </StyledDurationPill>
+                        )}
+                      </StyledVideoBottomOverlay>
+                    </StyledVideoBox>
+                    <StyledCardMeta>
+                      <strong>{vid.title}</strong>
+                      <span>{vid.notes || vid.originalFileName}</span>
+                      <StyledScopeTag>
+                        {vid.companyId ? 'Client' : 'Shared agency'}
+                      </StyledScopeTag>
+                    </StyledCardMeta>
+                  </StyledCard>
+                );
+              })}
             </StyledGrid>
           )}
         </StyledBody>

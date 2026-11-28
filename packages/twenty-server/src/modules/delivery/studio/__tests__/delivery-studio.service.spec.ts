@@ -285,6 +285,7 @@ describe('DeliveryStudioService', () => {
     };
     const driveService = {
       enqueueDeliverableSyncIfConnected: jest.fn().mockResolvedValue(true),
+      resolveClientActiveMonthKey: jest.fn().mockResolvedValue('2026-11'),
       listClientSubfolders: jest.fn().mockResolvedValue({
         connected: true,
         rootFolderId: 'drive-root-1',
@@ -471,6 +472,7 @@ describe('DeliveryStudioService', () => {
     expect(videoHooks.analyzeContext).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ deliverableId: DELIVERABLE_ID }),
+      expect.objectContaining({ overrideGeminiApiKey: null }),
     );
     expect(videoHooks.generateSuggestions).toHaveBeenCalledWith(
       expect.anything(),
@@ -485,6 +487,7 @@ describe('DeliveryStudioService', () => {
           variationCount: 6,
         }),
       }),
+      expect.objectContaining({ overrideGeminiApiKey: null }),
     );
     expect(suggested.deliverableId).toBe(DELIVERABLE_ID);
 

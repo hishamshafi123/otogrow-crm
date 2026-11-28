@@ -13,7 +13,7 @@ import { createWriteStream } from 'node:fs';
 import { pipeline } from 'node:stream/promises';
 import { type Readable } from 'node:stream';
 import { google, type drive_v3 } from 'googleapis';
-import { DataSource, type EntityManager, IsNull } from 'typeorm';
+import { DataSource, type EntityManager, In, IsNull } from 'typeorm';
 import { type WorkspaceAuthContext } from 'src/engine/core-modules/auth/types/workspace-auth-context.type';
 import { FileStorageDriverFactory } from 'src/engine/core-modules/file-storage/file-storage-driver.factory';
 import { InjectMessageQueue } from 'src/engine/core-modules/message-queue/decorators/message-queue.decorator';
@@ -28,7 +28,11 @@ import { buildSystemAuthContext } from 'src/engine/twenty-orm/utils/build-system
 import { type CompanyWorkspaceEntity } from 'src/modules/company/standard-objects/company.workspace-entity';
 import { DeliveryService } from 'src/modules/delivery/delivery.service';
 import { DeliveryProjectEntity } from 'src/modules/delivery/entities/delivery-project.entity';
-import { DeliveryClientDriveMappingEntity } from 'src/modules/delivery/deliverables/entities/delivery-client-drive-mapping.entity';
+import { DeliveryFinanceV2InvoiceScheduleEntity } from 'src/modules/delivery/finance-v2/entities/delivery-finance-v2-invoice-schedule.entity';
+import {
+  type CachedDriveMonthFolder,
+  DeliveryClientDriveMappingEntity,
+} from 'src/modules/delivery/deliverables/entities/delivery-client-drive-mapping.entity';
 import { DeliveryDeliverableEntity } from 'src/modules/delivery/deliverables/entities/delivery-deliverable.entity';
 import {
   DeliveryDriveConnectionEntity,
@@ -43,8 +47,10 @@ import {
   formatDriveMonthFolder,
   formatDriveVariationFilename,
   isUuidString,
+  matchExistingMonthSubfolder,
   MONTH_FOLDER_PRESETS,
   parseByteRangeHeader,
+  resolveClientBillingCycle,
   sanitizeSafeReturnPath,
   signDriveOAuthState,
   updateDriveSettingsSchema,
@@ -61,6 +67,58 @@ const GOOGLE_DRIVE_SCOPES = [
 ];
 
 const FOLDER_MIME = 'application/vnd.google-apps.folder';
+const CACHE_META_KEY = '__meta__';
+
+type DriveCacheMetaEntry = {
+  monthStartDay?: number;
+};
+
+const readExplicitMonthStartDay = (
+  cache?: Record<string, unknown> | null,
+): number | null => {
+  if (!cache || typeof cache !== 'object') return null;
+  const meta = cache[CACHE_META_KEY] as DriveCacheMetaEntry | undefined;
+  const raw = meta?.monthStartDay;
+  if (typeof raw !== 'number' || !Number.isInteger(raw) || raw < 1 || raw > 31) {
+    return null;
+  }
+  return raw;
+};
+
+const buildClearedMonthCache = (
+  existingCache?: Record<string, CachedDriveMonthFolder> | null,
+  monthStartDayUpdate?: number | null,
+): Record<string, CachedDriveMonthFolder> => {
+  const nextMonthStartDay =
+    monthStartDayUpdate === undefined
+      ? readExplicitMonthStartDay(existingCache)
+      : monthStartDayUpdate;
+  if (nextMonthStartDay !== null) {
+    return {
+      [CACHE_META_KEY]: {
+        monthStartDay: nextMonthStartDay,
+      } as unknown as CachedDriveMonthFolder,
+    };
+  }
+  return {};
+};
+
+const applyMonthStartDayToCache = (
+  existingCache: Record<string, CachedDriveMonthFolder> | null | undefined,
+  monthStartDayUpdate: number | null,
+): Record<string, CachedDriveMonthFolder> => {
+  const next: Record<string, CachedDriveMonthFolder> = {
+    ...(existingCache ?? {}),
+  };
+  if (monthStartDayUpdate === null) {
+    delete next[CACHE_META_KEY];
+  } else {
+    next[CACHE_META_KEY] = {
+      monthStartDay: monthStartDayUpdate,
+    } as unknown as CachedDriveMonthFolder;
+  }
+  return next;
+};
 
 const escapeDriveQueryValue = (value: string): string =>
   value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
@@ -99,12 +157,18 @@ export type DriveFolderOption = {
   webViewLink: string | null;
 };
 
+export type MonthStartDaySource = 'EXPLICIT' | 'BILLING_SCHEDULE' | 'DEFAULT';
+
 export type ClientDriveMappingDTO = {
   companyId: string;
   companyName: string | null;
   rootFolderId: string;
   rootFolderName: string;
   rootFolderWebUrl: string | null;
+  monthStartDay: number;
+  monthStartDaySource: MonthStartDaySource;
+  activeMonthKey: string;
+  activeCycleLabel: string;
   monthFolderPatternOverride: string | null;
   monthFolderPreview: string;
 };
@@ -259,6 +323,97 @@ export class DeliveryDriveService {
     return map;
   }
 
+  private async loadClientBillingDays(
+    workspaceId: string,
+    companyIds: string[],
+  ): Promise<Map<string, number>> {
+    const result = new Map<string, number>();
+    const uniqueCompanyIds = Array.from(
+      new Set(companyIds.filter((id) => isUuidString(id))),
+    );
+    if (!uniqueCompanyIds.length) return result;
+    try {
+      const projects = await this.dataSource
+        .getRepository(DeliveryProjectEntity)
+        .find({
+          where: { workspaceId, companyId: In(uniqueCompanyIds) },
+          select: ['id', 'companyId'],
+        });
+      if (!projects.length) return result;
+      const projectToCompany = new Map<string, string>();
+      for (const project of projects) {
+        if (project.id && project.companyId) {
+          projectToCompany.set(project.id, project.companyId);
+        }
+      }
+      const projectIds = Array.from(projectToCompany.keys());
+      if (!projectIds.length) return result;
+      const schedules = await this.dataSource
+        .getRepository(DeliveryFinanceV2InvoiceScheduleEntity)
+        .find({
+          where: {
+            workspaceId,
+            projectId: In(projectIds),
+            status: 'ACTIVE',
+          },
+          order: { updatedAt: 'DESC' },
+        });
+      for (const schedule of schedules) {
+        if (!schedule.projectId) continue;
+        const companyId = projectToCompany.get(schedule.projectId);
+        if (!companyId || result.has(companyId)) continue;
+        if (
+          typeof schedule.billingDayOfMonth === 'number' &&
+          schedule.billingDayOfMonth >= 1 &&
+          schedule.billingDayOfMonth <= 31
+        ) {
+          result.set(companyId, schedule.billingDayOfMonth);
+        }
+      }
+    } catch {
+      // Gracefully fallback to default day 1 if Finance V2 schedules are unavailable.
+    }
+    return result;
+  }
+
+  async resolveClientMonthStartDay(
+    workspaceId: string,
+    companyId: string,
+    existingMapping?: DeliveryClientDriveMappingEntity | null,
+  ): Promise<{ monthStartDay: number; source: MonthStartDaySource }> {
+    const mapping =
+      existingMapping !== undefined
+        ? existingMapping
+        : await this.dataSource
+            .getRepository(DeliveryClientDriveMappingEntity)
+            .findOne({ where: { workspaceId, companyId } });
+    const explicit = readExplicitMonthStartDay(mapping?.monthFolderCache);
+    if (explicit !== null) {
+      return { monthStartDay: explicit, source: 'EXPLICIT' };
+    }
+    const billingDays = await this.loadClientBillingDays(workspaceId, [
+      companyId,
+    ]);
+    const fromSchedule = billingDays.get(companyId);
+    if (fromSchedule !== undefined) {
+      return { monthStartDay: fromSchedule, source: 'BILLING_SCHEDULE' };
+    }
+    return { monthStartDay: 1, source: 'DEFAULT' };
+  }
+
+  async resolveClientActiveMonthKey(
+    workspaceId: string,
+    companyId: string,
+    referenceDate: Date = new Date(),
+  ): Promise<string> {
+    const { monthStartDay } = await this.resolveClientMonthStartDay(
+      workspaceId,
+      companyId,
+    );
+    return resolveClientBillingCycle(monthStartDay, referenceDate)
+      .cycleMonthKey;
+  }
+
   async getConfig(auth: WorkspaceAuthContext): Promise<DeliveryDriveConfigDTO> {
     const { workspaceId, memberId, userWorkspaceId } = this.identity(auth);
     const actor = await this.authorizeStaff(
@@ -299,8 +454,16 @@ export class DeliveryDriveService {
     const mappings = await this.dataSource
       .getRepository(DeliveryClientDriveMappingEntity)
       .find({ where: { workspaceId }, order: { updatedAt: 'DESC' } });
-    const companyNames =
-      mappings.length > 0 ? await this.loadCompanyNames(workspaceId) : new Map();
+    const [companyNames, billingDays] =
+      mappings.length > 0
+        ? await Promise.all([
+            this.loadCompanyNames(workspaceId),
+            this.loadClientBillingDays(
+              workspaceId,
+              mappings.map((m) => m.companyId),
+            ),
+          ])
+        : [new Map<string, string>(), new Map<string, number>()];
 
     return {
       oauthConfigured: creds.configured,
@@ -322,14 +485,31 @@ export class DeliveryDriveService {
       connectedAt: connection?.createdAt?.toISOString() ?? null,
       clientMappings: mappings.map((mapping) => {
         const effPattern = mapping.monthFolderPatternOverride || pattern;
+        const explicitDay = readExplicitMonthStartDay(mapping.monthFolderCache);
+        const scheduleDay = billingDays.get(mapping.companyId);
+        const monthStartDay = explicitDay ?? scheduleDay ?? 1;
+        const monthStartDaySource: MonthStartDaySource =
+          explicitDay !== null
+            ? 'EXPLICIT'
+            : scheduleDay !== undefined
+              ? 'BILLING_SCHEDULE'
+              : 'DEFAULT';
+        const cycle = resolveClientBillingCycle(monthStartDay);
         return {
           companyId: mapping.companyId,
           companyName: companyNames.get(mapping.companyId) ?? null,
           rootFolderId: mapping.rootFolderId,
           rootFolderName: mapping.rootFolderName,
           rootFolderWebUrl: mapping.rootFolderWebUrl,
+          monthStartDay,
+          monthStartDaySource,
+          activeMonthKey: cycle.cycleMonthKey,
+          activeCycleLabel: cycle.cycleLabel,
           monthFolderPatternOverride: mapping.monthFolderPatternOverride,
-          monthFolderPreview: formatDriveMonthFolder(sampleMonth, effPattern),
+          monthFolderPreview: formatDriveMonthFolder(
+            cycle.cycleMonthKey,
+            effPattern,
+          ),
         };
       }),
     };
@@ -597,7 +777,9 @@ export class DeliveryDriveService {
           .find({ where: { workspaceId } });
         for (const mapping of mappings) {
           if (!mapping.monthFolderPatternOverride) {
-            mapping.monthFolderCache = {};
+            mapping.monthFolderCache = buildClearedMonthCache(
+              mapping.monthFolderCache,
+            );
             await manager
               .getRepository(DeliveryClientDriveMappingEntity)
               .save(mapping);
@@ -764,14 +946,59 @@ export class DeliveryDriveService {
       }));
   }
 
+  private async listDirectChildFolders(
+    drive: drive_v3.Drive,
+    parentId: string,
+    search?: string | null,
+    pageSize = 100,
+  ): Promise<DriveFolderOption[]> {
+    const clauses = [
+      `mimeType = '${FOLDER_MIME}'`,
+      'trashed = false',
+      `'${escapeDriveQueryValue(parentId)}' in parents`,
+    ];
+    if (search?.trim()) {
+      clauses.push(
+        `name contains '${escapeDriveQueryValue(search.trim().slice(0, 80))}'`,
+      );
+    }
+    const res = await drive.files.list({
+      q: clauses.join(' and '),
+      fields: 'files(id,name,webViewLink)',
+      orderBy: 'modifiedTime desc,name asc',
+      pageSize,
+      supportsAllDrives: true,
+      includeItemsFromAllDrives: true,
+    });
+    return (res.data.files ?? [])
+      .filter((f): f is { id: string; name: string; webViewLink?: string | null } =>
+        Boolean(f.id && f.name),
+      )
+      .map((f) => ({
+        id: f.id,
+        name: f.name,
+        webViewLink:
+          f.webViewLink ?? `https://drive.google.com/drive/folders/${f.id}`,
+      }));
+  }
+
   async listClientSubfolders(
     auth: WorkspaceAuthContext,
     companyId: string,
+    search?: string | null,
   ): Promise<{
     connected: boolean;
+    clientMapped: boolean;
     rootFolderId: string | null;
     rootFolderName: string | null;
     rootFolderWebUrl: string | null;
+    monthStartDay: number;
+    monthStartDaySource: MonthStartDaySource;
+    activeMonthKey: string;
+    activeCycleLabel: string;
+    expectedMonthFolderName: string;
+    matchedMonthFolder: DriveFolderOption | null;
+    monthSubfolders: DriveFolderOption[];
     subfolders: DriveFolderOption[];
   }> {
     const { workspaceId, memberId, userWorkspaceId } = this.identity(auth);
@@ -780,67 +1007,138 @@ export class DeliveryDriveService {
     const connection = await this.dataSource
       .getRepository(DeliveryDriveConnectionEntity)
       .findOne({ where: { workspaceId } });
-    if (!connection || connection.revokedAt) {
-      return {
-        connected: false,
-        rootFolderId: null,
-        rootFolderName: null,
-        rootFolderWebUrl: null,
-        subfolders: [],
-      };
-    }
 
     const mapping = await this.dataSource
       .getRepository(DeliveryClientDriveMappingEntity)
       .findOne({ where: { workspaceId, companyId } });
-    if (!mapping?.rootFolderId) {
+
+    const { monthStartDay, source: monthStartDaySource } =
+      await this.resolveClientMonthStartDay(workspaceId, companyId, mapping);
+    const cycle = resolveClientBillingCycle(monthStartDay);
+    const pattern =
+      mapping?.monthFolderPatternOverride ||
+      connection?.monthFolderPattern ||
+      '{Month} {YYYY}';
+    const expectedMonthFolderName = formatDriveMonthFolder(
+      cycle.cycleMonthKey,
+      pattern,
+    );
+
+    if (!connection || connection.revokedAt) {
       return {
-        connected: true,
-        rootFolderId: connection.rootFolderId ?? null,
-        rootFolderName: connection.rootFolderName ?? null,
+        connected: false,
+        clientMapped: false,
+        rootFolderId: null,
+        rootFolderName: null,
         rootFolderWebUrl: null,
+        monthStartDay,
+        monthStartDaySource,
+        activeMonthKey: cycle.cycleMonthKey,
+        activeCycleLabel: cycle.cycleLabel,
+        expectedMonthFolderName,
+        matchedMonthFolder: null,
+        monthSubfolders: [],
         subfolders: [],
       };
     }
 
-    try {
-      const { drive } = await this.getAuthorizedDriveClient(workspaceId);
-      const clauses = [
-        `mimeType = '${FOLDER_MIME}'`,
-        'trashed = false',
-        `'${escapeDriveQueryValue(mapping.rootFolderId)}' in parents`,
-      ];
-      const res = await drive.files.list({
-        q: clauses.join(' and '),
-        fields: 'files(id,name,webViewLink)',
-        orderBy: 'modifiedTime desc,name asc',
-        pageSize: 60,
-        supportsAllDrives: true,
-        includeItemsFromAllDrives: true,
-      });
-      const subfolders = (res.data.files ?? [])
-        .filter((f): f is { id: string; name: string; webViewLink?: string | null } =>
-          Boolean(f.id && f.name),
-        )
-        .map((f) => ({
-          id: f.id,
-          name: f.name,
-          webViewLink:
-            f.webViewLink ?? `https://drive.google.com/drive/folders/${f.id}`,
-        }));
+    if (!mapping?.rootFolderId) {
       return {
         connected: true,
+        clientMapped: false,
+        rootFolderId: connection.rootFolderId ?? null,
+        rootFolderName: connection.rootFolderName ?? null,
+        rootFolderWebUrl: connection.rootFolderId
+          ? `https://drive.google.com/drive/folders/${connection.rootFolderId}`
+          : null,
+        monthStartDay,
+        monthStartDaySource,
+        activeMonthKey: cycle.cycleMonthKey,
+        activeCycleLabel: cycle.cycleLabel,
+        expectedMonthFolderName,
+        matchedMonthFolder: null,
+        monthSubfolders: [],
+        subfolders: [],
+      };
+    }
+
+    const searchTrimmed = search?.trim() || '';
+
+    try {
+      const { drive } = await this.getAuthorizedDriveClient(workspaceId);
+      const allRootChildren = await this.listDirectChildFolders(
+        drive,
+        mapping.rootFolderId,
+        null,
+        100,
+      );
+      const matchedMonthFolder = matchExistingMonthSubfolder(allRootChildren, {
+        monthKey: cycle.cycleMonthKey,
+        expectedName: expectedMonthFolderName,
+        monthStartDay,
+      });
+
+      let monthSubfolders: DriveFolderOption[] = [];
+      if (matchedMonthFolder) {
+        try {
+          monthSubfolders = await this.listDirectChildFolders(
+            drive,
+            matchedMonthFolder.id,
+            searchTrimmed || null,
+            60,
+          );
+        } catch {
+          monthSubfolders = [];
+        }
+      }
+
+      let subfolders = allRootChildren;
+      if (searchTrimmed) {
+        const lowerSearch = searchTrimmed.toLowerCase();
+        const filteredLocal = allRootChildren.filter((folder) =>
+          folder.name.toLowerCase().includes(lowerSearch),
+        );
+        if (filteredLocal.length > 0 || allRootChildren.length < 100) {
+          subfolders = filteredLocal;
+        } else {
+          subfolders = await this.listDirectChildFolders(
+            drive,
+            mapping.rootFolderId,
+            searchTrimmed,
+            60,
+          );
+        }
+      }
+
+      return {
+        connected: true,
+        clientMapped: true,
         rootFolderId: mapping.rootFolderId,
         rootFolderName: mapping.rootFolderName,
         rootFolderWebUrl: mapping.rootFolderWebUrl,
+        monthStartDay,
+        monthStartDaySource,
+        activeMonthKey: cycle.cycleMonthKey,
+        activeCycleLabel: cycle.cycleLabel,
+        expectedMonthFolderName,
+        matchedMonthFolder,
+        monthSubfolders,
         subfolders,
       };
     } catch {
       return {
         connected: true,
+        clientMapped: true,
         rootFolderId: mapping.rootFolderId,
         rootFolderName: mapping.rootFolderName,
         rootFolderWebUrl: mapping.rootFolderWebUrl,
+        monthStartDay,
+        monthStartDaySource,
+        activeMonthKey: cycle.cycleMonthKey,
+        activeCycleLabel: cycle.cycleLabel,
+        expectedMonthFolderName,
+        matchedMonthFolder: null,
+        monthSubfolders: [],
         subfolders: [],
       };
     }
@@ -988,11 +1286,21 @@ export class DeliveryDriveService {
         [`drive-client:${workspaceId}:${input.companyId}`],
       );
 
+      const repo = manager.getRepository(DeliveryClientDriveMappingEntity);
+      let mapping = await repo.findOne({
+        where: { workspaceId, companyId: input.companyId },
+      });
+
       let folderId = input.rootFolderId?.trim() || '';
       let folderName = input.rootFolderName?.trim() || companyName;
       let folderWebUrl: string | null = null;
 
-      if (input.autoCreate || !folderId) {
+      if (!input.autoCreate && !folderId && mapping?.rootFolderId) {
+        // Metadata-only update (e.g. changing monthStartDay or monthFolderPatternOverride)
+        folderId = mapping.rootFolderId;
+        folderName = mapping.rootFolderName;
+        folderWebUrl = mapping.rootFolderWebUrl;
+      } else if (input.autoCreate || !folderId) {
         if (connection.rootFolderId) {
           const folder = await this.findOrCreateChildFolder(
             drive,
@@ -1035,23 +1343,33 @@ export class DeliveryDriveService {
           `https://drive.google.com/drive/folders/${folderId}`;
       }
 
-      const repo = manager.getRepository(DeliveryClientDriveMappingEntity);
-      let mapping = await repo.findOne({
-        where: { workspaceId, companyId: input.companyId },
-      });
       if (mapping) {
         const folderChanged = mapping.rootFolderId !== folderId;
         const patternChanged =
           validatedOverride !== undefined &&
           validatedOverride !== mapping.monthFolderPatternOverride;
+        const prevExplicitDay = readExplicitMonthStartDay(
+          mapping.monthFolderCache,
+        );
+        const monthStartDayChanged =
+          input.monthStartDay !== undefined &&
+          input.monthStartDay !== prevExplicitDay;
         mapping.rootFolderId = folderId;
         mapping.rootFolderName = folderName;
         mapping.rootFolderWebUrl = folderWebUrl;
         if (validatedOverride !== undefined) {
           mapping.monthFolderPatternOverride = validatedOverride;
         }
-        if (folderChanged || patternChanged) {
-          mapping.monthFolderCache = {};
+        if (folderChanged || patternChanged || monthStartDayChanged) {
+          mapping.monthFolderCache = buildClearedMonthCache(
+            mapping.monthFolderCache,
+            input.monthStartDay,
+          );
+        } else if (input.monthStartDay !== undefined) {
+          mapping.monthFolderCache = applyMonthStartDayToCache(
+            mapping.monthFolderCache,
+            input.monthStartDay,
+          );
         }
       } else {
         mapping = repo.create({
@@ -1061,12 +1379,18 @@ export class DeliveryDriveService {
           rootFolderName: folderName,
           rootFolderWebUrl: folderWebUrl,
           monthFolderPatternOverride: validatedOverride ?? null,
-          monthFolderCache: {},
+          monthFolderCache: buildClearedMonthCache(
+            undefined,
+            input.monthStartDay ?? null,
+          ),
         });
       }
       return repo.save(mapping);
     });
 
+    const { monthStartDay, source: monthStartDaySource } =
+      await this.resolveClientMonthStartDay(workspaceId, saved.companyId, saved);
+    const cycle = resolveClientBillingCycle(monthStartDay);
     const effPattern =
       saved.monthFolderPatternOverride || connection.monthFolderPattern;
     return {
@@ -1075,8 +1399,15 @@ export class DeliveryDriveService {
       rootFolderId: saved.rootFolderId,
       rootFolderName: saved.rootFolderName,
       rootFolderWebUrl: saved.rootFolderWebUrl,
+      monthStartDay,
+      monthStartDaySource,
+      activeMonthKey: cycle.cycleMonthKey,
+      activeCycleLabel: cycle.cycleLabel,
       monthFolderPatternOverride: saved.monthFolderPatternOverride,
-      monthFolderPreview: formatDriveMonthFolder(currentMonthKey(), effPattern),
+      monthFolderPreview: formatDriveMonthFolder(
+        cycle.cycleMonthKey,
+        effPattern,
+      ),
     };
   }
 
@@ -1264,11 +1595,35 @@ export class DeliveryDriveService {
     }
 
     if (!monthFolder) {
-      monthFolder = await this.findOrCreateChildFolder(
-        drive,
-        mapping.rootFolderId,
-        expectedMonthFolderName,
+      const { monthStartDay } = await this.resolveClientMonthStartDay(
+        mapping.workspaceId,
+        mapping.companyId,
+        mapping,
       );
+      try {
+        const existingChildren = await this.listDirectChildFolders(
+          drive,
+          mapping.rootFolderId,
+          null,
+          100,
+        );
+        monthFolder = matchExistingMonthSubfolder(existingChildren, {
+          monthKey: deliverable.monthKey,
+          expectedName: expectedMonthFolderName,
+          monthStartDay,
+        });
+      } catch {
+        monthFolder = null;
+      }
+
+      if (!monthFolder) {
+        monthFolder = await this.findOrCreateChildFolder(
+          drive,
+          mapping.rootFolderId,
+          expectedMonthFolderName,
+        );
+      }
+
       const nextCache = {
         ...(mapping.monthFolderCache ?? {}),
         [cacheKey]: {

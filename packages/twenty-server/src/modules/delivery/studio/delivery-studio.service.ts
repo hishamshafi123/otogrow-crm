@@ -445,7 +445,10 @@ export class DeliveryStudioService {
     };
   }
 
-  private mapReferenceVideo(row: DeliveryStudioReferenceVideoEntity) {
+  private mapReferenceVideo(
+    row: DeliveryStudioReferenceVideoEntity,
+    usageCounts?: { totalCount: number; clientCount: number },
+  ) {
     return {
       id: row.id,
       companyId: row.companyId,
@@ -461,6 +464,8 @@ export class DeliveryStudioService {
       thumbnailPath: row.thumbnailKey
         ? this.signedMediaPath(row.workspaceId, 'ref-thumb', row.id)
         : null,
+      usageCount: usageCounts?.totalCount ?? 0,
+      clientUsageCount: usageCounts?.clientCount ?? 0,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     };
@@ -1157,6 +1162,37 @@ export class DeliveryStudioService {
         }),
       ]);
 
+      const assetRepo = manager.getRepository(DeliveryStudioAssetEntity);
+      const refUsageRows =
+        typeof assetRepo.createQueryBuilder === 'function'
+          ? await assetRepo
+              .createQueryBuilder('a')
+              .select('a."referenceVideoId"', 'referenceVideoId')
+              .addSelect('COUNT(*)', 'totalCount')
+              .addSelect(
+                companyId
+                  ? 'SUM(CASE WHEN a."companyId" = :usageCompanyId THEN 1 ELSE 0 END)'
+                  : '0',
+                'clientCount',
+              )
+              .where('a."workspaceId" = :usageWorkspaceId', {
+                usageWorkspaceId: id.workspaceId,
+              })
+              .andWhere('a."referenceVideoId" IS NOT NULL')
+              .andWhere('a.kind = :videoKind', { videoKind: 'GENERATED_VIDEO' })
+              .andWhere('a."providerUsed" <> :editorProvider', {
+                editorProvider: 'editor',
+              })
+              .andWhere('a.archived = false')
+              .setParameters(companyId ? { usageCompanyId: companyId } : {})
+              .groupBy('a."referenceVideoId"')
+              .getRawMany<{
+                referenceVideoId: string;
+                totalCount: string | number;
+                clientCount: string | number;
+              }>()
+          : [];
+
       return {
         actor,
         operations,
@@ -1167,6 +1203,7 @@ export class DeliveryStudioService {
         productKits,
         assets,
         globalJobs,
+        refUsageRows,
       };
     });
 
@@ -1180,7 +1217,20 @@ export class DeliveryStudioService {
       productKits,
       assets,
       globalJobs,
+      refUsageRows,
     } = txResult;
+
+    const refUsageMap = new Map<
+      string,
+      { totalCount: number; clientCount: number }
+    >();
+    for (const row of refUsageRows) {
+      if (!row.referenceVideoId) continue;
+      refUsageMap.set(row.referenceVideoId, {
+        totalCount: Number(row.totalCount ?? 0) || 0,
+        clientCount: Number(row.clientCount ?? 0) || 0,
+      });
+    }
 
     // Strictly use Delivery Clients roster (NOT all CRM companies)
     const roster = normalizeClientRoster(operations?.state.clientRoster);
@@ -1281,7 +1331,9 @@ export class DeliveryStudioService {
         selectedClientInfo?.isClothingBrand,
       ),
       presets: scopedPresets.map((p) => this.mapPreset(p)),
-      referenceVideos: refVideos.map((rv) => this.mapReferenceVideo(rv)),
+      referenceVideos: refVideos.map((rv) =>
+        this.mapReferenceVideo(rv, refUsageMap.get(rv.id)),
+      ),
       productKits: scopedProductKits.map((pk) => this.mapProductKit(pk)),
       characterSheets: scopedAssets
         .filter((a) => a.kind === 'CHARACTER_SHEET')
@@ -3402,6 +3454,15 @@ export class DeliveryStudioService {
       .getRepository(WorkspaceEntity)
       .findOneByOrFail({ id: id.workspaceId });
 
+    const resolvedMonthKey =
+      options?.monthKey ||
+      (typeof this.driveService?.resolveClientActiveMonthKey === 'function'
+        ? await this.driveService.resolveClientActiveMonthKey(
+            id.workspaceId,
+            asset.companyId,
+          )
+        : currentMonthKey());
+
     const created = await this.deliverables.createUploadedDeliverable(
       workspace,
       id.memberId,
@@ -3410,7 +3471,7 @@ export class DeliveryStudioService {
         companyId: asset.companyId,
         projectId: asset.projectId ?? undefined,
         serviceKey: options?.serviceKey?.trim() || 'AI Video',
-        monthKey: options?.monthKey || currentMonthKey(),
+        monthKey: resolvedMonthKey,
         title: asset.title,
         description: `Generated in Otogrow AI Studio (${asset.modelKey} via ${asset.providerUsed}).`,
         assetKind: 'VIDEO',
@@ -3439,23 +3500,41 @@ export class DeliveryStudioService {
     return { asset, deliverableId: created.id };
   }
 
-  async getClientDriveFolders(auth: WorkspaceAuthContext, companyId: string) {
+  async getClientDriveFolders(
+    auth: WorkspaceAuthContext,
+    companyId: string,
+    search?: string | null,
+  ) {
     if (!isUuidString(companyId)) {
       throw new BadRequestException('Invalid client company ID.');
     }
     if (!this.driveService) {
+      const monthKey = currentMonthKey();
       return {
         connected: false,
+        clientMapped: false,
         rootFolderId: null,
         rootFolderName: null,
-        folders: [] as Array<{
+        rootFolderWebUrl: null,
+        monthStartDay: 1,
+        monthStartDaySource: 'DEFAULT' as const,
+        activeMonthKey: monthKey,
+        activeCycleLabel: '',
+        expectedMonthFolderName: monthKey,
+        matchedMonthFolder: null,
+        monthSubfolders: [] as Array<{
+          id: string;
+          name: string;
+          webViewLink: string | null;
+        }>,
+        subfolders: [] as Array<{
           id: string;
           name: string;
           webViewLink: string | null;
         }>,
       };
     }
-    return this.driveService.listClientSubfolders(auth, companyId);
+    return this.driveService.listClientSubfolders(auth, companyId, search);
   }
 
   async saveHookDefault(auth: WorkspaceAuthContext, rawInput: unknown) {
@@ -3577,7 +3656,7 @@ export class DeliveryStudioService {
       { serviceKey: input.serviceKey, monthKey: input.monthKey },
     );
 
-    // Load optional saved Hook Master Prompt Preset + Examples
+    // Load saved Hook Master Prompt Preset + Working Examples (preferring explicit preset -> client brand preset -> workspace preset)
     let presetMasterPrompt: string | undefined;
     let presetExamples: string[] = [];
     let presetPlatform:
@@ -3589,48 +3668,84 @@ export class DeliveryStudioService {
       | undefined;
     let presetFunnel: 'COLD' | 'WARM' | 'RETARGETING' | 'ORGANIC' | undefined;
 
+    const presetRepo = this.dataSource.getRepository(DeliveryStudioPresetEntity);
+    let resolvedPreset: DeliveryStudioPresetEntity | null = null;
     if (input.hookPresetId) {
-      const preset = await this.dataSource
-        .getRepository(DeliveryStudioPresetEntity)
-        .findOne({
-          where: { id: input.hookPresetId, workspaceId: id.workspaceId },
-        });
-      if (preset) {
-        presetMasterPrompt = preset.masterPrompt || undefined;
-        presetExamples = preset.examplesJson ?? [];
-        presetPlatform = preset.configJson?.platform;
-        presetFunnel = preset.configJson?.funnelStage;
-      }
+      resolvedPreset = await presetRepo.findOne({
+        where: { id: input.hookPresetId, workspaceId: id.workspaceId },
+      });
+    } else if (typeof presetRepo.find === 'function') {
+      const candidates = await presetRepo.find({
+        where: {
+          workspaceId: id.workspaceId,
+          kind: 'TEXT_HOOK',
+          archived: false,
+        },
+        order: { isDefault: 'DESC', updatedAt: 'DESC' },
+      });
+      resolvedPreset =
+        candidates.find((p) => p.companyId === asset.companyId) ??
+        candidates.find((p) => !p.companyId) ??
+        null;
+    }
+
+    if (resolvedPreset) {
+      presetMasterPrompt = resolvedPreset.masterPrompt || undefined;
+      presetExamples = resolvedPreset.examplesJson ?? [];
+      presetPlatform = resolvedPreset.configJson?.platform;
+      presetFunnel = resolvedPreset.configJson?.funnelStage;
+    }
+
+    // Read workspace Studio Gemini API key if configured so AI hook suggestions use real Gemini even without global admin key
+    let overrideGeminiApiKey: string | null = null;
+    try {
+      const ops = await this.dataSource
+        .getRepository(DeliveryOperationsEntity)
+        .findOne({ where: { workspaceId: id.workspaceId } });
+      overrideGeminiApiKey = this.readDecryptedGeminiKeyFromConfig(
+        id.workspaceId,
+        ops?.state?.studioGeminiConfig ?? null,
+      );
+    } catch {
+      overrideGeminiApiKey = null;
     }
 
     // Step A: Assess the actual generated video + website + Brand Knowledge
-    await this.videoHooks.analyzeContext(auth, {
-      deliverableId,
-      websiteUrl: input.websiteUrl ?? undefined,
-      refreshVideo: input.refreshVideoAnalysis ?? false,
-    });
+    await this.videoHooks.analyzeContext(
+      auth,
+      {
+        deliverableId,
+        websiteUrl: input.websiteUrl ?? undefined,
+        refreshVideo: input.refreshVideoAnalysis ?? false,
+      },
+      { overrideGeminiApiKey },
+    );
 
     // Step B: Generate AI text hooks using Video Assessment + Brand Knowledge + Master Prompt + Fed-in Examples
-    const hookProject = await this.videoHooks.generateSuggestions(auth, {
-      deliverableId,
-      websiteUrl: input.websiteUrl ?? undefined,
-      creativeInput: {
-        platform: input.platform ?? presetPlatform ?? 'ALL',
-        funnelStage: input.funnelStage ?? presetFunnel ?? 'COLD',
-        campaignGoal: input.campaignGoal,
-        offerAngle: input.offerAngle,
-        toneOverride: input.toneOverride,
-        customDirection: input.customDirection,
-        masterPrompt: input.masterPrompt?.trim() || presetMasterPrompt,
-        exampleHooks:
-          input.exampleHooks && input.exampleHooks.length > 0
-            ? input.exampleHooks
-            : presetExamples.length > 0
-              ? presetExamples
-              : undefined,
-        variationCount: input.suggestionCount ?? 8,
+    const hookProject = await this.videoHooks.generateSuggestions(
+      auth,
+      {
+        deliverableId,
+        websiteUrl: input.websiteUrl ?? undefined,
+        creativeInput: {
+          platform: input.platform ?? presetPlatform ?? 'ALL',
+          funnelStage: input.funnelStage ?? presetFunnel ?? 'COLD',
+          campaignGoal: input.campaignGoal,
+          offerAngle: input.offerAngle,
+          toneOverride: input.toneOverride,
+          customDirection: input.customDirection,
+          masterPrompt: input.masterPrompt?.trim() || presetMasterPrompt,
+          exampleHooks:
+            input.exampleHooks && input.exampleHooks.length > 0
+              ? input.exampleHooks
+              : presetExamples.length > 0
+                ? presetExamples
+                : undefined,
+          variationCount: input.suggestionCount ?? 8,
+        },
       },
-    });
+      { overrideGeminiApiKey },
+    );
 
     if (asset.hookProjectId !== hookProject.id) {
       asset.hookProjectId = hookProject.id;

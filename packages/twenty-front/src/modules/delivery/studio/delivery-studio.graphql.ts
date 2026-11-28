@@ -130,8 +130,8 @@ export const RENDER_DELIVERY_STUDIO_VIDEO_HOOKS = gql`
 `;
 
 export const GET_DELIVERY_STUDIO_CLIENT_DRIVE_FOLDERS = gql`
-  query DeliveryStudioClientDriveFolders($companyId: String!) {
-    deliveryStudioClientDriveFolders(companyId: $companyId)
+  query DeliveryStudioClientDriveFolders($companyId: String!, $search: String) {
+    deliveryStudioClientDriveFolders(companyId: $companyId, search: $search)
   }
 `;
 

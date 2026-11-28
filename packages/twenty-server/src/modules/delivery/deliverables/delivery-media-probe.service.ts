@@ -48,26 +48,53 @@ type FfprobeOutput = {
   };
 };
 
-const resolveBinaryCandidates = (name: 'ffprobe' | 'ffmpeg'): string[] => [
-  name,
-  `/opt/homebrew/bin/${name}`,
-  `/usr/local/bin/${name}`,
-  `/usr/bin/${name}`,
-];
+const resolveBundledBinaryPath = (name: 'ffprobe' | 'ffmpeg'): string | null => {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const pkg =
+      name === 'ffmpeg'
+        ? (require('@ffmpeg-installer/ffmpeg') as { path?: string })
+        : (require('@ffprobe-installer/ffprobe') as { path?: string });
+    return typeof pkg?.path === 'string' && pkg.path.trim()
+      ? pkg.path.trim()
+      : null;
+  } catch {
+    return null;
+  }
+};
 
-const execWithBinaryFallback = async (
+export const resolveMediaBinaryCandidates = (
+  name: 'ffprobe' | 'ffmpeg',
+): string[] => {
+  const envOverride =
+    name === 'ffmpeg'
+      ? process.env.FFMPEG_PATH?.trim()
+      : process.env.FFPROBE_PATH?.trim();
+  const bundled = resolveBundledBinaryPath(name);
+  const candidates = [
+    envOverride || null,
+    name,
+    `/opt/homebrew/bin/${name}`,
+    `/usr/local/bin/${name}`,
+    `/usr/bin/${name}`,
+    bundled,
+  ].filter((item): item is string => Boolean(item));
+  return Array.from(new Set(candidates));
+};
+
+export const execMediaBinaryWithFallback = async (
   binaryName: 'ffprobe' | 'ffmpeg',
   args: string[],
   options: { timeout: number; maxBuffer: number },
 ) => {
   let lastErr: unknown;
-  for (const bin of resolveBinaryCandidates(binaryName)) {
+  for (const bin of resolveMediaBinaryCandidates(binaryName)) {
     try {
       return await execFileAsync(bin, args, options);
     } catch (error) {
       const code = (error as NodeJS.ErrnoException)?.code;
       lastErr = error;
-      if (code === 'ENOENT') {
+      if (code === 'ENOENT' || code === 'EACCES') {
         continue;
       }
       throw error;
@@ -75,6 +102,30 @@ const execWithBinaryFallback = async (
   }
   throw lastErr;
 };
+
+export const resolveFirstAvailableMediaBinary = async (
+  binaryName: 'ffprobe' | 'ffmpeg',
+): Promise<string> => {
+  const candidates = resolveMediaBinaryCandidates(binaryName);
+  for (const bin of candidates) {
+    try {
+      await execFileAsync(bin, ['-version'], {
+        timeout: 5_000,
+        maxBuffer: 256 * 1024,
+      });
+      return bin;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException)?.code;
+      if (code === 'ENOENT' || code === 'EACCES') {
+        continue;
+      }
+      return bin;
+    }
+  }
+  return candidates[0] ?? binaryName;
+};
+
+const execWithBinaryFallback = execMediaBinaryWithFallback;
 
 /**
  * Pure-JS fallback parser for MP4/MOV container duration via the ISO-BMFF `moov -> mvhd` atom.

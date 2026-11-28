@@ -4,7 +4,11 @@ import * as fs from 'node:fs/promises';
 import { promisify } from 'node:util';
 import { type DeliverableMediaMeta } from 'src/modules/delivery/deliverables/entities/delivery-deliverable.entity';
 import { type HookStyleConfig } from 'src/modules/delivery/deliverables/entities/delivery-video-hook-project.entity';
-import { DeliveryMediaProbeService } from 'src/modules/delivery/deliverables/delivery-media-probe.service';
+import {
+  DeliveryMediaProbeService,
+  execMediaBinaryWithFallback,
+  resolveFirstAvailableMediaBinary,
+} from 'src/modules/delivery/deliverables/delivery-media-probe.service';
 import {
   buildHookOverlaySvg,
   computeSafeFadeTimings,
@@ -228,7 +232,7 @@ export class DeliveryHookRenderAdapter {
     seekSec: number,
   ): Promise<boolean> {
     try {
-      await execFileAsync(
+      await execMediaBinaryWithFallback(
         'ffmpeg',
         [
           '-nostdin',
@@ -262,7 +266,7 @@ export class DeliveryHookRenderAdapter {
     outputProxyPath: string,
   ): Promise<Buffer> {
     // Transcode up to the first 60s into a compact 480p proxy for fast, low-cost Gemini video understanding.
-    await execFileAsync(
+    await execMediaBinaryWithFallback(
       'ffmpeg',
       [
         '-nostdin',
@@ -310,13 +314,14 @@ export class DeliveryHookRenderAdapter {
     return fs.readFile(outputProxyPath);
   }
 
-  private runFfmpegWithProgress(
+  private async runFfmpegWithProgress(
     args: string[],
     durationSec: number,
     onProgress?: (percent: number) => void,
   ): Promise<void> {
+    const ffmpegBin = await resolveFirstAvailableMediaBinary('ffmpeg');
     return new Promise((resolve, reject) => {
-      const child = spawn('ffmpeg', args, {
+      const child = spawn(ffmpegBin, args, {
         stdio: ['ignore', 'pipe', 'pipe'],
       });
 

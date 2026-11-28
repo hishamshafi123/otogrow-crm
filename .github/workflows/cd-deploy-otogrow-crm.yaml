@@ -270,6 +270,7 @@ jobs:
           # scripts carry exec bits the installer relies on. Symlinks are
           # stored as symlinks (yarn's relative workspace links), which the
           # installer re-validates on the server.
+          chmod +x node_modules/@ffmpeg-installer/*/ffmpeg node_modules/@ffprobe-installer/*/ffprobe 2>/dev/null || true
           tar --sort=name --owner=0 --group=0 --numeric-owner \
             -czf "otogrow-crm-deps-${DEPS_KEY}.tar.gz" node_modules
           ls -lh "otogrow-crm-deps-${DEPS_KEY}.tar.gz"

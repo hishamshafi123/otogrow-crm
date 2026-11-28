@@ -180,6 +180,10 @@ export type ClientDriveMappingSummary = {
   rootFolderId: string;
   rootFolderName: string;
   rootFolderWebUrl: string | null;
+  monthStartDay?: number;
+  monthStartDaySource?: 'EXPLICIT' | 'BILLING_SCHEDULE' | 'DEFAULT';
+  activeMonthKey?: string;
+  activeCycleLabel?: string;
   monthFolderPatternOverride: string | null;
   monthFolderPreview: string;
 };

@@ -15,6 +15,7 @@ import { useClientHub } from '@/delivery/client-workspace/useClientHub';
 import { ClientOverviewGrid } from '@/delivery/client-workspace/ClientOverviewGrid';
 import { ClientSelectedOverview } from '@/delivery/client-workspace/ClientSelectedOverview';
 import { ClientPortalSection } from '@/delivery/client-workspace/ClientPortalSection';
+import { ClientDriveAndStudioSettingsCard } from '@/delivery/client-workspace/ClientDriveAndStudioSettingsCard';
 import { ClientRosterPickerModal } from '@/delivery/client-workspace/ClientRosterPickerModal';
 import { ClientTagEditor } from '@/delivery/client-workspace/ClientTagEditor';
 import { type ClientHubItem } from '@/delivery/client-workspace/client-hub.types';
@@ -627,6 +628,13 @@ const ClientWorkspaceDirectory = () => {
                   <ClientPortalSection
                     companyId={company.id}
                     hubClient={selectedHubClient}
+                  />
+
+                  <ClientDriveAndStudioSettingsCard
+                    key={`drive-studio:${company.id}`}
+                    companyId={company.id}
+                    companyName={company.name}
+                    projectId={serviceProjectId}
                   />
                 </StyledDeliveryStack>
               )}

@@ -3,6 +3,7 @@ import { useMutation, useQuery } from '@apollo/client/react';
 import { styled } from '@linaria/react';
 import { useStore } from 'jotai';
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
 import {
   GET_DELIVERY_STUDIO_CLIENT_DRIVE_FOLDERS,
@@ -11,8 +12,10 @@ import {
   SAVE_DELIVERY_STUDIO_HOOK_DEFAULT,
   SAVE_DELIVERY_STUDIO_VIDEO_TO_DRIVE,
   SUGGEST_DELIVERY_STUDIO_VIDEO_HOOKS,
+  UPSERT_DELIVERY_STUDIO_PRESET,
 } from '@/delivery/studio/delivery-studio.graphql';
 import {
+  DEFAULT_TEXT_HOOK_MASTER_PROMPT,
   type StudioAssetDTO,
   type StudioDriveFoldersResponseDTO,
   type StudioHookDefaultSettingDTO,
@@ -554,8 +557,166 @@ const probeBrowserVideoMeta = (
     video.src = objectUrl;
   });
 
+const StyledPromptDrawer = styled.div`
+  background: ${themeCssVariables.background.primary};
+  border: 1px solid ${themeCssVariables.border.color.medium};
+  border-radius: 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 11px;
+`;
+
+const StyledPromptField = styled.label`
+  color: ${themeCssVariables.font.color.secondary};
+  display: flex;
+  flex-direction: column;
+  font-size: 11px;
+  font-weight: 600;
+  gap: 4px;
+
+  select,
+  input,
+  textarea {
+    background: ${themeCssVariables.background.secondary};
+    border: 1px solid ${themeCssVariables.border.color.medium};
+    border-radius: 7px;
+    color: ${themeCssVariables.font.color.primary};
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 400;
+    padding: 6px 8px;
+  }
+
+  textarea {
+    line-height: 1.4;
+    min-height: 70px;
+    resize: vertical;
+  }
+`;
+
+const StyledPromptActions = styled.div`
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: space-between;
+`;
+
+const StyledHeaderActions = styled.div`
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+`;
+
+const StyledDriveSummaryBox = styled.div`
+  background: ${themeCssVariables.background.primary};
+  border: 1px solid ${themeCssVariables.border.color.light};
+  border-radius: 8px;
+  color: ${themeCssVariables.font.color.secondary};
+  display: flex;
+  flex-direction: column;
+  font-size: 11px;
+  gap: 4px;
+  padding: 8px 10px;
+
+  strong {
+    color: ${themeCssVariables.font.color.primary};
+  }
+
+  a {
+    color: ${themeCssVariables.color.blue};
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  a:hover {
+    text-decoration: underline;
+  }
+`;
+
+const StyledDriveSummaryRow = styled.div`
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: space-between;
+`;
+
+const StyledDriveSearchInput = styled.input`
+  background: ${themeCssVariables.background.primary};
+  border: 1px solid ${themeCssVariables.border.color.medium};
+  border-radius: 7px;
+  color: ${themeCssVariables.font.color.primary};
+  font-size: 12px;
+  padding: 6px 9px;
+  width: 100%;
+`;
+
+const StyledDriveFolderList = styled.div`
+  background: ${themeCssVariables.background.primary};
+  border: 1px solid ${themeCssVariables.border.color.light};
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  max-height: 170px;
+  overflow-y: auto;
+`;
+
+const StyledDriveFolderOption = styled.button<{ $active?: boolean }>`
+  align-items: center;
+  background: ${({ $active }) =>
+    $active
+      ? themeCssVariables.background.transparent.blue
+      : 'transparent'};
+  border: none;
+  border-bottom: 1px solid ${themeCssVariables.border.color.light};
+  color: ${({ $active }) =>
+    $active
+      ? themeCssVariables.color.blue
+      : themeCssVariables.font.color.primary};
+  cursor: pointer;
+  display: flex;
+  font-size: 12px;
+  font-weight: ${({ $active }) => ($active ? 600 : 500)};
+  gap: 6px;
+  justify-content: space-between;
+  padding: 7px 9px;
+  text-align: left;
+  width: 100%;
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  &:hover {
+    background: ${({ $active }) =>
+      $active
+        ? themeCssVariables.background.transparent.blue
+        : themeCssVariables.background.secondary};
+  }
+
+  small {
+    color: ${themeCssVariables.font.color.tertiary};
+    flex-shrink: 0;
+    font-size: 10px;
+    font-weight: 500;
+  }
+`;
+
+const StyledSavingPathLine = styled.div`
+  color: ${themeCssVariables.font.color.secondary};
+  font-size: 11px;
+
+  strong {
+    color: ${themeCssVariables.font.color.primary};
+  }
+`;
+
 type DeliveryStudioHooksStageProps = {
   companyId: string | null;
+  clientName?: string | null;
   projectId?: string | null;
   selectedVideo: StudioAssetDTO | null;
   videos?: StudioAssetDTO[];
@@ -568,6 +729,7 @@ type DeliveryStudioHooksStageProps = {
 
 export const DeliveryStudioHooksStage = ({
   companyId,
+  clientName,
   projectId,
   selectedVideo,
   videos = [],
@@ -584,6 +746,44 @@ export const DeliveryStudioHooksStage = ({
   const [styleOpen, setStyleOpen] = useState(false);
   const [draggingOverlay, setDraggingOverlay] = useState(false);
 
+  // Editable AI Text-Hook Master Prompt & Brand Examples
+  const sortedHookPresets = useMemo(() => {
+    return [...hookPresets].sort((a, b) => {
+      const aBrand = a.companyId && a.companyId === companyId ? 1 : 0;
+      const bBrand = b.companyId && b.companyId === companyId ? 1 : 0;
+      if (aBrand !== bBrand) return bBrand - aBrand;
+      if (a.isDefault !== b.isDefault) return a.isDefault ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+  }, [companyId, hookPresets]);
+
+  const brandHookPreset = useMemo(
+    () =>
+      sortedHookPresets.find((p) => p.companyId && p.companyId === companyId) ??
+      null,
+    [companyId, sortedHookPresets],
+  );
+
+  const [promptOpen, setPromptOpen] = useState(false);
+  const [selectedHookPresetId, setSelectedHookPresetId] = useState<string>('');
+  const [hookMasterPrompt, setHookMasterPrompt] = useState(
+    DEFAULT_TEXT_HOOK_MASTER_PROMPT,
+  );
+  const [hookExamplesText, setHookExamplesText] = useState('');
+  const [hookCustomDirection, setHookCustomDirection] = useState('');
+  const [busySavePrompt, setBusySavePrompt] = useState(false);
+
+  useEffect(() => {
+    const initial = brandHookPreset ?? sortedHookPresets[0] ?? null;
+    setSelectedHookPresetId(initial?.id ?? '');
+    setHookMasterPrompt(
+      initial?.masterPrompt?.trim() || DEFAULT_TEXT_HOOK_MASTER_PROMPT,
+    );
+    setHookExamplesText(
+      (initial?.examplesJson ?? []).filter(Boolean).join('\n'),
+    );
+  }, [brandHookPreset, companyId, sortedHookPresets]);
+
   const [visualStyle, setVisualStyle] =
     useState<OverlayVisualStyle>(DEFAULT_VISUAL_STYLE);
   const [startSec, setStartSec] = useState(0);
@@ -591,12 +791,31 @@ export const DeliveryStudioHooksStage = ({
   const [currentVideoTime, setCurrentVideoTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
 
-  // Drive folder selection
+  // Drive folder selection + live search
   const [driveMode, setDriveMode] = useState<'AUTO' | 'EXISTING' | 'CUSTOM'>(
     'AUTO',
   );
   const [selectedDriveFolderId, setSelectedDriveFolderId] = useState('');
+  const [selectedDriveFolderName, setSelectedDriveFolderName] = useState('');
   const [customSubfolderName, setCustomSubfolderName] = useState('');
+  const [driveSearchInput, setDriveSearchInput] = useState('');
+  const [debouncedDriveSearch, setDebouncedDriveSearch] = useState('');
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedDriveSearch(driveSearchInput.trim());
+    }, 240);
+    return () => window.clearTimeout(timer);
+  }, [driveSearchInput]);
+
+  useEffect(() => {
+    setDriveMode('AUTO');
+    setSelectedDriveFolderId('');
+    setSelectedDriveFolderName('');
+    setCustomSubfolderName('');
+    setDriveSearchInput('');
+    setDebouncedDriveSearch('');
+  }, [companyId]);
 
   const [busySuggest, setBusySuggest] = useState(false);
   const [busySave, setBusySave] = useState(false);
@@ -661,7 +880,10 @@ export const DeliveryStudioHooksStage = ({
   const driveFoldersQuery = useQuery<{
     deliveryStudioClientDriveFolders: StudioDriveFoldersResponseDTO;
   }>(GET_DELIVERY_STUDIO_CLIENT_DRIVE_FOLDERS, {
-    variables: { companyId: companyId ?? '' },
+    variables: {
+      companyId: companyId ?? '',
+      search: debouncedDriveSearch || null,
+    },
     skip: !companyId,
     fetchPolicy: 'cache-and-network',
   });
@@ -685,9 +907,12 @@ export const DeliveryStudioHooksStage = ({
     SAVE_DELIVERY_STUDIO_HOOK_DEFAULT,
   );
 
+  const [upsertPresetMutation] = useMutation(UPSERT_DELIVERY_STUDIO_PRESET);
+
   const hookProject = hookProjectQuery.data?.deliveryStudioHookProject ?? null;
   const driveInfo = driveFoldersQuery.data?.deliveryStudioClientDriveFolders;
-  const driveSubfolders = driveInfo?.subfolders ?? driveInfo?.folders ?? [];
+  const driveRootSubfolders = driveInfo?.subfolders ?? driveInfo?.folders ?? [];
+  const driveMonthSubfolders = driveInfo?.monthSubfolders ?? [];
 
   // Reset hook list when switching to a different generated video
   useEffect(() => {
@@ -918,17 +1143,86 @@ export const DeliveryStudioHooksStage = ({
     );
   }
 
+  const parsedExampleHooks = hookExamplesText
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .slice(0, 20);
+
+  const hasCustomPromptOrExamples = Boolean(
+    brandHookPreset ||
+      hookMasterPrompt.trim() !== DEFAULT_TEXT_HOOK_MASTER_PROMPT.trim() ||
+      parsedExampleHooks.length > 0 ||
+      hookCustomDirection.trim().length > 0,
+  );
+
+  const handleSaveBrandHookPrompt = async () => {
+    setError(null);
+    setFeedback(null);
+    const cleaned = hookMasterPrompt.trim();
+    if (!cleaned) {
+      setError('Master prompt cannot be empty.');
+      return;
+    }
+    setBusySavePrompt(true);
+    try {
+      const targetBrandPreset =
+        sortedHookPresets.find(
+          (p) => p.id === selectedHookPresetId && p.companyId === companyId,
+        ) ?? brandHookPreset;
+      await upsertPresetMutation({
+        variables: {
+          input: {
+            ...(targetBrandPreset ? { id: targetBrandPreset.id } : {}),
+            companyId: companyId ?? null,
+            projectId: projectId ?? null,
+            kind: 'TEXT_HOOK',
+            name:
+              targetBrandPreset?.name ||
+              (clientName
+                ? `${clientName} Text Hooks`
+                : 'Brand Text Hooks'),
+            description: clientName
+              ? `Brand text-hook master prompt for ${clientName}`
+              : 'Brand text-hook master prompt',
+            masterPrompt: cleaned,
+            examplesJson: parsedExampleHooks,
+            isDefault: true,
+          },
+        },
+      });
+      await onRefreshWorkspace();
+      setFeedback(
+        `Saved text-hook prompt & ${parsedExampleHooks.length} example${parsedExampleHooks.length === 1 ? '' : 's'} for ${clientName || 'this brand'}.`,
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Failed to save brand text-hook prompt.',
+      );
+    } finally {
+      setBusySavePrompt(false);
+    }
+  };
+
   const handleSuggestHooks = async () => {
     setError(null);
     setFeedback(null);
     setBusySuggest(true);
     try {
-      const defaultPreset = hookPresets[0];
+      const activePreset =
+        sortedHookPresets.find((p) => p.id === selectedHookPresetId) ??
+        sortedHookPresets[0];
       const res = await suggestHooksMutation({
         variables: {
           input: {
             assetId: selectedVideo.id,
-            hookPresetId: defaultPreset?.id ?? undefined,
+            hookPresetId: activePreset?.id ?? undefined,
+            masterPrompt: hookMasterPrompt.trim() || undefined,
+            exampleHooks:
+              parsedExampleHooks.length > 0 ? parsedExampleHooks : undefined,
+            customDirection: hookCustomDirection.trim() || undefined,
             suggestionCount: 6,
           },
         },
@@ -1225,14 +1519,132 @@ export const DeliveryStudioHooksStage = ({
                 Select 0 to save raw video, or check hooks to render variations
               </span>
             </div>
-            <StyledSubtleButton
-              type="button"
-              disabled={busySuggest}
-              onClick={() => void handleSuggestHooks()}
-            >
-              {busySuggest ? 'Analyzing video…' : '✦ Suggest with AI'}
-            </StyledSubtleButton>
+            <StyledHeaderActions>
+              <StyledSubtleButton
+                type="button"
+                onClick={() => setPromptOpen((prev) => !prev)}
+                title="View & edit the AI Text-Hook master prompt and working examples for this brand"
+              >
+                {promptOpen
+                  ? 'Hide Prompt'
+                  : hasCustomPromptOrExamples
+                    ? 'Prompt ⚙ · Custom'
+                    : 'Prompt ⚙'}
+              </StyledSubtleButton>
+              <StyledSubtleButton
+                type="button"
+                disabled={busySuggest}
+                onClick={() => void handleSuggestHooks()}
+              >
+                {busySuggest ? 'Analyzing video…' : '✦ Suggest with AI'}
+              </StyledSubtleButton>
+            </StyledHeaderActions>
           </StyledPanelHeader>
+
+          {promptOpen && (
+            <StyledPromptDrawer>
+              {sortedHookPresets.length > 0 && (
+                <StyledPromptField>
+                  Hook Prompt Preset
+                  <select
+                    value={selectedHookPresetId}
+                    onChange={(e) => {
+                      const nextId = e.target.value;
+                      setSelectedHookPresetId(nextId);
+                      const picked = sortedHookPresets.find(
+                        (p) => p.id === nextId,
+                      );
+                      if (picked) {
+                        setHookMasterPrompt(
+                          picked.masterPrompt?.trim() ||
+                            DEFAULT_TEXT_HOOK_MASTER_PROMPT,
+                        );
+                        setHookExamplesText(
+                          (picked.examplesJson ?? [])
+                            .filter(Boolean)
+                            .join('\n'),
+                        );
+                      } else {
+                        setHookMasterPrompt(DEFAULT_TEXT_HOOK_MASTER_PROMPT);
+                        setHookExamplesText('');
+                      }
+                    }}
+                  >
+                    <option value="">Workspace Default Prompt</option>
+                    {sortedHookPresets.map((preset) => (
+                      <option key={preset.id} value={preset.id}>
+                        {preset.companyId === companyId ? '[Brand] ' : ''}
+                        {preset.name}
+                      </option>
+                    ))}
+                  </select>
+                </StyledPromptField>
+              )}
+
+              <StyledPromptField>
+                AI Master Prompt ({clientName || 'Active Brand'})
+                <textarea
+                  value={hookMasterPrompt}
+                  onChange={(e) => setHookMasterPrompt(e.target.value)}
+                  placeholder="Describe voice, hook structure, angles, and rules for this brand…"
+                />
+              </StyledPromptField>
+
+              <StyledPromptField>
+                Working Example Hooks (one per line)
+                <textarea
+                  style={{ minHeight: 62 }}
+                  value={hookExamplesText}
+                  onChange={(e) => setHookExamplesText(e.target.value)}
+                  placeholder="Paste hooks that already worked for this brand (one per line)…"
+                />
+              </StyledPromptField>
+
+              <StyledPromptField>
+                One-off direction for this video (optional)
+                <input
+                  type="text"
+                  value={hookCustomDirection}
+                  onChange={(e) => setHookCustomDirection(e.target.value)}
+                  placeholder="e.g. Focus on winter drop urgency or oversized fit"
+                />
+              </StyledPromptField>
+
+              <StyledPromptActions>
+                <StyledHeaderActions>
+                  <StyledSubtleButton
+                    type="button"
+                    disabled={busySavePrompt}
+                    onClick={() => void handleSaveBrandHookPrompt()}
+                  >
+                    {busySavePrompt
+                      ? 'Saving…'
+                      : clientName
+                        ? `Save for ${clientName}`
+                        : 'Save Brand Prompt'}
+                  </StyledSubtleButton>
+                  <StyledSubtleButton
+                    type="button"
+                    disabled={busySavePrompt}
+                    onClick={() =>
+                      setHookMasterPrompt(DEFAULT_TEXT_HOOK_MASTER_PROMPT)
+                    }
+                  >
+                    Reset
+                  </StyledSubtleButton>
+                </StyledHeaderActions>
+                <span
+                  style={{
+                    color: themeCssVariables.font.color.tertiary,
+                    fontSize: 11,
+                  }}
+                >
+                  {parsedExampleHooks.length} example
+                  {parsedExampleHooks.length === 1 ? '' : 's'} active
+                </span>
+              </StyledPromptActions>
+            </StyledPromptDrawer>
+          )}
 
           {hooks.length > 0 && (
             <StyledHookList>
@@ -1432,59 +1844,216 @@ export const DeliveryStudioHooksStage = ({
 
         <StyledPanel>
           <StyledPanelHeader>
-            <h4>Google Drive Folder</h4>
-            <span>
-              {driveInfo?.connected
-                ? driveInfo.rootFolderName
-                  ? `Connected · ${driveInfo.rootFolderName}`
-                  : 'Connected'
-                : 'Connect Drive in Deliverables to auto-sync'}
-            </span>
+            <div>
+              <h4>Google Drive Folder</h4>
+              <span>
+                {driveInfo?.connected
+                  ? driveInfo.clientMapped && driveInfo.rootFolderName
+                    ? `Linked · ${driveInfo.rootFolderName}`
+                    : 'Drive connected — link a client folder for smart month routing'
+                  : 'Connect Drive in Deliverables to auto-sync'}
+              </span>
+            </div>
+            {companyId && (
+              <Link
+                to={`/delivery?view=clients&clientCompany=${companyId}&clientSection=services`}
+                style={{
+                  color: themeCssVariables.color.blue,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  textDecoration: 'none',
+                }}
+              >
+                {driveInfo?.clientMapped ? 'Change folder ⚙' : 'Set up folder ⚙'}
+              </Link>
+            )}
           </StyledPanelHeader>
 
-          <StyledDriveRow>
-            <select
-              value={
-                driveMode === 'AUTO'
-                  ? 'AUTO'
-                  : driveMode === 'CUSTOM'
-                    ? 'CUSTOM'
-                    : selectedDriveFolderId
-              }
-              onChange={(e) => {
-                const val = e.target.value;
-                if (val === 'AUTO') {
-                  setDriveMode('AUTO');
-                  setSelectedDriveFolderId('');
-                } else if (val === 'CUSTOM') {
-                  setDriveMode('CUSTOM');
-                  setSelectedDriveFolderId('');
-                } else {
-                  setDriveMode('EXISTING');
-                  setSelectedDriveFolderId(val);
-                }
-              }}
-            >
-              <option value="AUTO">
-                Auto ({productNameFromMeta || 'AI Video'})
-              </option>
-              {driveSubfolders.map((folder) => (
-                <option key={folder.id} value={folder.id}>
-                  📁 {folder.name}
-                </option>
-              ))}
-              <option value="CUSTOM">+ New subfolder…</option>
-            </select>
+          {driveInfo?.connected && (
+            <StyledDriveSummaryBox>
+              <StyledDriveSummaryRow>
+                <span>
+                  Client folder:{' '}
+                  {driveInfo.clientMapped && driveInfo.rootFolderName ? (
+                    <a
+                      href={
+                        driveInfo.rootFolderWebUrl ||
+                        (driveInfo.rootFolderId
+                          ? `https://drive.google.com/drive/folders/${driveInfo.rootFolderId}`
+                          : '#')
+                      }
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      📁 {driveInfo.rootFolderName} ↗
+                    </a>
+                  ) : (
+                    <strong>Not linked yet</strong>
+                  )}
+                </span>
+                <span>
+                  Cycle: <strong>Day {driveInfo.monthStartDay ?? 1}</strong>
+                  {driveInfo.activeCycleLabel
+                    ? ` · ${driveInfo.activeCycleLabel}`
+                    : ''}
+                </span>
+              </StyledDriveSummaryRow>
 
-            {driveMode === 'CUSTOM' && (
+              {driveInfo.clientMapped && (
+                <div>
+                  Active month folder:{' '}
+                  {driveInfo.matchedMonthFolder ? (
+                    <a
+                      href={
+                        driveInfo.matchedMonthFolder.webViewLink ||
+                        `https://drive.google.com/drive/folders/${driveInfo.matchedMonthFolder.id}`
+                      }
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      ✓ 📁 {driveInfo.matchedMonthFolder.name} ↗
+                    </a>
+                  ) : (
+                    <strong>
+                      Auto-creates 📁 {driveInfo.expectedMonthFolderName}
+                    </strong>
+                  )}
+                </div>
+              )}
+            </StyledDriveSummaryBox>
+          )}
+
+          {driveInfo?.connected && driveInfo.clientMapped && (
+            <>
+              <StyledDriveSearchInput
+                type="text"
+                placeholder="Search folders inside this client’s Drive…"
+                value={driveSearchInput}
+                onChange={(e) => setDriveSearchInput(e.target.value)}
+              />
+
+              <StyledDriveFolderList>
+                <StyledDriveFolderOption
+                  type="button"
+                  $active={driveMode === 'AUTO'}
+                  onClick={() => {
+                    setDriveMode('AUTO');
+                    setSelectedDriveFolderId('');
+                    setSelectedDriveFolderName('');
+                  }}
+                >
+                  <span>
+                    ✦ Auto ({driveInfo.matchedMonthFolder?.name || driveInfo.expectedMonthFolderName || 'Active Month'}
+                    {productNameFromMeta ? ` / ${productNameFromMeta}` : ''})
+                  </span>
+                  <small>Recommended</small>
+                </StyledDriveFolderOption>
+
+                {driveMonthSubfolders.map((folder) => {
+                  const isActive =
+                    driveMode === 'EXISTING' &&
+                    selectedDriveFolderId === folder.id;
+                  return (
+                    <StyledDriveFolderOption
+                      key={`month:${folder.id}`}
+                      type="button"
+                      $active={isActive}
+                      onClick={() => {
+                        setDriveMode('EXISTING');
+                        setSelectedDriveFolderId(folder.id);
+                        setSelectedDriveFolderName(
+                          `${driveInfo.matchedMonthFolder?.name ?? 'Month'} / ${folder.name}`,
+                        );
+                      }}
+                    >
+                      <span>📁 {folder.name}</span>
+                      <small>
+                        In {driveInfo.matchedMonthFolder?.name ?? 'Month'}
+                      </small>
+                    </StyledDriveFolderOption>
+                  );
+                })}
+
+                {driveRootSubfolders.map((folder) => {
+                  const isActive =
+                    driveMode === 'EXISTING' &&
+                    selectedDriveFolderId === folder.id;
+                  const isMatchedMonth =
+                    driveInfo.matchedMonthFolder?.id === folder.id;
+                  return (
+                    <StyledDriveFolderOption
+                      key={`root:${folder.id}`}
+                      type="button"
+                      $active={isActive}
+                      onClick={() => {
+                        setDriveMode('EXISTING');
+                        setSelectedDriveFolderId(folder.id);
+                        setSelectedDriveFolderName(folder.name);
+                      }}
+                    >
+                      <span>📁 {folder.name}</span>
+                      <small>
+                        {isMatchedMonth ? 'Active month' : 'Client root'}
+                      </small>
+                    </StyledDriveFolderOption>
+                  );
+                })}
+
+                <StyledDriveFolderOption
+                  type="button"
+                  $active={driveMode === 'CUSTOM'}
+                  onClick={() => {
+                    setDriveMode('CUSTOM');
+                    setSelectedDriveFolderId('');
+                    setSelectedDriveFolderName('');
+                  }}
+                >
+                  <span>+ New subfolder inside active month…</span>
+                  <small>Create</small>
+                </StyledDriveFolderOption>
+              </StyledDriveFolderList>
+
+              {driveMode === 'CUSTOM' && (
+                <StyledDriveSearchInput
+                  type="text"
+                  placeholder="Subfolder name (e.g. Winter Drop)"
+                  value={customSubfolderName}
+                  onChange={(e) => setCustomSubfolderName(e.target.value)}
+                />
+              )}
+
+              <StyledSavingPathLine>
+                Saving to:{' '}
+                <strong>
+                  {driveInfo.rootFolderName || 'Client Drive'}
+                  {' / '}
+                  {driveMode === 'EXISTING' && selectedDriveFolderName
+                    ? selectedDriveFolderName
+                    : `${driveInfo.matchedMonthFolder?.name || driveInfo.expectedMonthFolderName || 'Active Month'}${
+                        driveMode === 'CUSTOM' && customSubfolderName.trim()
+                          ? ` / ${customSubfolderName.trim()}`
+                          : productNameFromMeta
+                            ? ` / ${productNameFromMeta}`
+                            : ''
+                      }`}
+                </strong>
+              </StyledSavingPathLine>
+            </>
+          )}
+
+          {(!driveInfo?.connected || !driveInfo.clientMapped) && (
+            <StyledDriveRow>
               <input
                 type="text"
-                placeholder="Subfolder name (e.g. Winter Drop)"
+                placeholder="Optional subfolder name (e.g. Winter Drop)"
                 value={customSubfolderName}
-                onChange={(e) => setCustomSubfolderName(e.target.value)}
+                onChange={(e) => {
+                  setCustomSubfolderName(e.target.value);
+                  setDriveMode(e.target.value.trim() ? 'CUSTOM' : 'AUTO');
+                }}
               />
-            )}
-          </StyledDriveRow>
+            </StyledDriveRow>
+          )}
 
           <StyledPrimaryButton
             type="button"

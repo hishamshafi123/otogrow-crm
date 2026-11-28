@@ -146,6 +146,8 @@ export type StudioReferenceVideoDTO = {
   };
   streamPath: string;
   thumbnailPath: string | null;
+  usageCount?: number;
+  clientUsageCount?: number;
   createdAt: string;
   updatedAt: string;
 };
@@ -309,11 +311,25 @@ export type StudioDriveFolderOptionDTO = {
   webViewLink: string | null;
 };
 
+export const DEFAULT_TEXT_HOOK_MASTER_PROMPT = [
+  'Write crisp, scroll-stopping on-screen opening text hooks (5 to 12 words each, readable in 2–4 seconds on mobile) that pair directly with the opening visual of the video.',
+  'Vary the angle across hooks (Curiosity Gap, Pain Point, Contrarian, Specific Proof, Direct Offer, Pattern Interrupt, Relatable POV, Mistake Callout).',
+  'Match the brand voice and any working example hooks provided. Avoid generic clichés and never invent fake statistics or guarantees.',
+].join('\n');
+
 export type StudioDriveFoldersResponseDTO = {
   connected: boolean;
+  clientMapped?: boolean;
   rootFolderId: string | null;
   rootFolderName: string | null;
   rootFolderWebUrl?: string | null;
+  monthStartDay?: number;
+  monthStartDaySource?: 'EXPLICIT' | 'BILLING_SCHEDULE' | 'DEFAULT';
+  activeMonthKey?: string;
+  activeCycleLabel?: string;
+  expectedMonthFolderName?: string;
+  matchedMonthFolder?: StudioDriveFolderOptionDTO | null;
+  monthSubfolders?: StudioDriveFolderOptionDTO[];
   subfolders?: StudioDriveFolderOptionDTO[];
   folders?: StudioDriveFolderOptionDTO[];
 };

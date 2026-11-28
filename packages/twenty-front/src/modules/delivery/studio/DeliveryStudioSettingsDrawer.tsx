@@ -1,6 +1,10 @@
+import { useMutation } from '@apollo/client/react';
 import { styled } from '@linaria/react';
+import { useEffect, useMemo, useState } from 'react';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
+import { UPSERT_DELIVERY_STUDIO_PRESET } from '@/delivery/studio/delivery-studio.graphql';
 import {
+  DEFAULT_TEXT_HOOK_MASTER_PROMPT,
   type StudioModelSpecDTO,
   type StudioPresetDTO,
   type StudioRoutingMode,
@@ -140,16 +144,64 @@ const StyledCheckRow = styled.label`
   gap: 8px;
 `;
 
+const StyledSaveRow = styled.div`
+  align-items: center;
+  display: flex;
+  gap: 8px;
+`;
+
+const StyledPrimaryMiniButton = styled.button`
+  background: ${themeCssVariables.color.blue};
+  border: 1px solid ${themeCssVariables.color.blue};
+  border-radius: 7px;
+  color: ${themeCssVariables.font.color.inverted};
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 11px;
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+`;
+
+const StyledSecondaryMiniButton = styled.button`
+  background: ${themeCssVariables.background.secondary};
+  border: 1px solid ${themeCssVariables.border.color.medium};
+  border-radius: 7px;
+  color: ${themeCssVariables.font.color.primary};
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 6px 10px;
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+`;
+
+const StyledFeedbackLine = styled.div<{ $error?: boolean }>`
+  color: ${({ $error }) =>
+    $error ? themeCssVariables.font.color.danger : themeCssVariables.color.green};
+  font-size: 11px;
+  font-weight: 500;
+`;
+
 type DeliveryStudioSettingsDrawerProps = {
   tab: StudioTabDraft;
+  clientName?: string | null;
   isClothingBrandClient: boolean;
   canManageProviders: boolean;
   imageModels: StudioModelSpecDTO[];
   videoModels: StudioModelSpecDTO[];
   characterPresets: StudioPresetDTO[];
   videoPresets: StudioPresetDTO[];
+  hookPresets?: StudioPresetDTO[];
   referenceVideoDurationSec?: number | null;
   onPatchTab: (patch: Partial<StudioTabDraft>) => void;
+  onRefreshWorkspace?: () => Promise<void> | void;
   onOpenProviders: () => void;
   onOpenPresets: () => void;
   onClose: () => void;
@@ -157,18 +209,114 @@ type DeliveryStudioSettingsDrawerProps = {
 
 export const DeliveryStudioSettingsDrawer = ({
   tab,
+  clientName,
   isClothingBrandClient,
   canManageProviders,
   imageModels,
   videoModels,
   characterPresets,
   videoPresets,
+  hookPresets = [],
   referenceVideoDurationSec,
   onPatchTab,
+  onRefreshWorkspace,
   onOpenProviders,
   onOpenPresets,
   onClose,
 }: DeliveryStudioSettingsDrawerProps) => {
+  const [upsertPreset, { loading: savingHookPrompt }] = useMutation(
+    UPSERT_DELIVERY_STUDIO_PRESET,
+  );
+
+  const brandHookPreset = useMemo(() => {
+    if (!tab.companyId) {
+      return hookPresets.find((p) => !p.companyId && p.isDefault) ?? hookPresets[0] ?? null;
+    }
+    return (
+      hookPresets.find((p) => p.companyId === tab.companyId && p.isDefault) ??
+      hookPresets.find((p) => p.companyId === tab.companyId) ??
+      null
+    );
+  }, [hookPresets, tab.companyId]);
+
+  const [brandMasterPrompt, setBrandMasterPrompt] = useState(
+    DEFAULT_TEXT_HOOK_MASTER_PROMPT,
+  );
+  const [brandExampleHooks, setBrandExampleHooks] = useState('');
+  const [hookPromptFeedback, setHookPromptFeedback] = useState<{
+    text: string;
+    isError?: boolean;
+  } | null>(null);
+
+  useEffect(() => {
+    if (brandHookPreset) {
+      setBrandMasterPrompt(
+        brandHookPreset.masterPrompt?.trim() || DEFAULT_TEXT_HOOK_MASTER_PROMPT,
+      );
+      setBrandExampleHooks(
+        (brandHookPreset.examplesJson ?? []).filter(Boolean).join('\n'),
+      );
+    } else {
+      setBrandMasterPrompt(DEFAULT_TEXT_HOOK_MASTER_PROMPT);
+      setBrandExampleHooks('');
+    }
+    setHookPromptFeedback(null);
+  }, [brandHookPreset, tab.companyId]);
+
+  const handleSaveBrandHookPrompt = async () => {
+    setHookPromptFeedback(null);
+    const cleaned = brandMasterPrompt.trim();
+    if (!cleaned) {
+      setHookPromptFeedback({
+        text: 'Master prompt cannot be empty.',
+        isError: true,
+      });
+      return;
+    }
+    const examplesJson = brandExampleHooks
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0)
+      .slice(0, 20);
+    try {
+      await upsertPreset({
+        variables: {
+          input: {
+            ...(brandHookPreset ? { id: brandHookPreset.id } : {}),
+            companyId: tab.companyId ?? null,
+            projectId: tab.projectId ?? null,
+            kind: 'TEXT_HOOK',
+            name:
+              brandHookPreset?.name ||
+              (clientName
+                ? `${clientName} Text Hooks`
+                : 'Workspace Text Hooks'),
+            description: clientName
+              ? `Brand text-hook master prompt for ${clientName}`
+              : 'Workspace default text-hook master prompt',
+            masterPrompt: cleaned,
+            examplesJson,
+            isDefault: true,
+          },
+        },
+      });
+      if (onRefreshWorkspace) {
+        await onRefreshWorkspace();
+      }
+      setHookPromptFeedback({
+        text: `Saved for ${clientName || 'workspace'} (${examplesJson.length} example${examplesJson.length === 1 ? '' : 's'}).`,
+      });
+    } catch (err) {
+      setHookPromptFeedback({
+        text:
+          err instanceof Error
+            ? err.message
+            : 'Failed to save text-hook master prompt.',
+        isError: true,
+      });
+    }
+  };
+
   const currentVideoModel = videoModels.find((m) => m.key === tab.videoModelKey);
   const minVideoSec = currentVideoModel?.capabilities.minDurationSec ?? 4;
   const maxVideoSec = currentVideoModel?.capabilities.maxDurationSec ?? 30;
@@ -215,9 +363,60 @@ export const DeliveryStudioSettingsDrawer = ({
                 onOpenPresets();
               }}
             >
-              <span>Master Prompt Presets</span>
+              <span>All Master Prompt Presets</span>
               <span>→</span>
             </StyledActionButton>
+          </StyledSection>
+
+          <StyledSection>
+            <StyledSectionTitle>
+              Brand Text-Hook Prompt{clientName ? ` · ${clientName}` : ''}
+            </StyledSectionTitle>
+            <StyledField>
+              Master Prompt (used by “Suggest with AI”)
+              <textarea
+                style={{ minHeight: 88 }}
+                value={brandMasterPrompt}
+                onChange={(e) => setBrandMasterPrompt(e.target.value)}
+                placeholder="Write instructions for hook voice, structure, and angles…"
+              />
+            </StyledField>
+            <StyledField>
+              Working Example Hooks (one per line)
+              <textarea
+                style={{ minHeight: 74 }}
+                value={brandExampleHooks}
+                onChange={(e) => setBrandExampleHooks(e.target.value)}
+                placeholder="Paste proven hooks for this brand (one per line)…"
+              />
+            </StyledField>
+            <StyledSaveRow>
+              <StyledPrimaryMiniButton
+                type="button"
+                disabled={savingHookPrompt}
+                onClick={() => void handleSaveBrandHookPrompt()}
+              >
+                {savingHookPrompt
+                  ? 'Saving…'
+                  : clientName
+                    ? `Save for ${clientName}`
+                    : 'Save Prompt'}
+              </StyledPrimaryMiniButton>
+              <StyledSecondaryMiniButton
+                type="button"
+                disabled={savingHookPrompt}
+                onClick={() =>
+                  setBrandMasterPrompt(DEFAULT_TEXT_HOOK_MASTER_PROMPT)
+                }
+              >
+                Reset
+              </StyledSecondaryMiniButton>
+            </StyledSaveRow>
+            {hookPromptFeedback && (
+              <StyledFeedbackLine $error={hookPromptFeedback.isError}>
+                {hookPromptFeedback.text}
+              </StyledFeedbackLine>
+            )}
           </StyledSection>
 
           <StyledSection>

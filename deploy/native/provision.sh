@@ -68,8 +68,8 @@ say 'Base packages'
 # Everything here is either already installed or additive.
 apt-get update -qq
 apt-get install -y --no-install-recommends \
-  ca-certificates curl xz-utils postgresql-contrib redis-server jq
-ok 'ca-certificates curl xz-utils postgresql-contrib redis-server jq'
+  ca-certificates curl xz-utils postgresql-contrib redis-server jq ffmpeg
+ok 'ca-certificates curl xz-utils postgresql-contrib redis-server jq ffmpeg'
 
 say "Node.js $NODE_VERSION at $NODE_PREFIX"
 # Deliberately NOT installed system-wide. /usr/bin/node stays on Node 22,

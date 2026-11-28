@@ -10,6 +10,7 @@ import {
   BATCH_GENERATE_DELIVERY_STUDIO_VIDEOS,
   GENERATE_DELIVERY_STUDIO_CHARACTER_SHEET,
   GENERATE_DELIVERY_STUDIO_VIDEO,
+  GET_DELIVERY_STUDIO_CLIENT_DRIVE_FOLDERS,
   GET_DELIVERY_STUDIO_WORKSPACE,
   IMPORT_DELIVERY_STUDIO_PRODUCT_FROM_URL,
   REMOVE_DELIVERY_STUDIO_PRODUCT_KIT_ASSET,
@@ -24,6 +25,7 @@ import {
   type StudioApiInputVideoRefDTO,
   type StudioApiRequestSnapshotDTO,
   type StudioAssetDTO,
+  type StudioDriveFoldersResponseDTO,
   type StudioProductKitDTO,
   type StudioProviderId,
   type StudioReferenceVideoDTO,
@@ -179,6 +181,42 @@ const StyledClothingBadge = styled.span`
   font-weight: 600;
   padding: 3px 9px;
   white-space: nowrap;
+`;
+
+const StyledDriveBadgeLink = styled(Link)`
+  align-items: center;
+  background: ${themeCssVariables.background.primary};
+  border: 1px solid ${themeCssVariables.border.color.medium};
+  border-radius: 999px;
+  color: ${themeCssVariables.font.color.secondary};
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 500;
+  gap: 5px;
+  height: 28px;
+  max-width: 240px;
+  overflow: hidden;
+  padding: 0 10px;
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  &:hover {
+    border-color: ${themeCssVariables.font.color.primary};
+    color: ${themeCssVariables.font.color.primary};
+  }
+
+  &[data-mapped='true'] {
+    background: ${themeCssVariables.color.transparent.green2};
+    border-color: ${themeCssVariables.color.green5};
+    color: ${themeCssVariables.color.green};
+  }
+
+  &[data-mapped='false'] {
+    background: ${themeCssVariables.color.transparent.orange2};
+    border-color: ${themeCssVariables.color.orange5};
+    color: ${themeCssVariables.color.orange};
+  }
 `;
 
 const StyledStepperBar = styled.div`
@@ -1083,6 +1121,18 @@ export const DeliveryAiStudioPage = () => {
   });
 
   const workspace = workspaceQuery.data?.deliveryStudioWorkspace;
+
+  const clientDriveQuery = useQuery<{
+    deliveryStudioClientDriveFolders: StudioDriveFoldersResponseDTO;
+  }>(GET_DELIVERY_STUDIO_CLIENT_DRIVE_FOLDERS, {
+    variables: {
+      companyId: activeTab.companyId ?? '',
+    },
+    skip: !activeTab.companyId,
+    fetchPolicy: 'cache-and-network',
+  });
+
+  const clientDrive = clientDriveQuery.data?.deliveryStudioClientDriveFolders;
 
   // Keep active tab synced with Delivery Clients roster without overriding new client-picker tabs
   useEffect(() => {
@@ -2414,6 +2464,22 @@ export const DeliveryAiStudioPage = () => {
               <StyledClothingBadge>Clothing Brand</StyledClothingBadge>
             )}
 
+            {activeTab.companyId && clientDrive?.connected && (
+              <StyledDriveBadgeLink
+                to={`/delivery?view=clients&clientCompany=${encodeURIComponent(activeTab.companyId)}&clientSection=services`}
+                data-mapped={clientDrive.clientMapped ? 'true' : 'false'}
+                title={
+                  clientDrive.clientMapped
+                    ? `Drive folder: ${clientDrive.rootFolderName ?? 'Linked'} · Cycle: ${clientDrive.activeCycleLabel ?? clientDrive.activeMonthKey ?? 'Current month'} (starts day ${clientDrive.monthStartDay ?? 1})${clientDrive.matchedMonthFolder ? ` · Auto-matched month folder: ${clientDrive.matchedMonthFolder.name}` : ` · Target month: ${clientDrive.expectedMonthFolderName ?? clientDrive.activeMonthKey ?? 'Active month'}`} — Click to configure in Client workspace`
+                    : 'No Google Drive folder linked for this client yet — Click to set up in Client workspace'
+                }
+              >
+                {clientDrive.clientMapped && clientDrive.rootFolderName
+                  ? `📁 ${clientDrive.rootFolderName}${clientDrive.matchedMonthFolder ? ` / ${clientDrive.matchedMonthFolder.name}` : clientDrive.expectedMonthFolderName ? ` / ${clientDrive.expectedMonthFolderName}` : clientDrive.activeMonthKey ? ` / ${clientDrive.activeMonthKey}` : ''}`
+                  : '📁 Link Drive folder'}
+              </StyledDriveBadgeLink>
+            )}
+
             <StyledIconButton
               type="button"
               data-pulse={activeJobs.length > 0}
@@ -3643,6 +3709,7 @@ export const DeliveryAiStudioPage = () => {
             /* ================= STEP 3: TEXT HOOKS & DRIVE ================= */
             <DeliveryStudioHooksStage
               companyId={activeTab.companyId}
+              clientName={selectedClient?.name ?? null}
               projectId={activeTab.projectId}
               selectedVideo={selectedVideo}
               videos={generatedVideos}
@@ -3781,14 +3848,17 @@ export const DeliveryAiStudioPage = () => {
       {settingsOpen && (
         <DeliveryStudioSettingsDrawer
           tab={activeTab}
+          clientName={selectedClient?.name ?? null}
           isClothingBrandClient={isClothingBrandClient}
           canManageProviders={Boolean(workspace?.canManageProviders)}
           imageModels={imageModels}
           videoModels={videoModels}
           characterPresets={characterPresets}
           videoPresets={videoPresets}
+          hookPresets={hookPresets}
           referenceVideoDurationSec={effectiveRefDurationSec}
           onPatchTab={patchActiveTab}
+          onRefreshWorkspace={() => void workspaceQuery.refetch()}
           onOpenProviders={() => setProviderModalOpen(true)}
           onOpenPresets={() => setPresetModalOpen(true)}
           onClose={() => setSettingsOpen(false)}

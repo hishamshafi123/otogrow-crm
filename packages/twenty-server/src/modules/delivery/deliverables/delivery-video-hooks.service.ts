@@ -611,6 +611,7 @@ export class DeliveryVideoHooksService {
   async analyzeContext(
     auth: WorkspaceAuthContext,
     rawInput: unknown,
+    options?: { overrideGeminiApiKey?: string | null },
   ): Promise<HookProjectDTO> {
     const parsed = analyzeHookContextSchema.safeParse(rawInput);
     if (!parsed.success) {
@@ -687,7 +688,10 @@ export class DeliveryVideoHooksService {
           !websiteSnapshotMatchesUrl(websiteProfile, setup.websiteUrl))
       ) {
         try {
-          websiteProfile = await this.hookAi.analyzeWebsite(setup.websiteUrl);
+          websiteProfile = await this.hookAi.analyzeWebsite(
+            setup.websiteUrl,
+            options?.overrideGeminiApiKey,
+          );
         } catch (error) {
           errors.push(
             error instanceof Error ? error.message : 'Website analysis failed.',
@@ -710,6 +714,7 @@ export class DeliveryVideoHooksService {
           videoAnalysis = await this.hookAi.analyzeVideo(
             videoPath,
             setup.deliverable.mediaMeta ?? {},
+            options?.overrideGeminiApiKey,
           );
         } catch (error) {
           errors.push(
@@ -789,6 +794,7 @@ export class DeliveryVideoHooksService {
   async generateSuggestions(
     auth: WorkspaceAuthContext,
     rawInput: unknown,
+    options?: { overrideGeminiApiKey?: string | null },
   ): Promise<HookProjectDTO> {
     const parsed = generateHookSuggestionsSchema.safeParse(rawInput);
     if (!parsed.success) {
@@ -843,7 +849,10 @@ export class DeliveryVideoHooksService {
       !websiteSnapshotMatchesUrl(websiteProfile, effectiveWebsiteUrl)
     ) {
       try {
-        websiteProfile = await this.hookAi.analyzeWebsite(effectiveWebsiteUrl);
+        websiteProfile = await this.hookAi.analyzeWebsite(
+          effectiveWebsiteUrl,
+          options?.overrideGeminiApiKey,
+        );
       } catch (error) {
         this.logger.warn(
           `Optional website refresh skipped during hook generation: ${error instanceof Error ? error.message : String(error)}`,
@@ -864,6 +873,7 @@ export class DeliveryVideoHooksService {
       videoAnalysis: ctx.project.videoAnalysis,
       creativeInput: mergedCreativeInput,
       videoDurationSec: ctx.deliverable.mediaMeta?.durationSec,
+      overrideGeminiApiKey: options?.overrideGeminiApiKey,
     });
 
     const saved = await this.dataSource.transaction(async (manager) => {

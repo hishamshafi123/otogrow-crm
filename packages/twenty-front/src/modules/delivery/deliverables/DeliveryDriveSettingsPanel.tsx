@@ -1,4 +1,4 @@
-import { useLazyQuery, useMutation, useQuery } from '@apollo/client/react';
+import { useMutation, useQuery } from '@apollo/client/react';
 import { styled } from '@linaria/react';
 import { useEffect, useMemo, useState } from 'react';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
@@ -7,7 +7,6 @@ import {
   CREATE_DELIVERY_DRIVE_FOLDER,
   DISCONNECT_DELIVERY_DRIVE,
   GET_DELIVERY_DRIVE_CONFIG,
-  GET_DELIVERY_DRIVE_FOLDERS,
   RUN_DELIVERY_VPS_CLEANUP,
   START_DELIVERY_DRIVE_OAUTH,
   UPDATE_DELIVERY_DRIVE_SETTINGS,
@@ -21,6 +20,7 @@ import {
   previewDriveMonthFolder,
   type VpsCleanupSummary,
 } from '@/delivery/deliverables/delivery-deliverables.types';
+import { DeliveryDriveFolderPicker } from '@/delivery/deliverables/DeliveryDriveFolderPicker';
 
 const StyledPanel = styled.section`
   background: ${themeCssVariables.background.secondary};
@@ -267,14 +267,6 @@ export const DeliveryDriveSettingsPanel = ({
     deliveryDriveConfig: DeliveryDriveConfig;
   }>(GET_DELIVERY_DRIVE_CONFIG, { fetchPolicy: 'network-only' });
 
-  const [
-    loadFolders,
-    { data: foldersData, loading: foldersLoading, error: foldersError },
-  ] = useLazyQuery<{ deliveryDriveFolders: DriveFolderOption[] }>(
-    GET_DELIVERY_DRIVE_FOLDERS,
-    { fetchPolicy: 'network-only' },
-  );
-
   const [startOAuth, { loading: oauthLoading }] = useMutation<{
     startDeliveryDriveOAuth: { authorizeUrl: string };
   }>(START_DELIVERY_DRIVE_OAUTH);
@@ -303,10 +295,14 @@ export const DeliveryDriveSettingsPanel = ({
   const [autoPurgeHoursInput, setAutoPurgeHoursInput] = useState('24');
   const [rootFolderId, setRootFolderId] = useState<string>('');
   const [rootFolderName, setRootFolderName] = useState<string>('');
-  const [folderSearch, setFolderSearch] = useState('');
   const [newFolderName, setNewFolderName] = useState('');
   const [selectedClientId, setSelectedClientId] = useState('');
   const [clientFolderId, setClientFolderId] = useState('');
+  const [clientFolderName, setClientFolderName] = useState('');
+  const [clientFolderWebUrl, setClientFolderWebUrl] = useState<string | null>(
+    null,
+  );
+  const [clientMonthStartDay, setClientMonthStartDay] = useState('1');
   const [clientPatternOverride, setClientPatternOverride] = useState('');
   const [feedback, setFeedback] = useState<{
     text: string;
@@ -332,7 +328,6 @@ export const DeliveryDriveSettingsPanel = ({
     [sampleMonth, monthPattern],
   );
 
-  const folders = foldersData?.deliveryDriveFolders ?? [];
   const mappingsByCompanyId = useMemo(() => {
     const map = new Map<string, DeliveryDriveConfig['clientMappings'][number]>();
     for (const m of config?.clientMappings ?? []) {
@@ -434,7 +429,6 @@ export const DeliveryDriveSettingsPanel = ({
         setFeedback({
           text: `Created top-level Drive folder "${created.name}". Click Save Settings to set it as workspace root.`,
         });
-        void loadFolders({ variables: { search: '' } });
       }
     } catch (error) {
       setFeedback({
@@ -453,7 +447,12 @@ export const DeliveryDriveSettingsPanel = ({
       return;
     }
     const client = clients.find((c) => c.id === selectedClientId);
-    const chosenFolder = folders.find((f) => f.id === clientFolderId);
+    const parsedDay = Math.round(Number(clientMonthStartDay));
+    const clampedDay =
+      Number.isFinite(parsedDay) && parsedDay >= 1
+        ? Math.min(31, parsedDay)
+        : 1;
+    setClientMonthStartDay(String(clampedDay));
     setFeedback(null);
     try {
       await bindClientFolder({
@@ -463,7 +462,10 @@ export const DeliveryDriveSettingsPanel = ({
             companyName: client?.name,
             autoCreate,
             rootFolderId: autoCreate ? undefined : clientFolderId || undefined,
-            rootFolderName: autoCreate ? undefined : chosenFolder?.name,
+            rootFolderName: autoCreate
+              ? undefined
+              : clientFolderName || undefined,
+            monthStartDay: clampedDay,
             monthFolderPatternOverride: clientPatternOverride.trim()
               ? clientPatternOverride.trim()
               : null,
@@ -472,7 +474,7 @@ export const DeliveryDriveSettingsPanel = ({
       });
       await refetch();
       setFeedback({
-        text: `Updated Google Drive folder mapping for ${client?.name ?? 'client'}.`,
+        text: `Updated Google Drive folder mapping for ${client?.name ?? 'client'} (month starts on day ${clampedDay}).`,
       });
     } catch (error) {
       setFeedback({
@@ -557,12 +559,6 @@ export const DeliveryDriveSettingsPanel = ({
         </StyledMessage>
       )}
 
-      {foldersError && (
-        <StyledMessage $error>
-          Could not browse Google Drive folders: {foldersError.message}
-        </StyledMessage>
-      )}
-
       {!loading && !configError && config && !config.oauthConfigured && (
         <StyledMessage $error>
           Google OAuth credentials (`AUTH_GOOGLE_CLIENT_ID` and
@@ -643,49 +639,23 @@ export const DeliveryDriveSettingsPanel = ({
 
             <StyledCard>
               <StyledTitle>Workspace Root Folder & 24h VPS Cleanup</StyledTitle>
-              <StyledSubtext>
-                Current root:{' '}
-                <strong>{rootFolderName || 'Not selected yet'}</strong>
-              </StyledSubtext>
-              <StyledRow>
-                <StyledInput
-                  onChange={(e) => setFolderSearch(e.target.value)}
-                  placeholder="Search Drive folders..."
-                  value={folderSearch}
-                />
-                <StyledButton
-                  disabled={foldersLoading}
-                  onClick={() =>
-                    void loadFolders({
-                      variables: { search: folderSearch.trim() || null },
-                    })
-                  }
-                  type="button"
-                >
-                  {foldersLoading ? 'Loading...' : 'Browse Drive'}
-                </StyledButton>
-              </StyledRow>
-              {folders.length > 0 && (
-                <StyledSelect
-                  onChange={(e) => {
-                    const picked = folders.find((f) => f.id === e.target.value);
-                    setRootFolderId(picked?.id ?? '');
-                    setRootFolderName(picked?.name ?? '');
-                  }}
-                  value={rootFolderId}
-                >
-                  <option value="">-- Choose Workspace Root Folder --</option>
-                  {folders.map((folder) => (
-                    <option key={folder.id} value={folder.id}>
-                      {folder.name}
-                    </option>
-                  ))}
-                </StyledSelect>
-              )}
+              <DeliveryDriveFolderPicker
+                selectedFolderId={rootFolderId}
+                selectedFolderName={rootFolderName}
+                placeholder="Search workspace root folder in Drive…"
+                onSelect={(folder) => {
+                  setRootFolderId(folder.id);
+                  setRootFolderName(folder.name);
+                }}
+                onClear={() => {
+                  setRootFolderId('');
+                  setRootFolderName('');
+                }}
+              />
               <StyledRow>
                 <StyledInput
                   onChange={(e) => setNewFolderName(e.target.value)}
-                  placeholder="New folder name (e.g. Otogrow Clients)"
+                  placeholder="Or create new root folder (e.g. Otogrow Clients)"
                   value={newFolderName}
                 />
                 <StyledButton
@@ -768,7 +738,7 @@ export const DeliveryDriveSettingsPanel = ({
           </StyledGrid>
 
           <StyledCard>
-            <StyledTitle>Client Folder Bindings & Overrides</StyledTitle>
+            <StyledTitle>Client Folder Bindings &amp; Month Cycle</StyledTitle>
             <StyledRow>
               <StyledSelect
                 onChange={(e) => {
@@ -776,6 +746,9 @@ export const DeliveryDriveSettingsPanel = ({
                   setSelectedClientId(id);
                   const existing = mappingsByCompanyId.get(id);
                   setClientFolderId(existing?.rootFolderId ?? '');
+                  setClientFolderName(existing?.rootFolderName ?? '');
+                  setClientFolderWebUrl(existing?.rootFolderWebUrl ?? null);
+                  setClientMonthStartDay(String(existing?.monthStartDay ?? 1));
                   setClientPatternOverride(
                     existing?.monthFolderPatternOverride ?? '',
                   );
@@ -789,41 +762,59 @@ export const DeliveryDriveSettingsPanel = ({
                   </option>
                 ))}
               </StyledSelect>
-              {folders.length > 0 && (
-                <StyledSelect
-                  onChange={(e) => setClientFolderId(e.target.value)}
-                  value={clientFolderId}
-                >
-                  <option value="">Existing Drive folder (optional)</option>
-                  {folders.map((folder) => (
-                    <option key={folder.id} value={folder.id}>
-                      {folder.name}
-                    </option>
-                  ))}
-                </StyledSelect>
-              )}
+              <StyledLabel style={{ flexDirection: 'row', alignItems: 'center' }}>
+                Month starts day
+                <StyledInput
+                  max={31}
+                  min={1}
+                  onChange={(e) => setClientMonthStartDay(e.target.value)}
+                  style={{ width: 68 }}
+                  type="number"
+                  value={clientMonthStartDay}
+                />
+              </StyledLabel>
               <StyledInput
                 onChange={(e) => setClientPatternOverride(e.target.value)}
                 placeholder="Optional month format override"
                 value={clientPatternOverride}
               />
+            </StyledRow>
+
+            {selectedClientId && (
+              <DeliveryDriveFolderPicker
+                selectedFolderId={clientFolderId}
+                selectedFolderName={clientFolderName}
+                selectedFolderWebUrl={clientFolderWebUrl}
+                placeholder="Search & pick an existing Drive folder for this client…"
+                onSelect={(folder) => {
+                  setClientFolderId(folder.id);
+                  setClientFolderName(folder.name);
+                  setClientFolderWebUrl(folder.webViewLink);
+                }}
+                onClear={() => {
+                  setClientFolderId('');
+                  setClientFolderName('');
+                  setClientFolderWebUrl(null);
+                }}
+              />
+            )}
+
+            <StyledRow>
               <StyledButton
                 $variant="primary"
+                disabled={bindingClient || !selectedClientId || !clientFolderId}
+                onClick={() => handleBindClient(false)}
+                type="button"
+              >
+                {bindingClient ? 'Saving…' : 'Save Client Folder & Cycle'}
+              </StyledButton>
+              <StyledButton
                 disabled={bindingClient || !selectedClientId}
                 onClick={() => handleBindClient(true)}
                 type="button"
               >
-                Auto-Create / Bind Folder
+                Auto-Create Folder under Root
               </StyledButton>
-              {clientFolderId && (
-                <StyledButton
-                  disabled={bindingClient || !selectedClientId}
-                  onClick={() => handleBindClient(false)}
-                  type="button"
-                >
-                  Bind Selected Folder
-                </StyledButton>
-              )}
             </StyledRow>
 
             {(config.clientMappings ?? []).length > 0 && (
@@ -835,8 +826,12 @@ export const DeliveryDriveSettingsPanel = ({
                         {mapping.companyName || mapping.companyId.slice(0, 8)}
                       </strong>
                       <StyledSubtext>
-                        Folder: {mapping.rootFolderName} · Month preview:{' '}
-                        <code>{mapping.monthFolderPreview}</code>
+                        📁 {mapping.rootFolderName} · Starts day{' '}
+                        <strong>{mapping.monthStartDay ?? 1}</strong>
+                        {mapping.activeCycleLabel
+                          ? ` (${mapping.activeCycleLabel})`
+                          : ''}{' '}
+                        · Target: <code>{mapping.monthFolderPreview}</code>
                       </StyledSubtext>
                     </div>
                     {mapping.rootFolderWebUrl && (

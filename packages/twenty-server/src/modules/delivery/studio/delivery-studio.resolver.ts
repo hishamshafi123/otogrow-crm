@@ -195,10 +195,13 @@ export class DeliveryStudioResolver {
   @Query(() => GraphQLJSON)
   deliveryStudioClientDriveFolders(
     @Args('companyId', { type: () => String }) companyId: string,
+    @Args('search', { type: () => String, nullable: true })
+    search?: string | null,
   ) {
     return this.studio.getClientDriveFolders(
       getWorkspaceAuthContext(),
       companyId,
+      search,
     );
   }
 

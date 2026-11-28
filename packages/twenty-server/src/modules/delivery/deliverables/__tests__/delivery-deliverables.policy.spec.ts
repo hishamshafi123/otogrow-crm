@@ -6,8 +6,10 @@ import {
   formatDriveVariationFilename,
   generateClientAccessCode,
   hashClientAccessCode,
+  matchExistingMonthSubfolder,
   normalizeServiceScope,
   parseByteRangeHeader,
+  resolveClientBillingCycle,
   sanitizeSafeReturnPath,
   signDeliverableMediaToken,
   signDriveOAuthState,
@@ -169,6 +171,104 @@ describe('delivery-deliverables.policy', () => {
       expect(verified?.w).toBe('11111111-1111-4111-8111-111111111111');
       expect(verified?.ret).toBe('/delivery?view=deliverables');
       expect(verifyDriveOAuthState('other-key', state)).toBeNull();
+    });
+  });
+
+  describe('resolveClientBillingCycle & matchExistingMonthSubfolder', () => {
+    it('computes client billing cycle across month and year boundaries', () => {
+      // Month starts on 15th; on Dec 5 we are still inside Nov 15 – Dec 14 cycle
+      const dec5 = resolveClientBillingCycle(
+        15,
+        new Date(Date.UTC(2026, 11, 5)),
+      );
+      expect(dec5.cycleMonthKey).toBe('2026-11');
+      expect(dec5.cycleLabel).toBe('Nov 15 – Dec 14, 2026');
+
+      // On Dec 15 we roll into Dec 15, 2026 – Jan 14, 2027
+      const dec15 = resolveClientBillingCycle(
+        15,
+        new Date(Date.UTC(2026, 11, 15)),
+      );
+      expect(dec15.cycleMonthKey).toBe('2026-12');
+      expect(dec15.cycleLabel).toBe('Dec 15, 2026 – Jan 14, 2027');
+
+      // On Jan 5 with start day 15 we are still inside 2026-12 cycle
+      const jan5 = resolveClientBillingCycle(
+        15,
+        new Date(Date.UTC(2027, 0, 5)),
+      );
+      expect(jan5.cycleMonthKey).toBe('2026-12');
+      expect(jan5.cycleLabel).toBe('Dec 15, 2026 – Jan 14, 2027');
+
+      // Start day 31 clamps cleanly for February
+      const mar10 = resolveClientBillingCycle(
+        31,
+        new Date(Date.UTC(2026, 2, 10)),
+      );
+      expect(mar10.cycleMonthKey).toBe('2026-02');
+      expect(mar10.startDay).toBe(28);
+    });
+
+    it('matches existing month folders across naming styles without confusing trailing range months or other years', () => {
+      const folders = [
+        { id: 'f-2025', name: 'November 2025' },
+        { id: 'f-oct', name: 'Oct 15 - Nov 14' },
+        { id: 'f-nov-range', name: 'Nov 15 - Dec 14' },
+        { id: 'f-dec', name: 'December 2026' },
+      ];
+
+      // Must match Nov 15 - Dec 14, NOT Oct 15 - Nov 14 and NOT November 2025
+      expect(
+        matchExistingMonthSubfolder(folders, {
+          monthKey: '2026-11',
+          expectedName: 'November 2026',
+          monthStartDay: 15,
+        })?.id,
+      ).toBe('f-nov-range');
+
+      // If only Oct 15 - Nov 14 exists, do NOT mistakenly match it for 2026-11
+      expect(
+        matchExistingMonthSubfolder(
+          [
+            { id: 'f-2025', name: 'November 2025' },
+            { id: 'f-oct', name: 'Oct 15 - Nov 14' },
+          ],
+          {
+            monthKey: '2026-11',
+            expectedName: 'November 2026',
+            monthStartDay: 15,
+          },
+        ),
+      ).toBeNull();
+
+      // Matches YYYY-MM and short month names
+      expect(
+        matchExistingMonthSubfolder(
+          [
+            { id: 'f-10', name: '2026-10' },
+            { id: 'f-11', name: '2026-11 Content' },
+          ],
+          {
+            monthKey: '2026-11',
+            expectedName: 'November 2026',
+            monthStartDay: 1,
+          },
+        )?.id,
+      ).toBe('f-11');
+
+      expect(
+        matchExistingMonthSubfolder(
+          [
+            { id: 'f-oct', name: 'October' },
+            { id: 'f-nov', name: 'November' },
+          ],
+          {
+            monthKey: '2026-11',
+            expectedName: 'November 2026',
+            monthStartDay: 1,
+          },
+        )?.id,
+      ).toBe('f-nov');
     });
   });
 });

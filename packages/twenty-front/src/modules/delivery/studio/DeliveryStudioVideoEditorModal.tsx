@@ -100,7 +100,7 @@ const StyledBody = styled.div`
 
 const StyledVideoStage = styled.div`
   align-items: center;
-  background: ${themeCssVariables.background.invertedPrimary};
+  background: ${themeCssVariables.background.tertiary};
   border: 1px solid ${themeCssVariables.border.color.medium};
   border-radius: 10px;
   cursor: pointer;

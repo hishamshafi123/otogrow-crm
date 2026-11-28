@@ -1,3 +1,4 @@
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { generateText, Output } from 'ai';
 import { convert } from 'html-to-text';
@@ -22,6 +23,12 @@ import {
 } from 'src/modules/delivery/deliverables/entities/delivery-video-hook-project.entity';
 import { DeliveryHookRenderAdapter } from 'src/modules/delivery/deliverables/delivery-hook-render.adapter';
 import { type DeliveryKnowledgeContext } from 'src/modules/delivery/knowledge/delivery-knowledge-context';
+
+export const DEFAULT_TEXT_HOOK_MASTER_PROMPT = [
+  'Write crisp, scroll-stopping on-screen opening text hooks (5 to 12 words each, readable in 2–4 seconds on mobile) that pair directly with the opening visual of the video.',
+  'Vary the angle across hooks (Curiosity Gap, Pain Point, Contrarian, Specific Proof, Direct Offer, Pattern Interrupt, Relatable POV, Mistake Callout).',
+  'Match the brand voice and any working example hooks provided. Avoid generic clichés and never invent fake statistics or guarantees.',
+].join('\n');
 
 const websiteProfileOutputSchema = z.object({
   brandName: z.string().min(1).max(120),
@@ -127,37 +134,75 @@ export class DeliveryHookAiService {
     private readonly renderAdapter: DeliveryHookRenderAdapter,
   ) {}
 
-  private pickTextModel(): RegisteredAiModel | null {
-    try {
-      const models = this.modelRegistry.getAdminFilteredModels();
-      if (!models.length) return null;
-      const preferred =
-        models.find((m) => /flash|mini|haiku|sonnet|gpt-4o/i.test(m.modelId)) ??
-        models[0];
-      return preferred ?? null;
-    } catch {
-      return null;
-    }
+  private buildDirectGeminiModel(
+    apiKey: string,
+  ): Pick<RegisteredAiModel, 'model' | 'modelId'> {
+    const google = createGoogleGenerativeAI({ apiKey });
+    const modelId = 'gemini-2.5-flash';
+    return { model: google(modelId), modelId };
   }
 
-  private pickGeminiVideoModel(): RegisteredAiModel | null {
+  private resolveEnvGeminiKey(): string | null {
+    return (
+      process.env.GOOGLE_API_KEY?.trim() ||
+      process.env.GEMINI_API_KEY?.trim() ||
+      process.env.GOOGLE_GENERATIVE_AI_API_KEY?.trim() ||
+      null
+    );
+  }
+
+  private pickTextModel(
+    overrideGeminiApiKey?: string | null,
+  ): Pick<RegisteredAiModel, 'model' | 'modelId'> | null {
+    const cleanOverride = overrideGeminiApiKey?.trim();
+    if (cleanOverride) {
+      return this.buildDirectGeminiModel(cleanOverride);
+    }
+    try {
+      const models = this.modelRegistry.getAdminFilteredModels();
+      if (models.length) {
+        const preferred =
+          models.find((m) => /flash|mini|haiku|sonnet|gpt-4o/i.test(m.modelId)) ??
+          models[0];
+        if (preferred) return preferred;
+      }
+    } catch {
+      // Fall through to env key check
+    }
+    const envKey = this.resolveEnvGeminiKey();
+    return envKey ? this.buildDirectGeminiModel(envKey) : null;
+  }
+
+  private pickGeminiVideoModel(
+    overrideGeminiApiKey?: string | null,
+  ): Pick<RegisteredAiModel, 'model' | 'modelId'> | null {
+    const cleanOverride = overrideGeminiApiKey?.trim();
+    if (cleanOverride) {
+      return this.buildDirectGeminiModel(cleanOverride);
+    }
     try {
       const models = this.modelRegistry.getAdminFilteredModels();
       const googleModels = models.filter(
         (m) => m.sdkPackage === '@ai-sdk/google',
       );
-      if (!googleModels.length) return null;
-      return (
-        googleModels.find((m) => /flash/i.test(m.modelId)) ??
-        googleModels[0] ??
-        null
-      );
+      if (googleModels.length) {
+        return (
+          googleModels.find((m) => /flash/i.test(m.modelId)) ??
+          googleModels[0] ??
+          null
+        );
+      }
     } catch {
-      return null;
+      // Fall through to env key check
     }
+    const envKey = this.resolveEnvGeminiKey();
+    return envKey ? this.buildDirectGeminiModel(envKey) : null;
   }
 
-  async analyzeWebsite(rawUrl: string): Promise<WebsiteProfileSnapshot> {
+  async analyzeWebsite(
+    rawUrl: string,
+    overrideGeminiApiKey?: string | null,
+  ): Promise<WebsiteProfileSnapshot> {
     const normalizedUrl = normalizeWebsiteUrl(rawUrl);
     let page: { url: string; body: string; contentType: string };
     try {
@@ -194,7 +239,7 @@ export class DeliveryHookAiService {
       .trim()
       .slice(0, 14_000);
 
-    const model = this.pickTextModel();
+    const model = this.pickTextModel(overrideGeminiApiKey);
     const fetchedAt = new Date().toISOString();
 
     if (model && visibleText.length >= 40) {
@@ -252,6 +297,7 @@ export class DeliveryHookAiService {
   async analyzeVideo(
     localVideoPath: string,
     mediaMeta: DeliverableMediaMeta,
+    overrideGeminiApiKey?: string | null,
   ): Promise<VideoHookAnalysis> {
     const analyzedAt = new Date().toISOString();
     const isVertical = (mediaMeta.height ?? 1920) >= (mediaMeta.width ?? 1080);
@@ -270,7 +316,7 @@ export class DeliveryHookAiService {
       source: 'FALLBACK',
     };
 
-    const geminiModel = this.pickGeminiVideoModel();
+    const geminiModel = this.pickGeminiVideoModel(overrideGeminiApiKey);
     if (!geminiModel) {
       return defaultPlacement;
     }
@@ -335,6 +381,7 @@ export class DeliveryHookAiService {
     videoAnalysis: VideoHookAnalysis | null;
     creativeInput: CreativeHookDirectionInput;
     videoDurationSec?: number;
+    overrideGeminiApiKey?: string | null;
   }): Promise<AiHookSuggestion[]> {
     const targetCount = Math.min(
       12,
@@ -345,7 +392,7 @@ export class DeliveryHookAiService {
         ? params.videoDurationSec
         : 15;
 
-    const model = this.pickTextModel();
+    const model = this.pickTextModel(params.overrideGeminiApiKey);
 
     if (model) {
       const knowledgeSnippet =
@@ -397,17 +444,13 @@ export class DeliveryHookAiService {
         exampleHooks.length > 0
           ? [
               '',
-              '--- EXAMPLE REFERENCE HOOKS (MATCH THIS STYLE, RHYTHM & ENERGY) ---',
+              '--- PROVEN WORKING EXAMPLE HOOKS FOR THIS BRAND (MATCH THIS STYLE, RHYTHM & ENERGY) ---',
               ...exampleHooks.map((ex, i) => `${i + 1}. "${ex}"`),
             ]
           : [];
-      const masterPromptBlock = params.creativeInput.masterPrompt?.trim()
-        ? [
-            '',
-            '--- SAVED HOOK MASTER PROMPT (HIGH PRIORITY INSTRUCTIONS) ---',
-            params.creativeInput.masterPrompt.trim(),
-          ]
-        : [];
+      const activeMasterPrompt =
+        params.creativeInput.masterPrompt?.trim() ||
+        DEFAULT_TEXT_HOOK_MASTER_PROMPT;
 
       const prompt = [
         `Client / Brand: ${params.websiteProfile?.brandName || params.companyName}`,
@@ -430,12 +473,12 @@ export class DeliveryHookAiService {
         `Offer / Angle: ${params.creativeInput.offerAngle || 'Use the strongest offer from the brand profile'}`,
         `Tone Override: ${params.creativeInput.toneOverride || params.websiteProfile?.toneOfVoice || 'Authentic, punchy, scroll-stopping'}`,
         `Custom Notes: ${params.creativeInput.customDirection || 'None'}`,
-        ...masterPromptBlock,
+        '',
+        '--- BRAND TEXT-HOOK MASTER PROMPT (HIGH PRIORITY INSTRUCTIONS) ---',
+        activeMasterPrompt,
         ...examplesBlock,
         '',
-        `Generate exactly ${targetCount} distinct, high-performing on-screen opening text hooks (5 to 12 words each, readable in 2-4 seconds on mobile).`,
-        'Vary the angle across hooks (e.g., Curiosity Gap, Pain Point, Contrarian, Specific Proof, Direct Offer, Pattern Interrupt, POV/Relatable, Mistake Callout).',
-        'Do NOT invent fake statistics or guarantees that are not in the brand profile or knowledge vault.',
+        `Generate exactly ${targetCount} distinct, high-performing on-screen opening text hooks.`,
         'Rank them from strongest scroll-stopper (#1) down.',
       ].join('\n');
 
@@ -443,7 +486,7 @@ export class DeliveryHookAiService {
         const response = await generateText({
           model: model.model,
           system:
-            'You are a world-class paid social & short-form creative director specializing in TikTok, Instagram Reels, and Meta Ads opening text hooks. Write crisp, punchy, natural hooks that pair directly with the opening visual of the video.',
+            'You are a world-class paid social & short-form creative director specializing in TikTok, Instagram Reels, and Meta Ads opening text hooks. Follow the Brand Text-Hook Master Prompt and working examples closely, and pair each hook directly with the opening visual of the video.',
           prompt,
           output: Output.object({ schema: hookSuggestionsOutputSchema }),
           maxOutputTokens: 2000,

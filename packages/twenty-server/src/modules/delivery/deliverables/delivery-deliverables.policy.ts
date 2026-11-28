@@ -120,6 +120,237 @@ export const validateMonthFolderPattern = (pattern: string): string => {
   return trimmed;
 };
 
+export type ClientBillingCycleInfo = {
+  monthStartDay: number;
+  cycleMonthKey: string;
+  startYear: number;
+  startMonth: number;
+  startDay: number;
+  endYear: number;
+  endMonth: number;
+  endDay: number;
+  cycleLabel: string;
+};
+
+const daysInUtcMonth = (year: number, month1Based: number): number =>
+  new Date(Date.UTC(year, month1Based, 0)).getUTCDate();
+
+export const resolveClientBillingCycle = (
+  monthStartDay?: number | null,
+  referenceDate: Date = new Date(),
+): ClientBillingCycleInfo => {
+  const clampedStartDay = Math.min(
+    31,
+    Math.max(1, Math.round(Number(monthStartDay) || 1)),
+  );
+  const year = referenceDate.getUTCFullYear();
+  const month = referenceDate.getUTCMonth() + 1;
+  const day = referenceDate.getUTCDate();
+
+  const currentMonthStartDay = Math.min(
+    clampedStartDay,
+    daysInUtcMonth(year, month),
+  );
+
+  let startYear = year;
+  let startMonth = month;
+  let startDay = currentMonthStartDay;
+
+  if (day < currentMonthStartDay) {
+    startYear = month === 1 ? year - 1 : year;
+    startMonth = month === 1 ? 12 : month - 1;
+    startDay = Math.min(
+      clampedStartDay,
+      daysInUtcMonth(startYear, startMonth),
+    );
+  }
+
+  const nextStartYear = startMonth === 12 ? startYear + 1 : startYear;
+  const nextStartMonth = startMonth === 12 ? 1 : startMonth + 1;
+  const nextStartDay = Math.min(
+    clampedStartDay,
+    daysInUtcMonth(nextStartYear, nextStartMonth),
+  );
+  const endDate = new Date(
+    Date.UTC(nextStartYear, nextStartMonth - 1, nextStartDay) - 86_400_000,
+  );
+  const endYear = endDate.getUTCFullYear();
+  const endMonth = endDate.getUTCMonth() + 1;
+  const endDay = endDate.getUTCDate();
+
+  const cycleMonthKey = `${startYear}-${String(startMonth).padStart(2, '0')}`;
+  const startLabel = `${MONTH_SHORT_NAMES[startMonth - 1]} ${startDay}`;
+  const endLabel = `${MONTH_SHORT_NAMES[endMonth - 1]} ${endDay}`;
+  const cycleLabel =
+    startYear === endYear
+      ? `${startLabel} – ${endLabel}, ${startYear}`
+      : `${startLabel}, ${startYear} – ${endLabel}, ${endYear}`;
+
+  return {
+    monthStartDay: clampedStartDay,
+    cycleMonthKey,
+    startYear,
+    startMonth,
+    startDay,
+    endYear,
+    endMonth,
+    endDay,
+    cycleLabel,
+  };
+};
+
+type MonthMention = { month: number; index: number };
+
+const findMonthNameMentions = (lowerName: string): MonthMention[] => {
+  const mentions: MonthMention[] = [];
+  for (let i = 0; i < 12; i += 1) {
+    const full = MONTH_NAMES[i].toLowerCase();
+    const short = MONTH_SHORT_NAMES[i].toLowerCase();
+    const regex = new RegExp(`\\b(?:${full}|${short})\\b`, 'g');
+    let match: RegExpExecArray | null = regex.exec(lowerName);
+    while (match) {
+      mentions.push({ month: i + 1, index: match.index });
+      match = regex.exec(lowerName);
+    }
+  }
+  return mentions.sort((a, b) => a.index - b.index);
+};
+
+export const matchExistingMonthSubfolder = <
+  T extends { id: string; name: string },
+>(
+  subfolders: T[],
+  params: {
+    monthKey: string;
+    expectedName: string;
+    monthStartDay?: number | null;
+  },
+): T | null => {
+  if (!subfolders.length || !MONTH_KEY_REGEX.test(params.monthKey)) {
+    return null;
+  }
+
+  const [yearStr, monthStr] = params.monthKey.split('-');
+  const year = Number(yearStr);
+  const month = Number(monthStr);
+  const yy = yearStr.slice(-2);
+  const monthFull = MONTH_NAMES[month - 1].toLowerCase();
+  const monthShort = MONTH_SHORT_NAMES[month - 1].toLowerCase();
+  const startDay = Math.min(
+    31,
+    Math.max(1, Math.round(Number(params.monthStartDay) || 1)),
+  );
+  const effectiveStartDay = Math.min(startDay, daysInUtcMonth(year, month));
+  const cycle = resolveClientBillingCycle(
+    startDay,
+    new Date(Date.UTC(year, month - 1, effectiveStartDay)),
+  );
+  const endMonthFull = MONTH_NAMES[cycle.endMonth - 1].toLowerCase();
+  const endMonthShort = MONTH_SHORT_NAMES[cycle.endMonth - 1].toLowerCase();
+  const allowedYears = new Set<number>([year, cycle.endYear]);
+  const expectedLower = params.expectedName.trim().toLowerCase();
+
+  const startDayStr = String(effectiveStartDay);
+  const startDayPad = startDayStr.padStart(2, '0');
+  const endDayStr = String(cycle.endDay);
+  const endDayPad = endDayStr.padStart(2, '0');
+  const endMonthPad = String(cycle.endMonth).padStart(2, '0');
+
+  const startMonthWord = `(?:${monthFull}|${monthShort})`;
+  const endMonthWord = `(?:${endMonthFull}|${endMonthShort})`;
+
+  const startMonthDayRegex = new RegExp(
+    `(?:\\b${startMonthWord}\\.?\\s+0?${effectiveStartDay}(?:st|nd|rd|th)?\\b|\\b0?${effectiveStartDay}(?:st|nd|rd|th)?\\s+${startMonthWord}\\.?\\b|\\b${yearStr}[-_/.]${monthStr}[-_/.]${startDayPad}\\b|\\b${monthStr}[-/.]${startDayPad}\\b|\\b${startDayPad}[-/.]${monthStr}\\b)`,
+    'i',
+  );
+  const endMonthDayRegex = new RegExp(
+    `(?:\\b${endMonthWord}\\.?\\s+0?${cycle.endDay}(?:st|nd|rd|th)?\\b|\\b0?${cycle.endDay}(?:st|nd|rd|th)?\\s+${endMonthWord}\\.?\\b|\\b${cycle.endYear}[-_/.]${endMonthPad}[-_/.]${endDayPad}\\b|\\b${endMonthPad}[-/.]${endDayPad}\\b|\\b${endDayPad}[-/.]${endMonthPad}\\b)`,
+    'i',
+  );
+  const numericYearMonthRegex = new RegExp(
+    `(?:\\b${yearStr}[-_/. ]${monthStr}\\b|\\b${monthStr}[-_/. ]${yearStr}\\b)`,
+  );
+  const hasShortYearRegex = new RegExp(`(?:'${yy}\\b|\\b${yy}\\b)`);
+
+  let best: { folder: T; score: number } | null = null;
+
+  for (const folder of subfolders) {
+    const rawName = folder.name.trim();
+    if (!rawName) continue;
+    const lower = rawName.toLowerCase();
+
+    // 1. Exact case-insensitive match to expected folder pattern
+    if (expectedLower && lower === expectedLower) {
+      return folder;
+    }
+
+    // Reject folders explicitly tagged with a different 4-digit year
+    const explicitYears = Array.from(lower.matchAll(/\b((?:19|20)\d{2})\b/g)).map(
+      (m) => Number(m[1]),
+    );
+    if (
+      explicitYears.length > 0 &&
+      !explicitYears.some((y) => allowedYears.has(y))
+    ) {
+      continue;
+    }
+    const hasMatchingFullYear = explicitYears.includes(year);
+
+    const mentions = findMonthNameMentions(lower);
+    const firstMentionedMonth = mentions[0]?.month ?? null;
+    const mentionsTargetMonth = mentions.some((m) => m.month === month);
+
+    // If a folder lists a month range (e.g. "Oct 15 - Nov 14"), only treat it as
+    // matching its STARTING month (Oct), never the trailing end month (Nov).
+    if (
+      mentions.length >= 2 &&
+      firstMentionedMonth !== null &&
+      firstMentionedMonth !== month
+    ) {
+      continue;
+    }
+
+    let score = 0;
+
+    // 2. Date-range or explicit start-day match (critical for custom month start days)
+    if (startDay > 1 && startMonthDayRegex.test(lower)) {
+      const hasEndMatch = endMonthDayRegex.test(lower);
+      score = hasEndMatch
+        ? hasMatchingFullYear
+          ? 98
+          : 95
+        : hasMatchingFullYear
+          ? 92
+          : 88;
+    }
+
+    // 3. Explicit YYYY-MM or MM-YYYY match
+    if (score < 85 && numericYearMonthRegex.test(lower)) {
+      score = 85;
+    }
+
+    // 4. Month name + matching year (4-digit or 2-digit)
+    if (
+      score < 80 &&
+      mentionsTargetMonth &&
+      (hasMatchingFullYear || hasShortYearRegex.test(lower))
+    ) {
+      score = hasMatchingFullYear ? 82 : 76;
+    }
+
+    // 5. Unambiguous month name without year (and no conflicting year)
+    if (score < 55 && mentionsTargetMonth && explicitYears.length === 0) {
+      score = 55;
+    }
+
+    if (score > 0 && (!best || score > best.score)) {
+      best = { folder, score };
+    }
+  }
+
+  return best?.folder ?? null;
+};
+
 const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 
 export const generateClientAccessCode = (): string => {
@@ -633,6 +864,7 @@ export const bindClientDriveFolderSchema = z
     autoCreate: z.boolean().optional(),
     rootFolderId: z.string().trim().min(1).max(200).optional(),
     rootFolderName: z.string().trim().min(1).max(200).optional(),
+    monthStartDay: z.number().int().min(1).max(31).nullable().optional(),
     monthFolderPatternOverride: z
       .string()
       .trim()
