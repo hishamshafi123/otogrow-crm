@@ -70,53 +70,198 @@ const GOOGLE_DRIVE_SCOPES = [
 const FOLDER_MIME = 'application/vnd.google-apps.folder';
 const CACHE_META_KEY = '__meta__';
 
+export type ClientDriveRootFolderOption = {
+  id: string;
+  name: string;
+  webViewLink: string | null;
+  label: string | null;
+  isDefault: boolean;
+};
+
+type StoredExtraRootFolder = {
+  id: string;
+  name: string;
+  webViewLink: string | null;
+  label?: string | null;
+};
+
 type DriveCacheMetaEntry = {
   monthStartDay?: number;
+  primaryFolderLabel?: string | null;
+  extraRootFolders?: StoredExtraRootFolder[];
+};
+
+const readCacheMeta = (
+  cache?: Record<string, unknown> | null,
+): DriveCacheMetaEntry => {
+  if (!cache || typeof cache !== 'object') return {};
+  const meta = cache[CACHE_META_KEY];
+  if (!meta || typeof meta !== 'object') return {};
+  return meta as DriveCacheMetaEntry;
 };
 
 const readExplicitMonthStartDay = (
   cache?: Record<string, unknown> | null,
 ): number | null => {
-  if (!cache || typeof cache !== 'object') return null;
-  const meta = cache[CACHE_META_KEY] as DriveCacheMetaEntry | undefined;
-  const raw = meta?.monthStartDay;
+  const raw = readCacheMeta(cache).monthStartDay;
   if (typeof raw !== 'number' || !Number.isInteger(raw) || raw < 1 || raw > 31) {
     return null;
   }
   return raw;
 };
 
+const readExtraRootFolders = (
+  cache?: Record<string, unknown> | null,
+): StoredExtraRootFolder[] => {
+  const raw = readCacheMeta(cache).extraRootFolders;
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  const out: StoredExtraRootFolder[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const id = typeof item.id === 'string' ? item.id.trim() : '';
+    const name = typeof item.name === 'string' ? item.name.trim() : '';
+    if (!id || !name || seen.has(id)) continue;
+    seen.add(id);
+    out.push({
+      id,
+      name,
+      webViewLink:
+        typeof item.webViewLink === 'string' && item.webViewLink.trim()
+          ? item.webViewLink.trim()
+          : `https://drive.google.com/drive/folders/${id}`,
+      label:
+        typeof item.label === 'string' && item.label.trim()
+          ? item.label.trim().slice(0, 80)
+          : null,
+    });
+  }
+  return out;
+};
+
+const readClientRootFolders = (
+  mapping?: DeliveryClientDriveMappingEntity | null,
+): ClientDriveRootFolderOption[] => {
+  if (!mapping?.rootFolderId) return [];
+  const meta = readCacheMeta(mapping.monthFolderCache);
+  const primaryLabel =
+    typeof meta.primaryFolderLabel === 'string' &&
+    meta.primaryFolderLabel.trim()
+      ? meta.primaryFolderLabel.trim().slice(0, 80)
+      : null;
+  const result: ClientDriveRootFolderOption[] = [
+    {
+      id: mapping.rootFolderId,
+      name: mapping.rootFolderName,
+      webViewLink:
+        mapping.rootFolderWebUrl ??
+        `https://drive.google.com/drive/folders/${mapping.rootFolderId}`,
+      label: primaryLabel,
+      isDefault: true,
+    },
+  ];
+  for (const extra of readExtraRootFolders(mapping.monthFolderCache)) {
+    if (extra.id === mapping.rootFolderId) continue;
+    result.push({
+      id: extra.id,
+      name: extra.name,
+      webViewLink: extra.webViewLink,
+      label: extra.label ?? null,
+      isDefault: false,
+    });
+  }
+  return result;
+};
+
+const buildMetaEntry = (params: {
+  monthStartDay: number | null;
+  primaryFolderLabel: string | null;
+  extraRootFolders: StoredExtraRootFolder[];
+}): DriveCacheMetaEntry | null => {
+  const entry: DriveCacheMetaEntry = {};
+  if (params.monthStartDay !== null) {
+    entry.monthStartDay = params.monthStartDay;
+  }
+  if (params.primaryFolderLabel) {
+    entry.primaryFolderLabel = params.primaryFolderLabel;
+  }
+  if (params.extraRootFolders.length > 0) {
+    entry.extraRootFolders = params.extraRootFolders;
+  }
+  return Object.keys(entry).length > 0 ? entry : null;
+};
+
 const buildClearedMonthCache = (
   existingCache?: Record<string, CachedDriveMonthFolder> | null,
-  monthStartDayUpdate?: number | null,
+  updates?: {
+    monthStartDay?: number | null;
+    primaryFolderLabel?: string | null;
+    extraRootFolders?: StoredExtraRootFolder[];
+  },
 ): Record<string, CachedDriveMonthFolder> => {
+  const prevMeta = readCacheMeta(existingCache);
   const nextMonthStartDay =
-    monthStartDayUpdate === undefined
+    updates?.monthStartDay === undefined
       ? readExplicitMonthStartDay(existingCache)
-      : monthStartDayUpdate;
-  if (nextMonthStartDay !== null) {
+      : updates.monthStartDay;
+  const nextPrimaryLabel =
+    updates?.primaryFolderLabel === undefined
+      ? typeof prevMeta.primaryFolderLabel === 'string' &&
+        prevMeta.primaryFolderLabel.trim()
+        ? prevMeta.primaryFolderLabel.trim()
+        : null
+      : updates.primaryFolderLabel;
+  const nextExtras =
+    updates?.extraRootFolders === undefined
+      ? readExtraRootFolders(existingCache)
+      : updates.extraRootFolders;
+
+  const meta = buildMetaEntry({
+    monthStartDay: nextMonthStartDay,
+    primaryFolderLabel: nextPrimaryLabel,
+    extraRootFolders: nextExtras,
+  });
+  if (meta) {
     return {
-      [CACHE_META_KEY]: {
-        monthStartDay: nextMonthStartDay,
-      } as unknown as CachedDriveMonthFolder,
+      [CACHE_META_KEY]: meta as unknown as CachedDriveMonthFolder,
     };
   }
   return {};
 };
 
-const applyMonthStartDayToCache = (
+const applyMetaToCache = (
   existingCache: Record<string, CachedDriveMonthFolder> | null | undefined,
-  monthStartDayUpdate: number | null,
+  updates: {
+    monthStartDay?: number | null;
+    primaryFolderLabel?: string | null;
+    extraRootFolders?: StoredExtraRootFolder[];
+  },
 ): Record<string, CachedDriveMonthFolder> => {
   const next: Record<string, CachedDriveMonthFolder> = {
     ...(existingCache ?? {}),
   };
-  if (monthStartDayUpdate === null) {
+  const prevMeta = readCacheMeta(existingCache);
+  const meta = buildMetaEntry({
+    monthStartDay:
+      updates.monthStartDay === undefined
+        ? readExplicitMonthStartDay(existingCache)
+        : updates.monthStartDay,
+    primaryFolderLabel:
+      updates.primaryFolderLabel === undefined
+        ? typeof prevMeta.primaryFolderLabel === 'string' &&
+          prevMeta.primaryFolderLabel.trim()
+          ? prevMeta.primaryFolderLabel.trim()
+          : null
+        : updates.primaryFolderLabel,
+    extraRootFolders:
+      updates.extraRootFolders === undefined
+        ? readExtraRootFolders(existingCache)
+        : updates.extraRootFolders,
+  });
+  if (!meta) {
     delete next[CACHE_META_KEY];
   } else {
-    next[CACHE_META_KEY] = {
-      monthStartDay: monthStartDayUpdate,
-    } as unknown as CachedDriveMonthFolder;
+    next[CACHE_META_KEY] = meta as unknown as CachedDriveMonthFolder;
   }
   return next;
 };
@@ -166,6 +311,7 @@ export type ClientDriveMappingDTO = {
   rootFolderId: string;
   rootFolderName: string;
   rootFolderWebUrl: string | null;
+  rootFolders: ClientDriveRootFolderOption[];
   monthStartDay: number;
   monthStartDaySource: MonthStartDaySource;
   activeMonthKey: string;
@@ -502,6 +648,7 @@ export class DeliveryDriveService {
           rootFolderId: mapping.rootFolderId,
           rootFolderName: mapping.rootFolderName,
           rootFolderWebUrl: mapping.rootFolderWebUrl,
+          rootFolders: readClientRootFolders(mapping),
           monthStartDay,
           monthStartDaySource,
           activeMonthKey: cycle.cycleMonthKey,
@@ -1007,12 +1154,15 @@ export class DeliveryDriveService {
     auth: WorkspaceAuthContext,
     companyId: string,
     search?: string | null,
+    requestedRootFolderId?: string | null,
   ): Promise<{
     connected: boolean;
     clientMapped: boolean;
     rootFolderId: string | null;
     rootFolderName: string | null;
     rootFolderWebUrl: string | null;
+    selectedRootFolderId: string | null;
+    rootFolders: ClientDriveRootFolderOption[];
     monthStartDay: number;
     monthStartDaySource: MonthStartDaySource;
     activeMonthKey: string;
@@ -1052,6 +1202,8 @@ export class DeliveryDriveService {
         rootFolderId: null,
         rootFolderName: null,
         rootFolderWebUrl: null,
+        selectedRootFolderId: null,
+        rootFolders: [],
         monthStartDay,
         monthStartDaySource,
         activeMonthKey: cycle.cycleMonthKey,
@@ -1063,7 +1215,8 @@ export class DeliveryDriveService {
       };
     }
 
-    if (!mapping?.rootFolderId) {
+    const rootFolders = readClientRootFolders(mapping);
+    if (!mapping?.rootFolderId || rootFolders.length === 0) {
       return {
         connected: true,
         clientMapped: false,
@@ -1072,6 +1225,8 @@ export class DeliveryDriveService {
         rootFolderWebUrl: connection.rootFolderId
           ? `https://drive.google.com/drive/folders/${connection.rootFolderId}`
           : null,
+        selectedRootFolderId: null,
+        rootFolders: [],
         monthStartDay,
         monthStartDaySource,
         activeMonthKey: cycle.cycleMonthKey,
@@ -1083,13 +1238,19 @@ export class DeliveryDriveService {
       };
     }
 
+    const requestedTrimmed = requestedRootFolderId?.trim() || '';
+    const activeRoot =
+      (requestedTrimmed
+        ? rootFolders.find((f) => f.id === requestedTrimmed)
+        : null) ?? rootFolders[0];
+
     const searchTrimmed = search?.trim() || '';
 
     try {
       const { drive } = await this.getAuthorizedDriveClient(workspaceId);
       const allRootChildren = await this.listDirectChildFolders(
         drive,
-        mapping.rootFolderId,
+        activeRoot.id,
         null,
         100,
       );
@@ -1124,7 +1285,7 @@ export class DeliveryDriveService {
         } else {
           subfolders = await this.listDirectChildFolders(
             drive,
-            mapping.rootFolderId,
+            activeRoot.id,
             searchTrimmed,
             60,
           );
@@ -1134,9 +1295,11 @@ export class DeliveryDriveService {
       return {
         connected: true,
         clientMapped: true,
-        rootFolderId: mapping.rootFolderId,
-        rootFolderName: mapping.rootFolderName,
-        rootFolderWebUrl: mapping.rootFolderWebUrl,
+        rootFolderId: activeRoot.id,
+        rootFolderName: activeRoot.name,
+        rootFolderWebUrl: activeRoot.webViewLink,
+        selectedRootFolderId: activeRoot.id,
+        rootFolders,
         monthStartDay,
         monthStartDaySource,
         activeMonthKey: cycle.cycleMonthKey,
@@ -1150,9 +1313,11 @@ export class DeliveryDriveService {
       return {
         connected: true,
         clientMapped: true,
-        rootFolderId: mapping.rootFolderId,
-        rootFolderName: mapping.rootFolderName,
-        rootFolderWebUrl: mapping.rootFolderWebUrl,
+        rootFolderId: activeRoot.id,
+        rootFolderName: activeRoot.name,
+        rootFolderWebUrl: activeRoot.webViewLink,
+        selectedRootFolderId: activeRoot.id,
+        rootFolders,
         monthStartDay,
         monthStartDaySource,
         activeMonthKey: cycle.cycleMonthKey,
@@ -1312,11 +1477,108 @@ export class DeliveryDriveService {
         where: { workspaceId, companyId: input.companyId },
       });
 
+      const verifyAndResolveFolder = async (
+        candidateId: string,
+        fallbackName: string,
+      ): Promise<{ id: string; name: string; webViewLink: string }> => {
+        const meta = await drive.files.get({
+          fileId: candidateId,
+          fields: 'id,name,mimeType,webViewLink,trashed',
+          supportsAllDrives: true,
+        });
+        if (!meta.data.id || meta.data.trashed) {
+          throw new BadRequestException(
+            'Selected Google Drive folder was not found or is in Trash.',
+          );
+        }
+        if (meta.data.mimeType !== FOLDER_MIME) {
+          throw new BadRequestException(
+            'Selected Google Drive item is not a folder. Choose a Drive folder.',
+          );
+        }
+        return {
+          id: meta.data.id,
+          name: meta.data.name ?? fallbackName,
+          webViewLink:
+            meta.data.webViewLink ??
+            `https://drive.google.com/drive/folders/${meta.data.id}`,
+        };
+      };
+
       let folderId = input.rootFolderId?.trim() || '';
       let folderName = input.rootFolderName?.trim() || companyName;
       let folderWebUrl: string | null = null;
+      let primaryFolderLabelUpdate: string | null | undefined = undefined;
+      let extraRootFoldersUpdate: StoredExtraRootFolder[] | undefined =
+        undefined;
 
-      if (!input.autoCreate && !folderId && mapping?.rootFolderId) {
+      if (
+        !input.autoCreate &&
+        Array.isArray(input.rootFolders) &&
+        input.rootFolders.length > 0
+      ) {
+        const dedupedInputs: Array<{
+          id: string;
+          name?: string;
+          label: string | null;
+          isDefault: boolean;
+        }> = [];
+        const seenIds = new Set<string>();
+        for (const entry of input.rootFolders) {
+          const cleanId = entry.id.trim();
+          if (!cleanId || seenIds.has(cleanId)) continue;
+          seenIds.add(cleanId);
+          dedupedInputs.push({
+            id: cleanId,
+            name: entry.name?.trim(),
+            label: entry.label?.trim() ? entry.label.trim().slice(0, 80) : null,
+            isDefault: Boolean(entry.isDefault),
+          });
+        }
+
+        if (dedupedInputs.length === 0) {
+          throw new BadRequestException(
+            'Select at least one Google Drive folder for this client.',
+          );
+        }
+
+        const resolvedList: Array<{
+          id: string;
+          name: string;
+          webViewLink: string;
+          label: string | null;
+          isDefault: boolean;
+        }> = [];
+        for (const entry of dedupedInputs) {
+          const verified = await verifyAndResolveFolder(
+            entry.id,
+            entry.name || companyName,
+          );
+          resolvedList.push({
+            ...verified,
+            label: entry.label,
+            isDefault: entry.isDefault,
+          });
+        }
+
+        const defaultIdx = Math.max(
+          0,
+          resolvedList.findIndex((item) => item.isDefault),
+        );
+        const primary = resolvedList[defaultIdx];
+        folderId = primary.id;
+        folderName = primary.name;
+        folderWebUrl = primary.webViewLink;
+        primaryFolderLabelUpdate = primary.label;
+        extraRootFoldersUpdate = resolvedList
+          .filter((_, idx) => idx !== defaultIdx)
+          .map((item) => ({
+            id: item.id,
+            name: item.name,
+            webViewLink: item.webViewLink,
+            label: item.label,
+          }));
+      } else if (!input.autoCreate && !folderId && mapping?.rootFolderId) {
         // Metadata-only update (e.g. changing monthStartDay or monthFolderPatternOverride)
         folderId = mapping.rootFolderId;
         folderName = mapping.rootFolderName;
@@ -1342,26 +1604,10 @@ export class DeliveryDriveService {
           folderWebUrl = folder.webViewLink;
         }
       } else {
-        const meta = await drive.files.get({
-          fileId: folderId,
-          fields: 'id,name,mimeType,webViewLink,trashed',
-          supportsAllDrives: true,
-        });
-        if (!meta.data.id || meta.data.trashed) {
-          throw new BadRequestException(
-            'Selected Google Drive folder was not found or is in Trash.',
-          );
-        }
-        if (meta.data.mimeType !== FOLDER_MIME) {
-          throw new BadRequestException(
-            'Selected Google Drive item is not a folder. Choose a Drive folder.',
-          );
-        }
-        folderId = meta.data.id;
-        folderName = meta.data.name ?? folderName;
-        folderWebUrl =
-          meta.data.webViewLink ??
-          `https://drive.google.com/drive/folders/${folderId}`;
+        const verified = await verifyAndResolveFolder(folderId, folderName);
+        folderId = verified.id;
+        folderName = verified.name;
+        folderWebUrl = verified.webViewLink;
       }
 
       if (mapping) {
@@ -1375,21 +1621,31 @@ export class DeliveryDriveService {
         const monthStartDayChanged =
           input.monthStartDay !== undefined &&
           input.monthStartDay !== prevExplicitDay;
+        const extrasChanged = extraRootFoldersUpdate !== undefined;
         mapping.rootFolderId = folderId;
         mapping.rootFolderName = folderName;
         mapping.rootFolderWebUrl = folderWebUrl;
         if (validatedOverride !== undefined) {
           mapping.monthFolderPatternOverride = validatedOverride;
         }
+        const metaUpdates = {
+          monthStartDay: input.monthStartDay,
+          primaryFolderLabel: primaryFolderLabelUpdate,
+          extraRootFolders: extraRootFoldersUpdate,
+        };
         if (folderChanged || patternChanged || monthStartDayChanged) {
           mapping.monthFolderCache = buildClearedMonthCache(
             mapping.monthFolderCache,
-            input.monthStartDay,
+            metaUpdates,
           );
-        } else if (input.monthStartDay !== undefined) {
-          mapping.monthFolderCache = applyMonthStartDayToCache(
+        } else if (
+          input.monthStartDay !== undefined ||
+          extrasChanged ||
+          primaryFolderLabelUpdate !== undefined
+        ) {
+          mapping.monthFolderCache = applyMetaToCache(
             mapping.monthFolderCache,
-            input.monthStartDay,
+            metaUpdates,
           );
         }
       } else {
@@ -1400,10 +1656,11 @@ export class DeliveryDriveService {
           rootFolderName: folderName,
           rootFolderWebUrl: folderWebUrl,
           monthFolderPatternOverride: validatedOverride ?? null,
-          monthFolderCache: buildClearedMonthCache(
-            undefined,
-            input.monthStartDay ?? null,
-          ),
+          monthFolderCache: buildClearedMonthCache(undefined, {
+            monthStartDay: input.monthStartDay ?? null,
+            primaryFolderLabel: primaryFolderLabelUpdate ?? null,
+            extraRootFolders: extraRootFoldersUpdate ?? [],
+          }),
         });
       }
       return repo.save(mapping);
@@ -1420,6 +1677,7 @@ export class DeliveryDriveService {
       rootFolderId: saved.rootFolderId,
       rootFolderName: saved.rootFolderName,
       rootFolderWebUrl: saved.rootFolderWebUrl,
+      rootFolders: readClientRootFolders(saved),
       monthStartDay,
       monthStartDaySource,
       activeMonthKey: cycle.cycleMonthKey,
@@ -1593,6 +1851,24 @@ export class DeliveryDriveService {
       }
     }
 
+    const requestedRootId = deliverable.mediaMeta?.driveRootFolderId?.trim();
+    const linkedRoots = readClientRootFolders(mapping);
+    let effectiveRootId = mapping.rootFolderId;
+    if (requestedRootId && requestedRootId !== mapping.rootFolderId) {
+      const matchedLinked = linkedRoots.find((f) => f.id === requestedRootId);
+      if (matchedLinked) {
+        effectiveRootId = matchedLinked.id;
+      } else {
+        const stillValidRoot = await this.verifyFolderActive(
+          drive,
+          requestedRootId,
+        );
+        if (stillValidRoot) {
+          effectiveRootId = requestedRootId;
+        }
+      }
+    }
+
     const pattern =
       mapping.monthFolderPatternOverride || connection.monthFolderPattern;
     const expectedMonthFolderName = formatDriveMonthFolder(
@@ -1600,7 +1876,10 @@ export class DeliveryDriveService {
       pattern,
     );
 
-    const cacheKey = `${deliverable.monthKey}::${expectedMonthFolderName}`;
+    const cacheKey =
+      effectiveRootId === mapping.rootFolderId
+        ? `${deliverable.monthKey}::${expectedMonthFolderName}`
+        : `${effectiveRootId}::${deliverable.monthKey}::${expectedMonthFolderName}`;
     const cached = mapping.monthFolderCache?.[cacheKey];
     let monthFolder: DriveFolderOption | null = null;
 
@@ -1624,7 +1903,7 @@ export class DeliveryDriveService {
       try {
         const existingChildren = await this.listDirectChildFolders(
           drive,
-          mapping.rootFolderId,
+          effectiveRootId,
           null,
           100,
         );
@@ -1640,7 +1919,7 @@ export class DeliveryDriveService {
       if (!monthFolder) {
         monthFolder = await this.findOrCreateChildFolder(
           drive,
-          mapping.rootFolderId,
+          effectiveRootId,
           expectedMonthFolderName,
         );
       }

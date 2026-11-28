@@ -249,6 +249,77 @@ const StyledLink = styled.a`
   }
 `;
 
+const StyledRootFolderList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+`;
+
+const StyledRootFolderItem = styled.div<{ $isDefault?: boolean }>`
+  background: ${themeCssVariables.background.secondary};
+  border: 1px solid
+    ${({ $isDefault }) =>
+      $isDefault
+        ? themeCssVariables.color.blue
+        : themeCssVariables.border.color.medium};
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+`;
+
+const StyledRootFolderMeta = styled.div`
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
+`;
+
+const StyledRootLabelInput = styled.input`
+  background: ${themeCssVariables.background.primary};
+  border: 1px solid ${themeCssVariables.border.color.light};
+  border-radius: 6px;
+  color: ${themeCssVariables.font.color.primary};
+  font-family: inherit;
+  font-size: 11px;
+  padding: 5px 8px;
+  width: 100%;
+`;
+
+const StyledFolderTags = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+`;
+
+const StyledFolderTagLink = styled.a<{ $isDefault?: boolean }>`
+  background: ${({ $isDefault }) =>
+    $isDefault
+      ? themeCssVariables.background.transparent.blue
+      : themeCssVariables.background.primary};
+  border: 1px solid
+    ${({ $isDefault }) =>
+      $isDefault
+        ? themeCssVariables.color.blue
+        : themeCssVariables.border.color.medium};
+  border-radius: 999px;
+  color: ${({ $isDefault }) =>
+    $isDefault
+      ? themeCssVariables.color.blue
+      : themeCssVariables.font.color.primary};
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+`;
+
 type DeliveryDriveSettingsPanelProps = {
   clients: { id: string; name: string }[];
   onClose?: () => void;
@@ -297,11 +368,15 @@ export const DeliveryDriveSettingsPanel = ({
   const [rootFolderName, setRootFolderName] = useState<string>('');
   const [newFolderName, setNewFolderName] = useState('');
   const [selectedClientId, setSelectedClientId] = useState('');
-  const [clientFolderId, setClientFolderId] = useState('');
-  const [clientFolderName, setClientFolderName] = useState('');
-  const [clientFolderWebUrl, setClientFolderWebUrl] = useState<string | null>(
-    null,
-  );
+  const [clientRootFolders, setClientRootFolders] = useState<
+    Array<{
+      id: string;
+      name: string;
+      webViewLink: string | null;
+      label: string;
+      isDefault: boolean;
+    }>
+  >([]);
   const [clientMonthStartDay, setClientMonthStartDay] = useState('1');
   const [clientPatternOverride, setClientPatternOverride] = useState('');
   const [feedback, setFeedback] = useState<{
@@ -335,6 +410,90 @@ export const DeliveryDriveSettingsPanel = ({
     }
     return map;
   }, [config?.clientMappings]);
+
+  const loadClientDraft = (companyIdToLoad: string) => {
+    setSelectedClientId(companyIdToLoad);
+    const existing = mappingsByCompanyId.get(companyIdToLoad);
+    if (existing?.rootFolders && existing.rootFolders.length > 0) {
+      const mapped = existing.rootFolders.map((f, idx) => ({
+        id: f.id,
+        name: f.name,
+        webViewLink: f.webViewLink,
+        label: f.label ?? '',
+        isDefault: Boolean(f.isDefault) || idx === 0,
+      }));
+      const hasDefault = mapped.some((f) => f.isDefault);
+      setClientRootFolders(
+        mapped.map((f, idx) => ({
+          ...f,
+          isDefault: hasDefault ? f.isDefault : idx === 0,
+        })),
+      );
+    } else if (existing?.rootFolderId) {
+      setClientRootFolders([
+        {
+          id: existing.rootFolderId,
+          name: existing.rootFolderName,
+          webViewLink: existing.rootFolderWebUrl,
+          label: '',
+          isDefault: true,
+        },
+      ]);
+    } else {
+      setClientRootFolders([]);
+    }
+    setClientMonthStartDay(String(existing?.monthStartDay ?? 1));
+    setClientPatternOverride(existing?.monthFolderPatternOverride ?? '');
+  };
+
+  const handleAddClientRootFolder = (folder: DriveFolderOption) => {
+    setFeedback(null);
+    setClientRootFolders((prev) => {
+      if (prev.some((f) => f.id === folder.id)) return prev;
+      if (prev.length >= 15) {
+        setFeedback({
+          text: 'You can link up to 15 main Drive folders per client.',
+          isError: true,
+        });
+        return prev;
+      }
+      return [
+        ...prev,
+        {
+          id: folder.id,
+          name: folder.name,
+          webViewLink: folder.webViewLink,
+          label: '',
+          isDefault: prev.length === 0,
+        },
+      ];
+    });
+  };
+
+  const handleSetClientDefaultFolder = (folderIdToMakeDefault: string) => {
+    setClientRootFolders((prev) =>
+      prev.map((f) => ({ ...f, isDefault: f.id === folderIdToMakeDefault })),
+    );
+  };
+
+  const handleUpdateClientFolderLabel = (
+    folderIdToEdit: string,
+    label: string,
+  ) => {
+    setClientRootFolders((prev) =>
+      prev.map((f) => (f.id === folderIdToEdit ? { ...f, label } : f)),
+    );
+  };
+
+  const handleRemoveClientRootFolder = (folderIdToRemove: string) => {
+    setClientRootFolders((prev) => {
+      const remaining = prev.filter((f) => f.id !== folderIdToRemove);
+      if (remaining.length > 0 && !remaining.some((f) => f.isDefault)) {
+        remaining[0] = { ...remaining[0], isDefault: true };
+      }
+      return remaining;
+    });
+  };
 
   const handleConnect = async () => {
     setFeedback(null);
@@ -454,6 +613,12 @@ export const DeliveryDriveSettingsPanel = ({
         : 1;
     setClientMonthStartDay(String(clampedDay));
     setFeedback(null);
+
+    const defaultFolder =
+      clientRootFolders.find((f) => f.isDefault) ??
+      clientRootFolders[0] ??
+      null;
+
     try {
       await bindClientFolder({
         variables: {
@@ -461,10 +626,21 @@ export const DeliveryDriveSettingsPanel = ({
             companyId: selectedClientId,
             companyName: client?.name,
             autoCreate,
-            rootFolderId: autoCreate ? undefined : clientFolderId || undefined,
+            rootFolderId: autoCreate
+              ? undefined
+              : defaultFolder?.id || undefined,
             rootFolderName: autoCreate
               ? undefined
-              : clientFolderName || undefined,
+              : defaultFolder?.name || undefined,
+            rootFolders:
+              autoCreate || clientRootFolders.length === 0
+                ? undefined
+                : clientRootFolders.map((f) => ({
+                    id: f.id,
+                    name: f.name,
+                    label: f.label.trim() ? f.label.trim() : null,
+                    isDefault: f.id === defaultFolder?.id,
+                  })),
             monthStartDay: clampedDay,
             monthFolderPatternOverride: clientPatternOverride.trim()
               ? clientPatternOverride.trim()
@@ -473,8 +649,11 @@ export const DeliveryDriveSettingsPanel = ({
         },
       });
       await refetch();
+      const folderCountText = autoCreate
+        ? 'Google Drive folder'
+        : `${clientRootFolders.length} main Google Drive folder${clientRootFolders.length === 1 ? '' : 's'}`;
       setFeedback({
-        text: `Updated Google Drive folder mapping for ${client?.name ?? 'client'} (month starts on day ${clampedDay}).`,
+        text: `Saved ${folderCountText} for ${client?.name ?? 'client'} (month starts on day ${clampedDay}).`,
       });
     } catch (error) {
       setFeedback({
@@ -738,21 +917,18 @@ export const DeliveryDriveSettingsPanel = ({
           </StyledGrid>
 
           <StyledCard>
-            <StyledTitle>Client Folder Bindings &amp; Month Cycle</StyledTitle>
+            <StyledTitle>
+              Client Main Folder Bindings &amp; Month Cycle
+            </StyledTitle>
+            <StyledSubtext>
+              Link one or more main Google Drive folders per client (e.g. Reels,
+              Paid Ads, UGC). The default folder is used automatically, and team
+              members can switch between any linked main folder inside AI
+              Studio.
+            </StyledSubtext>
             <StyledRow>
               <StyledSelect
-                onChange={(e) => {
-                  const id = e.target.value;
-                  setSelectedClientId(id);
-                  const existing = mappingsByCompanyId.get(id);
-                  setClientFolderId(existing?.rootFolderId ?? '');
-                  setClientFolderName(existing?.rootFolderName ?? '');
-                  setClientFolderWebUrl(existing?.rootFolderWebUrl ?? null);
-                  setClientMonthStartDay(String(existing?.monthStartDay ?? 1));
-                  setClientPatternOverride(
-                    existing?.monthFolderPatternOverride ?? '',
-                  );
-                }}
+                onChange={(e) => loadClientDraft(e.target.value)}
                 value={selectedClientId}
               >
                 <option value="">Select client...</option>
@@ -762,7 +938,9 @@ export const DeliveryDriveSettingsPanel = ({
                   </option>
                 ))}
               </StyledSelect>
-              <StyledLabel style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <StyledLabel
+                style={{ flexDirection: 'row', alignItems: 'center' }}
+              >
                 Month starts day
                 <StyledInput
                   max={31}
@@ -780,33 +958,105 @@ export const DeliveryDriveSettingsPanel = ({
               />
             </StyledRow>
 
+            {selectedClientId && clientRootFolders.length > 0 && (
+              <StyledRootFolderList>
+                {clientRootFolders.map((folder) => (
+                  <StyledRootFolderItem
+                    key={folder.id}
+                    $isDefault={folder.isDefault}
+                  >
+                    <StyledRootFolderMeta>
+                      <div
+                        style={{
+                          alignItems: 'center',
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          gap: 8,
+                        }}
+                      >
+                        <strong>
+                          {folder.isDefault ? '★' : '📁'}{' '}
+                          {folder.name || folder.id}
+                        </strong>
+                        <StyledLink
+                          href={
+                            folder.webViewLink ||
+                            `https://drive.google.com/drive/folders/${folder.id}`
+                          }
+                          rel="noreferrer"
+                          target="_blank"
+                        >
+                          Open ↗
+                        </StyledLink>
+                      </div>
+                      <StyledRow>
+                        {folder.isDefault ? (
+                          <StyledBadge $tone="ok">Default</StyledBadge>
+                        ) : (
+                          <StyledButton
+                            type="button"
+                            onClick={() =>
+                              handleSetClientDefaultFolder(folder.id)
+                            }
+                          >
+                            Set Default
+                          </StyledButton>
+                        )}
+                        <StyledButton
+                          $variant="danger"
+                          type="button"
+                          onClick={() =>
+                            handleRemoveClientRootFolder(folder.id)
+                          }
+                        >
+                          Remove
+                        </StyledButton>
+                      </StyledRow>
+                    </StyledRootFolderMeta>
+                    <StyledRootLabelInput
+                      type="text"
+                      maxLength={80}
+                      placeholder="Optional label (e.g. Reels, Paid Ads, UGC, Raw Footage)"
+                      value={folder.label}
+                      onChange={(e) =>
+                        handleUpdateClientFolderLabel(folder.id, e.target.value)
+                      }
+                    />
+                  </StyledRootFolderItem>
+                ))}
+              </StyledRootFolderList>
+            )}
+
             {selectedClientId && (
               <DeliveryDriveFolderPicker
-                selectedFolderId={clientFolderId}
-                selectedFolderName={clientFolderName}
-                selectedFolderWebUrl={clientFolderWebUrl}
-                placeholder="Search & pick an existing Drive folder for this client…"
-                onSelect={(folder) => {
-                  setClientFolderId(folder.id);
-                  setClientFolderName(folder.name);
-                  setClientFolderWebUrl(folder.webViewLink);
-                }}
-                onClear={() => {
-                  setClientFolderId('');
-                  setClientFolderName('');
-                  setClientFolderWebUrl(null);
-                }}
+                selectedFolderIds={clientRootFolders.map((f) => f.id)}
+                selectLabel="+ Add"
+                selectedLabel="✓ Added"
+                placeholder={
+                  clientRootFolders.length > 0
+                    ? 'Search Google Drive to add another main folder for this client…'
+                    : 'Search & add one or more main Drive folders for this client…'
+                }
+                onSelect={handleAddClientRootFolder}
               />
             )}
 
             <StyledRow>
               <StyledButton
                 $variant="primary"
-                disabled={bindingClient || !selectedClientId || !clientFolderId}
+                disabled={
+                  bindingClient ||
+                  !selectedClientId ||
+                  clientRootFolders.length === 0
+                }
                 onClick={() => handleBindClient(false)}
                 type="button"
               >
-                {bindingClient ? 'Saving…' : 'Save Client Folder & Cycle'}
+                {bindingClient
+                  ? 'Saving…'
+                  : clientRootFolders.length > 1
+                    ? `Save ${clientRootFolders.length} Folders & Cycle`
+                    : 'Save Client Folder & Cycle'}
               </StyledButton>
               <StyledButton
                 disabled={bindingClient || !selectedClientId}
@@ -819,32 +1069,62 @@ export const DeliveryDriveSettingsPanel = ({
 
             {(config.clientMappings ?? []).length > 0 && (
               <StyledClientList>
-                {config.clientMappings.map((mapping) => (
-                  <StyledClientRow key={mapping.companyId}>
-                    <div>
-                      <strong>
-                        {mapping.companyName || mapping.companyId.slice(0, 8)}
-                      </strong>
-                      <StyledSubtext>
-                        📁 {mapping.rootFolderName} · Starts day{' '}
-                        <strong>{mapping.monthStartDay ?? 1}</strong>
-                        {mapping.activeCycleLabel
-                          ? ` (${mapping.activeCycleLabel})`
-                          : ''}{' '}
-                        · Target: <code>{mapping.monthFolderPreview}</code>
-                      </StyledSubtext>
-                    </div>
-                    {mapping.rootFolderWebUrl && (
-                      <StyledLink
-                        href={mapping.rootFolderWebUrl}
-                        rel="noreferrer"
-                        target="_blank"
+                {config.clientMappings.map((mapping) => {
+                  const roots =
+                    mapping.rootFolders && mapping.rootFolders.length > 0
+                      ? mapping.rootFolders
+                      : [
+                          {
+                            id: mapping.rootFolderId,
+                            name: mapping.rootFolderName,
+                            webViewLink: mapping.rootFolderWebUrl,
+                            label: null,
+                            isDefault: true,
+                          },
+                        ];
+                  return (
+                    <StyledClientRow key={mapping.companyId}>
+                      <div>
+                        <strong>
+                          {mapping.companyName || mapping.companyId.slice(0, 8)}
+                        </strong>
+                        <StyledSubtext>
+                          {roots.length}{' '}
+                          {roots.length === 1 ? 'main folder' : 'main folders'}{' '}
+                          · Starts day{' '}
+                          <strong>{mapping.monthStartDay ?? 1}</strong>
+                          {mapping.activeCycleLabel
+                            ? ` (${mapping.activeCycleLabel})`
+                            : ''}{' '}
+                          · Target: <code>{mapping.monthFolderPreview}</code>
+                        </StyledSubtext>
+                        <StyledFolderTags>
+                          {roots.map((rf) => (
+                            <StyledFolderTagLink
+                              key={rf.id}
+                              $isDefault={rf.isDefault}
+                              href={
+                                rf.webViewLink ||
+                                `https://drive.google.com/drive/folders/${rf.id}`
+                              }
+                              rel="noreferrer"
+                              target="_blank"
+                            >
+                              {rf.isDefault ? '★ ' : '📁 '}
+                              {rf.label ? `${rf.label}: ${rf.name}` : rf.name} ↗
+                            </StyledFolderTagLink>
+                          ))}
+                        </StyledFolderTags>
+                      </div>
+                      <StyledButton
+                        type="button"
+                        onClick={() => loadClientDraft(mapping.companyId)}
                       >
-                        Open in Drive ↗
-                      </StyledLink>
-                    )}
-                  </StyledClientRow>
-                ))}
+                        Edit Folders
+                      </StyledButton>
+                    </StyledClientRow>
+                  );
+                })}
               </StyledClientList>
             )}
           </StyledCard>

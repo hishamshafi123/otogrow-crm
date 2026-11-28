@@ -174,12 +174,21 @@ export type DriveFolderOption = {
   webViewLink: string | null;
 };
 
+export type ClientDriveRootFolderOption = {
+  id: string;
+  name: string;
+  webViewLink: string | null;
+  label?: string | null;
+  isDefault: boolean;
+};
+
 export type ClientDriveMappingSummary = {
   companyId: string;
   companyName: string | null;
   rootFolderId: string;
   rootFolderName: string;
   rootFolderWebUrl: string | null;
+  rootFolders?: ClientDriveRootFolderOption[];
   monthStartDay?: number;
   monthStartDaySource?: 'EXPLICIT' | 'BILLING_SCHEDULE' | 'DEFAULT';
   activeMonthKey?: string;

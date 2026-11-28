@@ -1,5 +1,6 @@
 import {
   assetKindForMime,
+  bindClientDriveFolderSchema,
   buildPortalSlug,
   formatDriveDeliverableFilename,
   formatDriveMonthFolder,
@@ -269,6 +270,35 @@ describe('delivery-deliverables.policy', () => {
           },
         )?.id,
       ).toBe('f-nov');
+    });
+  });
+
+  describe('bindClientDriveFolderSchema (multiple main folders)', () => {
+    it('accepts multiple labeled main folders with a default and enforces the 15-folder cap', () => {
+      const valid = bindClientDriveFolderSchema.safeParse({
+        companyId: '11111111-1111-4111-8111-111111111111',
+        companyName: 'Acme Apparel',
+        rootFolders: [
+          { id: 'folder-reels', name: 'Acme Reels', label: 'Reels', isDefault: true },
+          { id: 'folder-ads', name: 'Acme Paid Ads', label: 'Paid Ads', isDefault: false },
+          { id: 'folder-ugc', name: 'Acme UGC', label: null, isDefault: false },
+        ],
+        monthStartDay: 10,
+      });
+      expect(valid.success).toBe(true);
+      if (valid.success) {
+        expect(valid.data.rootFolders).toHaveLength(3);
+        expect(valid.data.rootFolders?.[0].label).toBe('Reels');
+      }
+
+      const tooMany = bindClientDriveFolderSchema.safeParse({
+        companyId: '11111111-1111-4111-8111-111111111111',
+        rootFolders: Array.from({ length: 16 }, (_, idx) => ({
+          id: `folder-${idx}`,
+          name: `Folder ${idx}`,
+        })),
+      });
+      expect(tooMany.success).toBe(false);
     });
   });
 });

@@ -317,12 +317,22 @@ export const DEFAULT_TEXT_HOOK_MASTER_PROMPT = [
   'Match the brand voice and any working example hooks provided. Avoid generic clichés and never invent fake statistics or guarantees.',
 ].join('\n');
 
+export type StudioDriveRootFolderDTO = {
+  id: string;
+  name: string;
+  webViewLink: string | null;
+  label?: string | null;
+  isDefault: boolean;
+};
+
 export type StudioDriveFoldersResponseDTO = {
   connected: boolean;
   clientMapped?: boolean;
   rootFolderId: string | null;
   rootFolderName: string | null;
   rootFolderWebUrl?: string | null;
+  selectedRootFolderId?: string | null;
+  rootFolders?: StudioDriveRootFolderDTO[];
   monthStartDay?: number;
   monthStartDaySource?: 'EXPLICIT' | 'BILLING_SCHEDULE' | 'DEFAULT';
   activeMonthKey?: string;

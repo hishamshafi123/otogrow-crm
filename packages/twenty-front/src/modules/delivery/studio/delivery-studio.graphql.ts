@@ -48,6 +48,12 @@ export const ARCHIVE_DELIVERY_STUDIO_REFERENCE_VIDEO = gql`
   }
 `;
 
+export const TRIM_DELIVERY_STUDIO_REFERENCE_VIDEO = gql`
+  mutation TrimDeliveryStudioReferenceVideo($input: JSON!) {
+    trimDeliveryStudioReferenceVideo(input: $input)
+  }
+`;
+
 export const UPSERT_DELIVERY_STUDIO_PRODUCT_KIT = gql`
   mutation UpsertDeliveryStudioProductKit($input: JSON!) {
     upsertDeliveryStudioProductKit(input: $input)
@@ -130,8 +136,16 @@ export const RENDER_DELIVERY_STUDIO_VIDEO_HOOKS = gql`
 `;
 
 export const GET_DELIVERY_STUDIO_CLIENT_DRIVE_FOLDERS = gql`
-  query DeliveryStudioClientDriveFolders($companyId: String!, $search: String) {
-    deliveryStudioClientDriveFolders(companyId: $companyId, search: $search)
+  query DeliveryStudioClientDriveFolders(
+    $companyId: String!
+    $search: String
+    $rootFolderId: String
+  ) {
+    deliveryStudioClientDriveFolders(
+      companyId: $companyId
+      search: $search
+      rootFolderId: $rootFolderId
+    )
   }
 `;
 

@@ -12,8 +12,53 @@ import {
 } from 'src/engine/metadata-modules/ai/ai-models/services/ai-model-registry.service';
 import { DeliveryHookRenderAdapter } from 'src/modules/delivery/deliverables/delivery-hook-render.adapter';
 
-const MAX_INLINE_IMAGE_BYTES = 10 * 1024 * 1024;
-const MAX_DIRECT_VIDEO_FALLBACK_BYTES = 18 * 1024 * 1024;
+const MAX_INLINE_IMAGE_BYTES = 4 * 1024 * 1024;
+const IMAGE_DOWNSCALE_THRESHOLD_BYTES = 600 * 1024;
+const MAX_DIRECT_VIDEO_FALLBACK_BYTES = 4 * 1024 * 1024;
+const MAX_VIDEO_PROXY_BYTES = 5 * 1024 * 1024;
+const MAX_TOTAL_INLINE_BYTES = 7 * 1024 * 1024;
+
+type SharpPipeline = {
+  rotate: () => SharpPipeline;
+  resize: (opts: {
+    width: number;
+    height: number;
+    fit: 'inside';
+    withoutEnlargement: boolean;
+  }) => SharpPipeline;
+  jpeg: (opts: { quality: number; mozjpeg?: boolean }) => SharpPipeline;
+  toBuffer: () => Promise<Buffer>;
+};
+type SharpFactory = (input: Buffer) => SharpPipeline;
+
+const compactImageForGemini = async (
+  bytes: Buffer,
+  mimeType: string,
+): Promise<{ bytes: Buffer; mimeType: string }> => {
+  if (bytes.length <= IMAGE_DOWNSCALE_THRESHOLD_BYTES) {
+    return { bytes, mimeType };
+  }
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const sharp = require('sharp') as SharpFactory;
+    const resized = await sharp(bytes)
+      .rotate()
+      .resize({
+        width: 1024,
+        height: 1024,
+        fit: 'inside',
+        withoutEnlargement: true,
+      })
+      .jpeg({ quality: 82 })
+      .toBuffer();
+    if (resized.length > 0 && resized.length < bytes.length) {
+      return { bytes: resized, mimeType: 'image/jpeg' };
+    }
+  } catch {
+    // Fall back to original image bytes when sharp is unavailable
+  }
+  return { bytes, mimeType };
+};
 
 export type StudioPromptImageInput = {
   token: string;
@@ -28,7 +73,8 @@ export type StudioPromptVideoInput = {
   label: string;
   mimeType: string;
   durationSec?: number | null;
-  bytes: Buffer;
+  filePath?: string;
+  bytes?: Buffer;
 };
 
 export type StudioGeneratedVideoPromptResult = {
@@ -155,10 +201,10 @@ export class DeliveryStudioPromptAiService {
       );
       if (googleModels.length > 0) {
         const picked =
-          googleModels.find((m) => /gemini-2\.5-pro/i.test(m.modelId)) ??
           googleModels.find((m) => /gemini-2\.5-flash/i.test(m.modelId)) ??
           googleModels.find((m) => /gemini-2\.0-flash/i.test(m.modelId)) ??
-          googleModels.find((m) => /pro|flash/i.test(m.modelId)) ??
+          googleModels.find((m) => /gemini-2\.5-pro/i.test(m.modelId)) ??
+          googleModels.find((m) => /flash|pro/i.test(m.modelId)) ??
           googleModels[0];
         if (picked) {
           return {
@@ -294,32 +340,75 @@ export class DeliveryStudioPromptAiService {
       path.join(os.tmpdir(), 'otogrow-studio-prompt-ai-'),
     );
     try {
-      // Prepare lightweight video proxy (480p 15fps, full duration up to 60s)
+      // Use streamed source filePath directly when provided (avoids buffering huge videos in RAM)
       const rawExt =
         params.video.mimeType === 'video/quicktime'
           ? 'mov'
           : params.video.mimeType === 'video/webm'
             ? 'webm'
             : 'mp4';
-      const rawVideoPath = path.join(tempDir, `ref.${rawExt}`);
-      const proxyPath = path.join(tempDir, 'proxy.mp4');
-      await fs.writeFile(rawVideoPath, params.video.bytes);
+      let rawVideoPath = params.video.filePath ?? '';
+      if (!rawVideoPath) {
+        if (!params.video.bytes || params.video.bytes.length === 0) {
+          throw new Error('Reference video bytes were unavailable for analysis.');
+        }
+        rawVideoPath = path.join(tempDir, `ref.${rawExt}`);
+        await fs.writeFile(rawVideoPath, params.video.bytes);
+      }
 
+      const proxyPath = path.join(tempDir, 'proxy.mp4');
       let videoBytesForGemini: Buffer | null = null;
       let videoMimeForGemini = 'video/mp4';
+      let fallbackKeyframes: Array<{
+        label: string;
+        bytes: Buffer;
+        mimeType: 'image/jpeg';
+      }> = [];
+
       try {
         videoBytesForGemini =
           await this.renderAdapter.prepareLightweightAnalysisProxy(
             rawVideoPath,
             proxyPath,
+            {
+              includeAudio: false,
+              maxDurationSec: 25,
+              maxDimension: 360,
+              fps: 8,
+              maxBytes: MAX_VIDEO_PROXY_BYTES,
+              timeoutMs: 25_000,
+            },
           );
       } catch (proxyError) {
         this.logger.warn(
-          `Video proxy transcode failed; checking direct upload fallback: ${proxyError instanceof Error ? proxyError.message : String(proxyError)}`,
+          `Video proxy transcode failed; checking lightweight fallback: ${proxyError instanceof Error ? proxyError.message : String(proxyError)}`,
         );
-        if (params.video.bytes.length <= MAX_DIRECT_VIDEO_FALLBACK_BYTES) {
-          videoBytesForGemini = params.video.bytes;
+        const rawStat = await fs.stat(rawVideoPath).catch(() => null);
+        if (
+          rawStat &&
+          rawStat.size > 0 &&
+          rawStat.size <= MAX_DIRECT_VIDEO_FALLBACK_BYTES
+        ) {
+          videoBytesForGemini = await fs.readFile(rawVideoPath);
           videoMimeForGemini = params.video.mimeType || 'video/mp4';
+        } else {
+          try {
+            const keyframesDir = path.join(tempDir, 'keyframes');
+            await fs.mkdir(keyframesDir, { recursive: true });
+            fallbackKeyframes =
+              await this.renderAdapter.extractAnalysisKeyframes(
+                rawVideoPath,
+                keyframesDir,
+                {
+                  maxFrames: 6,
+                  durationSec: params.video.durationSec,
+                },
+              );
+          } catch (keyframeError) {
+            this.logger.warn(
+              `Keyframe extraction fallback also failed: ${keyframeError instanceof Error ? keyframeError.message : String(keyframeError)}`,
+            );
+          }
         }
       }
 
@@ -329,17 +418,32 @@ export class DeliveryStudioPromptAiService {
         | { type: 'file'; data: Buffer; mediaType: string }
       > = [];
 
-      // Attach every reference image with its exact token label so Gemini never mixes indices
+      let inlineBytesBudget = MAX_TOTAL_INLINE_BYTES;
+      if (videoBytesForGemini) {
+        inlineBytesBudget = Math.max(
+          1024 * 1024,
+          inlineBytesBudget - videoBytesForGemini.length,
+        );
+      }
+
+      // Attach every reference image (downscaled when large) with its exact token label
       for (const img of params.images) {
-        if (img.bytes.length > MAX_INLINE_IMAGE_BYTES) continue;
+        const compacted = await compactImageForGemini(img.bytes, img.mimeType);
+        if (
+          compacted.bytes.length > MAX_INLINE_IMAGE_BYTES ||
+          compacted.bytes.length > inlineBytesBudget
+        ) {
+          continue;
+        }
+        inlineBytesBudget -= compacted.bytes.length;
         contentParts.push({
           type: 'text',
           text: `Reference ${img.token} (Role: ${img.role}, Label: "${img.label}"):`,
         });
         contentParts.push({
           type: 'image',
-          image: img.bytes,
-          mediaType: img.mimeType,
+          image: compacted.bytes,
+          mediaType: compacted.mimeType,
         });
       }
 
@@ -353,6 +457,24 @@ export class DeliveryStudioPromptAiService {
           data: videoBytesForGemini,
           mediaType: videoMimeForGemini,
         });
+      } else if (fallbackKeyframes.length > 0) {
+        contentParts.push({
+          type: 'text',
+          text: `Reference ${params.video.token} (Role: REFERENCE_VIDEO, Title: "${params.video.label}", Duration: ${params.video.durationSec ? `${params.video.durationSec.toFixed(1)}s` : 'unknown'} — sampled sequentially as ${fallbackKeyframes.length} keyframes):`,
+        });
+        for (const frame of fallbackKeyframes) {
+          if (frame.bytes.length > inlineBytesBudget) break;
+          inlineBytesBudget -= frame.bytes.length;
+          contentParts.push({
+            type: 'text',
+            text: `${params.video.token} ${frame.label}:`,
+          });
+          contentParts.push({
+            type: 'image',
+            image: frame.bytes,
+            mediaType: frame.mimeType,
+          });
+        }
       }
 
       const tokenMappingSummary = [
@@ -468,8 +590,8 @@ export class DeliveryStudioPromptAiService {
           },
         ],
         maxOutputTokens: 1200,
-        maxRetries: 1,
-        abortSignal: AbortSignal.timeout(90_000),
+        maxRetries: 0,
+        abortSignal: AbortSignal.timeout(35_000),
       });
 
       const generated = response.text.trim();
@@ -478,7 +600,7 @@ export class DeliveryStudioPromptAiService {
           prompt: generated,
           source: 'GEMINI',
           modelId: gemini.modelId,
-          summary: `Analyzed ${params.images.length} image${params.images.length === 1 ? '' : 's'} + reference video with ${gemini.modelId}.`,
+          summary: `Analyzed ${params.images.length} image${params.images.length === 1 ? '' : 's'} + ${videoBytesForGemini ? 'reference video' : fallbackKeyframes.length > 0 ? `${fallbackKeyframes.length} video keyframes` : 'reference metadata'} with ${gemini.modelId}.`,
         };
       }
 

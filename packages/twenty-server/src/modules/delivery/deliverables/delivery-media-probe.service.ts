@@ -298,6 +298,8 @@ export class DeliveryMediaProbeService {
           '-hide_banner',
           '-loglevel',
           'error',
+          '-threads',
+          '1',
           '-ss',
           seekSec.toFixed(2),
           '-i',
@@ -344,6 +346,8 @@ export class DeliveryMediaProbeService {
           '-hide_banner',
           '-loglevel',
           'error',
+          '-threads',
+          '2',
           '-ss',
           safeStart.toFixed(3),
           '-i',
@@ -413,7 +417,14 @@ export class DeliveryMediaProbeService {
         : 30;
     const hasAnyAudio = clips.some((c) => c.hasAudio && !c.muted);
 
-    const args: string[] = ['-y', '-hide_banner', '-loglevel', 'error'];
+    const args: string[] = [
+      '-y',
+      '-hide_banner',
+      '-loglevel',
+      'error',
+      '-threads',
+      '2',
+    ];
     const filterParts: string[] = [];
     const concatInputs: string[] = [];
 

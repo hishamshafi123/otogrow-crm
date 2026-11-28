@@ -86,6 +86,7 @@ import {
   saveStudioVideoToDriveSchema,
   signStudioMediaToken,
   suggestHooksForStudioAssetSchema,
+  trimReferenceVideoSchema,
   updateProductAssetsSchema,
   upsertProductKitSchema,
   upsertStudioPresetSchema,
@@ -139,6 +140,17 @@ const readStreamToBuffer = async (stream: Readable): Promise<Buffer> => {
     chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as Uint8Array));
   }
   return Buffer.concat(chunks);
+};
+
+const hashFileSha256 = async (filePath: string): Promise<string> => {
+  const hash = createHash('sha256');
+  await new Promise<void>((resolve, reject) => {
+    const stream = createReadStream(filePath);
+    stream.on('data', (chunk) => hash.update(chunk));
+    stream.on('error', reject);
+    stream.on('end', () => resolve());
+  });
+  return hash.digest('hex');
 };
 
 const isFreshStagedUrl = (
@@ -371,6 +383,7 @@ export class DeliveryStudioService {
       | 'preset-thumb',
     id: string,
     subId?: string,
+    cacheVersion?: string | null,
   ): string {
     const secret = this.twentyConfig.get('APP_SECRET') || '';
     const token = signStudioMediaToken(secret, {
@@ -380,9 +393,12 @@ export class DeliveryStudioService {
       ...(subId ? { subId } : {}),
     });
     const base = `/delivery-studio/media/${kind}/${encodeURIComponent(id)}`;
+    const versionSuffix = cacheVersion
+      ? `&v=${encodeURIComponent(cacheVersion)}`
+      : '';
     return subId
-      ? `${base}/${encodeURIComponent(subId)}?token=${encodeURIComponent(token)}`
-      : `${base}?token=${encodeURIComponent(token)}`;
+      ? `${base}/${encodeURIComponent(subId)}?token=${encodeURIComponent(token)}${versionSuffix}`
+      : `${base}?token=${encodeURIComponent(token)}${versionSuffix}`;
   }
 
   private readDecryptedGeminiKeyFromConfig(
@@ -449,6 +465,7 @@ export class DeliveryStudioService {
     row: DeliveryStudioReferenceVideoEntity,
     usageCounts?: { totalCount: number; clientCount: number },
   ) {
+    const versionTag = row.sha256 ? row.sha256.slice(0, 12) : undefined;
     return {
       id: row.id,
       companyId: row.companyId,
@@ -460,9 +477,21 @@ export class DeliveryStudioService {
       mimeType: row.mimeType,
       sizeBytes: Number(row.sizeBytes ?? 0),
       mediaMeta: row.mediaMeta ?? {},
-      streamPath: this.signedMediaPath(row.workspaceId, 'ref-video', row.id),
+      streamPath: this.signedMediaPath(
+        row.workspaceId,
+        'ref-video',
+        row.id,
+        undefined,
+        versionTag,
+      ),
       thumbnailPath: row.thumbnailKey
-        ? this.signedMediaPath(row.workspaceId, 'ref-thumb', row.id)
+        ? this.signedMediaPath(
+            row.workspaceId,
+            'ref-thumb',
+            row.id,
+            undefined,
+            versionTag,
+          )
         : null,
       usageCount: usageCounts?.totalCount ?? 0,
       clientUsageCount: usageCounts?.clientCount ?? 0,
@@ -1515,8 +1544,7 @@ export class DeliveryStudioService {
         probedMeta = await this.probe.probeMedia(effectiveFilePath);
       }
 
-      const bytes = await fs.readFile(effectiveFilePath);
-      sha256 = createHash('sha256').update(bytes).digest('hex');
+      sha256 = await hashFileSha256(effectiveFilePath);
 
       const fallbackDuration = trimRange?.shouldTrim
         ? Math.round(trimRange.durationSec * 100) / 100
@@ -1621,8 +1649,7 @@ export class DeliveryStudioService {
     const storageKey = `delivery-studio/${id.workspaceId}/assets/${assetId}.${ext}`;
     const thumbKey = `delivery-studio/${id.workspaceId}/assets/${assetId}-thumb.jpg`;
 
-    const bytes = await fs.readFile(input.tempFilePath);
-    const sha256 = createHash('sha256').update(bytes).digest('hex');
+    const sha256 = await hashFileSha256(input.tempFilePath);
     const probedMeta = await this.probe.probeMedia(input.tempFilePath);
     const mediaMeta: DeliverableMediaMeta = {
       ...probedMeta,
@@ -1947,8 +1974,7 @@ export class DeliveryStudioService {
 
       const outputStats = await fs.stat(outputMp4Path);
       outputSizeBytes = outputStats.size;
-      const bytes = await fs.readFile(outputMp4Path);
-      sha256 = createHash('sha256').update(bytes).digest('hex');
+      sha256 = await hashFileSha256(outputMp4Path);
       outputMeta = await this.probe.probeMedia(outputMp4Path);
       hasThumb = await this.probe.extractVideoThumbnail(
         outputMp4Path,
@@ -2064,6 +2090,192 @@ export class DeliveryStudioService {
       await repo.save(row);
     });
     return { archived: true, id: refVideoId };
+  }
+
+  async trimReferenceVideo(auth: WorkspaceAuthContext, rawInput: unknown) {
+    const parsed = trimReferenceVideoSchema.safeParse(rawInput);
+    if (!parsed.success) {
+      throw new BadRequestException(
+        parsed.error.issues[0]?.message ?? 'Invalid reference video trim request.',
+      );
+    }
+    const input = parsed.data;
+    const id = this.identity(auth);
+
+    const existing = await this.dataSource.transaction(async (manager) => {
+      await this.resolveActor(manager, id);
+      return manager.getRepository(DeliveryStudioReferenceVideoEntity).findOne({
+        where: {
+          id: input.referenceVideoId,
+          workspaceId: id.workspaceId,
+          archived: false,
+        },
+      });
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Reference video not found.');
+    }
+
+    const workDir = await fs.mkdtemp(
+      path.join(os.tmpdir(), `studio-ref-retrim-${existing.id}-`),
+    );
+    const driver = this.storage.getCurrentDriver();
+    const saveAsCopy = Boolean(input.saveAsCopy);
+    const targetId = saveAsCopy ? v4() : existing.id;
+    const suffix = Date.now();
+    const newStorageKey = `delivery-studio/${id.workspaceId}/ref-videos/${targetId}-${suffix}.mp4`;
+    const newThumbKey = `delivery-studio/${id.workspaceId}/ref-videos/${targetId}-${suffix}-thumb.jpg`;
+
+    let outputSizeBytes = 0;
+    let sha256 = '';
+    let mediaMeta: DeliverableMediaMeta = existing.mediaMeta ?? {};
+    let hasThumb = false;
+    let didTrim = false;
+
+    try {
+      const ext = extensionForMime(existing.mimeType);
+      const localInputPath = path.join(workDir, `source.${ext}`);
+      const trimmedPath = path.join(workDir, 'trimmed.mp4');
+      const tempThumbPath = path.join(workDir, 'thumb.jpg');
+
+      const sourceStream = await driver.readFile({
+        filePath: existing.storageKey,
+      });
+      await pipeline(sourceStream, createWriteStream(localInputPath));
+
+      const probed = await this.probe.probeMedia(localInputPath);
+      const originalDurationSec =
+        typeof probed.durationSec === 'number' &&
+        Number.isFinite(probed.durationSec) &&
+        probed.durationSec > 0
+          ? probed.durationSec
+          : typeof existing.mediaMeta?.durationSec === 'number' &&
+              Number.isFinite(existing.mediaMeta.durationSec) &&
+              existing.mediaMeta.durationSec > 0
+            ? existing.mediaMeta.durationSec
+            : undefined;
+
+      const trimRange = normalizeTrimRange({
+        trimStartSec: input.trimStartSec,
+        trimEndSec: input.trimEndSec,
+        originalDurationSec,
+      });
+
+      if (!trimRange || trimRange.durationSec < 0.25) {
+        throw new BadRequestException(
+          'Selected trim range must be at least 0.3 seconds long.',
+        );
+      }
+
+      if (trimRange.shouldTrim || saveAsCopy) {
+        try {
+          await this.probe.trimVideo(
+            localInputPath,
+            trimmedPath,
+            trimRange.startSec,
+            trimRange.durationSec,
+          );
+        } catch (error) {
+          throw new BadRequestException(
+            `Could not trim reference video: ${(error as Error).message}`,
+          );
+        }
+        const trimmedStats = await fs.stat(trimmedPath);
+        outputSizeBytes = trimmedStats.size;
+        sha256 = await hashFileSha256(trimmedPath);
+        const trimmedMeta = await this.probe.probeMedia(trimmedPath);
+        mediaMeta = {
+          ...trimmedMeta,
+          ...(!trimmedMeta.durationSec
+            ? { durationSec: Math.round(trimRange.durationSec * 100) / 100 }
+            : {}),
+        };
+        hasThumb = await this.probe.extractVideoThumbnail(
+          trimmedPath,
+          tempThumbPath,
+          mediaMeta.durationSec,
+        );
+
+        await driver.writeFileStream({
+          filePath: newStorageKey,
+          stream: createReadStream(trimmedPath),
+          mimeType: 'video/mp4',
+        });
+        if (hasThumb) {
+          await driver.writeFileStream({
+            filePath: newThumbKey,
+            stream: createReadStream(tempThumbPath),
+            mimeType: 'image/jpeg',
+          });
+        }
+        didTrim = true;
+      }
+    } finally {
+      await fs
+        .rm(workDir, { recursive: true, force: true })
+        .catch(() => undefined);
+    }
+
+    const saved = await this.dataSource.transaction(async (manager) => {
+      await this.resolveActor(manager, id);
+      const repo = manager.getRepository(DeliveryStudioReferenceVideoEntity);
+
+      if (saveAsCopy) {
+        const defaultCopyTitle = `${existing.title} (Trimmed)`.slice(0, 180);
+        return repo.save(
+          repo.create({
+            id: targetId,
+            workspaceId: id.workspaceId,
+            companyId: existing.companyId,
+            projectId: existing.projectId,
+            title: input.title?.trim().slice(0, 180) || defaultCopyTitle,
+            notes:
+              input.notes !== undefined
+                ? input.notes.trim().slice(0, 2000)
+                : existing.notes,
+            tagsJson: existing.tagsJson ?? [],
+            storageKey: newStorageKey,
+            thumbnailKey: hasThumb ? newThumbKey : existing.thumbnailKey,
+            originalFileName: existing.originalFileName,
+            mimeType: 'video/mp4',
+            sizeBytes: String(outputSizeBytes),
+            sha256,
+            mediaMeta,
+            stagedUrlsJson: {},
+            archived: false,
+            createdById: id.memberId,
+          }),
+        );
+      }
+
+      const row = await repo.findOne({
+        where: { id: existing.id, workspaceId: id.workspaceId },
+      });
+      if (!row) {
+        throw new NotFoundException('Reference video not found.');
+      }
+
+      if (input.title !== undefined) {
+        row.title = input.title.trim().slice(0, 180) || row.title;
+      }
+      if (input.notes !== undefined) {
+        row.notes = input.notes.trim().slice(0, 2000);
+      }
+      if (didTrim) {
+        row.storageKey = newStorageKey;
+        row.thumbnailKey = hasThumb ? newThumbKey : row.thumbnailKey;
+        row.mimeType = 'video/mp4';
+        row.sizeBytes = String(outputSizeBytes);
+        row.sha256 = sha256;
+        row.mediaMeta = mediaMeta;
+        // Clear cached provider URLs so AI video models upload the newly trimmed clip
+        row.stagedUrlsJson = {};
+      }
+      return repo.save(row);
+    });
+
+    return this.mapReferenceVideo(saved);
   }
 
   async upsertProductKit(auth: WorkspaceAuthContext, rawInput: unknown) {
@@ -2785,16 +2997,22 @@ export class DeliveryStudioService {
     const driver = this.storage.getCurrentDriver();
     const images: StudioPromptImageInput[] = [];
     if (loaded.characterAsset) {
-      const bytes = await readStreamToBuffer(
-        await driver.readFile({ filePath: loaded.characterAsset.storageKey }),
-      );
-      images.push({
-        token: `${imgPrefix}1`,
-        role: 'CHARACTER_SHEET',
-        label: loaded.characterAsset.title || 'Character Sheet',
-        mimeType: loaded.characterAsset.mimeType,
-        bytes,
-      });
+      try {
+        const bytes = await readStreamToBuffer(
+          await driver.readFile({ filePath: loaded.characterAsset.storageKey }),
+        );
+        images.push({
+          token: `${imgPrefix}1`,
+          role: 'CHARACTER_SHEET',
+          label: loaded.characterAsset.title || 'Character Sheet',
+          mimeType: loaded.characterAsset.mimeType,
+          bytes,
+        });
+      } catch (err) {
+        this.logger.warn(
+          `Skipped unreadable character sheet ${loaded.characterAsset.id} during Gemini prompt analysis: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
     }
 
     for (const item of plannedKitAssets) {
@@ -2817,36 +3035,86 @@ export class DeliveryStudioService {
       }
     }
 
-    const videoBytes = await readStreamToBuffer(
-      await driver.readFile({ filePath: loaded.refVideo.storageKey }),
+    const workDir = await fs.mkdtemp(
+      path.join(os.tmpdir(), 'otogrow-studio-analyze-'),
     );
+    try {
+      const rawExt = extensionForMime(loaded.refVideo.mimeType);
+      const rawVideoPath = path.join(workDir, `ref.${rawExt}`);
+      let streamedVideoPath: string | undefined;
+      try {
+        const videoStream = await driver.readFile({
+          filePath: loaded.refVideo.storageKey,
+        });
+        await pipeline(videoStream, createWriteStream(rawVideoPath));
+        streamedVideoPath = rawVideoPath;
+      } catch (err) {
+        this.logger.warn(
+          `Could not read reference video ${loaded.refVideo.id} for Gemini prompt analysis: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
 
-    const generated = await this.promptAi.generateVideoPromptFromMedia({
-      usesAtMentionTokens: usesAtTokens,
-      images,
-      video: {
-        token: `${vidPrefix}1`,
-        label:
-          loaded.refVideo.title ||
-          loaded.refVideo.originalFileName ||
-          'Reference Video',
-        mimeType: loaded.refVideo.mimeType,
-        durationSec: loaded.refVideo.mediaMeta?.durationSec ?? null,
-        bytes: videoBytes,
-      },
-      productName,
-      productNotes: loaded.productKit?.notes || '',
-      environmentPrompt: loaded.resolvedEnvironmentPrompt,
-      brandNotes: loaded.brandNotes,
-      customNotes: input.customNotes?.trim() || '',
-      overrideApiKey: loaded.overrideGeminiApiKey,
-    });
+      if (!streamedVideoPath) {
+        const charToken = loaded.characterAsset ? `${imgPrefix}1` : null;
+        const prodStart = loaded.characterAsset ? 2 : 1;
+        const prompt = buildStructuredFallbackVideoPrompt({
+          usesAtMentionTokens: usesAtTokens,
+          characterToken: charToken,
+          productTokens: plannedKitAssets.map((item, idx) => ({
+            token: `${imgPrefix}${prodStart + idx}`,
+            label: item.label || item.role || `Product Image ${idx + 1}`,
+          })),
+          videoToken: `${vidPrefix}1`,
+          productName,
+          productNotes: loaded.productKit?.notes || '',
+          environmentPrompt: loaded.resolvedEnvironmentPrompt,
+          brandNotes: loaded.brandNotes,
+          customNotes: input.customNotes?.trim() || '',
+        });
+        return {
+          prompt,
+          source: 'FALLBACK' as const,
+          modelId: null,
+          summary:
+            'Reference video file could not be read from storage; used structured recreation template.',
+          analyzedImageCount: images.length,
+          referenceVideoDurationSec:
+            loaded.refVideo.mediaMeta?.durationSec ?? null,
+        };
+      }
 
-    return {
-      ...generated,
-      analyzedImageCount: images.length,
-      referenceVideoDurationSec: loaded.refVideo.mediaMeta?.durationSec ?? null,
-    };
+      const generated = await this.promptAi.generateVideoPromptFromMedia({
+        usesAtMentionTokens: usesAtTokens,
+        images,
+        video: {
+          token: `${vidPrefix}1`,
+          label:
+            loaded.refVideo.title ||
+            loaded.refVideo.originalFileName ||
+            'Reference Video',
+          mimeType: loaded.refVideo.mimeType,
+          durationSec: loaded.refVideo.mediaMeta?.durationSec ?? null,
+          filePath: streamedVideoPath,
+        },
+        productName,
+        productNotes: loaded.productKit?.notes || '',
+        environmentPrompt: loaded.resolvedEnvironmentPrompt,
+        brandNotes: loaded.brandNotes,
+        customNotes: input.customNotes?.trim() || '',
+        overrideApiKey: loaded.overrideGeminiApiKey,
+      });
+
+      return {
+        ...generated,
+        analyzedImageCount: images.length,
+        referenceVideoDurationSec:
+          loaded.refVideo.mediaMeta?.durationSec ?? null,
+      };
+    } finally {
+      await fs
+        .rm(workDir, { recursive: true, force: true })
+        .catch(() => undefined);
+    }
   }
 
   async queueVideoGeneration(auth: WorkspaceAuthContext, rawInput: unknown) {
@@ -3413,6 +3681,7 @@ export class DeliveryStudioService {
     options?: {
       serviceKey?: string;
       monthKey?: string;
+      driveRootFolderId?: string | null;
       driveTargetFolderId?: string | null;
       driveSubfolderName?: string | null;
     },
@@ -3438,6 +3707,10 @@ export class DeliveryStudioService {
       options?.driveSubfolderName !== undefined
         ? options.driveSubfolderName?.trim() || undefined
         : metaProductName || undefined;
+    const resolvedRootFolderId =
+      options?.driveRootFolderId !== undefined
+        ? options.driveRootFolderId?.trim() || undefined
+        : undefined;
     const resolvedTargetFolderId =
       options?.driveTargetFolderId !== undefined
         ? options.driveTargetFolderId?.trim() || undefined
@@ -3445,6 +3718,7 @@ export class DeliveryStudioService {
 
     if (asset.deliverableId) {
       if (
+        options?.driveRootFolderId !== undefined ||
         options?.driveTargetFolderId !== undefined ||
         options?.driveSubfolderName !== undefined
       ) {
@@ -3457,6 +3731,9 @@ export class DeliveryStudioService {
         if (existingDeliv) {
           existingDeliv.mediaMeta = {
             ...(existingDeliv.mediaMeta ?? {}),
+            ...(options?.driveRootFolderId !== undefined
+              ? { driveRootFolderId: resolvedRootFolderId }
+              : {}),
             ...(options?.driveTargetFolderId !== undefined
               ? { driveTargetFolderId: resolvedTargetFolderId }
               : {}),
@@ -3502,6 +3779,9 @@ export class DeliveryStudioService {
         sizeBytes: Number(asset.sizeBytes ?? 0),
         mediaMeta: {
           ...(asset.mediaMeta ?? {}),
+          ...(resolvedRootFolderId
+            ? { driveRootFolderId: resolvedRootFolderId }
+            : {}),
           ...(resolvedTargetFolderId
             ? { driveTargetFolderId: resolvedTargetFolderId }
             : {}),
@@ -3524,6 +3804,7 @@ export class DeliveryStudioService {
     auth: WorkspaceAuthContext,
     companyId: string,
     search?: string | null,
+    rootFolderId?: string | null,
   ) {
     if (!isUuidString(companyId)) {
       throw new BadRequestException('Invalid client company ID.');
@@ -3536,6 +3817,14 @@ export class DeliveryStudioService {
         rootFolderId: null,
         rootFolderName: null,
         rootFolderWebUrl: null,
+        selectedRootFolderId: null,
+        rootFolders: [] as Array<{
+          id: string;
+          name: string;
+          webViewLink: string | null;
+          label?: string | null;
+          isDefault: boolean;
+        }>,
         monthStartDay: 1,
         monthStartDaySource: 'DEFAULT' as const,
         activeMonthKey: monthKey,
@@ -3554,7 +3843,12 @@ export class DeliveryStudioService {
         }>,
       };
     }
-    return this.driveService.listClientSubfolders(auth, companyId, search);
+    return this.driveService.listClientSubfolders(
+      auth,
+      companyId,
+      search,
+      rootFolderId,
+    );
   }
 
   async saveHookDefault(auth: WorkspaceAuthContext, rawInput: unknown) {
@@ -3629,6 +3923,7 @@ export class DeliveryStudioService {
       {
         serviceKey: input.serviceKey,
         monthKey: input.monthKey,
+        driveRootFolderId: input.driveRootFolderId ?? null,
         driveTargetFolderId: input.driveTargetFolderId ?? null,
         driveSubfolderName: input.driveSubfolderName ?? undefined,
       },
@@ -3798,6 +4093,7 @@ export class DeliveryStudioService {
       auth,
       input.assetId,
       {
+        driveRootFolderId: input.driveRootFolderId ?? undefined,
         driveTargetFolderId: input.driveTargetFolderId ?? undefined,
         driveSubfolderName: input.driveSubfolderName ?? undefined,
       },

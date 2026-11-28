@@ -269,6 +269,7 @@ export const renderSelectedHooksForStudioAssetSchema = z
       )
       .min(1)
       .max(12),
+    driveRootFolderId: z.string().trim().max(200).nullable().optional(),
     driveTargetFolderId: z.string().trim().max(200).nullable().optional(),
     driveSubfolderName: z.string().trim().max(120).nullable().optional(),
     saveAsClientDefault: z.boolean().optional(),
@@ -280,6 +281,7 @@ export const renderSelectedHooksForStudioAssetSchema = z
 export const saveStudioVideoToDriveSchema = z
   .object({
     assetId: z.string().uuid(),
+    driveRootFolderId: z.string().trim().max(200).nullable().optional(),
     driveTargetFolderId: z.string().trim().max(200).nullable().optional(),
     driveSubfolderName: z.string().trim().max(120).nullable().optional(),
     serviceKey: z.string().trim().min(1).max(100).optional(),
@@ -294,6 +296,17 @@ export const saveStudioHookDefaultSchema = z
     styleConfig: z.record(z.string(), z.unknown()),
     startSec: z.number().min(0).max(60).default(0),
     durationSec: z.number().min(0.5).max(30).default(3.5),
+  })
+  .strict();
+
+export const trimReferenceVideoSchema = z
+  .object({
+    referenceVideoId: z.string().uuid(),
+    trimStartSec: z.number().min(0).max(600),
+    trimEndSec: z.number().positive().max(600),
+    title: z.string().trim().min(1).max(180).optional(),
+    notes: z.string().trim().max(2000).optional(),
+    saveAsCopy: z.boolean().optional(),
   })
   .strict();
 

@@ -40,6 +40,7 @@ export type DeliverableMediaMeta = {
   colorTransfer?: string | null;
   colorPrimaries?: string | null;
   pixFmt?: string | null;
+  driveRootFolderId?: string | null;
   driveTargetFolderId?: string | null;
   driveSubfolderName?: string | null;
 };

@@ -91,6 +91,13 @@ export class DeliveryStudioResolver {
   }
 
   @Mutation(() => GraphQLJSON)
+  trimDeliveryStudioReferenceVideo(
+    @Args('input', { type: () => GraphQLJSON }) input: unknown,
+  ) {
+    return this.studio.trimReferenceVideo(getWorkspaceAuthContext(), input);
+  }
+
+  @Mutation(() => GraphQLJSON)
   upsertDeliveryStudioProductKit(
     @Args('input', { type: () => GraphQLJSON }) input: unknown,
   ) {
@@ -197,11 +204,14 @@ export class DeliveryStudioResolver {
     @Args('companyId', { type: () => String }) companyId: string,
     @Args('search', { type: () => String, nullable: true })
     search?: string | null,
+    @Args('rootFolderId', { type: () => String, nullable: true })
+    rootFolderId?: string | null,
   ) {
     return this.studio.getClientDriveFolders(
       getWorkspaceAuthContext(),
       companyId,
       search,
+      rootFolderId,
     );
   }
 

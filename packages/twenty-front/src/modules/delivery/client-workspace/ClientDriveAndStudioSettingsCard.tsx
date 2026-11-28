@@ -193,6 +193,146 @@ const StyledMessage = styled.div<{ $error?: boolean }>`
   padding: 7px 10px;
 `;
 
+const StyledFolderList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+`;
+
+const StyledFolderRow = styled.div<{ $isDefault?: boolean }>`
+  background: ${themeCssVariables.background.secondary};
+  border: 1px solid
+    ${({ $isDefault }) =>
+      $isDefault
+        ? themeCssVariables.color.blue
+        : themeCssVariables.border.color.medium};
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+`;
+
+const StyledFolderTopRow = styled.div`
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
+`;
+
+const StyledFolderTitle = styled.div`
+  align-items: center;
+  color: ${themeCssVariables.font.color.primary};
+  display: flex;
+  flex: 1;
+  font-size: 12px;
+  font-weight: 600;
+  gap: 6px;
+  min-width: 140px;
+
+  a {
+    color: ${themeCssVariables.color.blue};
+    font-size: 11px;
+    font-weight: 600;
+    margin-left: 4px;
+    text-decoration: none;
+  }
+
+  a:hover {
+    text-decoration: underline;
+  }
+`;
+
+const StyledFolderControls = styled.div`
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+`;
+
+const StyledMiniBtn = styled.button<{ $active?: boolean; $danger?: boolean }>`
+  background: ${({ $active }) =>
+    $active
+      ? themeCssVariables.background.transparent.blue
+      : themeCssVariables.background.tertiary};
+  border: 1px solid
+    ${({ $active, $danger }) =>
+      $danger
+        ? themeCssVariables.border.color.danger
+        : $active
+          ? themeCssVariables.color.blue
+          : themeCssVariables.border.color.medium};
+  border-radius: 6px;
+  color: ${({ $active, $danger }) =>
+    $danger
+      ? themeCssVariables.font.color.danger
+      : $active
+        ? themeCssVariables.color.blue
+        : themeCssVariables.font.color.primary};
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+`;
+
+const StyledFolderLabelInput = styled.input`
+  background: ${themeCssVariables.background.primary};
+  border: 1px solid ${themeCssVariables.border.color.light};
+  border-radius: 6px;
+  color: ${themeCssVariables.font.color.primary};
+  font-family: inherit;
+  font-size: 11px;
+  padding: 5px 8px;
+  width: 100%;
+
+  &:focus {
+    border-color: ${themeCssVariables.color.blue};
+    outline: none;
+  }
+`;
+
+const StyledPreviewTabs = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 4px;
+`;
+
+const StyledPreviewPill = styled.button<{ $active?: boolean }>`
+  background: ${({ $active }) =>
+    $active
+      ? themeCssVariables.background.transparent.blue
+      : themeCssVariables.background.primary};
+  border: 1px solid
+    ${({ $active }) =>
+      $active
+        ? themeCssVariables.color.blue
+        : themeCssVariables.border.color.medium};
+  border-radius: 999px;
+  color: ${({ $active }) =>
+    $active
+      ? themeCssVariables.color.blue
+      : themeCssVariables.font.color.secondary};
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+`;
+
+type LinkedFolderDraft = {
+  id: string;
+  name: string;
+  webViewLink: string | null;
+  label: string;
+  isDefault: boolean;
+};
+
 type ClientDriveAndStudioSettingsCardProps = {
   companyId: string;
   companyName: string;
@@ -204,6 +344,8 @@ export const ClientDriveAndStudioSettingsCard = ({
   companyName,
   projectId,
 }: ClientDriveAndStudioSettingsCardProps) => {
+  const [previewRootFolderId, setPreviewRootFolderId] = useState<string>('');
+
   const driveConfigQuery = useQuery<{
     deliveryDriveConfig: DeliveryDriveConfig;
   }>(GET_DELIVERY_DRIVE_CONFIG, { fetchPolicy: 'cache-and-network' });
@@ -211,7 +353,10 @@ export const ClientDriveAndStudioSettingsCard = ({
   const driveFoldersQuery = useQuery<{
     deliveryStudioClientDriveFolders: StudioDriveFoldersResponseDTO;
   }>(GET_DELIVERY_STUDIO_CLIENT_DRIVE_FOLDERS, {
-    variables: { companyId },
+    variables: {
+      companyId,
+      rootFolderId: previewRootFolderId || null,
+    },
     skip: !companyId,
     fetchPolicy: 'cache-and-network',
   });
@@ -241,9 +386,7 @@ export const ClientDriveAndStudioSettingsCard = ({
     [companyId, driveConfig?.clientMappings],
   );
 
-  const [folderId, setFolderId] = useState('');
-  const [folderName, setFolderName] = useState('');
-  const [folderWebUrl, setFolderWebUrl] = useState<string | null>(null);
+  const [linkedFolders, setLinkedFolders] = useState<LinkedFolderDraft[]>([]);
   const [monthStartDayInput, setMonthStartDayInput] = useState('1');
   const [patternOverride, setPatternOverride] = useState('');
   const [driveFeedback, setDriveFeedback] = useState<{
@@ -252,22 +395,66 @@ export const ClientDriveAndStudioSettingsCard = ({
   } | null>(null);
 
   useEffect(() => {
+    setPreviewRootFolderId('');
+  }, [companyId]);
+
+  useEffect(() => {
     if (existingMapping) {
-      setFolderId(existingMapping.rootFolderId);
-      setFolderName(existingMapping.rootFolderName);
-      setFolderWebUrl(existingMapping.rootFolderWebUrl);
+      const fromList =
+        existingMapping.rootFolders && existingMapping.rootFolders.length > 0
+          ? existingMapping.rootFolders.map((f, idx) => ({
+              id: f.id,
+              name: f.name,
+              webViewLink: f.webViewLink,
+              label: f.label ?? '',
+              isDefault: Boolean(f.isDefault) || idx === 0,
+            }))
+          : existingMapping.rootFolderId
+            ? [
+                {
+                  id: existingMapping.rootFolderId,
+                  name: existingMapping.rootFolderName,
+                  webViewLink: existingMapping.rootFolderWebUrl,
+                  label: '',
+                  isDefault: true,
+                },
+              ]
+            : [];
+      const hasDefault = fromList.some((f) => f.isDefault);
+      setLinkedFolders(
+        fromList.map((f, idx) => ({
+          ...f,
+          isDefault: hasDefault ? f.isDefault : idx === 0,
+        })),
+      );
       setMonthStartDayInput(String(existingMapping.monthStartDay ?? 1));
       setPatternOverride(existingMapping.monthFolderPatternOverride ?? '');
-    } else if (driveInfo?.clientMapped && driveInfo.rootFolderId) {
-      setFolderId(driveInfo.rootFolderId);
-      setFolderName(driveInfo.rootFolderName ?? '');
-      setFolderWebUrl(driveInfo.rootFolderWebUrl ?? null);
+    } else if (driveInfo?.clientMapped) {
+      const fromInfo =
+        driveInfo.rootFolders && driveInfo.rootFolders.length > 0
+          ? driveInfo.rootFolders.map((f, idx) => ({
+              id: f.id,
+              name: f.name,
+              webViewLink: f.webViewLink,
+              label: f.label ?? '',
+              isDefault: Boolean(f.isDefault) || idx === 0,
+            }))
+          : driveInfo.rootFolderId
+            ? [
+                {
+                  id: driveInfo.rootFolderId,
+                  name: driveInfo.rootFolderName ?? '',
+                  webViewLink: driveInfo.rootFolderWebUrl ?? null,
+                  label: '',
+                  isDefault: true,
+                },
+              ]
+            : [];
+      setLinkedFolders(fromInfo);
       setMonthStartDayInput(String(driveInfo.monthStartDay ?? 1));
       setPatternOverride('');
     } else {
-      setFolderId('');
-      setFolderName('');
-      setFolderWebUrl(null);
+      setLinkedFolders([]);
       setMonthStartDayInput(String(driveInfo?.monthStartDay ?? 1));
       setPatternOverride('');
     }
@@ -278,8 +465,67 @@ export const ClientDriveAndStudioSettingsCard = ({
     driveInfo?.rootFolderId,
     driveInfo?.rootFolderName,
     driveInfo?.rootFolderWebUrl,
+    driveInfo?.rootFolders,
     existingMapping,
   ]);
+
+  const handleAddLinkedFolder = (folder: {
+    id: string;
+    name: string;
+    webViewLink: string | null;
+  }) => {
+    setDriveFeedback(null);
+    setLinkedFolders((prev) => {
+      if (prev.some((f) => f.id === folder.id)) {
+        return prev;
+      }
+      if (prev.length >= 15) {
+        setDriveFeedback({
+          text: 'You can link up to 15 main Drive folders per client.',
+          isError: true,
+        });
+        return prev;
+      }
+      return [
+        ...prev,
+        {
+          id: folder.id,
+          name: folder.name,
+          webViewLink: folder.webViewLink,
+          label: '',
+          isDefault: prev.length === 0,
+        },
+      ];
+    });
+  };
+
+  const handleSetDefaultFolder = (folderIdToMakeDefault: string) => {
+    setLinkedFolders((prev) =>
+      prev.map((f) => ({
+        ...f,
+        isDefault: f.id === folderIdToMakeDefault,
+      })),
+    );
+  };
+
+  const handleUpdateFolderLabel = (folderIdToEdit: string, label: string) => {
+    setLinkedFolders((prev) =>
+      prev.map((f) => (f.id === folderIdToEdit ? { ...f, label } : f)),
+    );
+  };
+
+  const handleRemoveLinkedFolder = (folderIdToRemove: string) => {
+    setLinkedFolders((prev) => {
+      const remaining = prev.filter((f) => f.id !== folderIdToRemove);
+      if (remaining.length > 0 && !remaining.some((f) => f.isDefault)) {
+        remaining[0] = { ...remaining[0], isDefault: true };
+      }
+      return remaining;
+    });
+    if (previewRootFolderId === folderIdToRemove) {
+      setPreviewRootFolderId('');
+    }
+  };
 
   // Brand Text-Hook Master Prompt state
   const brandHookPreset = useMemo(() => {
@@ -324,6 +570,9 @@ export const ClientDriveAndStudioSettingsCard = ({
         : 1;
     setMonthStartDayInput(String(clampedDay));
 
+    const defaultFolder =
+      linkedFolders.find((f) => f.isDefault) ?? linkedFolders[0] ?? null;
+
     try {
       await bindClientFolder({
         variables: {
@@ -331,8 +580,19 @@ export const ClientDriveAndStudioSettingsCard = ({
             companyId,
             companyName,
             autoCreate,
-            rootFolderId: autoCreate ? undefined : folderId || undefined,
-            rootFolderName: autoCreate ? undefined : folderName || undefined,
+            rootFolderId: autoCreate ? undefined : defaultFolder?.id || undefined,
+            rootFolderName: autoCreate
+              ? undefined
+              : defaultFolder?.name || undefined,
+            rootFolders:
+              autoCreate || linkedFolders.length === 0
+                ? undefined
+                : linkedFolders.map((f) => ({
+                    id: f.id,
+                    name: f.name,
+                    label: f.label.trim() ? f.label.trim() : null,
+                    isDefault: f.id === defaultFolder?.id,
+                  })),
             monthStartDay: clampedDay,
             monthFolderPatternOverride: patternOverride.trim()
               ? patternOverride.trim()
@@ -344,8 +604,11 @@ export const ClientDriveAndStudioSettingsCard = ({
         driveConfigQuery.refetch(),
         driveFoldersQuery.refetch(),
       ]);
+      const countLabel = autoCreate
+        ? 'Google Drive folder'
+        : `${linkedFolders.length} main Google Drive folder${linkedFolders.length === 1 ? '' : 's'}`;
       setDriveFeedback({
-        text: `Saved Google Drive folder & month cycle (starts day ${clampedDay}) for ${companyName}.`,
+        text: `Saved ${countLabel} & month cycle (starts day ${clampedDay}) for ${companyName}.`,
       });
     } catch (error) {
       setDriveFeedback({
@@ -409,22 +672,34 @@ export const ClientDriveAndStudioSettingsCard = ({
     driveConfig?.connected ?? driveInfo?.connected,
   );
   const canManageDrive = Boolean(
-    driveConfig?.googleEmail || (driveConfig?.clientMappings?.length ?? 0) > 0 || driveConfig?.connected,
+    driveConfig?.googleEmail ||
+      (driveConfig?.clientMappings?.length ?? 0) > 0 ||
+      driveConfig?.connected,
   );
+  const savedRootFolders = driveInfo?.rootFolders ?? [];
+  const activePreviewRootId =
+    previewRootFolderId ||
+    driveInfo?.selectedRootFolderId ||
+    driveInfo?.rootFolderId ||
+    '';
 
   return (
     <StyledGrid>
       <StyledCard>
         <StyledHeader>
           <div>
-            <h3>Google Drive Folder &amp; Month Cycle</h3>
+            <h3>Google Drive Main Folders &amp; Month Cycle</h3>
             <p>
-              Connect {companyName}’s Google Drive folder and set which day of
-              the month their billing/content cycle starts.
+              Link one or more main Google Drive folders for {companyName} (e.g.
+              Reels, Paid Ads, UGC) and set their monthly cycle start day.
             </p>
           </div>
-          {driveConnected && (folderId || driveInfo?.clientMapped) ? (
-            <StyledBadge $tone="ok">Folder Linked</StyledBadge>
+          {driveConnected && (linkedFolders.length > 0 || driveInfo?.clientMapped) ? (
+            <StyledBadge $tone="ok">
+              {linkedFolders.length > 1
+                ? `${linkedFolders.length} Folders Linked`
+                : 'Folder Linked'}
+            </StyledBadge>
           ) : driveConnected ? (
             <StyledBadge $tone="muted">Unmapped</StyledBadge>
           ) : (
@@ -444,21 +719,71 @@ export const ClientDriveAndStudioSettingsCard = ({
           </StyledCycleBox>
         ) : (
           <>
+            {linkedFolders.length > 0 && (
+              <StyledFolderList>
+                {linkedFolders.map((folder) => (
+                  <StyledFolderRow key={folder.id} $isDefault={folder.isDefault}>
+                    <StyledFolderTopRow>
+                      <StyledFolderTitle title={folder.name}>
+                        <span>{folder.isDefault ? '★' : '📁'}</span>
+                        <span>{folder.name || folder.id}</span>
+                        <a
+                          href={
+                            folder.webViewLink ||
+                            `https://drive.google.com/drive/folders/${folder.id}`
+                          }
+                          rel="noreferrer"
+                          target="_blank"
+                        >
+                          Open ↗
+                        </a>
+                      </StyledFolderTitle>
+                      <StyledFolderControls>
+                        {folder.isDefault ? (
+                          <StyledMiniBtn type="button" $active disabled>
+                            Default
+                          </StyledMiniBtn>
+                        ) : (
+                          <StyledMiniBtn
+                            type="button"
+                            onClick={() => handleSetDefaultFolder(folder.id)}
+                          >
+                            Set default
+                          </StyledMiniBtn>
+                        )}
+                        <StyledMiniBtn
+                          type="button"
+                          $danger
+                          onClick={() => handleRemoveLinkedFolder(folder.id)}
+                        >
+                          Remove
+                        </StyledMiniBtn>
+                      </StyledFolderControls>
+                    </StyledFolderTopRow>
+                    <StyledFolderLabelInput
+                      type="text"
+                      maxLength={80}
+                      placeholder="Optional label (e.g. Reels, Paid Ads, UGC, Raw Footage)"
+                      value={folder.label}
+                      onChange={(e) =>
+                        handleUpdateFolderLabel(folder.id, e.target.value)
+                      }
+                    />
+                  </StyledFolderRow>
+                ))}
+              </StyledFolderList>
+            )}
+
             <DeliveryDriveFolderPicker
-              selectedFolderId={folderId}
-              selectedFolderName={folderName}
-              selectedFolderWebUrl={folderWebUrl}
-              placeholder={`Search Google Drive for ${companyName}’s folder…`}
-              onSelect={(folder) => {
-                setFolderId(folder.id);
-                setFolderName(folder.name);
-                setFolderWebUrl(folder.webViewLink);
-              }}
-              onClear={() => {
-                setFolderId('');
-                setFolderName('');
-                setFolderWebUrl(null);
-              }}
+              selectedFolderIds={linkedFolders.map((f) => f.id)}
+              selectLabel="+ Add"
+              selectedLabel="✓ Added"
+              placeholder={
+                linkedFolders.length > 0
+                  ? `Search Google Drive to add another main folder for ${companyName}…`
+                  : `Search Google Drive for ${companyName}’s main folder…`
+              }
+              onSelect={handleAddLinkedFolder}
             />
 
             <StyledFieldRow>
@@ -485,6 +810,21 @@ export const ClientDriveAndStudioSettingsCard = ({
 
             {driveInfo && (
               <StyledCycleBox>
+                {savedRootFolders.length > 1 && (
+                  <StyledPreviewTabs>
+                    {savedRootFolders.map((rf) => (
+                      <StyledPreviewPill
+                        key={rf.id}
+                        type="button"
+                        $active={activePreviewRootId === rf.id}
+                        onClick={() => setPreviewRootFolderId(rf.id)}
+                      >
+                        {rf.isDefault ? '★ ' : '📁 '}
+                        {rf.label ? `${rf.label} (${rf.name})` : rf.name}
+                      </StyledPreviewPill>
+                    ))}
+                  </StyledPreviewTabs>
+                )}
                 <div>
                   Active cycle:{' '}
                   <strong>
@@ -499,7 +839,11 @@ export const ClientDriveAndStudioSettingsCard = ({
                 {driveInfo.clientMapped ? (
                   driveInfo.matchedMonthFolder ? (
                     <div>
-                      ✓ Auto-matched existing month folder:{' '}
+                      ✓ Auto-matched existing month folder
+                      {driveInfo.rootFolderName
+                        ? ` in ${driveInfo.rootFolderName}`
+                        : ''}
+                      :{' '}
                       <a
                         href={
                           driveInfo.matchedMonthFolder.webViewLink ??
@@ -513,15 +857,19 @@ export const ClientDriveAndStudioSettingsCard = ({
                     </div>
                   ) : (
                     <div>
-                      No matching month subfolder found yet — will create{' '}
+                      No matching month subfolder found yet
+                      {driveInfo.rootFolderName
+                        ? ` in ${driveInfo.rootFolderName}`
+                        : ''}{' '}
+                      — will create{' '}
                       <strong>📁 {driveInfo.expectedMonthFolderName}</strong> on
                       first upload.
                     </div>
                   )
                 ) : (
                   <div>
-                    Select a Drive folder above so AI Studio automatically
-                    routes uploads into the active month folder.
+                    Add one or more Drive folders above so AI Studio
+                    automatically routes uploads into the active month folder.
                   </div>
                 )}
               </StyledCycleBox>
@@ -532,10 +880,14 @@ export const ClientDriveAndStudioSettingsCard = ({
                 <StyledButton
                   type="button"
                   $primary
-                  disabled={savingDrive || !folderId}
+                  disabled={savingDrive || linkedFolders.length === 0}
                   onClick={() => void handleSaveDrive(false)}
                 >
-                  {savingDrive ? 'Saving…' : 'Save Drive Folder & Cycle'}
+                  {savingDrive
+                    ? 'Saving…'
+                    : linkedFolders.length > 1
+                      ? `Save ${linkedFolders.length} Folders & Cycle`
+                      : 'Save Drive Folder & Cycle'}
                 </StyledButton>
                 <StyledButton
                   type="button"

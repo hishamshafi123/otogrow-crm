@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { execFile, spawn } from 'node:child_process';
 import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
 import { promisify } from 'node:util';
 import { type DeliverableMediaMeta } from 'src/modules/delivery/deliverables/entities/delivery-deliverable.entity';
 import { type HookStyleConfig } from 'src/modules/delivery/deliverables/entities/delivery-video-hook-project.entity';
@@ -17,7 +18,7 @@ import {
 const execFileAsync = promisify(execFile);
 
 const MAX_RENDER_TIMEOUT_MS = 9 * 60 * 1000; // 9 minutes (fits inside 10m BullMQ lockDuration)
-const MAX_PROXY_BYTES = 18 * 1024 * 1024; // 18 MiB proxy ceiling for Gemini multimodal analysis
+const MAX_PROXY_BYTES = 6 * 1024 * 1024; // 6 MiB low-RAM proxy ceiling for Gemini multimodal analysis
 
 type SharpFactory = (input: Buffer) => {
   png: () => { toFile: (outputPath: string) => Promise<unknown> };
@@ -264,8 +265,104 @@ export class DeliveryHookRenderAdapter {
   async prepareLightweightAnalysisProxy(
     inputVideoPath: string,
     outputProxyPath: string,
+    options?: {
+      includeAudio?: boolean;
+      maxDurationSec?: number;
+      maxDimension?: number;
+      fps?: number;
+      maxBytes?: number;
+      timeoutMs?: number;
+    },
   ): Promise<Buffer> {
-    // Transcode up to the first 60s into a compact 480p proxy for fast, low-cost Gemini video understanding.
+    const includeAudio = options?.includeAudio ?? true;
+    const maxDurationSec = Math.max(
+      5,
+      Math.min(60, Math.round(options?.maxDurationSec ?? 30)),
+    );
+    const maxDim = Math.max(
+      240,
+      Math.min(480, Math.round(options?.maxDimension ?? 360)),
+    );
+    const fps = Math.max(4, Math.min(15, Math.round(options?.fps ?? 10)));
+    const maxBytes = Math.min(
+      MAX_PROXY_BYTES,
+      Math.max(512 * 1024, Math.round(options?.maxBytes ?? MAX_PROXY_BYTES)),
+    );
+    const timeoutMs = Math.max(
+      10_000,
+      Math.min(45_000, Math.round(options?.timeoutMs ?? 30_000)),
+    );
+
+    const args = [
+      '-nostdin',
+      '-hide_banner',
+      '-y',
+      '-loglevel',
+      'error',
+      '-threads',
+      '2',
+      '-t',
+      String(maxDurationSec),
+      '-i',
+      inputVideoPath,
+      '-map',
+      '0:v:0',
+      ...(includeAudio ? ['-map', '0:a?'] : []),
+      '-vf',
+      `scale=${maxDim}:${maxDim}:force_original_aspect_ratio=decrease:force_divisible_by=2,fps=${fps}`,
+      '-c:v',
+      'libx264',
+      '-preset',
+      'ultrafast',
+      '-crf',
+      '30',
+      '-maxrate',
+      '280k',
+      '-bufsize',
+      '560k',
+      '-pix_fmt',
+      'yuv420p',
+      ...(includeAudio
+        ? ['-c:a', 'aac', '-ac', '1', '-ar', '22050', '-b:a', '32k']
+        : ['-an']),
+      '-movflags',
+      '+faststart',
+      '-fs',
+      String(maxBytes),
+      outputProxyPath,
+    ];
+
+    // Transcode a compact low-RAM proxy (360p, capped threads & bitrate) so API containers never OOM or hit gateway timeouts.
+    await execMediaBinaryWithFallback('ffmpeg', args, {
+      timeout: timeoutMs,
+      maxBuffer: 1024 * 1024,
+    });
+
+    const stats = await fs.stat(outputProxyPath);
+    if (!stats || stats.size <= 0 || stats.size > maxBytes) {
+      throw new Error('Could not build bounded analysis proxy for video.');
+    }
+    return fs.readFile(outputProxyPath);
+  }
+
+  async extractAnalysisKeyframes(
+    inputVideoPath: string,
+    outputDir: string,
+    options?: { maxFrames?: number; durationSec?: number | null },
+  ): Promise<Array<{ label: string; bytes: Buffer; mimeType: 'image/jpeg' }>> {
+    const maxFrames = Math.max(2, Math.min(8, options?.maxFrames ?? 6));
+    const effectiveDuration =
+      typeof options?.durationSec === 'number' &&
+      Number.isFinite(options.durationSec) &&
+      options.durationSec > 0.5
+        ? Math.min(options.durationSec, 30)
+        : 10;
+    const sampleFps = Math.max(
+      0.15,
+      Math.min(2, Number((maxFrames / effectiveDuration).toFixed(3))),
+    );
+    const framePattern = path.join(outputDir, 'keyframe-%02d.jpg');
+
     await execMediaBinaryWithFallback(
       'ffmpeg',
       [
@@ -274,44 +371,49 @@ export class DeliveryHookRenderAdapter {
         '-y',
         '-loglevel',
         'error',
+        '-threads',
+        '1',
         '-t',
-        '60',
+        String(Math.ceil(effectiveDuration)),
         '-i',
         inputVideoPath,
         '-vf',
-        'scale=480:480:force_original_aspect_ratio=decrease:force_divisible_by=2,fps=15',
-        '-c:v',
-        'libx264',
-        '-preset',
-        'veryfast',
-        '-crf',
-        '28',
-        '-maxrate',
-        '450k',
-        '-bufsize',
-        '900k',
-        '-pix_fmt',
-        'yuv420p',
-        '-c:a',
-        'aac',
-        '-ac',
-        '1',
-        '-b:a',
-        '48k',
-        '-movflags',
-        '+faststart',
-        '-fs',
-        String(MAX_PROXY_BYTES),
-        outputProxyPath,
+        `fps=${sampleFps},scale=360:360:force_original_aspect_ratio=decrease`,
+        '-frames:v',
+        String(maxFrames),
+        '-q:v',
+        '6',
+        framePattern,
       ],
-      { timeout: 120_000, maxBuffer: 2 * 1024 * 1024 },
+      { timeout: 15_000, maxBuffer: 1024 * 1024 },
     );
 
-    const stats = await fs.stat(outputProxyPath);
-    if (!stats || stats.size <= 0 || stats.size > MAX_PROXY_BYTES) {
-      throw new Error('Could not build bounded analysis proxy for video.');
+    const files = (await fs.readdir(outputDir))
+      .filter((name) => /^keyframe-\d+\.jpg$/i.test(name))
+      .sort()
+      .slice(0, maxFrames);
+
+    const frames: Array<{
+      label: string;
+      bytes: Buffer;
+      mimeType: 'image/jpeg';
+    }> = [];
+    for (let i = 0; i < files.length; i += 1) {
+      const fullPath = path.join(outputDir, files[i]);
+      const stat = await fs.stat(fullPath).catch(() => null);
+      if (!stat || stat.size <= 0 || stat.size > 350 * 1024) continue;
+      const bytes = await fs.readFile(fullPath);
+      const approxSec = (
+        ((i + 0.5) / Math.max(1, files.length)) *
+        effectiveDuration
+      ).toFixed(1);
+      frames.push({
+        label: `frame ${i + 1}/${files.length} (~${approxSec}s)`,
+        bytes,
+        mimeType: 'image/jpeg',
+      });
     }
-    return fs.readFile(outputProxyPath);
+    return frames;
   }
 
   private async runFfmpegWithProgress(

@@ -3,7 +3,10 @@ import { styled } from '@linaria/react';
 import { useStore } from 'jotai';
 import { useEffect, useMemo, useState } from 'react';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
-import { UPSERT_DELIVERY_STUDIO_PRESET } from '@/delivery/studio/delivery-studio.graphql';
+import {
+  ARCHIVE_DELIVERY_STUDIO_REFERENCE_VIDEO,
+  UPSERT_DELIVERY_STUDIO_PRESET,
+} from '@/delivery/studio/delivery-studio.graphql';
 import {
   type StudioPresetDTO,
   type StudioReferenceVideoDTO,
@@ -476,6 +479,48 @@ const StyledScopeTag = styled.small`
   margin-top: 2px;
 `;
 
+const StyledCardActionsRow = styled.div`
+  align-items: center;
+  border-top: 1px solid ${themeCssVariables.border.color.light};
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+  padding-top: 6px;
+`;
+
+const StyledCardActionBtn = styled.button`
+  background: ${themeCssVariables.background.primary};
+  border: 1px solid ${themeCssVariables.border.color.medium};
+  border-radius: 6px;
+  color: ${themeCssVariables.font.color.secondary};
+  cursor: pointer;
+  flex: 1;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 6px;
+  transition: border-color 120ms ease, color 120ms ease, background 120ms ease;
+
+  &:hover:not(:disabled) {
+    border-color: ${themeCssVariables.font.color.primary};
+    color: ${themeCssVariables.font.color.primary};
+  }
+
+  &[data-danger='true'] {
+    color: ${themeCssVariables.color.red};
+
+    &:hover:not(:disabled) {
+      background: ${themeCssVariables.color.transparent.red1};
+      border-color: ${themeCssVariables.color.red};
+      color: ${themeCssVariables.color.red};
+    }
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+`;
+
 const StyledError = styled.div`
   background: ${themeCssVariables.color.transparent.red1};
   border: 1px solid ${themeCssVariables.color.red};
@@ -503,6 +548,7 @@ type DeliveryStudioLibraryModalProps = {
   referenceVideos: StudioReferenceVideoDTO[];
   onSelectPreset: (preset: StudioPresetDTO) => void;
   onSelectReferenceVideo: (video: StudioReferenceVideoDTO) => void;
+  onDeletedReferenceVideo?: (videoId: string) => void;
   onCreated: () => Promise<void> | void;
   onClose: () => void;
 };
@@ -522,6 +568,7 @@ export const DeliveryStudioLibraryModal = ({
   referenceVideos,
   onSelectPreset,
   onSelectReferenceVideo,
+  onDeletedReferenceVideo,
   onCreated,
   onClose,
 }: DeliveryStudioLibraryModalProps) => {
@@ -531,6 +578,12 @@ export const DeliveryStudioLibraryModal = ({
   const [creating, setCreating] = useState(false);
   const [busy, setBusy] = useState(false);
   const [pendingTrimFile, setPendingTrimFile] = useState<File | null>(null);
+  const [editingRefVideo, setEditingRefVideo] =
+    useState<StudioReferenceVideoDTO | null>(null);
+  const [confirmDeleteVideoId, setConfirmDeleteVideoId] = useState<
+    string | null
+  >(null);
+  const [deletingVideoId, setDeletingVideoId] = useState<string | null>(null);
   const [playingVideoId, setPlayingVideoId] = useState<string | null>(null);
   const [videoMuted, setVideoMuted] = useState(true);
   const [uploadingPresetId, setUploadingPresetId] = useState<string | null>(
@@ -558,6 +611,32 @@ export const DeliveryStudioLibraryModal = ({
   const [upsertPreset] = useMutation<{
     upsertDeliveryStudioPreset: StudioPresetDTO;
   }>(UPSERT_DELIVERY_STUDIO_PRESET);
+
+  const [archiveReferenceVideo] = useMutation<{
+    archiveDeliveryStudioReferenceVideo: { archived: boolean; id: string };
+  }>(ARCHIVE_DELIVERY_STUDIO_REFERENCE_VIDEO);
+
+  const handleDeleteReferenceVideo = async (videoId: string) => {
+    setError(null);
+    setDeletingVideoId(videoId);
+    try {
+      await archiveReferenceVideo({ variables: { id: videoId } });
+      if (playingVideoId === videoId) {
+        setPlayingVideoId(null);
+      }
+      setConfirmDeleteVideoId(null);
+      await onCreated();
+      onDeletedReferenceVideo?.(videoId);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Failed to delete reference video.',
+      );
+    } finally {
+      setDeletingVideoId(null);
+    }
+  };
 
   const handleUploadExistingPresetPhoto = async (
     preset: StudioPresetDTO,
@@ -1040,6 +1119,55 @@ export const DeliveryStudioLibraryModal = ({
                       <StyledScopeTag>
                         {vid.companyId ? 'Client' : 'Shared agency'}
                       </StyledScopeTag>
+                      <StyledCardActionsRow
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {confirmDeleteVideoId === vid.id ? (
+                          <>
+                            <StyledCardActionBtn
+                              type="button"
+                              data-danger="true"
+                              disabled={deletingVideoId === vid.id}
+                              onClick={() =>
+                                void handleDeleteReferenceVideo(vid.id)
+                              }
+                            >
+                              {deletingVideoId === vid.id
+                                ? 'Deleting…'
+                                : 'Confirm'}
+                            </StyledCardActionBtn>
+                            <StyledCardActionBtn
+                              type="button"
+                              disabled={deletingVideoId === vid.id}
+                              onClick={() => setConfirmDeleteVideoId(null)}
+                            >
+                              Cancel
+                            </StyledCardActionBtn>
+                          </>
+                        ) : (
+                          <>
+                            <StyledCardActionBtn
+                              type="button"
+                              title="Trim this uploaded reference video"
+                              onClick={() => {
+                                setError(null);
+                                setPlayingVideoId(null);
+                                setEditingRefVideo(vid);
+                              }}
+                            >
+                              ✂ Trim
+                            </StyledCardActionBtn>
+                            <StyledCardActionBtn
+                              type="button"
+                              data-danger="true"
+                              title="Delete this reference video from library"
+                              onClick={() => setConfirmDeleteVideoId(vid.id)}
+                            >
+                              Delete
+                            </StyledCardActionBtn>
+                          </>
+                        )}
+                      </StyledCardActionsRow>
                     </StyledCardMeta>
                   </StyledCard>
                 );
@@ -1064,6 +1192,22 @@ export const DeliveryStudioLibraryModal = ({
             onClose();
           }}
           onCancel={() => setPendingTrimFile(null)}
+        />
+      )}
+
+      {editingRefVideo && (
+        <DeliveryStudioVideoTrimmerModal
+          existingVideo={editingRefVideo}
+          companyId={companyId}
+          projectId={projectId}
+          onSaved={async (updated) => {
+            await onCreated();
+            if (updated?.id && (editingRefVideo.id === selectedId || updated.id !== editingRefVideo.id)) {
+              onSelectReferenceVideo(updated);
+            }
+            setEditingRefVideo(null);
+          }}
+          onCancel={() => setEditingRefVideo(null)}
         />
       )}
     </>

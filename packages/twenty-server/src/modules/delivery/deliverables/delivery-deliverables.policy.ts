@@ -857,6 +857,15 @@ export const updateDriveSettingsSchema = z
   })
   .strict();
 
+export const clientDriveRootFolderInputSchema = z
+  .object({
+    id: z.string().trim().min(1).max(200),
+    name: z.string().trim().min(1).max(200).optional(),
+    label: z.string().trim().max(80).nullable().optional(),
+    isDefault: z.boolean().optional(),
+  })
+  .strict();
+
 export const bindClientDriveFolderSchema = z
   .object({
     companyId: z.uuid(),
@@ -864,6 +873,7 @@ export const bindClientDriveFolderSchema = z
     autoCreate: z.boolean().optional(),
     rootFolderId: z.string().trim().min(1).max(200).optional(),
     rootFolderName: z.string().trim().min(1).max(200).optional(),
+    rootFolders: z.array(clientDriveRootFolderInputSchema).max(15).optional(),
     monthStartDay: z.number().int().min(1).max(31).nullable().optional(),
     monthFolderPatternOverride: z
       .string()

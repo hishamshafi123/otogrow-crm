@@ -1,3 +1,4 @@
+import { useMutation } from '@apollo/client/react';
 import { styled } from '@linaria/react';
 import { useStore } from 'jotai';
 import {
@@ -9,7 +10,11 @@ import {
   useState,
 } from 'react';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
-import { type StudioReferenceVideoDTO } from '@/delivery/studio/delivery-studio.types';
+import { TRIM_DELIVERY_STUDIO_REFERENCE_VIDEO } from '@/delivery/studio/delivery-studio.graphql';
+import {
+  type StudioReferenceVideoDTO,
+  studioMediaUrl,
+} from '@/delivery/studio/delivery-studio.types';
 import { uploadStudioMultipart } from '@/delivery/studio/studio-upload';
 
 const MIN_CLIP_SEC = 0.5;
@@ -461,7 +466,8 @@ type DragMode =
   | { kind: 'scrub' };
 
 export type DeliveryStudioVideoTrimmerModalProps = {
-  file: File;
+  file?: File | null;
+  existingVideo?: StudioReferenceVideoDTO | null;
   companyId: string | null;
   projectId: string | null;
   initialTitle?: string;
@@ -472,7 +478,8 @@ export type DeliveryStudioVideoTrimmerModalProps = {
 };
 
 export const DeliveryStudioVideoTrimmerModal = ({
-  file,
+  file = null,
+  existingVideo = null,
   companyId,
   projectId,
   initialTitle,
@@ -482,39 +489,73 @@ export const DeliveryStudioVideoTrimmerModal = ({
   onCancel,
 }: DeliveryStudioVideoTrimmerModalProps) => {
   const store = useStore();
+  const isExistingMode = Boolean(existingVideo && !file);
   const videoRef = useRef<HTMLVideoElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const [dragMode, setDragMode] = useState<DragMode | null>(null);
 
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  const [duration, setDuration] = useState<number>(0);
-  const [videoWidth, setVideoWidth] = useState<number | undefined>(undefined);
-  const [videoHeight, setVideoHeight] = useState<number | undefined>(undefined);
+  const [duration, setDuration] = useState<number>(
+    isExistingMode &&
+      typeof existingVideo?.mediaMeta?.durationSec === 'number' &&
+      existingVideo.mediaMeta.durationSec > 0
+      ? existingVideo.mediaMeta.durationSec
+      : 0,
+  );
+  const [videoWidth, setVideoWidth] = useState<number | undefined>(
+    isExistingMode ? existingVideo?.mediaMeta?.width : undefined,
+  );
+  const [videoHeight, setVideoHeight] = useState<number | undefined>(
+    isExistingMode ? existingVideo?.mediaMeta?.height : undefined,
+  );
   const [startSec, setStartSec] = useState<number>(0);
-  const [endSec, setEndSec] = useState<number>(0);
+  const [endSec, setEndSec] = useState<number>(
+    isExistingMode &&
+      typeof existingVideo?.mediaMeta?.durationSec === 'number' &&
+      existingVideo.mediaMeta.durationSec > 0
+      ? existingVideo.mediaMeta.durationSec
+      : 0,
+  );
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [muted, setMuted] = useState<boolean>(true);
   const [filmstrip, setFilmstrip] = useState<string[]>([]);
 
   const [title, setTitle] = useState<string>(
-    initialTitle?.trim() || file.name.replace(/\.[^.]+$/, ''),
+    initialTitle?.trim() ||
+      existingVideo?.title?.trim() ||
+      file?.name.replace(/\.[^.]+$/, '') ||
+      '',
   );
-  const [notes, setNotes] = useState<string>(initialNotes ?? '');
+  const [notes, setNotes] = useState<string>(
+    initialNotes ?? existingVideo?.notes ?? '',
+  );
   const [clientOnly, setClientOnly] = useState<boolean>(initialClientOnly);
+  const [saveAsCopy, setSaveAsCopy] = useState<boolean>(false);
   const [saving, setSaving] = useState<boolean>(false);
   const [uploadPct, setUploadPct] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const objectUrl = URL.createObjectURL(file);
-    setVideoUrl(objectUrl);
-    return () => {
-      URL.revokeObjectURL(objectUrl);
-    };
-  }, [file]);
+  const [trimReferenceVideoMutation] = useMutation<{
+    trimDeliveryStudioReferenceVideo: StudioReferenceVideoDTO;
+  }>(TRIM_DELIVERY_STUDIO_REFERENCE_VIDEO);
 
-  // Generate lightweight filmstrip preview frames from the local file
+  useEffect(() => {
+    if (file) {
+      const objectUrl = URL.createObjectURL(file);
+      setVideoUrl(objectUrl);
+      return () => {
+        URL.revokeObjectURL(objectUrl);
+      };
+    }
+    if (existingVideo?.streamPath) {
+      setVideoUrl(studioMediaUrl(existingVideo.streamPath) ?? null);
+      return;
+    }
+    setVideoUrl(null);
+  }, [file, existingVideo?.streamPath]);
+
+  // Generate lightweight filmstrip preview frames from the video source
   useEffect(() => {
     if (!videoUrl || duration <= 0) {
       setFilmstrip([]);
@@ -523,6 +564,7 @@ export const DeliveryStudioVideoTrimmerModal = ({
 
     let cancelled = false;
     const offscreen = document.createElement('video');
+    offscreen.crossOrigin = 'anonymous';
     offscreen.muted = true;
     offscreen.playsInline = true;
     offscreen.preload = 'auto';
@@ -784,8 +826,33 @@ export const DeliveryStudioVideoTrimmerModal = ({
   const handleSave = async () => {
     setError(null);
     setSaving(true);
-    setUploadPct(0);
+    setUploadPct(isExistingMode ? null : 0);
     try {
+      if (isExistingMode && existingVideo) {
+        const res = await trimReferenceVideoMutation({
+          variables: {
+            input: {
+              referenceVideoId: existingVideo.id,
+              trimStartSec: Number(startSec.toFixed(3)),
+              trimEndSec: Number(endSec.toFixed(3)),
+              title: title.trim() || existingVideo.title,
+              notes: notes.trim(),
+              saveAsCopy,
+            },
+          },
+        });
+        const updated = res.data?.trimDeliveryStudioReferenceVideo;
+        if (!updated) {
+          throw new Error('Server did not return trimmed video metadata.');
+        }
+        await onSaved(updated);
+        return;
+      }
+
+      if (!file) {
+        throw new Error('No video file selected.');
+      }
+
       const formData = new FormData();
       formData.append('file', file);
       formData.append(
@@ -838,16 +905,26 @@ export const DeliveryStudioVideoTrimmerModal = ({
     duration > 0 ? Math.max(0, Math.min(100, (currentTime / duration) * 100)) : 0;
 
   const ctaLabel = saving
-    ? uploadPct !== null && uploadPct < 100
+    ? !isExistingMode && uploadPct !== null && uploadPct < 100
       ? `Uploading ${uploadPct}%…`
       : isTrimmed
         ? 'Trimming & saving…'
         : 'Saving…'
     : duration > 0
       ? isTrimmed
-        ? `Trim & Save (${selectedDuration.toFixed(1)}s)`
-        : `Save Full Video (${duration.toFixed(1)}s)`
+        ? isExistingMode && saveAsCopy
+          ? `Save Trimmed Copy (${selectedDuration.toFixed(1)}s)`
+          : `Trim & Save (${selectedDuration.toFixed(1)}s)`
+        : isExistingMode
+          ? 'Save Details'
+          : `Save Full Video (${duration.toFixed(1)}s)`
       : 'Save Video';
+
+  const sourceDisplayName =
+    file?.name ||
+    existingVideo?.originalFileName ||
+    existingVideo?.title ||
+    'Reference video';
 
   return (
     <StyledBackdrop
@@ -861,7 +938,7 @@ export const DeliveryStudioVideoTrimmerModal = ({
             <h3>Trim Reference Video</h3>
             <span>
               Drag the blue handles to keep just the motion you want ·{' '}
-              {file.name}
+              {sourceDisplayName}
             </span>
           </StyledHeaderTitle>
           <StyledCloseButton
@@ -882,6 +959,7 @@ export const DeliveryStudioVideoTrimmerModal = ({
               <video
                 ref={videoRef}
                 src={videoUrl}
+                crossOrigin="anonymous"
                 muted={muted}
                 playsInline
                 preload="auto"
@@ -1110,16 +1188,28 @@ export const DeliveryStudioVideoTrimmerModal = ({
         </StyledBody>
 
         <StyledFooter>
-          {companyId && (
+          {isExistingMode ? (
             <StyledCheckboxLabel>
               <input
                 type="checkbox"
-                checked={clientOnly}
+                checked={saveAsCopy}
                 disabled={saving}
-                onChange={(e) => setClientOnly(e.target.checked)}
+                onChange={(e) => setSaveAsCopy(e.target.checked)}
               />
-              This client only
+              Save as new copy (keep original)
             </StyledCheckboxLabel>
+          ) : (
+            companyId && (
+              <StyledCheckboxLabel>
+                <input
+                  type="checkbox"
+                  checked={clientOnly}
+                  disabled={saving}
+                  onChange={(e) => setClientOnly(e.target.checked)}
+                />
+                This client only
+              </StyledCheckboxLabel>
+            )
           )}
           <StyledFooterActions>
             <StyledCancelButton
@@ -1131,7 +1221,7 @@ export const DeliveryStudioVideoTrimmerModal = ({
             </StyledCancelButton>
             <StyledPrimaryButton
               type="button"
-              disabled={saving}
+              disabled={saving || (isExistingMode && duration <= 0)}
               onClick={() => void handleSave()}
             >
               {ctaLabel}

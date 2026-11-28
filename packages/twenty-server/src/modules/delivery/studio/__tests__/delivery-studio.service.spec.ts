@@ -1,3 +1,5 @@
+import * as fs from 'node:fs/promises';
+import { Readable } from 'node:stream';
 import { ForbiddenException } from '@nestjs/common';
 import { type DataSource, type EntityManager } from 'typeorm';
 import { type WorkspaceAuthContext } from 'src/engine/core-modules/auth/types/workspace-auth-context.type';
@@ -91,6 +93,15 @@ const makeRepo = (initial: unknown[] = []) => {
         ) ?? null
       );
     }),
+    findOneBy: jest.fn(async (where: Record<string, unknown>) => {
+      return (
+        store.find((item) =>
+          Object.entries(where).every(
+            ([k, v]) => (item as Record<string, unknown>)[k] === v,
+          ),
+        ) ?? null
+      );
+    }),
     findOneByOrFail: jest.fn(async () => ({ id: WORKSPACE_ID })),
     find: jest.fn(async () => [...store]),
     count: jest.fn(async () => store.length),
@@ -119,6 +130,7 @@ describe('DeliveryStudioService', () => {
             storageKey: 'ref/1.mp4',
             mimeType: 'video/mp4',
             sizeBytes: '1000',
+            archived: false,
             createdAt: new Date(),
             updatedAt: new Date(),
           },
@@ -224,12 +236,36 @@ describe('DeliveryStudioService', () => {
     const twentyConfig = {
       get: jest.fn(() => 'test-app-secret-for-studio'),
     };
+    const storageDriver = {
+      readFile: jest.fn(async () => Readable.from(Buffer.from('fake-media-bytes'))),
+      writeFile: jest.fn(async () => undefined),
+      writeFileStream: jest.fn(
+        async ({ stream }: { stream?: NodeJS.ReadableStream }) => {
+          if (stream) {
+            for await (const _chunk of stream) {
+              // drain stream so file handle closes cleanly
+            }
+          }
+        },
+      ),
+      delete: jest.fn(async () => undefined),
+    };
     const storage = {
-      getCurrentDriver: jest.fn(),
+      getCurrentDriver: jest.fn(() => storageDriver),
     };
     const probe = {
-      probeMedia: jest.fn(),
-      extractVideoThumbnail: jest.fn(),
+      probeMedia: jest.fn().mockResolvedValue({
+        durationSec: 4.5,
+        width: 1080,
+        height: 1920,
+      }),
+      extractVideoThumbnail: jest.fn().mockResolvedValue(null),
+      trimVideo: jest.fn(
+        async (_inputPath: string, outputPath: string) => {
+          await fs.writeFile(outputPath, Buffer.from('trimmed-mp4-bytes'));
+          return outputPath;
+        },
+      ),
     };
     const router = {
       verifyProviderKey: jest.fn().mockResolvedValue({
@@ -296,6 +332,23 @@ describe('DeliveryStudioService', () => {
       }),
     };
 
+    const promptAi = {
+      getGeminiStatus: jest.fn(() => ({
+        configured: true,
+        source: 'ENV',
+        modelId: 'gemini-2.5-flash',
+      })),
+      generateVideoPromptFromMedia: jest.fn().mockResolvedValue({
+        prompt: 'Cinematic tracking shot matching @video1 motion',
+        summary: 'Analyzed video and product',
+        provider: 'gemini',
+        model: 'gemini-2.5-flash',
+        videoAnalysisUsed: true,
+        imagesAnalyzedCount: 1,
+        warnings: [],
+      }),
+    };
+
     const service = new DeliveryStudioService(
       dataSource,
       delivery as never,
@@ -309,6 +362,7 @@ describe('DeliveryStudioService', () => {
       videoHooks as never,
       aiQueue as never,
       driveService as never,
+      promptAi as never,
     );
 
     return {
@@ -319,6 +373,9 @@ describe('DeliveryStudioService', () => {
       videoHooks,
       aiQueue,
       driveService,
+      storageDriver,
+      probe,
+      promptAi,
     };
   };
 
@@ -681,4 +738,106 @@ describe('DeliveryStudioService', () => {
     expect(saveCallArg.defaultStyleConfig.borderRadiusPx).toBeUndefined();
     expect(saveCallArg.defaultStyleConfig.unknownExtraField).toBeUndefined();
   });
+
+  it('trims an already-uploaded reference video in-place and as a new copy while invalidating staged provider URLs', async () => {
+    const { service, repos, probe, storageDriver } = buildHarness();
+    const refRepo = repos.get(DeliveryStudioReferenceVideoEntity)!;
+    const original = refRepo.store[0] as Record<string, unknown>;
+    original.stagedUrlsJson = { wavespeed: 'https://cdn.example/old.mp4' };
+
+    probe.probeMedia.mockResolvedValueOnce({
+      durationSec: 8,
+      width: 1080,
+      height: 1920,
+    });
+
+    const trimmedInPlace = await service.trimReferenceVideo(makeAuth(), {
+      referenceVideoId: REF_VIDEO_ID,
+      trimStartSec: 1.2,
+      trimEndSec: 5.7,
+      title: 'Viral Walk Hook Ref (Trimmed)',
+      saveAsCopy: false,
+    });
+
+    expect(probe.trimVideo).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(String),
+      1.2,
+      4.5,
+    );
+    expect(storageDriver.writeFileStream).toHaveBeenCalled();
+    expect(trimmedInPlace.id).toBe(REF_VIDEO_ID);
+    expect(trimmedInPlace.title).toBe('Viral Walk Hook Ref (Trimmed)');
+    expect(trimmedInPlace.streamPath).toContain('&v=');
+    expect((refRepo.store[0] as Record<string, unknown>).stagedUrlsJson).toEqual(
+      {},
+    );
+    expect(refRepo.store).toHaveLength(1);
+
+    const trimmedCopy = await service.trimReferenceVideo(makeAuth(), {
+      referenceVideoId: REF_VIDEO_ID,
+      trimStartSec: 0,
+      trimEndSec: 3.0,
+      title: 'Short 3s Cut',
+      saveAsCopy: true,
+    });
+
+    expect(trimmedCopy.id).not.toBe(REF_VIDEO_ID);
+    expect(trimmedCopy.title).toBe('Short 3s Cut');
+    expect(refRepo.store).toHaveLength(2);
+  });
+
+  it('streams reference video to disk (passing filePath instead of raw bytes) during analyzeVideoPromptWithGemini and tolerates storage read errors', async () => {
+    const { service, storageDriver, promptAi } = buildHarness();
+
+    let capturedFilePath: string | undefined;
+    let capturedBytes: Buffer | undefined;
+    let fileExistedDuringCall = false;
+    promptAi.generateVideoPromptFromMedia.mockImplementationOnce(
+      async (input: {
+        video?: { filePath?: string; bytes?: Buffer } | null;
+      }) => {
+        capturedFilePath = input.video?.filePath;
+        capturedBytes = input.video?.bytes;
+        if (capturedFilePath) {
+          const stat = await fs.stat(capturedFilePath);
+          fileExistedDuringCall = stat.size > 0;
+        }
+        return {
+          prompt: 'Motion-matched prompt',
+          summary: 'OK',
+          provider: 'gemini',
+          model: 'gemini-2.5-flash',
+          videoAnalysisUsed: true,
+          imagesAnalyzedCount: 1,
+          warnings: [],
+        };
+      },
+    );
+
+    const res = await service.analyzeVideoPromptWithGemini(makeAuth(), {
+      companyId: COMPANY_ID,
+      referenceVideoId: REF_VIDEO_ID,
+      characterAssetId: CHAR_ASSET_ID,
+      productKitId: KIT_ID,
+      modelKey: 'seedance-2.5',
+    });
+
+    expect(res.prompt).toBe('Motion-matched prompt');
+    expect(capturedFilePath).toBeTruthy();
+    expect(capturedBytes).toBeUndefined();
+    expect(fileExistedDuringCall).toBe(true);
+    // Temp file must be cleaned up after analysis completes
+    await expect(fs.stat(capturedFilePath!)).rejects.toThrow();
+
+    // Even if storage fails to stream the video, analysis should degrade cleanly instead of crashing
+    storageDriver.readFile.mockRejectedValueOnce(new Error('ENOENT missing'));
+    const degraded = await service.analyzeVideoPromptWithGemini(makeAuth(), {
+      companyId: COMPANY_ID,
+      referenceVideoId: REF_VIDEO_ID,
+      modelKey: 'seedance-2.5',
+    });
+    expect(degraded.prompt).toBeTruthy();
+  });
 });
+

@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
 import {
+  ARCHIVE_DELIVERY_STUDIO_ASSET,
   GET_DELIVERY_STUDIO_CLIENT_DRIVE_FOLDERS,
   GET_DELIVERY_STUDIO_HOOK_PROJECT,
   RENDER_DELIVERY_STUDIO_VIDEO_HOOKS,
@@ -714,13 +715,48 @@ const StyledSavingPathLine = styled.div`
   }
 `;
 
+const StyledDriveRootRow = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+`;
+
+const StyledDriveRootPill = styled.button<{ $active?: boolean }>`
+  align-items: center;
+  background: ${({ $active }) =>
+    $active
+      ? themeCssVariables.background.transparent.blue
+      : themeCssVariables.background.primary};
+  border: 1px solid
+    ${({ $active }) =>
+      $active
+        ? themeCssVariables.color.blue
+        : themeCssVariables.border.color.medium};
+  border-radius: 999px;
+  color: ${({ $active }) =>
+    $active
+      ? themeCssVariables.color.blue
+      : themeCssVariables.font.color.secondary};
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 600;
+  gap: 4px;
+  padding: 4px 10px;
+
+  &:hover {
+    border-color: ${themeCssVariables.color.blue};
+    color: ${themeCssVariables.font.color.primary};
+  }
+`;
+
 type DeliveryStudioHooksStageProps = {
   companyId: string | null;
   clientName?: string | null;
   projectId?: string | null;
   selectedVideo: StudioAssetDTO | null;
   videos?: StudioAssetDTO[];
-  onSelectVideo?: (video: StudioAssetDTO) => void;
+  onSelectVideo?: (video: StudioAssetDTO | null) => void;
   hookPresets: StudioPresetDTO[];
   hookDefault: StudioHookDefaultSettingDTO | null;
   hasClientHookDefault: boolean;
@@ -792,6 +828,7 @@ export const DeliveryStudioHooksStage = ({
   const [isPlaying, setIsPlaying] = useState(false);
 
   // Drive folder selection + live search
+  const [selectedRootFolderId, setSelectedRootFolderId] = useState('');
   const [driveMode, setDriveMode] = useState<'AUTO' | 'EXISTING' | 'CUSTOM'>(
     'AUTO',
   );
@@ -809,6 +846,7 @@ export const DeliveryStudioHooksStage = ({
   }, [driveSearchInput]);
 
   useEffect(() => {
+    setSelectedRootFolderId('');
     setDriveMode('AUTO');
     setSelectedDriveFolderId('');
     setSelectedDriveFolderName('');
@@ -825,6 +863,10 @@ export const DeliveryStudioHooksStage = ({
     null,
   );
   const [editorOpen, setEditorOpen] = useState(false);
+  const [confirmDeleteVideoId, setConfirmDeleteVideoId] = useState<
+    string | null
+  >(null);
+  const [deletingVideo, setDeletingVideo] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -883,6 +925,7 @@ export const DeliveryStudioHooksStage = ({
     variables: {
       companyId: companyId ?? '',
       search: debouncedDriveSearch || null,
+      rootFolderId: selectedRootFolderId || null,
     },
     skip: !companyId,
     fetchPolicy: 'cache-and-network',
@@ -909,6 +952,8 @@ export const DeliveryStudioHooksStage = ({
 
   const [upsertPresetMutation] = useMutation(UPSERT_DELIVERY_STUDIO_PRESET);
 
+  const [archiveAssetMutation] = useMutation(ARCHIVE_DELIVERY_STUDIO_ASSET);
+
   const hookProject = hookProjectQuery.data?.deliveryStudioHookProject ?? null;
   const driveInfo = driveFoldersQuery.data?.deliveryStudioClientDriveFolders;
   const driveRootSubfolders = driveInfo?.subfolders ?? driveInfo?.folders ?? [];
@@ -918,6 +963,7 @@ export const DeliveryStudioHooksStage = ({
   useEffect(() => {
     setHooks([]);
     setPreviewHookId(null);
+    setConfirmDeleteVideoId(null);
     setError(null);
     setFeedback(null);
   }, [selectedVideo?.id]);
@@ -1036,6 +1082,31 @@ export const DeliveryStudioHooksStage = ({
     }
   };
 
+  const handleDeleteSelectedVideo = async () => {
+    if (!selectedVideo) return;
+    setDeletingVideo(true);
+    setError(null);
+    setFeedback(null);
+    const deletedId = selectedVideo.id;
+    const deletedTitle = selectedVideo.title;
+    try {
+      await archiveAssetMutation({
+        variables: { assetId: deletedId },
+      });
+      setConfirmDeleteVideoId(null);
+      const nextVideo = videos.find((v) => v.id !== deletedId) ?? null;
+      onSelectVideo?.(nextVideo);
+      await onRefreshWorkspace();
+      setFeedback(`Deleted video "${deletedTitle}".`);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Failed to delete video.',
+      );
+    } finally {
+      setDeletingVideo(false);
+    }
+  };
+
   const renderSourceBar = () => (
     <StyledSourceBar>
       <div
@@ -1087,17 +1158,57 @@ export const DeliveryStudioHooksStage = ({
         )}
       </div>
 
-      <div style={{ alignItems: 'center', display: 'flex', gap: 8 }}>
+      <div
+        style={{
+          alignItems: 'center',
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 8,
+        }}
+      >
         {selectedVideo && companyId && (
           <StyledSubtleButton
             type="button"
-            disabled={uploadingVideos}
+            disabled={uploadingVideos || deletingVideo}
             onClick={() => setEditorOpen(true)}
             title="Trim this video or stitch another clip onto it before rendering text hook variations"
           >
-            ✂ Edit / Add Clips
+            ✂ Trim / Add Clips
           </StyledSubtleButton>
         )}
+
+        {selectedVideo &&
+          (confirmDeleteVideoId === selectedVideo.id ? (
+            <>
+              <StyledSubtleButton
+                type="button"
+                disabled={deletingVideo}
+                onClick={() => void handleDeleteSelectedVideo()}
+                style={{
+                  borderColor: themeCssVariables.color.red,
+                  color: themeCssVariables.color.red11,
+                }}
+              >
+                {deletingVideo ? 'Deleting…' : 'Confirm Delete'}
+              </StyledSubtleButton>
+              <StyledSubtleButton
+                type="button"
+                disabled={deletingVideo}
+                onClick={() => setConfirmDeleteVideoId(null)}
+              >
+                Cancel
+              </StyledSubtleButton>
+            </>
+          ) : (
+            <StyledSubtleButton
+              type="button"
+              disabled={uploadingVideos || deletingVideo}
+              onClick={() => setConfirmDeleteVideoId(selectedVideo.id)}
+              title="Delete this uploaded or generated video"
+            >
+              Delete
+            </StyledSubtleButton>
+          ))}
 
         <StyledUploadLabel disabled={!companyId || uploadingVideos}>
           {uploadingVideos
@@ -1315,19 +1426,27 @@ export const DeliveryStudioHooksStage = ({
   };
 
   const resolveDriveRoutingInput = () => {
+    const activeRootFolderId =
+      driveInfo?.selectedRootFolderId ||
+      selectedRootFolderId ||
+      driveInfo?.rootFolderId ||
+      null;
     if (driveMode === 'EXISTING' && selectedDriveFolderId) {
       return {
+        driveRootFolderId: activeRootFolderId,
         driveTargetFolderId: selectedDriveFolderId,
         driveSubfolderName: null,
       };
     }
     if (driveMode === 'CUSTOM' && customSubfolderName.trim()) {
       return {
+        driveRootFolderId: activeRootFolderId,
         driveTargetFolderId: null,
         driveSubfolderName: customSubfolderName.trim(),
       };
     }
     return {
+      driveRootFolderId: activeRootFolderId,
       driveTargetFolderId: null,
       driveSubfolderName: productNameFromMeta || null,
     };
@@ -1849,7 +1968,9 @@ export const DeliveryStudioHooksStage = ({
               <span>
                 {driveInfo?.connected
                   ? driveInfo.clientMapped && driveInfo.rootFolderName
-                    ? `Linked · ${driveInfo.rootFolderName}`
+                    ? (driveInfo.rootFolders?.length ?? 0) > 1
+                      ? `${driveInfo.rootFolders?.length} main folders linked · Active: ${driveInfo.rootFolderName}`
+                      : `Linked · ${driveInfo.rootFolderName}`
                     : 'Drive connected — link a client folder for smart month routing'
                   : 'Connect Drive in Deliverables to auto-sync'}
               </span>
@@ -1864,16 +1985,51 @@ export const DeliveryStudioHooksStage = ({
                   textDecoration: 'none',
                 }}
               >
-                {driveInfo?.clientMapped ? 'Change folder ⚙' : 'Set up folder ⚙'}
+                {driveInfo?.clientMapped ? 'Manage folders ⚙' : 'Set up folder ⚙'}
               </Link>
             )}
           </StyledPanelHeader>
+
+          {driveInfo?.connected &&
+            driveInfo.clientMapped &&
+            (driveInfo.rootFolders?.length ?? 0) > 1 && (
+              <StyledDriveRootRow>
+                {(driveInfo.rootFolders ?? []).map((rf) => {
+                  const activeId =
+                    driveInfo.selectedRootFolderId ||
+                    selectedRootFolderId ||
+                    driveInfo.rootFolderId;
+                  const isActive = activeId === rf.id;
+                  return (
+                    <StyledDriveRootPill
+                      key={rf.id}
+                      type="button"
+                      $active={isActive}
+                      title={
+                        rf.label
+                          ? `${rf.label} — ${rf.name}${rf.isDefault ? ' (Default)' : ''}`
+                          : `${rf.name}${rf.isDefault ? ' (Default)' : ''}`
+                      }
+                      onClick={() => {
+                        setSelectedRootFolderId(rf.id);
+                        setDriveMode('AUTO');
+                        setSelectedDriveFolderId('');
+                        setSelectedDriveFolderName('');
+                      }}
+                    >
+                      <span>{rf.isDefault ? '★' : '📁'}</span>
+                      <span>{rf.label ? `${rf.label} · ${rf.name}` : rf.name}</span>
+                    </StyledDriveRootPill>
+                  );
+                })}
+              </StyledDriveRootRow>
+            )}
 
           {driveInfo?.connected && (
             <StyledDriveSummaryBox>
               <StyledDriveSummaryRow>
                 <span>
-                  Client folder:{' '}
+                  Main folder:{' '}
                   {driveInfo.clientMapped && driveInfo.rootFolderName ? (
                     <a
                       href={

@@ -202,9 +202,12 @@ type BreadcrumbItem = {
 };
 
 type DeliveryDriveFolderPickerProps = {
-  selectedFolderId: string;
-  selectedFolderName: string;
+  selectedFolderId?: string;
+  selectedFolderName?: string;
   selectedFolderWebUrl?: string | null;
+  selectedFolderIds?: string[];
+  selectLabel?: string;
+  selectedLabel?: string;
   placeholder?: string;
   autoLoad?: boolean;
   onSelect: (folder: DriveFolderOption) => void;
@@ -212,9 +215,12 @@ type DeliveryDriveFolderPickerProps = {
 };
 
 export const DeliveryDriveFolderPicker = ({
-  selectedFolderId,
-  selectedFolderName,
+  selectedFolderId = '',
+  selectedFolderName = '',
   selectedFolderWebUrl,
+  selectedFolderIds,
+  selectLabel = 'Select',
+  selectedLabel = 'Selected',
   placeholder = 'Search Google Drive folders by name…',
   autoLoad = false,
   onSelect,
@@ -359,13 +365,15 @@ export const DeliveryDriveFolderPicker = ({
               </StyledEmptyState>
             ) : (
               folders.map((folder) => {
-                const isSelected = folder.id === selectedFolderId;
+                const isSelected = selectedFolderIds
+                  ? selectedFolderIds.includes(folder.id)
+                  : folder.id === selectedFolderId;
                 return (
                   <StyledFolderRow key={folder.id} $selected={isSelected}>
                     <StyledFolderNameButton
                       type="button"
                       onClick={() => onSelect(folder)}
-                      title={`Select "${folder.name}"`}
+                      title={`${selectLabel} "${folder.name}"`}
                     >
                       <span>📁</span>
                       <span>{folder.name}</span>
@@ -392,7 +400,7 @@ export const DeliveryDriveFolderPicker = ({
                         $active={isSelected}
                         onClick={() => onSelect(folder)}
                       >
-                        {isSelected ? 'Selected' : 'Select'}
+                        {isSelected ? selectedLabel : selectLabel}
                       </StyledMiniButton>
                     </div>
                   </StyledFolderRow>

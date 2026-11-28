@@ -7,6 +7,8 @@ import { themeCssVariables } from 'twenty-ui/theme-constants';
 import { DeliveryOperationalPage } from '@/delivery/operations-pages/DeliveryOperationalPage';
 import {
   ANALYZE_DELIVERY_STUDIO_VIDEO_PROMPT,
+  ARCHIVE_DELIVERY_STUDIO_ASSET,
+  ARCHIVE_DELIVERY_STUDIO_REFERENCE_VIDEO,
   BATCH_GENERATE_DELIVERY_STUDIO_VIDEOS,
   GENERATE_DELIVERY_STUDIO_CHARACTER_SHEET,
   GENERATE_DELIVERY_STUDIO_VIDEO,
@@ -1044,6 +1046,18 @@ export const DeliveryAiStudioPage = () => {
   );
   const [editingVideoAsset, setEditingVideoAsset] =
     useState<StudioAssetDTO | null>(null);
+  const [editingRefVideo, setEditingRefVideo] =
+    useState<StudioReferenceVideoDTO | null>(null);
+  const [confirmDeleteRefVideoId, setConfirmDeleteRefVideoId] = useState<
+    string | null
+  >(null);
+  const [deletingRefVideoId, setDeletingRefVideoId] = useState<string | null>(
+    null,
+  );
+  const [confirmDeleteAssetId, setConfirmDeleteAssetId] = useState<
+    string | null
+  >(null);
+  const [deletingAssetId, setDeletingAssetId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [providerModalOpen, setProviderModalOpen] = useState(false);
   const [presetModalOpen, setPresetModalOpen] = useState(false);
@@ -1236,6 +1250,10 @@ export const DeliveryAiStudioPage = () => {
   const [approveAssetMutation] = useMutation(
     SET_DELIVERY_STUDIO_ASSET_APPROVED,
   );
+  const [archiveReferenceVideoMutation] = useMutation(
+    ARCHIVE_DELIVERY_STUDIO_REFERENCE_VIDEO,
+  );
+  const [archiveAssetMutation] = useMutation(ARCHIVE_DELIVERY_STUDIO_ASSET);
   const [analyzeVideoPromptMutation] = useMutation<{
     analyzeDeliveryStudioVideoPrompt: {
       prompt: string;
@@ -1867,6 +1885,55 @@ export const DeliveryAiStudioPage = () => {
     }
   };
 
+  const handleDeleteReferenceVideo = async (videoId: string) => {
+    setBanner(null);
+    setDeletingRefVideoId(videoId);
+    try {
+      await archiveReferenceVideoMutation({ variables: { id: videoId } });
+      setConfirmDeleteRefVideoId(null);
+      if (activeTab.selectedReferenceVideoId === videoId) {
+        patchActiveTab({
+          selectedReferenceVideoId: null,
+          geminiPromptMeta: null,
+        });
+      }
+      await workspaceQuery.refetch();
+      setBanner({ tone: 'info', text: 'Reference video deleted.' });
+    } catch (err) {
+      setBanner({
+        tone: 'error',
+        text:
+          err instanceof Error
+            ? err.message
+            : 'Could not delete reference video.',
+      });
+    } finally {
+      setDeletingRefVideoId(null);
+    }
+  };
+
+  const handleDeleteVideoAsset = async (assetId: string) => {
+    setBanner(null);
+    setDeletingAssetId(assetId);
+    try {
+      await archiveAssetMutation({ variables: { assetId } });
+      setConfirmDeleteAssetId(null);
+      if (activeTab.selectedVideoAssetId === assetId) {
+        const remaining = generatedVideos.find((v) => v.id !== assetId) ?? null;
+        patchActiveTab({ selectedVideoAssetId: remaining?.id ?? null });
+      }
+      await workspaceQuery.refetch();
+      setBanner({ tone: 'info', text: 'Video deleted.' });
+    } catch (err) {
+      setBanner({
+        tone: 'error',
+        text: err instanceof Error ? err.message : 'Could not delete video.',
+      });
+    } finally {
+      setDeletingAssetId(null);
+    }
+  };
+
   const handleGenerateVideo = async () => {
     if (!activeTab.companyId || !selectedRefVideo) return;
     setBanner(null);
@@ -2464,21 +2531,35 @@ export const DeliveryAiStudioPage = () => {
               <StyledClothingBadge>Clothing Brand</StyledClothingBadge>
             )}
 
-            {activeTab.companyId && clientDrive?.connected && (
-              <StyledDriveBadgeLink
-                to={`/delivery?view=clients&clientCompany=${encodeURIComponent(activeTab.companyId)}&clientSection=services`}
-                data-mapped={clientDrive.clientMapped ? 'true' : 'false'}
-                title={
-                  clientDrive.clientMapped
-                    ? `Drive folder: ${clientDrive.rootFolderName ?? 'Linked'} · Cycle: ${clientDrive.activeCycleLabel ?? clientDrive.activeMonthKey ?? 'Current month'} (starts day ${clientDrive.monthStartDay ?? 1})${clientDrive.matchedMonthFolder ? ` · Auto-matched month folder: ${clientDrive.matchedMonthFolder.name}` : ` · Target month: ${clientDrive.expectedMonthFolderName ?? clientDrive.activeMonthKey ?? 'Active month'}`} — Click to configure in Client workspace`
-                    : 'No Google Drive folder linked for this client yet — Click to set up in Client workspace'
-                }
-              >
-                {clientDrive.clientMapped && clientDrive.rootFolderName
-                  ? `📁 ${clientDrive.rootFolderName}${clientDrive.matchedMonthFolder ? ` / ${clientDrive.matchedMonthFolder.name}` : clientDrive.expectedMonthFolderName ? ` / ${clientDrive.expectedMonthFolderName}` : clientDrive.activeMonthKey ? ` / ${clientDrive.activeMonthKey}` : ''}`
-                  : '📁 Link Drive folder'}
-              </StyledDriveBadgeLink>
-            )}
+            {activeTab.companyId && clientDrive?.connected && (() => {
+              const linkedRoots = clientDrive.rootFolders ?? [];
+              const extraRootCount = Math.max(0, linkedRoots.length - 1);
+              const rootSummary =
+                linkedRoots.length > 1
+                  ? linkedRoots
+                      .map(
+                        (f) =>
+                          `${f.label ? `${f.label} (${f.name})` : f.name}${f.isDefault ? ' [Default]' : ''}`,
+                      )
+                      .join(', ')
+                  : (clientDrive.rootFolderName ?? 'Linked');
+
+              return (
+                <StyledDriveBadgeLink
+                  to={`/delivery?view=clients&clientCompany=${encodeURIComponent(activeTab.companyId)}&clientSection=services`}
+                  data-mapped={clientDrive.clientMapped ? 'true' : 'false'}
+                  title={
+                    clientDrive.clientMapped
+                      ? `Drive folder${linkedRoots.length > 1 ? 's' : ''}: ${rootSummary} · Cycle: ${clientDrive.activeCycleLabel ?? clientDrive.activeMonthKey ?? 'Current month'} (starts day ${clientDrive.monthStartDay ?? 1})${clientDrive.matchedMonthFolder ? ` · Auto-matched month folder: ${clientDrive.matchedMonthFolder.name}` : ` · Target month: ${clientDrive.expectedMonthFolderName ?? clientDrive.activeMonthKey ?? 'Active month'}`} — Click to configure in Client workspace`
+                      : 'No Google Drive folder linked for this client yet — Click to set up in Client workspace'
+                  }
+                >
+                  {clientDrive.clientMapped && clientDrive.rootFolderName
+                    ? `📁 ${clientDrive.rootFolderName}${extraRootCount > 0 ? ` (+${extraRootCount})` : ''}${clientDrive.matchedMonthFolder ? ` / ${clientDrive.matchedMonthFolder.name}` : clientDrive.expectedMonthFolderName ? ` / ${clientDrive.expectedMonthFolderName}` : clientDrive.activeMonthKey ? ` / ${clientDrive.activeMonthKey}` : ''}`
+                    : '📁 Link Drive folder'}
+                </StyledDriveBadgeLink>
+              );
+            })()}
 
             <StyledIconButton
               type="button"
@@ -3273,6 +3354,65 @@ export const DeliveryAiStudioPage = () => {
                     </StyledPickerMeta>
                     <StyledChangeLabel>Library →</StyledChangeLabel>
                   </StyledPickerTrigger>
+                  {selectedRefVideo && (
+                    <div
+                      style={{
+                        alignItems: 'center',
+                        display: 'flex',
+                        gap: 6,
+                        justifyContent: 'flex-end',
+                        marginTop: 6,
+                      }}
+                    >
+                      <StyledSubtleBtn
+                        type="button"
+                        disabled={deletingRefVideoId === selectedRefVideo.id}
+                        onClick={() => setEditingRefVideo(selectedRefVideo)}
+                        title="Trim this uploaded reference video"
+                      >
+                        ✂ Trim Video
+                      </StyledSubtleBtn>
+                      {confirmDeleteRefVideoId === selectedRefVideo.id ? (
+                        <>
+                          <StyledSubtleBtn
+                            type="button"
+                            disabled={deletingRefVideoId === selectedRefVideo.id}
+                            style={{
+                              borderColor: themeCssVariables.color.red,
+                              color: themeCssVariables.color.red,
+                            }}
+                            onClick={() =>
+                              void handleDeleteReferenceVideo(
+                                selectedRefVideo.id,
+                              )
+                            }
+                          >
+                            {deletingRefVideoId === selectedRefVideo.id
+                              ? 'Deleting…'
+                              : 'Confirm Delete'}
+                          </StyledSubtleBtn>
+                          <StyledSubtleBtn
+                            type="button"
+                            disabled={deletingRefVideoId === selectedRefVideo.id}
+                            onClick={() => setConfirmDeleteRefVideoId(null)}
+                          >
+                            Cancel
+                          </StyledSubtleBtn>
+                        </>
+                      ) : (
+                        <StyledSubtleBtn
+                          type="button"
+                          style={{ color: themeCssVariables.color.red }}
+                          onClick={() =>
+                            setConfirmDeleteRefVideoId(selectedRefVideo.id)
+                          }
+                          title="Delete this reference video from library"
+                        >
+                          Delete
+                        </StyledSubtleBtn>
+                      )}
+                    </div>
+                  )}
                 </StyledSlotCard>
 
                 <StyledSlotCard>
@@ -3571,13 +3711,55 @@ export const DeliveryAiStudioPage = () => {
                               buttonLabel="Inspect API Input"
                               legacyNote={resolvedApi.legacyNote}
                             />
-                            <StyledSubtleBtn
-                              type="button"
-                              style={{ width: '100%', padding: '7px 10px' }}
-                              onClick={() => setEditingVideoAsset(vid)}
-                            >
-                              ✂ Edit / Add Clips
-                            </StyledSubtleBtn>
+                            <div style={{ display: 'flex', gap: 6, width: '100%' }}>
+                              <StyledSubtleBtn
+                                type="button"
+                                style={{ flex: 1, padding: '7px 10px' }}
+                                onClick={() => setEditingVideoAsset(vid)}
+                              >
+                                ✂ Edit / Trim
+                              </StyledSubtleBtn>
+                              {confirmDeleteAssetId === vid.id ? (
+                                <>
+                                  <StyledSubtleBtn
+                                    type="button"
+                                    disabled={deletingAssetId === vid.id}
+                                    style={{
+                                      borderColor: themeCssVariables.color.red,
+                                      color: themeCssVariables.color.red,
+                                      padding: '7px 10px',
+                                    }}
+                                    onClick={() =>
+                                      void handleDeleteVideoAsset(vid.id)
+                                    }
+                                  >
+                                    {deletingAssetId === vid.id
+                                      ? '…'
+                                      : 'Confirm'}
+                                  </StyledSubtleBtn>
+                                  <StyledSubtleBtn
+                                    type="button"
+                                    disabled={deletingAssetId === vid.id}
+                                    style={{ padding: '7px 8px' }}
+                                    onClick={() => setConfirmDeleteAssetId(null)}
+                                  >
+                                    ×
+                                  </StyledSubtleBtn>
+                                </>
+                              ) : (
+                                <StyledSubtleBtn
+                                  type="button"
+                                  style={{
+                                    color: themeCssVariables.color.red,
+                                    padding: '7px 10px',
+                                  }}
+                                  onClick={() => setConfirmDeleteAssetId(vid.id)}
+                                  title="Delete this video"
+                                >
+                                  Delete
+                                </StyledSubtleBtn>
+                              )}
+                            </div>
                             <StyledPrimaryCta
                               type="button"
                               style={{ padding: '8px 12px', fontSize: 12 }}
@@ -3714,7 +3896,7 @@ export const DeliveryAiStudioPage = () => {
               selectedVideo={selectedVideo}
               videos={generatedVideos}
               onSelectVideo={(vid) =>
-                patchActiveTab({ selectedVideoAssetId: vid.id })
+                patchActiveTab({ selectedVideoAssetId: vid?.id ?? null })
               }
               hookPresets={hookPresets}
               hookDefault={workspace?.hookDefault ?? null}
@@ -3783,6 +3965,14 @@ export const DeliveryAiStudioPage = () => {
                 : {}),
             });
           }}
+          onDeletedReferenceVideo={(deletedId) => {
+            if (activeTab.selectedReferenceVideoId === deletedId) {
+              patchActiveTab({
+                selectedReferenceVideoId: null,
+                geminiPromptMeta: null,
+              });
+            }
+          }}
           onCreated={async () => {
             await workspaceQuery.refetch();
           }}
@@ -3821,6 +4011,45 @@ export const DeliveryAiStudioPage = () => {
             setPendingRefTrimFile(null);
           }}
           onCancel={() => setPendingRefTrimFile(null)}
+        />
+      )}
+
+      {/* Trim Already-Uploaded Reference Video Pop-Up */}
+      {editingRefVideo && (
+        <DeliveryStudioVideoTrimmerModal
+          existingVideo={editingRefVideo}
+          companyId={activeTab.companyId}
+          projectId={activeTab.projectId}
+          onSaved={async (video: StudioReferenceVideoDTO) => {
+            await workspaceQuery.refetch();
+            const minSec = currentVideoModel?.capabilities.minDurationSec ?? 4;
+            const maxSec = currentVideoModel?.capabilities.maxDurationSec ?? 15;
+            const knownDur =
+              typeof video.mediaMeta?.durationSec === 'number' &&
+              Number.isFinite(video.mediaMeta.durationSec) &&
+              video.mediaMeta.durationSec > 0
+                ? video.mediaMeta.durationSec
+                : null;
+            patchActiveTab({
+              selectedReferenceVideoId: video.id,
+              videoDurationAutoMatched: true,
+              geminiPromptMeta: null,
+              ...(knownDur !== null
+                ? {
+                    videoDurationSec: Math.max(
+                      minSec,
+                      Math.min(maxSec, Math.round(knownDur)),
+                    ),
+                  }
+                : {}),
+            });
+            setEditingRefVideo(null);
+            setBanner({
+              tone: 'info',
+              text: `Saved trimmed reference video "${video.title}"${knownDur ? ` (${knownDur.toFixed(1)}s)` : ''}.`,
+            });
+          }}
+          onCancel={() => setEditingRefVideo(null)}
         />
       )}
 
