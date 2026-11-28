@@ -59,6 +59,10 @@ export type StudioTabDraft = {
     modelId: string | null;
     summary: string;
     key: string;
+    videoFromCache?: boolean;
+    cachedImageCount?: number;
+    newlyAnalyzedImageCount?: number;
+    analyzedAt?: string;
   } | null;
   generateAudio: boolean;
   // Routing

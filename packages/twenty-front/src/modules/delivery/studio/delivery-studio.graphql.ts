@@ -178,3 +178,9 @@ export const ANALYZE_DELIVERY_STUDIO_VIDEO_PROMPT = gql`
     analyzeDeliveryStudioVideoPrompt(input: $input)
   }
 `;
+
+export const REFINE_DELIVERY_STUDIO_VIDEO_PROMPT = gql`
+  mutation RefineDeliveryStudioVideoPrompt($input: JSON!) {
+    refineDeliveryStudioVideoPrompt(input: $input)
+  }
+`;

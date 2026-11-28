@@ -7,6 +7,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { WorkspaceRelatedEntity } from 'src/engine/workspace-manager/types/workspace-related-entity';
+import { type StudioCachedImageAnalysis } from 'src/modules/delivery/deliverables/entities/delivery-deliverable.entity';
 import { type StagedProviderUrlMap } from 'src/modules/delivery/studio/entities/delivery-studio-reference-video.entity';
 
 export type StudioProductAssetItem = {
@@ -19,6 +20,7 @@ export type StudioProductAssetItem = {
   sizeBytes: number;
   sha256: string;
   stagedUrls?: StagedProviderUrlMap;
+  aiVisualAnalysis?: StudioCachedImageAnalysis | null;
   createdAt: string;
 };
 

@@ -15,6 +15,7 @@ import {
   GET_DELIVERY_STUDIO_CLIENT_DRIVE_FOLDERS,
   GET_DELIVERY_STUDIO_WORKSPACE,
   IMPORT_DELIVERY_STUDIO_PRODUCT_FROM_URL,
+  REFINE_DELIVERY_STUDIO_VIDEO_PROMPT,
   REMOVE_DELIVERY_STUDIO_PRODUCT_KIT_ASSET,
   SET_DELIVERY_STUDIO_ASSET_APPROVED,
   UPDATE_DELIVERY_STUDIO_PRODUCT_ASSETS,
@@ -46,6 +47,7 @@ import { DeliveryStudioProviderModal } from '@/delivery/studio/DeliveryStudioPro
 import { DeliveryStudioQueueDock } from '@/delivery/studio/DeliveryStudioQueueDock';
 import { DeliveryStudioSettingsDrawer } from '@/delivery/studio/DeliveryStudioSettingsDrawer';
 import { DeliveryStudioVideoEditorModal } from '@/delivery/studio/DeliveryStudioVideoEditorModal';
+import { DeliveryStudioVideoPromptPanel } from '@/delivery/studio/DeliveryStudioVideoPromptPanel';
 import { DeliveryStudioVideoTrimmerModal } from '@/delivery/studio/DeliveryStudioVideoTrimmerModal';
 import {
   closeStudioTab,
@@ -965,32 +967,10 @@ const StyledToggleDot = styled.span`
   }
 `;
 
-const StyledPromptActionsRow = styled.div`
-  align-items: center;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: space-between;
-`;
-
 const StyledPromptHint = styled.div`
   color: ${themeCssVariables.font.color.secondary};
   font-size: 11px;
   line-height: 1.4;
-`;
-
-const StyledPromptTextarea = styled.textarea`
-  background: ${themeCssVariables.background.primary};
-  border: 1px solid ${themeCssVariables.border.color.medium};
-  border-radius: 8px;
-  color: ${themeCssVariables.font.color.primary};
-  font-family: inherit;
-  font-size: 12px;
-  line-height: 1.45;
-  min-height: 132px;
-  padding: 9px 10px;
-  resize: vertical;
-  width: 100%;
 `;
 
 const StyledCostCaption = styled.div`
@@ -1073,7 +1053,27 @@ export const DeliveryAiStudioPage = () => {
     Record<string, number>
   >({});
   const [analyzingPrompt, setAnalyzingPrompt] = useState(false);
+  const [refiningPrompt, setRefiningPrompt] = useState(false);
   const [promptExpanded, setPromptExpanded] = useState(false);
+  const [autoAttemptedKeys, setAutoAttemptedKeys] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const markAutoAttemptedKey = useCallback((key: string) => {
+    setAutoAttemptedKeys((prev) => {
+      if (prev.has(key)) return prev;
+      const next = new Set(prev);
+      next.add(key);
+      return next;
+    });
+  }, []);
+  const clearAutoAttemptedKey = useCallback((key: string) => {
+    setAutoAttemptedKeys((prev) => {
+      if (!prev.has(key)) return prev;
+      const next = new Set(prev);
+      next.delete(key);
+      return next;
+    });
+  }, []);
   const [dismissedFailedJobIds, setDismissedFailedJobIds] = useState<
     Set<string>
   >(() => new Set());
@@ -1261,9 +1261,24 @@ export const DeliveryAiStudioPage = () => {
       modelId: string | null;
       summary: string;
       analyzedImageCount: number;
+      newlyAnalyzedImageCount?: number;
+      cachedImageCount?: number;
+      videoAnalysisFromCache?: boolean;
+      videoAnalysisSaved?: boolean;
+      videoAnalysisText?: string | null;
+      videoAnalyzedAt?: string | null;
       referenceVideoDurationSec: number | null;
     };
   }>(ANALYZE_DELIVERY_STUDIO_VIDEO_PROMPT);
+
+  const [refineVideoPromptMutation] = useMutation<{
+    refineDeliveryStudioVideoPrompt: {
+      prompt: string;
+      source: string;
+      modelId: string | null;
+      summary: string;
+    };
+  }>(REFINE_DELIVERY_STUDIO_VIDEO_PROMPT);
 
   // Derived data
   const clients = useMemo(
@@ -1809,79 +1824,242 @@ export const DeliveryAiStudioPage = () => {
     includedAssetIdSet,
   ]);
 
+  const refVideoVersion = useMemo(() => {
+    const path = selectedRefVideo?.streamPath ?? '';
+    const match = /[?&]v=([^&]+)/.exec(path);
+    return match?.[1] ?? '';
+  }, [selectedRefVideo?.streamPath]);
+
   const videoPromptInputKey = useMemo(
     () =>
       [
+        activeTab.companyId ?? '',
         activeTab.useCharacterSheet ? 'char' : 'direct',
         effectiveCharSheet?.id ?? '',
         selectedVideoProductAssets.map((a) => a.id).join(','),
         selectedRefVideo?.id ?? '',
+        refVideoVersion,
         activeTab.videoModelKey,
       ].join('|'),
     [
+      activeTab.companyId,
       activeTab.useCharacterSheet,
       effectiveCharSheet?.id,
       selectedVideoProductAssets,
       selectedRefVideo?.id,
+      refVideoVersion,
       activeTab.videoModelKey,
     ],
   );
 
-  const handleAnalyzeVideoPrompt = async () => {
+  const handleAnalyzeVideoPrompt = useCallback(
+    async (opts?: {
+      forceReanalyzeVideo?: boolean;
+      forceReanalyzeImages?: boolean;
+      auto?: boolean;
+    }) => {
+      if (!activeTab.companyId || !selectedRefVideo) return;
+      const targetTabId = activeTab.id;
+      const targetKey = videoPromptInputKey;
+      markAutoAttemptedKey(targetKey);
+      if (!opts?.auto) {
+        setBanner(null);
+      }
+      setAnalyzingPrompt(true);
+      try {
+        const videoProductAssetIds = selectedVideoProductAssets.map(
+          (a) => a.id,
+        );
+        const res = await analyzeVideoPromptMutation({
+          variables: {
+            input: {
+              companyId: activeTab.companyId,
+              referenceVideoId: selectedRefVideo.id,
+              characterAssetId: effectiveCharSheet?.id ?? null,
+              productKitId: selectedVideoGarment?.id ?? null,
+              productAssetIds:
+                videoProductAssetIds.length > 0
+                  ? videoProductAssetIds
+                  : undefined,
+              environmentPresetId: !effectiveCharSheet
+                ? activeTab.selectedEnvironmentPresetId ?? null
+                : undefined,
+              modelKey: activeTab.videoModelKey,
+              environmentOverride:
+                activeTab.videoEnvironmentOverride.trim() || undefined,
+              customNotes: activeTab.videoCustomNotes.trim() || undefined,
+              forceReanalyzeVideo: opts?.forceReanalyzeVideo ?? false,
+              forceReanalyzeImages: opts?.forceReanalyzeImages ?? false,
+            },
+          },
+        });
+        const analyzed = res.data?.analyzeDeliveryStudioVideoPrompt;
+        if (analyzed?.prompt) {
+          setTabsState((prev) => ({
+            ...prev,
+            tabs: prev.tabs.map((t) =>
+              t.id === targetTabId
+                ? {
+                    ...t,
+                    videoMasterPrompt: analyzed.prompt,
+                    geminiPromptMeta: {
+                      source: analyzed.source,
+                      modelId: analyzed.modelId,
+                      summary: analyzed.summary,
+                      key: targetKey,
+                      videoFromCache: analyzed.videoAnalysisFromCache,
+                      cachedImageCount: analyzed.cachedImageCount,
+                      newlyAnalyzedImageCount: analyzed.newlyAnalyzedImageCount,
+                      analyzedAt:
+                        analyzed.videoAnalyzedAt ?? new Date().toISOString(),
+                    },
+                  }
+                : t,
+            ),
+          }));
+          if (
+            analyzed.videoAnalysisSaved ||
+            (analyzed.newlyAnalyzedImageCount ?? 0) > 0
+          ) {
+            void workspaceQuery.refetch();
+          }
+          if (!opts?.auto) {
+            setBanner({
+              tone: 'info',
+              text: analyzed.summary,
+            });
+          }
+        }
+      } catch (err) {
+        setBanner({
+          tone: 'error',
+          text:
+            err instanceof Error
+              ? err.message
+              : 'Could not analyze media with Gemini.',
+        });
+      } finally {
+        setAnalyzingPrompt(false);
+      }
+    },
+    [
+      activeTab.companyId,
+      activeTab.id,
+      activeTab.selectedEnvironmentPresetId,
+      activeTab.videoModelKey,
+      activeTab.videoEnvironmentOverride,
+      activeTab.videoCustomNotes,
+      selectedRefVideo,
+      selectedVideoProductAssets,
+      selectedVideoGarment?.id,
+      effectiveCharSheet,
+      videoPromptInputKey,
+      markAutoAttemptedKey,
+      analyzeVideoPromptMutation,
+      workspaceQuery,
+    ],
+  );
+
+  // Automatic one-shot media analysis when entering Step 2 or when selected media changes.
+  // Never repeats for the same media key, and never overwrites a user-typed prompt when no AI meta exists.
+  useEffect(() => {
+    if (activeTab.stage !== 'VIDEO_GENERATION') return;
+    if (!activeTab.autoPromptWithGemini) return;
+    if (!workspace?.providerConfig?.geminiConfigured) return;
     if (!activeTab.companyId || !selectedRefVideo) return;
+    const hasVisualInputs = Boolean(
+      effectiveCharSheet || selectedVideoProductAssets.length > 0,
+    );
+    if (!hasVisualInputs) return;
+    if (analyzingPrompt || refiningPrompt) return;
+    if (activeTab.geminiPromptMeta?.key === videoPromptInputKey) return;
+    if (
+      !activeTab.geminiPromptMeta &&
+      activeTab.videoMasterPrompt.trim().length > 0
+    ) {
+      return;
+    }
+    if (autoAttemptedKeys.has(videoPromptInputKey)) return;
+
+    void handleAnalyzeVideoPrompt({ auto: true });
+  }, [
+    activeTab.stage,
+    activeTab.autoPromptWithGemini,
+    activeTab.companyId,
+    activeTab.geminiPromptMeta,
+    activeTab.videoMasterPrompt,
+    workspace?.providerConfig?.geminiConfigured,
+    selectedRefVideo,
+    effectiveCharSheet,
+    selectedVideoProductAssets.length,
+    analyzingPrompt,
+    refiningPrompt,
+    videoPromptInputKey,
+    autoAttemptedKeys,
+    handleAnalyzeVideoPrompt,
+  ]);
+
+  const handleRefineVideoPrompt = async (
+    editInstruction: string,
+  ): Promise<boolean> => {
+    if (!activeTab.companyId || !activeTab.videoMasterPrompt.trim()) {
+      return false;
+    }
+    const targetTabId = activeTab.id;
+    const targetKey = videoPromptInputKey;
     setBanner(null);
-    setAnalyzingPrompt(true);
+    setRefiningPrompt(true);
     try {
-      const videoProductAssetIds = selectedVideoProductAssets.map((a) => a.id);
-      const res = await analyzeVideoPromptMutation({
+      const res = await refineVideoPromptMutation({
         variables: {
           input: {
             companyId: activeTab.companyId,
-            referenceVideoId: selectedRefVideo.id,
-            characterAssetId: effectiveCharSheet?.id ?? null,
-            productKitId: selectedVideoGarment?.id ?? null,
-            productAssetIds:
-              videoProductAssetIds.length > 0 ? videoProductAssetIds : undefined,
-            environmentPresetId: !effectiveCharSheet
-              ? activeTab.selectedEnvironmentPresetId ?? null
-              : undefined,
+            currentPrompt: activeTab.videoMasterPrompt,
+            editInstruction,
             modelKey: activeTab.videoModelKey,
-            environmentOverride:
-              activeTab.videoEnvironmentOverride.trim() || undefined,
-            customNotes: activeTab.videoCustomNotes.trim() || undefined,
           },
         },
       });
-      const analyzed = res.data?.analyzeDeliveryStudioVideoPrompt;
-      if (analyzed?.prompt) {
-        patchActiveTab({
-          videoMasterPrompt: analyzed.prompt,
-          geminiPromptMeta: {
-            source: analyzed.source,
-            modelId: analyzed.modelId,
-            summary: analyzed.summary,
-            key: videoPromptInputKey,
-          },
-        });
-        setPromptExpanded(true);
-        setBanner({
-          tone: 'info',
-          text:
-            analyzed.source === 'GEMINI'
-              ? `Gemini (${analyzed.modelId ?? 'multimodal'}) wrote a tailored prompt from ${analyzed.analyzedImageCount} image${analyzed.analyzedImageCount === 1 ? '' : 's'} + reference video. Review or edit below before generating.`
-              : analyzed.summary,
-        });
+      const refined = res.data?.refineDeliveryStudioVideoPrompt;
+      if (refined?.prompt) {
+        markAutoAttemptedKey(targetKey);
+        setTabsState((prev) => ({
+          ...prev,
+          tabs: prev.tabs.map((t) =>
+            t.id === targetTabId
+              ? {
+                  ...t,
+                  videoMasterPrompt: refined.prompt,
+                  geminiPromptMeta: {
+                    ...(t.geminiPromptMeta ?? {
+                      source: 'GEMINI',
+                      modelId: refined.modelId,
+                      summary: refined.summary,
+                      key: targetKey,
+                    }),
+                    modelId:
+                      refined.modelId ?? t.geminiPromptMeta?.modelId ?? null,
+                    summary: refined.summary,
+                    key: targetKey,
+                  },
+                }
+              : t,
+          ),
+        }));
+        return true;
       }
+      return false;
     } catch (err) {
       setBanner({
         tone: 'error',
         text:
           err instanceof Error
             ? err.message
-            : 'Could not analyze media with Gemini.',
+            : 'Could not update prompt with AI.',
       });
+      return false;
     } finally {
-      setAnalyzingPrompt(false);
+      setRefiningPrompt(false);
     }
   };
 
@@ -3347,8 +3525,8 @@ export const DeliveryAiStudioPage = () => {
                       <span>
                         {selectedRefVideo
                           ? effectiveRefDurationSec !== null
-                            ? `${Math.round(effectiveRefDurationSec)}s · Output ${activeTab.videoDurationAutoMatched ? 'auto-matched to' : 'set to'} ${activeTab.videoDurationSec}s`
-                            : `Detecting length… · ${selectedRefVideo.notes || selectedRefVideo.originalFileName}`
+                            ? `${Math.round(effectiveRefDurationSec)}s · Output ${activeTab.videoDurationAutoMatched ? 'auto-matched to' : 'set to'} ${activeTab.videoDurationSec}s${selectedRefVideo.aiVideoAnalysis?.analysisText ? ' · Analyzed' : ''}`
+                            : `Detecting length… · ${selectedRefVideo.notes || selectedRefVideo.originalFileName}${selectedRefVideo.aiVideoAnalysis?.analysisText ? ' · Analyzed' : ''}`
                           : 'Pick from Reference Video Library or upload new'}
                       </span>
                     </StyledPickerMeta>
@@ -3415,161 +3593,56 @@ export const DeliveryAiStudioPage = () => {
                   )}
                 </StyledSlotCard>
 
-                <StyledSlotCard>
-                  <StyledSlotHeader>
-                    <h4>Auto-Prompt (Gemini)</h4>
-                    <div style={{ alignItems: 'center', display: 'flex', gap: 6 }}>
-                      {workspace?.providerConfig?.geminiConfigured ? (
-                        <span
-                          style={{
-                            color: themeCssVariables.color.green11,
-                            fontSize: 11,
-                            fontWeight: 600,
-                          }}
-                          title={`Active via ${workspace.providerConfig.geminiSource ?? 'API key'}`}
-                        >
-                          ● Gemini live
-                        </span>
-                      ) : (
-                        <StyledSubtleBtn
-                          type="button"
-                          onClick={() => setProviderModalOpen(true)}
-                          title="Add your Google Gemini API key so Analyze Images & Video uses live multimodal Gemini"
-                        >
-                          ○ Add Gemini key →
-                        </StyledSubtleBtn>
-                      )}
-                      <StyledTogglePill
-                        type="button"
-                        data-on={
-                          activeTab.autoPromptWithGemini ? 'true' : 'false'
-                        }
-                        aria-pressed={activeTab.autoPromptWithGemini}
-                        onClick={() => {
-                          const next = !activeTab.autoPromptWithGemini;
-                          if (!next && activeTab.geminiPromptMeta) {
-                            patchActiveTab({
-                              autoPromptWithGemini: false,
-                              videoMasterPrompt: '',
-                              geminiPromptMeta: null,
-                            });
-                          } else {
-                            patchActiveTab({ autoPromptWithGemini: next });
-                          }
-                        }}
-                      >
-                        <StyledToggleDot
-                          data-on={
-                            activeTab.autoPromptWithGemini ? 'true' : 'false'
-                          }
-                        />
-                        {activeTab.autoPromptWithGemini ? 'ON' : 'OFF'}
-                      </StyledTogglePill>
-                    </div>
-                  </StyledSlotHeader>
-
-                  {activeTab.autoPromptWithGemini ? (
-                    <>
-                      <StyledPromptHint>
-                        {effectiveCharSheet
-                          ? 'Gemini watches your Reference Video + inspects your Character Sheet & Product Photos to write a tailored shot-by-shot prompt with strict anti-leakage rules.'
-                          : 'Gemini watches your Reference Video + inspects your Product Photos to write a direct product-swap prompt keeping the reference person & motion.'}
-                      </StyledPromptHint>
-                      {activeTab.geminiPromptMeta && (
-                        <StyledPromptHint>
-                          {activeTab.geminiPromptMeta.key !==
-                          videoPromptInputKey
-                            ? 'Inputs changed since last analysis — click Re-analyze or Reset to regenerate.'
-                            : activeTab.geminiPromptMeta.source === 'GEMINI'
-                              ? `Prompt ready (${activeTab.geminiPromptMeta.modelId ?? 'Gemini'})`
-                              : activeTab.geminiPromptMeta.summary}
-                        </StyledPromptHint>
-                      )}
-                      <StyledPromptActionsRow>
-                        <StyledSubtleBtn
-                          type="button"
-                          disabled={analyzingPrompt || !selectedRefVideo}
-                          onClick={() => void handleAnalyzeVideoPrompt()}
-                        >
-                          {analyzingPrompt
-                            ? 'Analyzing media…'
-                            : activeTab.videoMasterPrompt.trim()
-                              ? 'Re-analyze Media'
-                              : 'Analyze Images & Video'}
-                        </StyledSubtleBtn>
-                        <div style={{ display: 'flex', gap: 6 }}>
-                          <StyledSubtleBtn
-                            type="button"
-                            onClick={() => setPromptExpanded((v) => !v)}
-                          >
-                            {promptExpanded
-                              ? 'Hide Prompt'
-                              : activeTab.videoMasterPrompt.trim()
-                                ? 'Edit Prompt'
-                                : 'Custom Prompt'}
-                          </StyledSubtleBtn>
-                          {activeTab.videoMasterPrompt.trim() && (
-                            <StyledSubtleBtn
-                              type="button"
-                              onClick={() =>
-                                patchActiveTab({
-                                  videoMasterPrompt: '',
-                                  geminiPromptMeta: null,
-                                })
-                              }
-                            >
-                              Reset
-                            </StyledSubtleBtn>
-                          )}
-                        </div>
-                      </StyledPromptActionsRow>
-                    </>
-                  ) : (
-                    <>
-                      <StyledPromptHint>
-                        Off — uses the built-in shot-by-shot recreation template
-                        (or your custom prompt below) without calling Gemini.
-                      </StyledPromptHint>
-                      <StyledPromptActionsRow>
-                        <StyledSubtleBtn
-                          type="button"
-                          onClick={() => setPromptExpanded((v) => !v)}
-                        >
-                          {promptExpanded
-                            ? 'Hide Prompt'
-                            : activeTab.videoMasterPrompt.trim()
-                              ? 'Edit Custom Prompt'
-                              : 'Write Custom Prompt'}
-                        </StyledSubtleBtn>
-                        {activeTab.videoMasterPrompt.trim() && (
-                          <StyledSubtleBtn
-                            type="button"
-                            onClick={() =>
-                              patchActiveTab({
-                                videoMasterPrompt: '',
-                                geminiPromptMeta: null,
-                              })
-                            }
-                          >
-                            Reset
-                          </StyledSubtleBtn>
-                        )}
-                      </StyledPromptActionsRow>
-                    </>
+                <DeliveryStudioVideoPromptPanel
+                  geminiConfigured={Boolean(
+                    workspace?.providerConfig?.geminiConfigured,
                   )}
-
-                  {promptExpanded && (
-                    <StyledPromptTextarea
-                      value={activeTab.videoMasterPrompt}
-                      placeholder="Leave empty to auto-generate with Gemini (when ON) or use the default recreation prompt (when OFF)…"
-                      onChange={(e) =>
-                        patchActiveTab({
-                          videoMasterPrompt: e.target.value,
-                        })
+                  geminiModelId={
+                    workspace?.providerConfig?.geminiModelId ?? null
+                  }
+                  geminiSource={workspace?.providerConfig?.geminiSource ?? null}
+                  autoPromptWithGemini={activeTab.autoPromptWithGemini}
+                  onToggleAutoPrompt={(next) => {
+                    if (!next && activeTab.geminiPromptMeta) {
+                      patchActiveTab({
+                        autoPromptWithGemini: false,
+                        videoMasterPrompt: '',
+                        geminiPromptMeta: null,
+                      });
+                    } else {
+                      if (next) {
+                        clearAutoAttemptedKey(videoPromptInputKey);
                       }
-                    />
+                      patchActiveTab({ autoPromptWithGemini: next });
+                    }
+                  }}
+                  prompt={activeTab.videoMasterPrompt}
+                  onChangePrompt={(next) =>
+                    patchActiveTab({ videoMasterPrompt: next })
+                  }
+                  onResetPrompt={() => {
+                    markAutoAttemptedKey(videoPromptInputKey);
+                    patchActiveTab({
+                      videoMasterPrompt: '',
+                      geminiPromptMeta: null,
+                    });
+                  }}
+                  promptExpanded={promptExpanded}
+                  onTogglePromptExpanded={() => setPromptExpanded((v) => !v)}
+                  analyzingPrompt={analyzingPrompt}
+                  refiningPrompt={refiningPrompt}
+                  onAnalyze={(opts) => void handleAnalyzeVideoPrompt(opts)}
+                  onRefinePrompt={handleRefineVideoPrompt}
+                  onOpenProviderSettings={() => setProviderModalOpen(true)}
+                  selectedRefVideo={selectedRefVideo}
+                  effectiveCharSheet={effectiveCharSheet}
+                  selectedProductAssets={selectedVideoProductAssets}
+                  isStaleForMedia={Boolean(
+                    activeTab.geminiPromptMeta &&
+                      activeTab.geminiPromptMeta.key !== videoPromptInputKey,
                   )}
-                </StyledSlotCard>
+                  promptMeta={activeTab.geminiPromptMeta}
+                />
 
                 <StyledPrimaryCta
                   type="button"

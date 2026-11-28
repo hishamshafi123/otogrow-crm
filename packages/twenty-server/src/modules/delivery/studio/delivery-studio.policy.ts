@@ -187,6 +187,20 @@ export const analyzeVideoPromptSchema = z
       .optional(),
     environmentOverride: z.string().trim().max(2000).optional(),
     customNotes: z.string().trim().max(2000).optional(),
+    forceReanalyzeVideo: z.boolean().optional(),
+    forceReanalyzeImages: z.boolean().optional(),
+  })
+  .strict();
+
+export const refineVideoPromptSchema = z
+  .object({
+    companyId: z.string().uuid(),
+    currentPrompt: z.string().trim().min(10).max(12000),
+    editInstruction: z.string().trim().min(2).max(1500),
+    modelKey: z
+      .string()
+      .refine((v) => MODEL_KEYS.includes(v), 'Unsupported video model')
+      .optional(),
   })
   .strict();
 

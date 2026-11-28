@@ -144,6 +144,12 @@ export type StudioReferenceVideoDTO = {
     width?: number;
     height?: number;
   };
+  aiVideoAnalysis?: {
+    analysisText: string;
+    modelId: string;
+    analyzedAt: string;
+    mode: 'VIDEO' | 'KEYFRAMES';
+  } | null;
   streamPath: string;
   thumbnailPath: string | null;
   usageCount?: number;
@@ -160,6 +166,8 @@ export type StudioProductAssetDTO = {
   mimeType: string;
   sizeBytes: number;
   imagePath: string;
+  hasAiAnalysis?: boolean;
+  aiAnalysisDescription?: string | null;
   createdAt: string;
 };
 
@@ -203,6 +211,8 @@ export type StudioAssetDTO = {
   hookProjectId: string | null;
   tags: string[];
   metadata: Record<string, unknown>;
+  hasAiAnalysis?: boolean;
+  aiAnalysisDescription?: string | null;
   mediaPath: string;
   thumbnailPath: string | null;
   createdAt: string;

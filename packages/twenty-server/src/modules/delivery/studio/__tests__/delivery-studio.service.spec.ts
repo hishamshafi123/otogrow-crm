@@ -839,5 +839,198 @@ describe('DeliveryStudioService', () => {
     });
     expect(degraded.prompt).toBeTruthy();
   });
+
+  it('persists video & image analyses in DB and reuses them without re-streaming unless forced', async () => {
+    const { service, repos, storageDriver, promptAi } = buildHarness();
+
+    const kitRepo = repos.get(DeliveryStudioProductKitEntity)!;
+    (kitRepo.store[0] as Record<string, unknown>).assetsJson = [
+      {
+        id: 'prod-img-front',
+        role: 'front',
+        label: 'IMG_001.jpg',
+        storageKey: 'prod/front.jpg',
+        mimeType: 'image/jpeg',
+        sha256: 'sha-prod-front',
+      },
+      {
+        id: 'prod-img-back',
+        role: 'back',
+        label: 'IMG_002.jpg',
+        storageKey: 'prod/back.jpg',
+        mimeType: 'image/jpeg',
+        sha256: 'sha-prod-back',
+      },
+    ];
+    const refRepo = repos.get(DeliveryStudioReferenceVideoEntity)!;
+    (refRepo.store[0] as Record<string, unknown>).sha256 = 'sha-ref-v1';
+    const assetRepo = repos.get(DeliveryStudioAssetEntity)!;
+    (assetRepo.store[0] as Record<string, unknown>).sha256 = 'sha-char-v1';
+
+    const analyzeReferenceVideo = jest.fn().mockResolvedValue({
+      analysisText:
+        'SHOT & CAMERA: Handheld tracking push.\nORIGINAL GARMENT: Grey hoodie (to be replaced).',
+      modelId: 'gemini-2.5-flash',
+      mode: 'video',
+    });
+    const refineVideoPrompt = jest.fn().mockResolvedValue({
+      prompt: 'Slower camera push with warmer golden-hour lighting on @image1 wearing @image2.',
+      source: 'GEMINI' as const,
+      modelId: 'gemini-2.5-flash',
+      summary: 'Updated prompt with gemini-2.5-flash.',
+    });
+    Object.assign(promptAi, { analyzeReferenceVideo, refineVideoPrompt });
+
+    promptAi.generateVideoPromptFromMedia.mockImplementationOnce(async () => ({
+      prompt: 'Prompt v1 using @image1 @image2 @image3 @video1',
+      source: 'GEMINI' as const,
+      modelId: 'gemini-2.5-flash',
+      summary: 'Analyzed 3 images + video.',
+      analyzedImageCount: 3,
+      newlyAnalyzedImagesCount: 3,
+      usedCachedVideo: true,
+      newImageAnalyses: {
+        '@image1':
+          'View: CHARACTER SHEET (multi-angle) | Talent wearing matte black jacket.',
+        '@image2':
+          'View: FRONT VIEW | Matte black Japanese nylon shell jacket with front chest zip.',
+        '@image3':
+          'View: BACK VIEW | Clean plain matte black back panel with zero graphic prints.',
+      },
+    }));
+
+    // 1st call: analyzes video + all 3 images and saves every breakdown into DB
+    const first = await service.analyzeVideoPromptWithGemini(makeAuth(), {
+      companyId: COMPANY_ID,
+      referenceVideoId: REF_VIDEO_ID,
+      characterAssetId: CHAR_ASSET_ID,
+      productKitId: KIT_ID,
+      modelKey: 'seedance-2.5',
+    });
+
+    expect(analyzeReferenceVideo).toHaveBeenCalledTimes(1);
+    expect(first.videoAnalysisSaved).toBe(true);
+    expect(first.videoAnalysisFromCache).toBe(false);
+    expect(first.cachedImageCount).toBe(0);
+    expect(first.newlyAnalyzedImageCount).toBe(3);
+
+    // Verify video analysis is persisted into the reference video DB record
+    const savedRef = refRepo.store[0] as {
+      mediaMeta?: { aiVideoAnalysis?: { analysisText: string; sha256: string } };
+    };
+    expect(savedRef.mediaMeta?.aiVideoAnalysis?.analysisText).toContain(
+      'Handheld tracking push',
+    );
+    expect(savedRef.mediaMeta?.aiVideoAnalysis?.sha256).toBe('sha-ref-v1');
+
+    // Verify image analyses (character sheet + front/back product images) are persisted into DB
+    const savedChar = assetRepo.store[0] as {
+      metadataJson?: { aiVisualAnalysis?: { description: string } };
+    };
+    expect(savedChar.metadataJson?.aiVisualAnalysis?.description).toContain(
+      'CHARACTER SHEET',
+    );
+    const savedKitAssets = (
+      kitRepo.store[0] as {
+        assetsJson: Array<{
+          id: string;
+          aiVisualAnalysis?: { description: string };
+        }>;
+      }
+    ).assetsJson;
+    expect(savedKitAssets[0].aiVisualAnalysis?.description).toContain(
+      'FRONT VIEW',
+    );
+    expect(savedKitAssets[1].aiVisualAnalysis?.description).toContain(
+      'BACK VIEW',
+    );
+
+    // 2nd call for same media: reuses BOTH DB video analysis & DB image analyses (0 storage reads!)
+    storageDriver.readFile.mockClear();
+    analyzeReferenceVideo.mockClear();
+    promptAi.generateVideoPromptFromMedia.mockImplementationOnce(
+      async (input: {
+        images: Array<{ token: string; cachedAnalysis?: string; bytes?: Buffer }>;
+        video?: { cachedAnalysis?: string; filePath?: string };
+      }) => {
+        expect(input.video?.cachedAnalysis).toContain('Handheld tracking push');
+        expect(input.video?.filePath).toBeUndefined();
+        expect(input.images).toHaveLength(3);
+        for (const img of input.images) {
+          expect(img.cachedAnalysis).toBeTruthy();
+          expect(img.bytes).toBeUndefined();
+        }
+        return {
+          prompt: 'Fast cached prompt using @image1 @image2 @image3 @video1',
+          source: 'GEMINI' as const,
+          modelId: 'gemini-2.5-flash',
+          summary: 'Used cached video & image analyses.',
+          analyzedImageCount: 3,
+          newlyAnalyzedImagesCount: 0,
+          usedCachedVideo: true,
+          newImageAnalyses: {},
+        };
+      },
+    );
+
+    const second = await service.analyzeVideoPromptWithGemini(makeAuth(), {
+      companyId: COMPANY_ID,
+      referenceVideoId: REF_VIDEO_ID,
+      characterAssetId: CHAR_ASSET_ID,
+      productKitId: KIT_ID,
+      modelKey: 'seedance-2.5',
+    });
+
+    expect(analyzeReferenceVideo).not.toHaveBeenCalled();
+    expect(storageDriver.readFile).not.toHaveBeenCalled();
+    expect(second.videoAnalysisFromCache).toBe(true);
+    expect(second.videoAnalysisSaved).toBe(false);
+    expect(second.cachedImageCount).toBe(3);
+    expect(second.newlyAnalyzedImageCount).toBe(0);
+
+    // 3rd call with forceReanalyzeVideo: true -> re-analyzes video & updates DB, still reuses cached images
+    promptAi.generateVideoPromptFromMedia.mockImplementationOnce(async () => ({
+      prompt: 'Refreshed video prompt',
+      source: 'GEMINI' as const,
+      modelId: 'gemini-2.5-flash',
+      summary: 'Re-analyzed video.',
+      analyzedImageCount: 3,
+      newlyAnalyzedImagesCount: 0,
+      usedCachedVideo: true,
+      newImageAnalyses: {},
+    }));
+
+    const forced = await service.analyzeVideoPromptWithGemini(makeAuth(), {
+      companyId: COMPANY_ID,
+      referenceVideoId: REF_VIDEO_ID,
+      characterAssetId: CHAR_ASSET_ID,
+      productKitId: KIT_ID,
+      modelKey: 'seedance-2.5',
+      forceReanalyzeVideo: true,
+    });
+
+    expect(analyzeReferenceVideo).toHaveBeenCalledTimes(1);
+    expect(forced.videoAnalysisFromCache).toBe(false);
+    expect(forced.videoAnalysisSaved).toBe(true);
+    expect(forced.cachedImageCount).toBe(3);
+
+    // Quick AI prompt edit (text-only refinement without re-analyzing media)
+    const refined = await service.refineVideoPromptWithGemini(makeAuth(), {
+      companyId: COMPANY_ID,
+      currentPrompt: 'Prompt v1 using @image1 @image2 @video1',
+      editInstruction: 'Make the camera push slower with warmer lighting',
+      modelKey: 'seedance-2.5',
+    });
+
+    expect(refineVideoPrompt).toHaveBeenCalledWith(
+      expect.objectContaining({
+        currentPrompt: 'Prompt v1 using @image1 @image2 @video1',
+        editInstruction: 'Make the camera push slower with warmer lighting',
+        usesAtMentionTokens: true,
+      }),
+    );
+    expect(refined.prompt).toContain('warmer golden-hour lighting');
+    expect(refined.modelId).toBe('gemini-2.5-flash');
+  });
 });
 

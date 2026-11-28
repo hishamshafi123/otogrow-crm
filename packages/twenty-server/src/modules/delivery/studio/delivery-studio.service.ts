@@ -50,6 +50,8 @@ import {
 import {
   DeliveryDeliverableEntity,
   type DeliverableMediaMeta,
+  type StudioCachedImageAnalysis,
+  type StudioCachedVideoAnalysis,
 } from 'src/modules/delivery/deliverables/entities/delivery-deliverable.entity';
 import { type HookStyleConfig } from 'src/modules/delivery/deliverables/entities/delivery-video-hook-project.entity';
 import {
@@ -80,6 +82,7 @@ import {
   generateCharacterSheetSchema,
   generateVideoSchema,
   importProductFromUrlSchema,
+  refineVideoPromptSchema,
   renderSelectedHooksForStudioAssetSchema,
   saveProviderConfigSchema,
   saveStudioHookDefaultSchema,
@@ -466,6 +469,18 @@ export class DeliveryStudioService {
     usageCounts?: { totalCount: number; clientCount: number },
   ) {
     const versionTag = row.sha256 ? row.sha256.slice(0, 12) : undefined;
+    const savedAnalysis = row.mediaMeta?.aiVideoAnalysis;
+    const validAnalysis =
+      savedAnalysis &&
+      savedAnalysis.analysisText &&
+      (!row.sha256 || savedAnalysis.sha256 === row.sha256)
+        ? {
+            analysisText: savedAnalysis.analysisText,
+            modelId: savedAnalysis.modelId,
+            analyzedAt: savedAnalysis.analyzedAt,
+            mode: savedAnalysis.mode,
+          }
+        : null;
     return {
       id: row.id,
       companyId: row.companyId,
@@ -477,6 +492,7 @@ export class DeliveryStudioService {
       mimeType: row.mimeType,
       sizeBytes: Number(row.sizeBytes ?? 0),
       mediaMeta: row.mediaMeta ?? {},
+      aiVideoAnalysis: validAnalysis,
       streamPath: this.signedMediaPath(
         row.workspaceId,
         'ref-video',
@@ -510,21 +526,32 @@ export class DeliveryStudioService {
       category: row.category,
       notes: row.notes,
       tags: row.tagsJson ?? [],
-      assets: (row.assetsJson ?? []).map((item) => ({
-        id: item.id,
-        role: item.role,
-        label: item.label,
-        originalFileName: item.originalFileName,
-        mimeType: item.mimeType,
-        sizeBytes: item.sizeBytes,
-        imagePath: this.signedMediaPath(
-          row.workspaceId,
-          'product-asset',
-          row.id,
-          item.id,
-        ),
-        createdAt: item.createdAt,
-      })),
+      assets: (row.assetsJson ?? []).map((item) => {
+        const cached = item.aiVisualAnalysis;
+        const validCached =
+          cached &&
+          cached.description &&
+          (!item.sha256 || cached.sha256 === item.sha256)
+            ? cached
+            : null;
+        return {
+          id: item.id,
+          role: item.role,
+          label: item.label,
+          originalFileName: item.originalFileName,
+          mimeType: item.mimeType,
+          sizeBytes: item.sizeBytes,
+          imagePath: this.signedMediaPath(
+            row.workspaceId,
+            'product-asset',
+            row.id,
+            item.id,
+          ),
+          hasAiAnalysis: Boolean(validCached),
+          aiAnalysisDescription: validCached?.description ?? null,
+          createdAt: item.createdAt,
+        };
+      }),
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     };
@@ -611,6 +638,17 @@ export class DeliveryStudioService {
     const metadata = hydratedApiRequest
       ? { ...rawMeta, apiRequest: hydratedApiRequest }
       : rawMeta;
+    const rawCached = rawMeta.aiVisualAnalysis as
+      | StudioCachedImageAnalysis
+      | undefined
+      | null;
+    const validCached =
+      rawCached &&
+      typeof rawCached.description === 'string' &&
+      rawCached.description.length > 0 &&
+      (!row.sha256 || rawCached.sha256 === row.sha256)
+        ? rawCached
+        : null;
     return {
       id: row.id,
       companyId: row.companyId,
@@ -633,6 +671,8 @@ export class DeliveryStudioService {
       hookProjectId: row.hookProjectId,
       tags: row.tagsJson ?? [],
       metadata,
+      hasAiAnalysis: Boolean(validCached),
+      aiAnalysisDescription: validCached?.description ?? null,
       mediaPath: this.signedMediaPath(row.workspaceId, 'studio-asset', row.id),
       thumbnailPath: row.thumbnailKey
         ? this.signedMediaPath(row.workspaceId, 'studio-thumb', row.id)
@@ -2996,91 +3036,230 @@ export class DeliveryStudioService {
 
     const driver = this.storage.getCurrentDriver();
     const images: StudioPromptImageInput[] = [];
+    const imageMetaByToken = new Map<
+      string,
+      | { kind: 'CHARACTER_SHEET'; assetId: string; sha256: string }
+      | { kind: 'PRODUCT'; productKitId: string; itemId: string; sha256: string }
+    >();
+
     if (loaded.characterAsset) {
-      try {
-        const bytes = await readStreamToBuffer(
-          await driver.readFile({ filePath: loaded.characterAsset.storageKey }),
-        );
+      const charToken = `${imgPrefix}1`;
+      const rawCachedChar = (
+        (loaded.characterAsset.metadataJson ?? {}) as Record<string, unknown>
+      ).aiVisualAnalysis as StudioCachedImageAnalysis | undefined | null;
+      const validCachedChar =
+        !input.forceReanalyzeImages &&
+        rawCachedChar &&
+        typeof rawCachedChar.description === 'string' &&
+        rawCachedChar.description.trim().length > 0 &&
+        (!loaded.characterAsset.sha256 ||
+          rawCachedChar.sha256 === loaded.characterAsset.sha256)
+          ? rawCachedChar
+          : null;
+
+      imageMetaByToken.set(charToken, {
+        kind: 'CHARACTER_SHEET',
+        assetId: loaded.characterAsset.id,
+        sha256: loaded.characterAsset.sha256 ?? '',
+      });
+
+      if (validCachedChar) {
         images.push({
-          token: `${imgPrefix}1`,
+          token: charToken,
           role: 'CHARACTER_SHEET',
           label: loaded.characterAsset.title || 'Character Sheet',
           mimeType: loaded.characterAsset.mimeType,
-          bytes,
+          cachedAnalysis: validCachedChar.description,
         });
-      } catch (err) {
-        this.logger.warn(
-          `Skipped unreadable character sheet ${loaded.characterAsset.id} during Gemini prompt analysis: ${err instanceof Error ? err.message : String(err)}`,
-        );
+      } else {
+        try {
+          const bytes = await readStreamToBuffer(
+            await driver.readFile({ filePath: loaded.characterAsset.storageKey }),
+          );
+          images.push({
+            token: charToken,
+            role: 'CHARACTER_SHEET',
+            label: loaded.characterAsset.title || 'Character Sheet',
+            mimeType: loaded.characterAsset.mimeType,
+            bytes,
+          });
+        } catch (err) {
+          this.logger.warn(
+            `Skipped unreadable character sheet ${loaded.characterAsset.id} during Gemini prompt analysis: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
       }
     }
 
     for (const item of plannedKitAssets) {
       const idx = images.length + 1;
-      try {
-        const bytes = await readStreamToBuffer(
-          await driver.readFile({ filePath: item.storageKey }),
-        );
+      const prodToken = `${imgPrefix}${idx}`;
+      const rawCachedProd = item.aiVisualAnalysis;
+      const validCachedProd =
+        !input.forceReanalyzeImages &&
+        rawCachedProd &&
+        typeof rawCachedProd.description === 'string' &&
+        rawCachedProd.description.trim().length > 0 &&
+        (!item.sha256 || rawCachedProd.sha256 === item.sha256)
+          ? rawCachedProd
+          : null;
+
+      if (loaded.productKit) {
+        imageMetaByToken.set(prodToken, {
+          kind: 'PRODUCT',
+          productKitId: loaded.productKit.id,
+          itemId: item.id,
+          sha256: item.sha256 ?? '',
+        });
+      }
+
+      if (validCachedProd) {
         images.push({
-          token: `${imgPrefix}${idx}`,
+          token: prodToken,
           role: 'PRODUCT',
           label: item.label || item.role || `Product Image ${idx}`,
           mimeType: item.mimeType,
-          bytes,
+          cachedAnalysis: validCachedProd.description,
         });
-      } catch (err) {
-        this.logger.warn(
-          `Skipped unreadable product image ${item.id} during Gemini prompt analysis: ${err instanceof Error ? err.message : String(err)}`,
-        );
+      } else {
+        try {
+          const bytes = await readStreamToBuffer(
+            await driver.readFile({ filePath: item.storageKey }),
+          );
+          images.push({
+            token: prodToken,
+            role: 'PRODUCT',
+            label: item.label || item.role || `Product Image ${idx}`,
+            mimeType: item.mimeType,
+            bytes,
+          });
+        } catch (err) {
+          this.logger.warn(
+            `Skipped unreadable product image ${item.id} during Gemini prompt analysis: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
       }
     }
+
+    // Reuse saved reference video analysis from DB whenever sha256 matches and user didn't force video re-analysis
+    const existingVideoAnalysis = loaded.refVideo.mediaMeta?.aiVideoAnalysis;
+    const validCachedVideoAnalysis =
+      !input.forceReanalyzeVideo &&
+      existingVideoAnalysis &&
+      typeof existingVideoAnalysis.analysisText === 'string' &&
+      existingVideoAnalysis.analysisText.trim().length > 0 &&
+      (!loaded.refVideo.sha256 ||
+        existingVideoAnalysis.sha256 === loaded.refVideo.sha256)
+        ? existingVideoAnalysis
+        : null;
+
+    let resolvedVideoAnalysis: StudioCachedVideoAnalysis | null =
+      validCachedVideoAnalysis;
+    let videoAnalysisFromCache = Boolean(validCachedVideoAnalysis);
+    let videoAnalysisSaved = false;
 
     const workDir = await fs.mkdtemp(
       path.join(os.tmpdir(), 'otogrow-studio-analyze-'),
     );
     try {
-      const rawExt = extensionForMime(loaded.refVideo.mimeType);
-      const rawVideoPath = path.join(workDir, `ref.${rawExt}`);
       let streamedVideoPath: string | undefined;
-      try {
-        const videoStream = await driver.readFile({
-          filePath: loaded.refVideo.storageKey,
-        });
-        await pipeline(videoStream, createWriteStream(rawVideoPath));
-        streamedVideoPath = rawVideoPath;
-      } catch (err) {
-        this.logger.warn(
-          `Could not read reference video ${loaded.refVideo.id} for Gemini prompt analysis: ${err instanceof Error ? err.message : String(err)}`,
-        );
-      }
 
-      if (!streamedVideoPath) {
-        const charToken = loaded.characterAsset ? `${imgPrefix}1` : null;
-        const prodStart = loaded.characterAsset ? 2 : 1;
-        const prompt = buildStructuredFallbackVideoPrompt({
-          usesAtMentionTokens: usesAtTokens,
-          characterToken: charToken,
-          productTokens: plannedKitAssets.map((item, idx) => ({
-            token: `${imgPrefix}${prodStart + idx}`,
-            label: item.label || item.role || `Product Image ${idx + 1}`,
-          })),
-          videoToken: `${vidPrefix}1`,
-          productName,
-          productNotes: loaded.productKit?.notes || '',
-          environmentPrompt: loaded.resolvedEnvironmentPrompt,
-          brandNotes: loaded.brandNotes,
-          customNotes: input.customNotes?.trim() || '',
-        });
-        return {
-          prompt,
-          source: 'FALLBACK' as const,
-          modelId: null,
-          summary:
-            'Reference video file could not be read from storage; used structured recreation template.',
-          analyzedImageCount: images.length,
-          referenceVideoDurationSec:
-            loaded.refVideo.mediaMeta?.durationSec ?? null,
-        };
+      if (!resolvedVideoAnalysis) {
+        const rawExt = extensionForMime(loaded.refVideo.mimeType);
+        const rawVideoPath = path.join(workDir, `ref.${rawExt}`);
+        try {
+          const videoStream = await driver.readFile({
+            filePath: loaded.refVideo.storageKey,
+          });
+          await pipeline(videoStream, createWriteStream(rawVideoPath));
+          streamedVideoPath = rawVideoPath;
+        } catch (err) {
+          this.logger.warn(
+            `Could not read reference video ${loaded.refVideo.id} for Gemini prompt analysis: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+
+        if (!streamedVideoPath) {
+          const charToken = loaded.characterAsset ? `${imgPrefix}1` : null;
+          const prodStart = loaded.characterAsset ? 2 : 1;
+          const prompt = buildStructuredFallbackVideoPrompt({
+            usesAtMentionTokens: usesAtTokens,
+            characterToken: charToken,
+            productTokens: plannedKitAssets.map((item, idx) => ({
+              token: `${imgPrefix}${prodStart + idx}`,
+              label: item.label || item.role || `Product Image ${idx + 1}`,
+            })),
+            videoToken: `${vidPrefix}1`,
+            productName,
+            productNotes: loaded.productKit?.notes || '',
+            environmentPrompt: loaded.resolvedEnvironmentPrompt,
+            brandNotes: loaded.brandNotes,
+            customNotes: input.customNotes?.trim() || '',
+          });
+          return {
+            prompt,
+            source: 'FALLBACK' as const,
+            modelId: null,
+            summary:
+              'Reference video file could not be read from storage; used structured recreation template.',
+            analyzedImageCount: images.length,
+            newlyAnalyzedImageCount: 0,
+            cachedImageCount: images.filter((i) => Boolean(i.cachedAnalysis))
+              .length,
+            videoAnalysisFromCache: false,
+            videoAnalysisSaved: false,
+            videoAnalysisText: null,
+            videoAnalyzedAt: null,
+            referenceVideoDurationSec:
+              loaded.refVideo.mediaMeta?.durationSec ?? null,
+          };
+        }
+
+        // Analyze reference video once and save its reusable breakdown straight into the video DB record
+        if (typeof this.promptAi.analyzeReferenceVideo === 'function') {
+          const videoAnalyzed = await this.promptAi.analyzeReferenceVideo({
+            label:
+              loaded.refVideo.title ||
+              loaded.refVideo.originalFileName ||
+              'Reference Video',
+            mimeType: loaded.refVideo.mimeType,
+            durationSec: loaded.refVideo.mediaMeta?.durationSec ?? null,
+            filePath: streamedVideoPath,
+            overrideApiKey: loaded.overrideGeminiApiKey,
+          });
+
+          if (videoAnalyzed) {
+            const cachedRecord: StudioCachedVideoAnalysis = {
+              sha256: loaded.refVideo.sha256 ?? '',
+              analysisText: videoAnalyzed.analysisText,
+              modelId: videoAnalyzed.modelId,
+              analyzedAt: new Date().toISOString(),
+              mode: videoAnalyzed.mode,
+            };
+            resolvedVideoAnalysis = cachedRecord;
+            videoAnalysisFromCache = false;
+            try {
+              const refRepo = this.dataSource.getRepository(
+                DeliveryStudioReferenceVideoEntity,
+              );
+              const freshRef = await refRepo.findOne({
+                where: { id: loaded.refVideo.id, workspaceId: id.workspaceId },
+              });
+              if (freshRef) {
+                freshRef.mediaMeta = {
+                  ...(freshRef.mediaMeta ?? {}),
+                  aiVideoAnalysis: cachedRecord,
+                };
+                await refRepo.save(freshRef);
+                videoAnalysisSaved = true;
+              }
+            } catch (saveErr) {
+              this.logger.warn(
+                `Could not persist cached analysis on reference video ${loaded.refVideo.id}: ${saveErr instanceof Error ? saveErr.message : String(saveErr)}`,
+              );
+            }
+          }
+        }
       }
 
       const generated = await this.promptAi.generateVideoPromptFromMedia({
@@ -3094,7 +3273,8 @@ export class DeliveryStudioService {
             'Reference Video',
           mimeType: loaded.refVideo.mimeType,
           durationSec: loaded.refVideo.mediaMeta?.durationSec ?? null,
-          filePath: streamedVideoPath,
+          filePath: resolvedVideoAnalysis ? undefined : streamedVideoPath,
+          cachedAnalysis: resolvedVideoAnalysis?.analysisText ?? null,
         },
         productName,
         productNotes: loaded.productKit?.notes || '',
@@ -3104,9 +3284,99 @@ export class DeliveryStudioService {
         overrideApiKey: loaded.overrideGeminiApiKey,
       });
 
+      // Persist newly analyzed image descriptions back to DB so future runs never re-analyze the same images
+      const newImageAnalyses = generated.newImageAnalyses ?? {};
+      const newTokens = Object.keys(newImageAnalyses);
+      if (newTokens.length > 0 && generated.modelId) {
+        const analyzedAt = new Date().toISOString();
+        const productUpdates = new Map<
+          string,
+          Map<string, StudioCachedImageAnalysis>
+        >();
+
+        for (const tok of newTokens) {
+          const desc = newImageAnalyses[tok]?.trim();
+          const meta = imageMetaByToken.get(tok);
+          if (!desc || !meta) continue;
+          const record: StudioCachedImageAnalysis = {
+            sha256: meta.sha256,
+            description: desc,
+            modelId: generated.modelId,
+            analyzedAt,
+          };
+
+          if (meta.kind === 'CHARACTER_SHEET') {
+            try {
+              const assetRepo = this.dataSource.getRepository(
+                DeliveryStudioAssetEntity,
+              );
+              const freshAsset = await assetRepo.findOne({
+                where: { id: meta.assetId, workspaceId: id.workspaceId },
+              });
+              if (freshAsset) {
+                freshAsset.metadataJson = {
+                  ...(freshAsset.metadataJson ?? {}),
+                  aiVisualAnalysis: record,
+                };
+                await assetRepo.save(freshAsset);
+              }
+            } catch (err) {
+              this.logger.warn(
+                `Could not save image analysis for character sheet ${meta.assetId}: ${err instanceof Error ? err.message : String(err)}`,
+              );
+            }
+          } else {
+            const kitMap =
+              productUpdates.get(meta.productKitId) ??
+              new Map<string, StudioCachedImageAnalysis>();
+            kitMap.set(meta.itemId, record);
+            productUpdates.set(meta.productKitId, kitMap);
+          }
+        }
+
+        for (const [kitId, itemMap] of productUpdates.entries()) {
+          try {
+            const kitRepo = this.dataSource.getRepository(
+              DeliveryStudioProductKitEntity,
+            );
+            const freshKit = await kitRepo.findOne({
+              where: { id: kitId, workspaceId: id.workspaceId },
+            });
+            if (freshKit) {
+              freshKit.assetsJson = (freshKit.assetsJson ?? []).map((item) => {
+                const updatedAnalysis = itemMap.get(item.id);
+                return updatedAnalysis
+                  ? { ...item, aiVisualAnalysis: updatedAnalysis }
+                  : item;
+              });
+              await kitRepo.save(freshKit);
+            }
+          } catch (err) {
+            this.logger.warn(
+              `Could not save image analyses for product kit ${kitId}: ${err instanceof Error ? err.message : String(err)}`,
+            );
+          }
+        }
+      }
+
+      const cachedImageCount = images.filter((i) =>
+        Boolean(i.cachedAnalysis),
+      ).length;
+      const newlyAnalyzedImageCount =
+        generated.newlyAnalyzedImagesCount ?? images.length - cachedImageCount;
+
       return {
-        ...generated,
+        prompt: generated.prompt,
+        source: generated.source,
+        modelId: generated.modelId,
+        summary: generated.summary,
         analyzedImageCount: images.length,
+        newlyAnalyzedImageCount,
+        cachedImageCount,
+        videoAnalysisFromCache,
+        videoAnalysisSaved,
+        videoAnalysisText: resolvedVideoAnalysis?.analysisText ?? null,
+        videoAnalyzedAt: resolvedVideoAnalysis?.analyzedAt ?? null,
         referenceVideoDurationSec:
           loaded.refVideo.mediaMeta?.durationSec ?? null,
       };
@@ -3115,6 +3385,55 @@ export class DeliveryStudioService {
         .rm(workDir, { recursive: true, force: true })
         .catch(() => undefined);
     }
+  }
+
+  async refineVideoPromptWithGemini(
+    auth: WorkspaceAuthContext,
+    rawInput: unknown,
+  ) {
+    const parsed = refineVideoPromptSchema.safeParse(rawInput);
+    if (!parsed.success) {
+      throw new BadRequestException(
+        parsed.error.issues[0]?.message ??
+          'Invalid video prompt edit request.',
+      );
+    }
+    const input = parsed.data;
+    const id = this.identity(auth);
+
+    const spec =
+      getStudioModelSpec(input.modelKey || 'seedance-2.5') ??
+      STUDIO_MODEL_CATALOG.find((m) => m.kind === 'VIDEO')!;
+    const usesAtTokens = Boolean(spec.capabilities.usesAtMentionTokens);
+
+    const overrideGeminiApiKey = await this.dataSource.transaction(
+      async (manager) => {
+        await this.resolveActor(manager, id);
+        const ops = await manager
+          .getRepository(DeliveryOperationsEntity)
+          .findOneBy({ workspaceId: id.workspaceId });
+        return this.readDecryptedGeminiKeyFromConfig(
+          id.workspaceId,
+          ops?.state?.studioGeminiConfig,
+        );
+      },
+    );
+
+    if (!this.promptAi) {
+      return {
+        prompt: input.currentPrompt,
+        source: 'FALLBACK' as const,
+        modelId: null,
+        summary: 'Prompt AI service is unavailable.',
+      };
+    }
+
+    return this.promptAi.refineVideoPrompt({
+      currentPrompt: input.currentPrompt,
+      editInstruction: input.editInstruction,
+      usesAtMentionTokens: usesAtTokens,
+      overrideApiKey: overrideGeminiApiKey,
+    });
   }
 
   async queueVideoGeneration(auth: WorkspaceAuthContext, rawInput: unknown) {

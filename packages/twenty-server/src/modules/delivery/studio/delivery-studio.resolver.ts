@@ -144,6 +144,16 @@ export class DeliveryStudioResolver {
   }
 
   @Mutation(() => GraphQLJSON)
+  refineDeliveryStudioVideoPrompt(
+    @Args('input', { type: () => GraphQLJSON }) input: unknown,
+  ) {
+    return this.studio.refineVideoPromptWithGemini(
+      getWorkspaceAuthContext(),
+      input,
+    );
+  }
+
+  @Mutation(() => GraphQLJSON)
   generateDeliveryStudioVideo(
     @Args('input', { type: () => GraphQLJSON }) input: unknown,
   ) {

@@ -28,6 +28,21 @@ export type DeliverableDriveSyncStatus =
   | 'FAILED';
 export type DeliverableStorageState = 'LOCAL' | 'DRIVE_ONLY' | 'EXTERNAL';
 
+export type StudioCachedVideoAnalysis = {
+  sha256: string;
+  analysisText: string;
+  modelId: string;
+  analyzedAt: string;
+  mode: 'VIDEO' | 'KEYFRAMES';
+};
+
+export type StudioCachedImageAnalysis = {
+  sha256: string;
+  description: string;
+  modelId: string;
+  analyzedAt: string;
+};
+
 export type DeliverableMediaMeta = {
   width?: number;
   height?: number;
@@ -43,6 +58,7 @@ export type DeliverableMediaMeta = {
   driveRootFolderId?: string | null;
   driveTargetFolderId?: string | null;
   driveSubfolderName?: string | null;
+  aiVideoAnalysis?: StudioCachedVideoAnalysis | null;
 };
 
 @Entity({ name: 'deliveryDeliverable', schema: 'core' })
